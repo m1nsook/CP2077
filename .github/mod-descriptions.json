@@ -1,0 +1,10 @@
+{
+  "No_Tracking_Please": {
+    "name": "No Tracking Please",
+    "summary": "Experimental protection against enemy position-reveal hacks."
+  },
+  "Reveal_Map_Pins": {
+    "name": "Reveal Map Pins",
+    "summary": "Experimental map marker reveal; does not unlock fast travel or quests."
+  }
+}

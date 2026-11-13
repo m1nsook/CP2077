@@ -1,0 +1,44 @@
+name: Publish mod releases
+
+# Runs only for a version tag, not every commit.
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Package and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Create all mod ZIPs and SHA-256 checksums
+        run: python3 scripts/package_release.py --tag "$GITHUB_REF_NAME" --output dist
+
+      - name: Publish or update release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          extra=()
+          if [[ "$tag" == *-* ]]; then extra+=(--prerelease); fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/*.zip dist/SHA256SUMS.txt --clobber
+            gh release edit "$tag" --title "CP2077 Mods $tag" --notes-file dist/RELEASE_NOTES.md
+          else
+            gh release create "$tag" dist/*.zip dist/SHA256SUMS.txt \
+              --title "CP2077 Mods $tag" \
+              --notes-file dist/RELEASE_NOTES.md --verify-tag "${extra[@]}"
+          fi
