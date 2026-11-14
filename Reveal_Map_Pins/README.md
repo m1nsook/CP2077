@@ -8,9 +8,11 @@ Player-visible name: **UndiscoverMe**. The internal CET mod folder
 `mods/RevealMapPins`, REDscript module `MisoRevealMapPins`,
 `miso_rmp_*` quest-fact bridge, existing hotkey IDs and `db.json`
 **intentionally remain unchanged**. Do not rename or delete that folder:
-keeping these stable prevents the existing working save settings and CET
-bindings from being lost. All visible labels in CET, NSUI and Mod Settings
-are branded UndiscoverMe.
+keeping these stable prevents existing save settings and CET bindings from
+being lost. CET hotkey **descriptions**, NSUI and Mod Settings now say
+UndiscoverMe; CET may still display the legacy `RevealMapPins` **group
+heading** because CET derives it from the mod folder name. A full internal
+rename needs a separate explicit settings/keybind migration.
 
 An **optional** native World Map → **Custom** section is installed via
 TweakXL at `r6/tweaks/UndiscoverMe/filters.yaml`:
