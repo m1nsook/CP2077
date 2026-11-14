@@ -1,44 +1,64 @@
-name: Publish mod releases
+name: Release a mod
 
-# Runs only for a version tag, not every commit.
+# Runs only when manually started. Never triggered by a push, tag, or PR.
 on:
-  push:
-    tags:
-      - 'v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      mod:
+        description: Mod to release
+        required: true
+        type: choice
+        options:
+          - No_Tracking_Please
+          - UndiscoverMe
+          - UndiscoverMe_Teleporter
+      version:
+        description: "Version (v0.1.0 or v0.1.0-dev.1)"
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref_name }}
+  group: release-${{ inputs.mod }}
   cancel-in-progress: false
 
 jobs:
   release:
-    name: Package and publish
+    name: Release ${{ inputs.mod }} ${{ inputs.version }}
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - name: Check out tagged source
+      - name: Check out main
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: Create all mod ZIPs and SHA-256 checksums
-        run: python3 scripts/package_release.py --tag "$GITHUB_REF_NAME" --output dist
+      - name: Package selected mod
+        env:
+          MOD: ${{ inputs.mod }}
+          VERSION: ${{ inputs.version }}
+        run: python3 scripts/package_release.py --mod "$MOD" --tag "$VERSION" --output dist
 
-      - name: Publish or update release
+      - name: Publish standalone release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          tag="$GITHUB_REF_NAME"
-          extra=()
-          if [[ "$tag" == *-* ]]; then extra+=(--prerelease); fi
+          tag="$(cat dist/RELEASE_TAG.txt)"
+          title="$(cat dist/RELEASE_TITLE.txt)"
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/*.zip dist/SHA256SUMS.txt --clobber
-            gh release edit "$tag" --title "CP2077 Mods $tag" --notes-file dist/RELEASE_NOTES.md
-          else
-            gh release create "$tag" dist/*.zip dist/SHA256SUMS.txt \
-              --title "CP2077 Mods $tag" \
-              --notes-file dist/RELEASE_NOTES.md --verify-tag "${extra[@]}"
+            echo "Release $tag exists already. Choose a new version." >&2
+            exit 1
           fi
+          extra=()
+          if [[ "$tag" == *-v*-* ]]; then extra+=(--prerelease); fi
+          gh release create "$tag" dist/*.zip dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "$title" \
+            --notes-file dist/RELEASE_NOTES.md \
+            "${extra[@]}"
