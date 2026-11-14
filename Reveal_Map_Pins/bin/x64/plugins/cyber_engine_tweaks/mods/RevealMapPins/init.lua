@@ -1,9 +1,10 @@
--- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.2.0-allowlist-preview
+-- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.3.0-catalog-preview
 -- CET is the settings/database bridge. Native Settings UI is optional.
 local MOD = "RevealMapPins"
 local TITLE = "Reveal Map Pins"
 local OPTIONS = {
   { key = "enabled", label = "Reveal map pins", desc = "Master switch for selected vanilla categories.", fact = "miso_rmp_all_disabled", default = true },
+  { key = "catalog", label = "Use classified map catalog (experimental)", desc = "Display missing verified vanilla POIs using their native icon variants; disable anytime.", fact = "miso_rmp_catalog_enabled", default = false },
   { key = "travel", label = "Fast travel locations", desc = "Display only; does NOT unlock destinations.", fact = "miso_rmp_travel_disabled", default = true },
   { key = "fixer", label = "Fixers", desc = "Fixer locations only, never gigs or jobs.", fact = "miso_rmp_fixer_disabled", default = true },
   { key = "ncpd", label = "NCPD scanner hustles", desc = "Assault in Progress, Organized Crime and Reported Crime.", fact = "miso_rmp_ncpd_disabled", default = true },
@@ -63,7 +64,12 @@ end
 local function writeFact(item)
   local qs = questSystem()
   if not qs then return false end
-  local number = db.settings[item.key] and 0 or 1
+  local number
+  if item.key == "catalog" then
+    number = db.settings.catalog and 1 or 0
+  else
+    number = db.settings[item.key] and 0 or 1
+  end
   local ok = pcall(function() qs:SetFactStr(item.fact, number) end)
   if ok then lastWritten[item.fact] = number end
   return ok
@@ -78,6 +84,14 @@ local function updateOption(key, value)
     pcall(function() ns.setOption(uiOptions[key], value) end)
   end
 end
+
+-- Separate CET owner for the 219 journal-classified game-derived POIs.
+-- This mode starts disabled until the player explicitly opts in.
+local catalogRuntime = dofile(scriptDir() .. "catalog_runtime.lua").new(
+  scriptDir(),
+  function(key) return db.settings[key] == true end,
+  function(message) print("[" .. MOD .. "] " .. message) end
+)
 
 -- REDscript ScriptableSystem classes are accessed through the system
 -- container. Explicitly resolve them when a game session is available: if
@@ -162,6 +176,11 @@ registerHotkey(MOD .. "_Toggle", TITLE .. ": master on/off", function()
   print("[" .. MOD .. "] " .. (db.settings.enabled and "ON" or "OFF"))
 end)
 
+registerHotkey(MOD .. "_Catalog", TITLE .. ": toggle classified catalog", function()
+  updateOption("catalog", not db.settings.catalog)
+  print("[" .. MOD .. "] Classified 219-location catalog " .. (db.settings.catalog and "ON" or "OFF"))
+end)
+
 -- CET Bindings -> diagnostic hotkey. This reports whether the game has
 -- hidden eligible sources and whether our own proxy registration succeeded.
 registerHotkey(MOD .. "_Status", TITLE .. ": print map scan diagnostics", function()
@@ -177,7 +196,7 @@ registerHotkey(MOD .. "_Status", TITLE .. ": print map scan diagnostics", functi
   end
   print("[" .. MOD .. "] scanner=" .. (scannerReady and "initialized" or "MISSING")
     .. " | settings=" .. (settingsReady and "initialized" or "MISSING")
-    .. " | " .. table.concat(values, " | "))
+    .. " | " .. table.concat(values, " | ") .. " | " .. catalogRuntime:stats())
 end)
 
 -- Independent map-rendering probe, inspired by standard CET MappinSystem usage.
@@ -232,6 +251,7 @@ registerHotkey(MOD .. "_Preview", TITLE .. ": toggle temporary marker test", fun
 end)
 
 registerForEvent("onSessionStart", function()
+  catalogRuntime:reset()
   inSession = false
   scannerReady, settingsReady = false, false
   bootPoll, bootAttempts = 0, 0
@@ -239,12 +259,14 @@ registerForEvent("onSessionStart", function()
   bootstrapSystems()
 end)
 registerForEvent("onSessionEnd", function()
+  catalogRuntime:reset()
   clearPreviewMappin()
   inSession = false
   scannerReady, settingsReady = false, false
 end)
 
 registerForEvent("onUpdate", function(delta)
+  catalogRuntime:tick(delta)
   if not scannerReady or not settingsReady then
     bootPoll = bootPoll + (delta or 0)
     if bootPoll >= 3 then
@@ -295,6 +317,7 @@ end)
 
 -- Optional debugging convenience; no additional dependency.
 registerForEvent("onShutdown", function()
+  catalogRuntime:reset()
   clearPreviewMappin()
   saveDB()
 end)
