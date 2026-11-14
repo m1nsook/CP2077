@@ -1,4 +1,4 @@
--- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.3.1-cet-hotkey-fix
+-- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.3.2-cet1381-sandbox
 -- CET is the settings/database bridge. Native Settings UI is optional.
 local MOD = "RevealMapPins"
 local TITLE = "Reveal Map Pins"
@@ -11,11 +11,9 @@ local OPTIONS = {
   { key = "psycho", label = "Cyberpsycho sightings", desc = "Cyberpsycho locations, not quest stages.", fact = "miso_rmp_psycho_disabled", default = true },
   { key = "tarot", label = "Tarot cards", desc = "Tarot graffiti markers.", fact = "miso_rmp_tarot_disabled", default = true },
 }
-local function scriptDir()
-  local s = debug.getinfo(1, "S").source or ""
-  return s:sub(1, 1) == "@" and (s:sub(2):match("^(.*[\\/])") or "") or ""
-end
-local DATA_FILE = scriptDir() .. "db.json"
+-- CET 1.38.1 sandbox excludes the Lua debug standard library.
+-- Relative file paths resolve inside the mod sandbox directory.
+local DATA_FILE = "db.json"
 local db = { schema = 1, settings = {} }
 local byKey, byFact, uiOptions = {}, {}, {}
 for _, item in ipairs(OPTIONS) do
@@ -98,10 +96,10 @@ local catalogRuntime = {
 local catalogReady = false
 local function initializeCatalog()
   local ok, instance = pcall(function()
-    local mod = dofile(scriptDir() .. "catalog_runtime.lua")
+    local mod = dofile("catalog_runtime.lua")
     assert(type(mod) == "table" and type(mod.new) == "function", "catalog module missing constructor")
     return mod.new(
-      scriptDir(),
+      "",
       function(key) return db.settings[key] == true end,
       function(message) print("[" .. MOD .. "] " .. message) end
     )
@@ -277,20 +275,7 @@ registerHotkey(MOD .. "_Preview", TITLE .. ": toggle temporary marker test", fun
   print("[" .. MOD .. "] Temporary test marker added near H10 / V's Apartment. Open the world map; press the same binding to remove it.")
 end)
 
-registerForEvent("onSessionStart", function()
-  catalogRuntime:reset()
-  inSession = false
-  scannerReady, settingsReady = false, false
-  bootPoll, bootAttempts = 0, 0
-  bootWarningIssued = false
-  bootstrapSystems()
-end)
-registerForEvent("onSessionEnd", function()
-  catalogRuntime:reset()
-  clearPreviewMappin()
-  inSession = false
-  scannerReady, settingsReady = false, false
-end)
+-- CET has no onSessionStart/onSessionEnd events; use onUpdate instead.
 
 registerForEvent("onUpdate", function(delta)
   catalogRuntime:tick(delta)
@@ -313,11 +298,20 @@ registerForEvent("onUpdate", function(delta)
   pollTime = 0
   local qs = questSystem()
   if not qs then
+    if inSession then
+      catalogRuntime:reset()
+      clearPreviewMappin()
+      scannerReady, settingsReady = false, false
+      bootPoll, bootAttempts = 0, 0
+      bootWarningIssued = false
+      lastWritten = {}
+    end
     inSession = false
     return
   end
   if not inSession then
     -- The JSON database is the source of truth whenever a save is loaded.
+    lastWritten = {}
     for _, item in ipairs(OPTIONS) do writeFact(item) end
     inSession = true
     return

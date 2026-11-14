@@ -1,4 +1,4 @@
--- No Tracking Please | Cyberpunk 2077 2.5 | v0.1.0
+-- No Tracking Please | Cyberpunk 2077 2.5 | v0.1.1-cet1381
 -- CET is the settings/database bridge. Native Settings UI is optional.
 local MOD = "NoTrackingPlease"
 local TITLE = "No Tracking Please"
@@ -6,11 +6,9 @@ local OPTIONS = {
   { key = "enabled", label = "No enemy position trace", desc = "Stop reveal-position hacks. Other enemy attacks still work.", fact = "miso_ntp_disabled", default = true },
 }
 
-local function scriptDir()
-  local s = debug.getinfo(1, "S").source or ""
-  return s:sub(1, 1) == "@" and (s:sub(2):match("^(.*[\\/])") or "") or ""
-end
-local DATA_FILE = scriptDir() .. "db.json"
+-- CET 1.38.1 sandbox excludes the Lua debug standard library.
+-- Relative file paths resolve inside the mod sandbox directory.
+local DATA_FILE = "db.json"
 local db = { schema = 1, settings = {} }
 local byKey, byFact, uiOptions = {}, {}, {}
 for _, item in ipairs(OPTIONS) do
@@ -98,8 +96,7 @@ registerHotkey(MOD .. "_Toggle", TITLE .. ": master on/off", function()
   print("[" .. MOD .. "] " .. (db.settings.enabled and "ON" or "OFF"))
 end)
 
-registerForEvent("onSessionStart", function() inSession = false end)
-registerForEvent("onSessionEnd", function() inSession = false end)
+-- CET session transitions are handled by onUpdate instead.
 
 registerForEvent("onUpdate", function(delta)
   pollTime = pollTime + (delta or 0)
@@ -107,11 +104,13 @@ registerForEvent("onUpdate", function(delta)
   pollTime = 0
   local qs = questSystem()
   if not qs then
+    if inSession then lastWritten = {} end
     inSession = false
     return
   end
   if not inSession then
     -- The JSON database is the source of truth whenever a save is loaded.
+    lastWritten = {}
     for _, item in ipairs(OPTIONS) do writeFact(item) end
     inSession = true
     return
