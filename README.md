@@ -16,7 +16,7 @@ This repository contains the full source code, build instructions, and release h
 | Mod | Description | Status |
 |-----|-------------|--------|
 | **[No Tracking Please](https://github.com/m1nsook/CP2077/tree/main/No_Tracking_Please)** | Blocks standard netrunner and police position-reveal requests, plus quickhack trace acceleration. | ✅ Active |
-| **[Reveal Map Pins](https://github.com/m1nsook/CP2077/tree/main/Reveal_Map_Pins)** | Attempts to reveal already-registered hidden map markers, with 12 individual category switches and a master switch. | ✅ Active |
+| **[Reveal Map Pins](https://github.com/m1nsook/CP2077/tree/main/Reveal_Map_Pins)** | Experimental vanilla-only marker reveal (fast travel, fixers, NCPD, cyberpsychos, tarot); excludes jobs, gigs and shops. Legendary/Iconic item catalog pending. | ✅ Active |
 
 > Each mod folder contains its own `README.md` with specific installation and configuration instructions.
 
