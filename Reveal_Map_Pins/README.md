@@ -1,6 +1,44 @@
-# Reveal Map Pins
+# UndiscoverMe
 
-**Cyberpunk 2077 2.5 — experimental build**
+**Cyberpunk 2077 2.5 — experimental map-filter build**
+
+## UndiscoverMe branding and native map UI (v0.4 experimental)
+
+Player-visible name: **UndiscoverMe**. The internal CET mod folder
+`mods/RevealMapPins`, REDscript module `MisoRevealMapPins`,
+`miso_rmp_*` quest-fact bridge, existing hotkey IDs and `db.json`
+**intentionally remain unchanged**. Do not rename or delete that folder:
+keeping these stable prevents the existing working save settings and CET
+bindings from being lost. All visible labels in CET, NSUI and Mod Settings
+are branded UndiscoverMe.
+
+An **optional** native World Map → **Custom** section is installed via
+TweakXL at `r6/tweaks/UndiscoverMe/filters.yaml`:
+
+- UNDISCOVERME / ALL
+- NCPD SCANNER
+- CYBERPSYCHO SIGHTINGS
+- TAROT
+- FAST TRAVEL (existing registered locations only; no complete terminal catalog yet)
+
+The five rows are backed by *empty* map-filter records and intercepted by
+REDscript, so they change only UndiscoverMe's existing fact/settings switches
+instead of registering new marker variants or taking over a stock filter bit.
+When enabling a mod category, its corresponding **vanilla filter is also
+enabled in the map UI** as necessary for the original icon variants to render.
+Turning off a mod category only removes our extra markers; it **never hides or
+unregisters vanilla markers** or markers owned by other mods.
+
+TweakXL **1.12.2+** (compatible with game patch 2.5) is required only for
+the new native Custom filter rows; UndiscoverMe's proven 212-marker catalog,
+quest completion read checks and CET hotkeys still work if the map extension
+is absent. In-game map hook behavior is currently experimental and needs
+a 2.5 smoke test; keep the prior PR #18 ZIP for immediate rollback.
+
+This section is additional map UI, **not** an implementation of the
+undiscovered fast-travel database, special loot markers, or fog reveal.
+
+
 
 Requires RED4ext, redscript and Cyber Engine Tweaks. Mod Settings and
 Native Settings UI are optional. Settings are persisted through CET
