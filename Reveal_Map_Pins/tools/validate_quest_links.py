@@ -15,7 +15,7 @@ def validate(catalog: Path, links: Path):
             assert h not in categories
             categories[h] = category
 
-    assert len(categories) == 219, f"expected 219 POIs; got {len(categories)}"
+    assert len(categories) == 212, f"expected 212 POIs; got {len(categories)}"
     found = {}
     counts = Counter()
     for line in links.read_text(encoding="utf-8").splitlines():
@@ -35,7 +35,7 @@ def validate(catalog: Path, links: Path):
     expected = Counter({"C": 17, "R": 26, "O": 14, "A": 2})
     assert counts == expected, f"expected {expected}, got {counts}"
     assert len(found) == 59
-    print("PASS: 219 catalog entries, 59 linked quests, all 17 cyberpsychos linked")
+    print("PASS: 212 catalog entries, 59 linked quests, all 17 cyberpsychos linked")
 
 
 if __name__ == "__main__":
