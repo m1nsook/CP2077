@@ -12,8 +12,8 @@ tweak = (root / "r6/tweaks/UndiscoverMe/filters.yaml").read_text(encoding="utf-8
 core = (root / "r6/scripts/RevealMapPins/RevealMapPins.reds").read_text(encoding="utf-8")
 cet = (root / "bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins/init.lua").read_text(encoding="utf-8")
 
-groups = ["All", "NCPD", "Psycho", "Tarot", "Travel"]
-assert len(groups) == 5
+groups = ["Menu", "All", "NCPD", "Psycho", "Tarot", "Travel"]
+assert len(groups) == 6
 for group in groups:
     record = "WorldMap.UndiscoverMe" + group
     assert record + ":" in tweak, record
@@ -28,6 +28,8 @@ assert "WorldMap.WorldMapCustomFiltersList.list:" in tweak
 # Our click handler must identify owned record IDs and use the original
 # game's handler for any other mod/vanilla filter.
 assert "row.UDMFilterSlot()" in ui
+assert "m_udmExpanded" in ui and "UDMRefreshFilterRows()" in ui
+assert "row.GetRootWidget().SetVisible(!this.m_udmExpanded)" in ui
 assert "if slot > 0" in ui
 assert "wrappedMethod(evt);" in ui
 assert "evt.Consume();" in ui
