@@ -53,7 +53,7 @@ The Teleporter addon is a separate download, never bundled into the core ZIP. It
 
 ## Publish one mod (maintainers)
 
-Open **Actions → Release a mod → Run workflow** (branch `main`), choose a mod, language pack, or the translation-source bundle, and enter a version such as `v0.1.0` or `v0.1.0-dev.1`.
+Open **Actions → Release a mod → Run workflow** (branch `main`), choose a mod, language pack, or the translation-source bundle, and enter a version such as `1.0.0`, `v1.0.0`, or `1.0.0-dev.1`. The `v` prefix is optional; release tags always include it.
 
 Each manual run publishes **only the selected mod**, including an installable ZIP, SHA-256 checksum and short release notes. Tags are mod-specific (for example `undiscoverme-v0.5.0` and `undiscoverme-teleporter-v0.1.0`), so versions are independent. Existing releases are never overwritten. **Normal pushes, PRs and tag creation do not run this workflow.**
 
