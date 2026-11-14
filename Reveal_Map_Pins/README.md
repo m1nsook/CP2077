@@ -15,13 +15,19 @@ are branded UndiscoverMe.
 An **optional** native World Map → **Custom** section is installed via
 TweakXL at `r6/tweaks/UndiscoverMe/filters.yaml`:
 
-- UNDISCOVERME / ALL
-- NCPD SCANNER
-- CYBERPSYCHO SIGHTINGS
-- TAROT
-- FAST TRAVEL (existing registered locations only; no complete terminal catalog yet)
+- UNDISCOVERME  + (one extra row in the stock Custom filter list)
+  - ALL SUPPORTED PINS
+  - NCPD SCANNER
+  - CYBERPSYCHO SIGHTINGS
+  - TAROT
+  - FAST TRAVEL (existing registered locations only; no complete terminal catalog yet)
 
-The five rows are backed by *empty* map-filter records and intercepted by
+The section is **collapsed by default** so the default 13-row filter list
+doesn't grow longer. Selecting UNDISCOVERME hides the original filter rows
+*inside that menu only* and shows these five shortcuts. Selecting it again
+restores the original filter menu. This does not hide the original map pins.
+
+The six rows are backed by *empty* map-filter records and intercepted by
 REDscript, so they change only UndiscoverMe's existing fact/settings switches
 instead of registering new marker variants or taking over a stock filter bit.
 When enabling a mod category, its corresponding **vanilla filter is also
