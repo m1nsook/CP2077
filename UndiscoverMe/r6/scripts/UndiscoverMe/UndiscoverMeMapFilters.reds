@@ -187,16 +187,70 @@ protected cb func OnQuickFilterChanged(filterGroup: wref<MappinUIFilterGroup_Rec
   return true;
 }
 
-// The base map ink widget has FOUR preauthored indicator references. A fifth
-// quick-filter record would index out of bounds and can break the map.
-// Reuse the last indicator safely until an additional native dot is authored.
+// The shipped world_map.inkwidget contains four quick-filter indicator
+// references under filterSelector/dots. Build a fifth native ink rectangle
+// beside those original widgets at runtime rather than replacing the entire
+// world-map asset (which would conflict with other UI archives).
+// This access to the native parentWidget field does not require Codeware.
+@addMethod(inkWidget)
+public func UDMIndicatorParent() -> wref<inkWidget> {
+  return this.parentWidget;
+}
+
+@addField(WorldMapMenuGameController)
+private let m_udmFifthIndicator: wref<inkWidget>;
+
+@addMethod(WorldMapMenuGameController)
+private final func UDMCreateFifthIndicator() -> Void {
+  if IsDefined(this.m_udmFifthIndicator) { return; }
+  if ArraySize(this.m_quickFilterIndicators) != 4 { return; }
+
+  let fourth = inkWidgetRef.Get(this.m_quickFilterIndicators[3]);
+  if !IsDefined(fourth) { return; }
+  let parent = fourth.UDMIndicatorParent() as inkCompoundWidget;
+  if !IsDefined(parent) { return; }
+
+  let extra = new inkRectangle();
+  extra.SetName(n"udm_quick_filter_fifth");
+  extra.SetSize(fourth.GetSize());
+  extra.SetMargin(fourth.GetMargin());
+  extra.SetTintColor(fourth.GetTintColor());
+  extra.SetOpacity(0.35);
+  extra.SetState(n"Default");
+  extra.Reparent(parent);
+  this.m_udmFifthIndicator = extra;
+}
+
+// The engine still expects its four authored references. Keep its index
+// bounded, then independently reflect the fifth logical tab on our extra
+// indicator. Never access m_quickFilterIndicators[4].
 @wrapMethod(WorldMapMenuGameController)
 private final func SetQuickFilterIndicator(index: Int32) -> Void {
   let count = ArraySize(this.m_quickFilterIndicators);
   if count <= 0 { return; }
-  if index < 0 { wrappedMethod(0); return; }
-  if index >= count { wrappedMethod(count - 1); return; }
-  wrappedMethod(index);
+
+  this.UDMCreateFifthIndicator();
+  if index < 0 {
+    wrappedMethod(0);
+  } else {
+    wrappedMethod(index >= count ? count - 1 : index);
+  }
+
+  if !IsDefined(this.m_udmFifthIndicator) { return; }
+
+  if index == 4 && count == 4 {
+    let fourth = inkWidgetRef.Get(this.m_quickFilterIndicators[3]);
+    if IsDefined(fourth) {
+      // Copy the native selected tint before resetting the fourth indicator.
+      this.m_udmFifthIndicator.SetTintColor(fourth.GetTintColor());
+      fourth.SetState(n"Default");
+    }
+    this.m_udmFifthIndicator.SetState(n"Selected");
+    this.m_udmFifthIndicator.SetOpacity(1.0);
+  } else {
+    this.m_udmFifthIndicator.SetState(n"Default");
+    this.m_udmFifthIndicator.SetOpacity(0.35);
+  }
 }
 
 // Called after each of the game's original Custom filter widgets has spawned.
