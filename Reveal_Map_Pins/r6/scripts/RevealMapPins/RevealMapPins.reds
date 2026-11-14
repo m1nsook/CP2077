@@ -102,6 +102,14 @@ public abstract class RMPVanillaGuard {
     if Equals(group, gamedataWorldMapFilter.NoFilter) || !RMPState.Enabled(gi, group) {
       return false;
     }
+    // The external catalog handles all classified POI types when enabled;
+    // keep the registered fast-travel path alive because it is not in that
+    // catalog and its originals cannot conflict with NCPD/Tarot/Fixer pins.
+    let facts = GameInstance.GetQuestsSystem(gi);
+    if IsDefined(facts) && facts.GetFactStr("miso_rmp_catalog_enabled") == 1
+      && !Equals(group, gamedataWorldMapFilter.FastTravel) {
+      return false;
+    }
     if IsDefined(m as FastTravelMappin) {
       return Equals(group, gamedataWorldMapFilter.FastTravel);
     }
@@ -168,14 +176,6 @@ public class RMPSystem extends ScriptableSystem {
     if !IsDefined(GetPlayer(gi)) { this.ClearAll(); this.Schedule(); return; }
     let ms = GameInstance.GetMappinSystem(gi);
     if !IsDefined(ms) { this.Schedule(); return; }
-    // The independently classified CET catalog owns its own marker IDs.
-    // Never clone the same hidden original with the legacy scan concurrently.
-    let facts = GameInstance.GetQuestsSystem(gi);
-    if IsDefined(facts) && facts.GetFactStr("miso_rmp_catalog_enabled") == 1 {
-      this.ClearAll();
-      this.Schedule();
-      return;
-    }
     if !IsDefined(this.filters) { this.filters = RMPFilters.Build(); }
     let arr: array<ref<IMappin>>;
     ms.GetMappins(gamemappinsMappinTargetType.Map, arr);
