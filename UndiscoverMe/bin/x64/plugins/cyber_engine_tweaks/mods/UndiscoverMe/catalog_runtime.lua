@@ -1,4 +1,4 @@
--- Reveal Map Pins: opt-in, game-derived POI catalog (Cyberpunk 2077 2.5).
+-- UndiscoverMe: opt-in, game-derived POI catalog (Cyberpunk 2077 2.5).
 -- Owns only the NewMappinIDs that it registers; never edits vanilla pins.
 local Runtime = {}
 
@@ -131,7 +131,8 @@ local function existingPins(ms)
   return result
 end
 
-function Runtime.new(directory, getSetting, log)
+function Runtime.new(directory, getSetting, log, onOwnedChanged)
+  onOwnedChanged = onOwnedChanged or function() end
   local rows, loadErr = readCatalog(directory .. "catalog.tsv")
   local questIdsLoaded, questErr = false, nil
   if rows then questIdsLoaded, questErr = attachQuestIds(directory .. "quest_ids.tsv", rows) end
@@ -150,6 +151,7 @@ function Runtime.new(directory, getSetting, log)
     local ok, ms = pcall(Game.GetMappinSystem)
     if not ok then ms = nil end
     for hash, id in pairs(self.owned) do
+      onOwnedChanged(id, false)
       if ms then pcall(function() ms:UnregisterMappin(id) end) end
       self.owned[hash] = nil
     end
@@ -259,6 +261,7 @@ function Runtime.new(directory, getSetting, log)
       if not allowed then
         if self.owned[entry.hash] then
           local id = self.owned[entry.hash]
+          onOwnedChanged(id, false)
           pcall(function() ms:UnregisterMappin(id) end)
           local key = ident(id)
           if key then self.ownedId[key] = nil end
@@ -288,7 +291,11 @@ function Runtime.new(directory, getSetting, log)
             end
           end
         end
-        if self.owned[entry.hash] then active = active + 1 end
+        if self.owned[entry.hash] then
+          -- Retry registry sync if the core system initialized later.
+          onOwnedChanged(self.owned[entry.hash], true)
+          active = active + 1
+        end
       end
     end
     self.statistics.added = active

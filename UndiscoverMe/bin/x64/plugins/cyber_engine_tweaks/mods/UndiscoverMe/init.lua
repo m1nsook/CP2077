@@ -1,11 +1,11 @@
--- UndiscoverMe | Cyberpunk 2077 2.5 | 0.4.0-map-filters
+-- UndiscoverMe | Cyberpunk 2077 2.5
 -- CET is the settings/database bridge. Native Settings UI is optional.
 -- Keep the existing CET mod ID and folder to preserve player keybinds and db.json.
 local MOD = "RevealMapPins"
 local TITLE = "UndiscoverMe"
 local OPTIONS = {
   { key = "enabled", label = "Enable UndiscoverMe", desc = "Master switch for selected vanilla categories.", fact = "miso_rmp_all_disabled", default = true },
-  { key = "catalog", label = "Use classified map catalog (experimental)", desc = "Display missing verified vanilla POIs using their native icon variants; disable anytime.", fact = "miso_rmp_catalog_enabled", default = false },
+  { key = "catalog", label = "Reveal additional map markers", desc = "Show undiscovered NCPD, Cyberpsycho and Tarot locations.", fact = "miso_rmp_catalog_enabled", default = false },
   { key = "travel", label = "Fast travel locations", desc = "Display only; does NOT unlock destinations.", fact = "miso_rmp_travel_disabled", default = true },
   { key = "ncpd", label = "NCPD scanner hustles", desc = "Assault in Progress, Organized Crime and Reported Crime.", fact = "miso_rmp_ncpd_disabled", default = true },
   { key = "psycho", label = "Cyberpsycho sightings", desc = "Cyberpsycho locations, not quest stages.", fact = "miso_rmp_psycho_disabled", default = true },
@@ -15,11 +15,10 @@ local OPTIONS = {
 -- Relative file paths resolve inside the mod sandbox directory.
 local DATA_FILE = "db.json"
 local db = { schema = 1, settings = {} }
-local byKey, byFact, uiOptions = {}, {}, {}
+local byKey, uiOptions = {}, {}
 for _, item in ipairs(OPTIONS) do
   db.settings[item.key] = item.default
   byKey[item.key] = item
-  byFact[item.fact] = item
 end
 
 local function loadDB()
@@ -83,17 +82,29 @@ local function updateOption(key, value)
   end
 end
 
--- UndiscoverMe uses the same proven CET owner for 212 classified POIs.
--- This mode starts disabled until the player explicitly opts in.
--- Bindings must always register, even if a missing/corrupt catalog fails.
--- CET exposes RTTI/Game types only after onInit: do not load the catalog
--- module at top level, before the hotkeys and onInit event are registered.
+-- The catalog starts disabled until enabled in settings.
+-- CET exposes RTTI only after onInit; the optional addon uses this
+-- session-scoped registry rather than guessing pin ownership.
+local function notifyCatalogPin(id, active)
+  pcall(function()
+    if not Game.GetPlayer() then return end
+    local container = Game.GetScriptableSystemsContainer()
+    if not container then return end
+    local system = container:Get(CName.new("MisoRevealMapPins.RMPSystem"))
+    if not system then return end
+    if active then
+      system:UDMRegisterCatalogPin(id)
+    else
+      system:UDMUnregisterCatalogPin(id)
+    end
+  end)
+end
+
 local catalogRuntime = {
   reset = function() end,
   tick = function() end,
   stats = function() return "catalog=not-loaded" end,
 }
-local catalogReady = false
 local function initializeCatalog()
   local ok, instance = pcall(function()
     local mod = dofile("catalog_runtime.lua")
@@ -101,18 +112,17 @@ local function initializeCatalog()
     return mod.new(
       "",
       function(key) return db.settings[key] == true end,
-      function(message) print("[" .. MOD .. "] " .. message) end
+      function(message) print("[" .. MOD .. "] " .. message) end,
+      notifyCatalogPin
     )
   end)
   if ok and type(instance) == "table" and type(instance.tick) == "function"
     and type(instance.reset) == "function" and type(instance.stats) == "function" then
     catalogRuntime = instance
-    catalogReady = true
     print("[" .. MOD .. "] Classified catalog loaded (" .. catalogRuntime:stats() .. ")")
   else
-    catalogReady = false
     print("[" .. MOD .. "] Classified catalog startup FAILED: " .. tostring(instance))
-    print("[" .. MOD .. "] CET hotkeys remain available; check catalog_runtime.lua and catalog.tsv")
+    print("[" .. MOD .. "] Check catalog_runtime.lua and catalog.tsv")
   end
 end
 
@@ -187,7 +197,7 @@ end
 
 registerForEvent("onInit", function()
   initializeCatalog()
-  print("[" .. MOD .. "] CET initialized; four UndiscoverMe bindings registered")
+  print("[" .. MOD .. "] CET initialized; two UndiscoverMe bindings registered")
   tryRegisterNativeSettings()
   if not nativeUIReady then
     print("[" .. MOD .. "] Native Settings UI not detected yet; will retry in game")
@@ -204,75 +214,6 @@ end)
 registerHotkey(MOD .. "_Catalog", TITLE .. ": toggle classified catalog", function()
   updateOption("catalog", not db.settings.catalog)
   print("[" .. MOD .. "] Classified 212-location catalog " .. (db.settings.catalog and "ON" or "OFF"))
-end)
-
--- CET Bindings -> diagnostic hotkey. This reports whether the game has
--- hidden eligible sources and whether our own proxy registration succeeded.
-registerHotkey(MOD .. "_Status", TITLE .. ": print map scan diagnostics", function()
-  local qs = questSystem()
-  if not qs then
-    print("[" .. MOD .. "] Diagnostics unavailable: no active game session")
-    return
-  end
-  local values = {}
-  for _, name in ipairs({"seen", "hidden", "eligible", "active", "failed"}) do
-    local ok, value = pcall(function() return qs:GetFactStr("miso_rmp_diag_" .. name) end)
-    values[#values + 1] = name .. "=" .. tostring(ok and value or "?")
-  end
-  print("[" .. MOD .. "] scanner=" .. (scannerReady and "initialized" or "MISSING")
-    .. " | settings=" .. (settingsReady and "initialized" or "MISSING")
-    .. " | " .. table.concat(values, " | ") .. " | " .. catalogRuntime:stats())
-end)
-
--- Independent map-rendering probe, inspired by standard CET MappinSystem usage.
--- This does NOT discover any locations. It is an opt-in, temporary marker
--- at a user-verified vanilla coordinate, for isolating map UI from REDscript.
-local previewMappinId = nil
-
-local function clearPreviewMappin()
-  if not previewMappinId then return end
-  local id = previewMappinId
-  previewMappinId = nil
-  local ok, err = pcall(function()
-    local ms = Game.GetMappinSystem()
-    if ms then ms:UnregisterMappin(id) end
-  end)
-  if not ok then
-    print("[" .. MOD .. "] Preview cleanup warning: " .. tostring(err))
-  end
-end
-
-registerHotkey(MOD .. "_Preview", TITLE .. ": toggle temporary marker test", function()
-  if previewMappinId then
-    clearPreviewMappin()
-    print("[" .. MOD .. "] Temporary preview marker removed")
-    return
-  end
-  if not Game.GetPlayer() then
-    print("[" .. MOD .. "] Preview unavailable: load a save first")
-    return
-  end
-  local ok, result = pcall(function()
-    local mappin = MappinData.new()
-    mappin.mappinType = TweakDBID.new("Mappins.QuestStaticMappinDefinition")
-    mappin.variant = gamedataMappinVariant.ExclamationMarkVariant
-    mappin.active = true
-    mappin.visibleThroughWalls = false
-    return Game.GetMappinSystem():RegisterMappin(
-      mappin, Vector4.new(-1382.2, 1270.6, 123.08, 1)
-    )
-  end)
-  if not ok or not result then
-    print("[" .. MOD .. "] Preview registration FAILED: " .. tostring(result))
-    return
-  end
-  local valid, value = pcall(function() return result.value end)
-  if not valid or value == nil or tostring(value) == "0" then
-    print("[" .. MOD .. "] Preview registration returned invalid marker ID: " .. tostring(value))
-    return
-  end
-  previewMappinId = result
-  print("[" .. MOD .. "] Temporary test marker added near H10 / V's Apartment. Open the world map; press the same binding to remove it.")
 end)
 
 -- CET has no onSessionStart/onSessionEnd events; use onUpdate instead.
@@ -300,7 +241,6 @@ registerForEvent("onUpdate", function(delta)
   if not qs then
     if inSession then
       catalogRuntime:reset()
-      clearPreviewMappin()
       scannerReady, settingsReady = false, false
       bootPoll, bootAttempts = 0, 0
       bootWarningIssued = false
@@ -321,7 +261,7 @@ registerForEvent("onUpdate", function(delta)
     local ok, value = pcall(function() return qs:GetFactStr(item.fact) end)
     if ok and type(value) == "number" and (value == 0 or value == 1) then
       if lastWritten[item.fact] ~= nil and value ~= lastWritten[item.fact] then
-        -- The experimental catalog fact is positive (1=ON), unlike the
+        -- The catalog fact is positive (1=ON), unlike the
         -- legacy *_disabled facts (0=ON).
         local enabled = item.key == "catalog" and value == 1 or item.key ~= "catalog" and value == 0
         if db.settings[item.key] ~= enabled then
@@ -338,9 +278,7 @@ registerForEvent("onUpdate", function(delta)
   if changed then saveDB() end
 end)
 
--- Optional debugging convenience; no additional dependency.
 registerForEvent("onShutdown", function()
   catalogRuntime:reset()
-  clearPreviewMappin()
   saveDB()
 end)

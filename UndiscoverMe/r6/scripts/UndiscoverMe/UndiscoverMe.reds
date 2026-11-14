@@ -136,6 +136,38 @@ public class RMPSystem extends ScriptableSystem {
   private let filters: ref<RMPFilters>;
   private let sourceIds: array<Uint64>;
   private let proxyIds: array<NewMappinID>;
+  private let catalogIds: array<NewMappinID>;
+
+  // Public runtime API; deliberately excludes original vanilla mappins.
+  public func UDMRegisterCatalogPin(id: NewMappinID) -> Void {
+    if id.value == 0ul { return; }
+    for existing in this.catalogIds {
+      if existing.value == id.value { return; }
+    }
+    ArrayPush(this.catalogIds, id);
+  }
+
+  public func UDMUnregisterCatalogPin(id: NewMappinID) -> Void {
+    let i = ArraySize(this.catalogIds) - 1;
+    while i >= 0 {
+      if this.catalogIds[i].value == id.value {
+        ArrayErase(this.catalogIds, i);
+        return;
+      }
+      i -= 1;
+    }
+  }
+
+  public func UDMOwnsPin(id: NewMappinID) -> Bool {
+    if id.value == 0ul { return false; }
+    for proxy in this.proxyIds {
+      if proxy.value == id.value { return true; }
+    }
+    for catalog in this.catalogIds {
+      if catalog.value == id.value { return true; }
+    }
+    return false;
+  }
 
   private func OnAttach() { this.Schedule(); }
 
@@ -154,6 +186,7 @@ public class RMPSystem extends ScriptableSystem {
     }
     ArrayClear(this.proxyIds);
     ArrayClear(this.sourceIds);
+    ArrayClear(this.catalogIds);
   }
 
   private func ContainsSource(id: Uint64) -> Bool {
@@ -175,9 +208,6 @@ public class RMPSystem extends ScriptableSystem {
     if !IsDefined(this.filters) { this.filters = RMPFilters.Build(); }
     let arr: array<ref<IMappin>>;
     ms.GetMappins(gamemappinsMappinTargetType.Map, arr);
-    let hiddenCount = 0;
-    let eligibleCount = 0;
-    let failedCount = 0;
 
     // Remove proxies if source has become visible, disappeared, or is toggled off.
     let i = ArraySize(this.sourceIds) - 1;
@@ -199,9 +229,7 @@ public class RMPSystem extends ScriptableSystem {
 
     // Register proxies only for eligible game-managed sources.
     for source in arr {
-      if IsDefined(source) && !source.IsVisible() { hiddenCount += 1; }
       if RMPVanillaGuard.ShouldReveal(gi, source, this.filters) {
-        eligibleCount += 1;
         let id = source.GetNewMappinID().value;
         if id != 0ul && !this.ContainsSource(id) && !this.ContainsProxy(id) {
           let data: MappinData;
@@ -214,20 +242,9 @@ public class RMPSystem extends ScriptableSystem {
           if proxy.value != 0ul {
             ArrayPush(this.sourceIds, id);
             ArrayPush(this.proxyIds, proxy);
-          } else {
-            failedCount += 1;
           }
         }
       }
-    }
-    // CET diagnostic hotkey reads these separate, non-gameplay counters.
-    let quests = GameInstance.GetQuestsSystem(gi);
-    if IsDefined(quests) {
-      quests.SetFactStr("miso_rmp_diag_seen", ArraySize(arr));
-      quests.SetFactStr("miso_rmp_diag_hidden", hiddenCount);
-      quests.SetFactStr("miso_rmp_diag_eligible", eligibleCount);
-      quests.SetFactStr("miso_rmp_diag_active", ArraySize(this.proxyIds));
-      quests.SetFactStr("miso_rmp_diag_failed", failedCount);
     }
     this.Schedule();
   }

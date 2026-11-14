@@ -1,7 +1,7 @@
 -- Test the last confirmed working catalog behavior with fixers fully excluded.
--- Run from Reveal_Map_Pins: lua tools/test_completed_catalog.lua
+-- Run from UndiscoverMe: lua tools/test_completed_catalog.lua
 -- No live game/save required. Does not assume journal APIs work on 2.5.
-local root = (arg and arg[1]) or "bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins/"
+local root = (arg and arg[1]) or "bin/x64/plugins/cyber_engine_tweaks/mods/UndiscoverMe/"
 if root:sub(-1) ~= "/" and root:sub(-1) ~= "\\" then root = root .. "/" end
 
 local owned, nextId = {}, 0
