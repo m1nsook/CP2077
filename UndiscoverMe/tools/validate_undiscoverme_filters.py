@@ -21,9 +21,22 @@ assert "mappins: []" in tweak
 assert "WorldMap.WorldMapCustomFiltersList.list:" not in tweak
 assert "!prepend" not in tweak
 
-# The new fifth tab must never index the game's four hard-coded dots.
+# Five real INK indicators: the vanilla fixed array remains size four, but
+# a safe native sibling is created for the extra quick filter. No out-of-bounds
+# reference is ever passed to the engine.
 assert "SetQuickFilterIndicator(index: Int32)" in ui
-assert "if index >= count { wrappedMethod(count - 1); return; }" in ui
+assert "if index >= count {" in ui
+assert "wrappedMethod(count - 1);" in ui
+assert "if ArraySize(this.m_quickFilterIndicators) != 4 { return; }" in ui
+assert "UDMEnsureFifthPill()" in ui
+assert 'new inkRectangle()' in ui
+assert 'source.GetParentWidget() as inkCompoundWidget' in ui
+assert 'pill.Reparent(parent)' in ui
+assert 'this.m_udmFifthPill.SetState(n"Selected")' in ui
+assert 'fourth.SetState(n"Default")' in ui
+assert "ToggleQuickFilterIndicatorsVsibility(toggle: Bool)" in ui
+assert "this.m_udmFifthPill.SetVisible(toggle)" in ui
+assert "this.m_udmFifthPill = null" in ui
 
 # Record-identity-based quick tab, not the shared native CustomFilter bit.
 assert 'Equals(rec.GetID(), t"WorldMap.UndiscoverMeQuickFilter")' in ui
@@ -61,4 +74,4 @@ assert 'local TITLE = "UndiscoverMe"' in cet
 assert "ModSettings.mod\", \"UndiscoverMe" in core
 assert "JOURNAL_QUEST_IDS = 175" in runtime
 assert "if #rows ~= 212" in runtime
-print("PASS: UndiscoverMe is a fifth quick tab; Custom unchanged; safe restore")
+print("PASS: UndiscoverMe has a native fifth pill, separate quick tab, Custom unchanged, safe restore")
