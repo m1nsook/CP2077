@@ -69,6 +69,38 @@ public abstract class RMPState {
   }
 }
 
+// Compatibility: only game-managed POI, quest and fast-travel mappins.
+// Generic RuntimeMappin/StubMappin are commonly used by other mods,
+// including those that reuse vanilla icon variants and filter groups.
+// FastTravelMappin inherits RuntimeMappin: check it first.
+public abstract class RMPVanillaGuard {
+  public static func ShouldReveal(gi: GameInstance, m: ref<IMappin>, filters: ref<RMPFilters>) -> Bool {
+    if !IsDefined(m) || !IsDefined(filters) || m.IsVisible() || m.IsPlayerTracked() {
+      return false;
+    }
+    let group = filters.TypeOf(m.GetVariant());
+    if Equals(group, gamedataWorldMapFilter.NoFilter) || !RMPState.Enabled(gi, group) {
+      return false;
+    }
+    if IsDefined(m as FastTravelMappin) {
+      return Equals(group, gamedataWorldMapFilter.FastTravel);
+    }
+    if IsDefined(m as RuntimeMappin) {
+      return false;
+    }
+    if IsDefined(m as PointOfInterestMappin) {
+      return true;
+    }
+    if IsDefined(m as QuestMappin) {
+      return Equals(group, gamedataWorldMapFilter.Quest)
+        || Equals(group, gamedataWorldMapFilter.Gigs)
+        || Equals(group, gamedataWorldMapFilter.PsychoFilter)
+        || Equals(group, gamedataWorldMapFilter.Story);
+    }
+    return false;
+  }
+}
+
 public class RMPSystem extends ScriptableSystem {
   private let filters: ref<RMPFilters>;
   private let sourceIds: array<Uint64>;
@@ -119,8 +151,7 @@ public class RMPSystem extends ScriptableSystem {
       let needed = false;
       for source in arr {
         if IsDefined(source) && source.GetNewMappinID().value == this.sourceIds[i] {
-          let t = this.filters.TypeOf(source.GetVariant());
-          needed = !source.IsVisible() && RMPState.Enabled(gi, t);
+          needed = RMPVanillaGuard.ShouldReveal(gi, source, this.filters);
           break;
         }
       }
@@ -132,11 +163,11 @@ public class RMPSystem extends ScriptableSystem {
       i -= 1;
     }
 
-    // Register a marker at the original's location without forcing discovery.
+    // Register proxies only for eligible game-managed sources.
     for source in arr {
-      if IsDefined(source) && !source.IsVisible() {
+      if RMPVanillaGuard.ShouldReveal(gi, source, this.filters) {
         let id = source.GetNewMappinID().value;
-        if !this.ContainsSource(id) && !this.ContainsProxy(id) && RMPState.Enabled(gi, this.filters.TypeOf(source.GetVariant())) {
+        if id != 0ul && !this.ContainsSource(id) && !this.ContainsProxy(id) {
           let data: MappinData;
           data.mappinType = t"Mappins.DefaultStaticMappin";
           data.variant = source.GetVariant();
