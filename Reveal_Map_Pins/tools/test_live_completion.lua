@@ -1,7 +1,7 @@
 -- Regression for native completed-quest enumeration, no game/save required.
 -- Run from Reveal_Map_Pins: texlua tools/test_live_completion.lua
 local folder = (arg and arg[1]) or "bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins/"
-if folder:sub(-1) ~= "/" and folder:sub(-1) ~= "\" then folder=folder.."/" end
+if folder:sub(-1) ~= "/" and folder:sub(-1) ~= "\\" then folder=folder.."/" end
 local owned, nextId = {}, 0
 local mappins = {}
 function mappins:GetMappins() return {} end
