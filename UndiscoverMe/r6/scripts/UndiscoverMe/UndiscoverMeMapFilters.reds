@@ -204,7 +204,7 @@ private final func UDMEnsureFifthPill() -> Void {
   let previous = inkWidgetRef.Get(this.m_quickFilterIndicators[2]);
   if !IsDefined(source) || !IsDefined(previous) { return; }
   let parent = source.GetParentWidget() as inkCompoundWidget;
-  if !IsDefined(parent) || NotEquals(previous.GetParentWidget(), parent) { return; }
+  if !IsDefined(parent) { return; }
 
   let pill = new inkRectangle();
   pill.SetName(n"UDM_QuickFilterIndicator5");
