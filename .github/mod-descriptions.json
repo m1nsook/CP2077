@@ -5,6 +5,10 @@
   },
   "UndiscoverMe": {
     "name": "UndiscoverMe",
-    "summary": "Reveals eligible vanilla map markers; experimental fifth world-map filter."
+    "summary": "Reveals eligible undiscovered vanilla map markers without modifying quests."
+  },
+  "UndiscoverMe_Teleporter": {
+    "name": "UndiscoverMe Teleporter",
+    "summary": "Optional UndiscoverMe-core addon: hold the map's Fast Travel action on an UndiscoverMe pin to teleport."
   }
 }
