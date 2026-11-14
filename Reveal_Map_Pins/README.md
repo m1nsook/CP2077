@@ -246,10 +246,12 @@ The links are derived from the user's WolvenKit base+EP1 journals, not
 guessed quest completion facts.
 
 When either quest or POI state is completed/failed, the mod unregisters
-its own marker on its regular 12-second refresh. Unknown critical journal
-states are **unverified and hidden**, not assumed to be unfinished. This
-never writes game quest facts, advances quests, changes original markers,
-or unlocks fast travel. Original native icons are preserved.
+its own marker on its regular 12-second refresh. A journal result is allowed to **remove a marker only when completion
+is positively confirmed**. Unknown critical journal states are counted as
+`unverified` and retain the otherwise-eligible marker. This preserves
+the previously confirmed PR #13 native marker behavior while the exact
+quest lookup behavior is tested on real saves. The mod never writes game
+quest facts, advances quests, changes original markers, or unlocks fast travel. Original native icons are preserved.
 
 The diagnostic hotkey now prints additional catalog counters:
 
@@ -263,3 +265,32 @@ If `unverified` is unexpectedly high on a save, send that diagnostic
 line before reporting missing icons. This update has passed an offline
 Lua game-system simulation (219 registered; completed and failed quests
 removed; missing journal clears owned pins) but still needs live testing.
+
+
+## PR #14 regression safety fix
+
+The PR #14 completion check was **not safe on real save data**: a user
+reported `catalog=219 active=0 skipped=219 completed=0 unverified=203 failed=0`
+and the visible map pins disappeared. The new check interpreted
+`unverified` as completed even though the game often returns no saved POI
+record and some journal calls cannot resolve a quest.
+
+This patch keeps PR #13's confirmed native marker/coordinate behavior:
+
+- **Only a positively verified `Succeeded`, `Failed`, or native
+  `CompletedPhase` hides a marker**. Unknown journal states leave that pin
+  eligible and are counted separately.
+- A missing `Game.GetJournalManager()` no longer clears the catalog.
+  Native saved-state checks continue; unknown entries retain their markers.
+- Within one game session, once an activity is positively recognized as
+  completed, a transient loss of the journal manager will **not** bring
+  its pin back. This cache resets when the save/session ends.
+- CET diagnostics now include `questOK` (linked quests with a readable
+  state) and `questUnknown` (linked quests without a readable state).
+  These help distinguish incomplete quests from broken journal lookups.
+
+This is a **safety repair**, not proof that every finished cyberpsycho can
+be detected. The linked quest lookup must still be verified on a real
+completed save. If the new diagnostics show `questOK=0` and a large
+`questUnknown`, that remaining lookup problem requires further work
+without making all map pins disappear again.

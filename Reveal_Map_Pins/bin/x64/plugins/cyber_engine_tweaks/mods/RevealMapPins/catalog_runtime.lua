@@ -97,7 +97,6 @@ end
 -- Only reads the game's journal and mappin saved state. Never advances quests,
 -- sets facts or changes entries. Completed/failed = no temporary marker.
 local function completionStatus(ms, jm, entry)
-  if not jm then return "unverified" end
   local okSaved, found, phase, _, active = pcall(function()
     return ms:GetPointOfInterestMappinSavedState(entry.hash)
   end)
@@ -107,6 +106,9 @@ local function completionStatus(ms, jm, entry)
   local n = nativeKnown and enumNumber(phase) or nil
   if nativeKnown and n == completedPhase then return "completed" end
   if nativeKnown and n ~= hiddenPhase and active == false then return "completed" end
+  -- Some saves do not expose a JournalManager for the current session.
+  -- Retain the native map state fallback in that case.
+  if not jm then return nativeKnown and "ready" or "unverified" end
 
   -- A journal entry may remain after the engine removes the saved POI record.
   local okPoi, poi = pcall(function() return jm:GetEntry(entry.hash) end)
@@ -127,9 +129,9 @@ local function completionStatus(ms, jm, entry)
     if not ok or not quest then return "unverified" end
     local stateOk, state = pcall(function() return jm:GetEntryState(quest) end)
     local value = stateOk and enumNumber(state) or nil
-    if value == 3 or value == 4 then return "completed" end
+    if value == 3 or value == 4 then return "completed", true end
     if value ~= 1 and value ~= 2 then return "unverified" end
-    return "ready"
+    return "ready", true
   end
 
   -- Unknown completion state is *not* equivalent to undiscovered. A finished
@@ -168,9 +170,10 @@ function Runtime.new(directory, getSetting, log)
     links, linkErr = readQuestLinks(directory .. "quest_links.tsv", rows)
     if not links then rows = nil end
   end
-  local self = { rows = rows, owned = {}, ownedId = {}, clock = 0, errorShown = false,
+  local self = { rows = rows, owned = {}, ownedId = {}, completedHashes = {}, clock = 0, errorShown = false,
     enabledLast = false, statistics = { catalog = rows and #rows or 0,
-    added = 0, failed = 0, skipped = 0, completed = 0, unverified = 0 } }
+    added = 0, failed = 0, skipped = 0, completed = 0, unverified = 0,
+    questResolved = 0, questUnknown = 0 } }
   if not rows then log("Catalog unavailable: " .. tostring(loadErr or linkErr)) end
 
   function self:clear()
@@ -185,21 +188,28 @@ function Runtime.new(directory, getSetting, log)
     self.statistics.added = 0
     self.statistics.completed = 0
     self.statistics.unverified = 0
+    self.statistics.questResolved = 0
+    self.statistics.questUnknown = 0
   end
 
   function self:reset()
     self:clear()
+    -- Quest completion cache is save/session-scoped, never written to db.json.
+    self.completedHashes = {}
     self.clock = 0
     self.errorShown = false
     self.registrationErrorShown = false
+    self.journalWarningShown = false
+    self.questWarningShown = false
     self.enabledLast = false
   end
 
   function self:stats()
-    return string.format("catalog=%d active=%d skipped=%d completed=%d unverified=%d failed=%d",
+    return string.format("catalog=%d active=%d skipped=%d completed=%d unverified=%d questOK=%d questUnknown=%d failed=%d",
       self.statistics.catalog, self.statistics.added,
       self.statistics.skipped, self.statistics.completed,
-      self.statistics.unverified, self.statistics.failed)
+      self.statistics.unverified, self.statistics.questResolved,
+      self.statistics.questUnknown, self.statistics.failed)
   end
 
   function self:refresh()
@@ -217,12 +227,11 @@ function Runtime.new(directory, getSetting, log)
     self.errorShown = false
     local okJM, journal = pcall(Game.GetJournalManager)
     if not okJM or not journal then
-      if not self.errorShown then
-        log("Catalog waiting: JournalManager is not available for completion checks")
-        self.errorShown = true
+      journal = nil
+      if not self.journalWarningShown then
+        log("JournalManager unavailable; preserving last working map pin behavior")
+        self.journalWarningShown = true
       end
-      self:clear()  -- never retain stale pins if status is unreadable
-      return
     end
     local ep1 = false
     local expansionOk, expansion = pcall(Game.IsEP1)
@@ -241,15 +250,29 @@ function Runtime.new(directory, getSetting, log)
     end
 
     local active, skipped, failed, finished, unverified = 0, 0, 0, 0, 0
+    local questResolved, questUnknown = 0, 0
     for _, entry in ipairs(self.rows) do
       local allowed = getSetting("enabled") and getSetting(entry.kind.key) and (ep1 or not entry.ep1)
       if allowed then
-        local status = completionStatus(ms, journal, entry)
+        local status, resolvedQuest
+        if self.completedHashes[entry.hash] then
+          status = "completed"
+        else
+          status, resolvedQuest = completionStatus(ms, journal, entry)
+        end
+        if entry.questPath then
+          if resolvedQuest then questResolved = questResolved + 1
+          else questUnknown = questUnknown + 1 end
+        end
         if status == "completed" then
+          self.completedHashes[entry.hash] = true
           allowed = false
           finished = finished + 1
         elseif status ~= "ready" then
-          allowed = false
+          -- PR #14 was a regression because "unverified" removed 203 of
+          -- the 219 pins on the user's save. Unknown != completed.
+          -- Preserve PR #13's confirmed working marker registration until
+          -- the game's quest state can be positively resolved.
           unverified = unverified + 1
         end
       end
@@ -307,7 +330,13 @@ function Runtime.new(directory, getSetting, log)
     self.statistics.skipped = skipped
     self.statistics.completed = finished
     self.statistics.unverified = unverified
+    self.statistics.questResolved = questResolved
+    self.statistics.questUnknown = questUnknown
     self.statistics.failed = failed
+    if questUnknown > 0 and questResolved == 0 and not self.questWarningShown then
+      log("Quest completion lookup unresolved on this save; markers preserved (not treated as completed)")
+      self.questWarningShown = true
+    end
   end
 
   function self:tick(delta)
