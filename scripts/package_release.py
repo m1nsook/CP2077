@@ -1,90 +1,117 @@
 #!/usr/bin/env python3
-"""Build one installable ZIP per mod and short release notes with SHA-256."""
+"""Package exactly one Cyberpunk 2077 mod for a standalone GitHub Release."""
+
 import argparse
 import hashlib
 import json
 import re
 import subprocess
-from collections import defaultdict
 from pathlib import Path, PurePosixPath
-from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 INSTALL_DIRS = {"bin", "r6", "archive", "red4ext", "engine", "mods", "dlc"}
+VERSION = re.compile(r"v\d+\.\d+\.\d+(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?\Z")
+IGNORED_EXTENSIONS = {".log", ".bak", ".tmp"}
+IGNORED_NAMES = {"db.json", ".gitkeep"}
 
 
-def tracked_mods():
-    names = subprocess.check_output(["git", "ls-files", "-z", "--cached"]).decode("utf-8").split("\0")
-    found = defaultdict(list)
-    for name in names:
+def tracked_install_files(mod: str) -> list[PurePosixPath]:
+    """Use the Git index; never package untracked player saves/configuration."""
+    output = subprocess.check_output(
+        ["git", "ls-files", "-z", "--cached", "--", f"{mod}/"]
+    ).decode("utf-8")
+    paths = []
+    for name in output.split("\0"):
         if not name:
             continue
         path = PurePosixPath(name)
-        if len(path.parts) < 3 or path.parts[1] not in INSTALL_DIRS:
-            continue
-        if path.name == "db.json" or path.name == ".gitkeep" or path.suffix in {".log", ".bak", ".tmp"}:
+        if (
+            len(path.parts) < 3
+            or path.parts[0] != mod
+            or path.parts[1] not in INSTALL_DIRS
+            or path.name in IGNORED_NAMES
+            or path.suffix.lower() in IGNORED_EXTENSIONS
+        ):
             continue
         if not Path(name).is_file():
-            raise FileNotFoundError(f"Tracked file is missing: {name}")
-        found[path.parts[0]].append(path)
-    return {root: sorted(files, key=str) for root, files in sorted(found.items())}
+            raise FileNotFoundError(f"Tracked install file is missing: {name}")
+        paths.append(path)
+    return sorted(paths, key=str)
 
 
-def sha256(path):
+def sha256(path: Path) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+    with path.open("rb") as src:
+        for chunk in iter(lambda: src.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--tag", required=True)
-    ap.add_argument("--output", default="dist")
-    args = ap.parse_args()
-    if not re.fullmatch(r"v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.+-]+)?", args.tag):
-        ap.error("Tag must look like v0.1.0 or v0.2.0-beta.1")
-    out = Path(args.output)
-    out.mkdir(parents=True, exist_ok=True)
+def build(mod: str, version: str, output: Path) -> Path:
+    if not VERSION.fullmatch(version):
+        raise ValueError("Version must be like v0.1.0 or v0.2.0-dev.1")
+
     descriptions = json.loads(Path(".github/mod-descriptions.json").read_text("utf-8"))
-    mods = tracked_mods()
-    if not mods:
-        raise RuntimeError("No root-level directories with installable mod files found")
+    if mod not in descriptions:
+        raise ValueError(f"Unknown mod {mod!r}. Choose a listed mod.")
+    metadata = descriptions[mod]
+    name = metadata["name"]
+    summary = metadata["summary"]
+    if not all(isinstance(v, str) and v and "\n" not in v for v in (name, summary)):
+        raise ValueError("Mod name and summary must be nonempty, single-line strings")
 
-    overview, hashes, used_names = [], [], set()
-    for directory, files in mods.items():
-        zip_name = re.sub(r"[^A-Za-z0-9._-]", "-", directory).replace("_", "-") + "-" + args.tag + ".zip"
-        if zip_name in used_names:
-            raise RuntimeError(f"Duplicate ZIP name: {zip_name}")
-        used_names.add(zip_name)
-        zip_path = out / zip_name
-        with ZipFile(zip_path, "w", ZIP_DEFLATED, compresslevel=9) as zf:
-            for source in files:
-                inside = PurePosixPath(*source.parts[1:]).as_posix()
-                info = ZipInfo(inside, date_time=(2020, 1, 1, 0, 0, 0))
-                info.compress_type = ZIP_DEFLATED
-                info.external_attr = 0o100644 << 16
-                zf.writestr(info, Path(str(source)).read_bytes(), compress_type=ZIP_DEFLATED, compresslevel=9)
-        meta = descriptions.get(directory, {})
-        name = meta.get("name", directory.replace("_", " "))
-        summary = meta.get("summary", "Cyberpunk 2077 mod.")
-        if "\n" in name or "\n" in summary:
-            raise ValueError("Release metadata must be single-line")
-        overview.append(f"- **{name}** — {summary}")
-        hashes.append(f"{sha256(zip_path)}  {zip_name}")
-        print(f"{name}: {len(files)} files -> {zip_name}")
+    files = tracked_install_files(mod)
+    if not files:
+        raise ValueError(f"No tracked installable files in {mod}/")
+    output.mkdir(parents=True, exist_ok=True)
+    zip_filename = mod.replace("_", "-") + "-" + version + ".zip"
+    zip_path = output / zip_filename
+    with ZipFile(zip_path, "w", compression=ZIP_DEFLATED, compresslevel=9) as archive:
+        for path in files:
+            installed_path = PurePosixPath(*path.parts[1:]).as_posix()
+            info = ZipInfo(installed_path, date_time=(2020, 1, 1, 0, 0, 0))
+            info.compress_type = ZIP_DEFLATED
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, Path(str(path)).read_bytes(), compress_type=ZIP_DEFLATED, compresslevel=9)
 
-    (out / "SHA256SUMS.txt").write_text("\n".join(hashes) + "\n", encoding="utf-8")
-    notes = (
-        "**Game:** Cyberpunk 2077 2.5\n\n"
-        "### Included mods\n" + "\n".join(overview) +
-        "\n\n### SHA-256\n"
-        + "\n" + chr(96) * 3 + "text\n"
-        + "\n".join(hashes)
-        + "\n" + chr(96) * 3 + "\n"
+    digest = sha256(zip_path)
+    release_tag = mod.lower().replace("_", "-") + "-" + version
+    requirements = metadata.get("requires", [])
+    if not isinstance(requirements, list) or any(req not in descriptions for req in requirements):
+        raise ValueError("Invalid mod dependency metadata")
+    required_line = (
+        "**Requires:** " + ", ".join(descriptions[req]["name"] for req in requirements) + ".\n\n"
+        if requirements else ""
     )
-    (out / "RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
-    print(f"Packaged {len(mods)} mods; checksums and release notes written.")
+    notes = (
+        f"## {name} {version}\n\n"
+        f"{summary}\n\n"
+        f"{required_line}"
+        "**Game:** Cyberpunk 2077 2.5\n\n"
+        "**Install:** Extract the ZIP into your Cyberpunk 2077 game directory. "
+        "The archive contains game-ready folders only; no tools, docs, or saved settings.\n\n"
+        "### SHA-256\n\n"
+        f"{chr(96)}{digest}  {zip_filename}{chr(96)}\n"
+    )
+    (output / "SHA256SUMS.txt").write_text(f"{digest}  {zip_filename}\n", encoding="utf-8")
+    (output / "RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
+    (output / "RELEASE_TAG.txt").write_text(release_tag + "\n", encoding="utf-8")
+    (output / "RELEASE_TITLE.txt").write_text(f"{name} {version}\n", encoding="utf-8")
+    print(f"{name}: {len(files)} files -> {zip_path} ({digest})")
+    print(f"Release tag: {release_tag}")
+    return zip_path
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--mod", required=True, help="One mod directory, e.g. UndiscoverMe_Teleporter")
+    parser.add_argument("--tag", required=True, help="Mod version, e.g. v0.1.0")
+    parser.add_argument("--output", default="dist")
+    args = parser.parse_args()
+    try:
+        build(args.mod, args.tag, Path(args.output))
+    except (ValueError, FileNotFoundError) as err:
+        parser.error(str(err))
 
 
 if __name__ == "__main__":

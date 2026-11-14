@@ -9,6 +9,9 @@
   },
   "UndiscoverMe_Teleporter": {
     "name": "UndiscoverMe Teleporter",
-    "summary": "Optional UndiscoverMe-core addon: hold the map's Fast Travel action on an UndiscoverMe pin to teleport."
+    "summary": "Optional UndiscoverMe-core addon: hold the map's Fast Travel action on an UndiscoverMe pin to teleport.",
+    "requires": [
+      "UndiscoverMe"
+    ]
   }
 }
