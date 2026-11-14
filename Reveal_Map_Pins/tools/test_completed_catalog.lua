@@ -1,81 +1,63 @@
--- Run from Reveal_Map_Pins/ with Lua 5.4:
--- lua tools/test_completed_catalog.lua
--- No Cyberpunk game files or player save required.
-local folder = (arg and arg[1]) or "bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins/"
-if folder:sub(-1) ~= "/" and folder:sub(-1) ~= "\\" then folder=folder.."/" end
-local mappins, count = {}, 0
-local ms = {}
-function ms:GetMappins() return {} end
+-- Test the last confirmed working catalog behavior with native-only fixers.
+-- Run from Reveal_Map_Pins: lua tools/test_completed_catalog.lua
+-- No live game/save required. Does not assume journal APIs work on 2.5.
+local root = (arg and arg[1]) or "bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins/"
+if root:sub(-1) ~= "/" and root:sub(-1) ~= "\\" then root = root .. "/" end
+
+local owned, nextId = {}, 0
+local completed = {[359900925]=true, [9669499]=true}
+local nativePin = {
+  IsVisible=function() return true end,
+  GetWorldPosition=function() return {x=395.26306, y=1151.14099} end,
+  GetVariant=function() return "TarotVariant" end,
+  GetNewMappinID=function() return {value=400000} end,
+}
+local ms={}
+function ms:GetMappins() return {nativePin} end
 function ms:GetPointOfInterestMappinSavedState(hash)
-  if hash == 359900925 then return true, 0, 1, false end
+  if completed[hash] then return true, 0, 0, false end
   return false, 0, 0, false
 end
-function ms:RegisterMappin(data, position)
-  count = count + 1
-  local id = {value=count}
-  mappins[count] = {data=data,position=position,id=id}
-  return id
+function ms:RegisterMappin(data, pos)
+  assert(type(pos.x) == "number")
+  nextId = nextId+1
+  owned[nextId] = {data=data, position=pos}
+  assert(data.variant ~= "FixerVariant", "Never create duplicate fixer overlays")
+  return {value=nextId}
 end
-function ms:UnregisterMappin(id) mappins[id.value] = nil end
+function ms:UnregisterMappin(id) owned[id.value] = nil end
 
-local terminal = {
-  ["quests/minor_quest/ma_pac_cvi_08"] = 3,
-  ["quests/minor_quest/ma_wat_nid_03"] = 4,
-  ["quests/minor_activities/watson/little_china/ma_wat_lch_03"] = 3,
-}
-local journal = {}
-function journal:GetEntry(hash) return nil end
-function journal:GetEntryByString(path, cl)
-  assert(cl == "gameJournalQuest")
-  if terminal[path] then return {path=path} end
-  return nil
-end
-function journal:GetEntryState(entry) return terminal[entry.path] end
-
-local settings = {enabled=true,catalog=true,ncpd=true,fixer=true,psycho=true,tarot=true}
 Game = {
   GetMappinSystem=function() return ms end,
   GetPlayer=function() return {} end,
   IsEP1=function() return true end,
-  GetJournalManager=function() return journal end,
 }
-MappinData = {new=function() return {} end}
-TweakDBID = {new=function(record) return record end}
-Vector4 = {new=function(x,y,z,w) return {x=x,y=y,z=z,w=w} end}
-gamedataMappinPhase = {CompletedPhase=0,UndiscoveredPhase=3}
-gamedataMappinVariant = {
-  GangWatchVariant="A", OutpostVariant="O", HiddenStashVariant="R",
-  HuntForPsychoVariant="C", TarotVariant="T", FixerVariant="F",
+gamemappinsMappinTargetType={Map=1}
+gamedataMappinPhase={CompletedPhase=0, UndiscoveredPhase=3}
+gamedataMappinVariant={
+  GangWatchVariant="GangWatchVariant", OutpostVariant="OutpostVariant",
+  HiddenStashVariant="HiddenStashVariant",
+  HuntForPsychoVariant="HuntForPsychoVariant",
+  TarotVariant="TarotVariant", FixerVariant="FixerVariant",
 }
-gamemappinsMappinTargetType = {Map=1}
-EnumInt = function(x) return x end
+MappinData={new=function() return {} end}
+Vector4={new=function(x,y,z,w) return {x=x,y=y,z=z,w=w} end}
+TweakDBID={new=function(x) return x end}
+EnumInt=function(x) return x end
 
-local runtime = dofile(folder.."catalog_runtime.lua").new(
-  folder, function(key) return settings[key] end, function() end
-)
-assert(runtime.rows and #runtime.rows == 219)
-runtime:tick(0)
--- One native saved completion, two cyberpsychos, one NCPD completed quest.
-assert(runtime.statistics.added == 215, runtime:stats())
-assert(runtime.statistics.completed == 4)
-assert(runtime.statistics.unverified > 100, "mock deliberately has unknown journals")
-assert(runtime.statistics.questResolved >= 3)
-
--- A newly completed cyberpsycho should disappear on the next refresh.
-terminal["quests/minor_quest/ma_bls_ina_se1_08"] = 3
-runtime:tick(12)
-assert(runtime.statistics.added == 214, runtime:stats())
-assert(runtime.statistics.completed == 5)
-
--- A transient unavailable journal must not destroy the map or resurrect
--- previously VERIFIED finished quests within this session.
-Game.GetJournalManager = function() return nil end
-runtime:tick(12)
-assert(runtime.statistics.added == 214, runtime:stats())
-assert(runtime.statistics.completed == 5)
-
+local settings={catalog=true,enabled=true,fixer=true,ncpd=true,psycho=true,tarot=true}
+local catalog=dofile(root.."catalog_runtime.lua").new(
+  root, function(key) return settings[key] end, print)
+assert(catalog.rows and #catalog.rows == 219)
+catalog:tick(0)
+-- 219 total - 7 service-point fixer proxies - 2 completed native POIs - 1 visible original
+assert(catalog.statistics.added == 209, catalog:stats())
+assert(catalog.statistics.skipped == 10)
+completed[148304100] = true
+catalog:tick(12)
+assert(catalog.statistics.added == 208, catalog:stats())
 settings.catalog = false
-runtime:tick(0)
-assert(runtime.statistics.added == 0)
-for _ in pairs(mappins) do error("leaked registered mappin") end
-print("PASS: unknown states preserve pins; verified completion hides; session cleanup")
+catalog:tick(0)
+assert(catalog.statistics.added == 0)
+assert(next(owned) == nil)
+print("PASS: native fixers only, no duplicate originals, registration and cleanup intact")
