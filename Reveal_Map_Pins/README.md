@@ -51,3 +51,14 @@ available independently.
 
 **This is a static code fix, not yet verified with a running 2.5 game.**
 If the game reports a compile error, share `r6/logs/redscript_rCURRENT.log`.
+
+## Startup check
+
+On session load, the CET companion now explicitly requests the REDscript
+`RMPSystem` scanner and `RMPSettings` bridge. A missing system emits one
+warning in the CET console instead of silently doing nothing. The CET
+**print map scan diagnostics** binding reports `scanner=initialized` or
+`scanner=MISSING` alongside the existing map scan counters.
+
+This startup fix doesn't create a complete catalog of undiscovered vanilla
+locations; it first makes the existing registered-marker scanner observable.

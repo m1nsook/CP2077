@@ -1,4 +1,4 @@
--- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.1.1-compat
+-- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.1.2-bootstrap
 -- CET is the settings/database bridge. Native Settings UI is optional.
 local MOD = "RevealMapPins"
 local TITLE = "Reveal Map Pins"
@@ -87,6 +87,46 @@ local function updateOption(key, value)
   end
 end
 
+-- REDscript ScriptableSystem classes are accessed through the system
+-- container. Explicitly resolve them when a game session is available: if
+-- the scanner was never instantiated, toggles alone cannot reveal anything.
+local scannerReady = false
+local settingsReady = false
+local bootPoll = 0
+local bootAttempts = 0
+local bootWarningIssued = false
+
+local function bootstrapSystems()
+  if not Game.GetPlayer() then return end
+  local function getSystem(name)
+    local ok, result = pcall(function()
+      local container = Game.GetScriptableSystemsContainer()
+      if not container then return nil end
+      return container:Get(CName.new("MisoRevealMapPins." .. name))
+    end)
+    return ok and result ~= nil
+  end
+  if not scannerReady then
+    scannerReady = getSystem("RMPSystem")
+    if scannerReady then
+      print("[" .. MOD .. "] World-map marker scanner initialized")
+    end
+  end
+  if not settingsReady then
+    settingsReady = getSystem("RMPSettings")
+    if settingsReady then
+      print("[" .. MOD .. "] REDscript settings bridge initialized")
+    end
+  end
+  if scannerReady and settingsReady then return end
+  bootAttempts = bootAttempts + 1
+  if bootAttempts >= 4 and not bootWarningIssued then
+    bootWarningIssued = true
+    print("[" .. MOD .. "] WARNING: REDscript system missing (scanner=" .. tostring(scannerReady) ..
+      ", settings=" .. tostring(settingsReady) .. "). Check r6/logs/redscript_rCURRENT.log")
+  end
+end
+
 local nativeUIReady = false
 local nativeUIPoll = 0
 
@@ -143,13 +183,31 @@ registerHotkey(MOD .. "_Status", TITLE .. ": print map scan diagnostics", functi
     local ok, value = pcall(function() return qs:GetFactStr("miso_rmp_diag_" .. name) end)
     values[#values + 1] = name .. "=" .. tostring(ok and value or "?")
   end
-  print("[" .. MOD .. "] " .. table.concat(values, " | "))
+  print("[" .. MOD .. "] scanner=" .. (scannerReady and "initialized" or "MISSING")
+    .. " | settings=" .. (settingsReady and "initialized" or "MISSING")
+    .. " | " .. table.concat(values, " | "))
 end)
 
-registerForEvent("onSessionStart", function() inSession = false end)
-registerForEvent("onSessionEnd", function() inSession = false end)
+registerForEvent("onSessionStart", function()
+  inSession = false
+  scannerReady, settingsReady = false, false
+  bootPoll, bootAttempts = 0, 0
+  bootWarningIssued = false
+  bootstrapSystems()
+end)
+registerForEvent("onSessionEnd", function()
+  inSession = false
+  scannerReady, settingsReady = false, false
+end)
 
 registerForEvent("onUpdate", function(delta)
+  if not scannerReady or not settingsReady then
+    bootPoll = bootPoll + (delta or 0)
+    if bootPoll >= 3 then
+      bootPoll = 0
+      bootstrapSystems()
+    end
+  end
   if not nativeUIReady then
     nativeUIPoll = nativeUIPoll + (delta or 0)
     if nativeUIPoll >= 4 then
