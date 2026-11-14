@@ -45,7 +45,7 @@ def tracked_source_files(mod: str) -> list[PurePosixPath]:
         ["git", "ls-files", "-z", "--cached", "--", f"{mod}/"]
     ).decode("utf-8")
     result = []
-    for name in output.split("\\0"):
+    for name in output.split("\0"):
         if not name:
             continue
         path = PurePosixPath(name)
