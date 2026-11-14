@@ -14,7 +14,6 @@ local TYPES = {
 -- Construct it during an in-game registration, never at module load time.
 local POI_DEFINITION = "Mappins.StaticPointOfInterestMappinDefinition"
 local POLL_SECONDS = 12
-local EXPECTED_QUEST_LINKS = 59
 local DUPLICATE_METERS = 3
 
 local function ident(id)
@@ -47,99 +46,6 @@ local function readCatalog(filename)
   return rows
 end
 
--- Quest links are game-derived and describe actual journal quest entries.
--- The original POI hash alone is not always retained after completion.
-local function readQuestLinks(filename, rows)
-  local links, validHashes = {}, {}
-  for _, row in ipairs(rows) do validHashes[row.hash] = row.kind end
-  local file, err = io.open(filename, "r")
-  if not file then return nil, "cannot open journal quest links: " .. tostring(err) end
-  local count, psychos = 0, 0
-  for line in file:lines() do
-    if line:sub(1, 1) ~= "#" and line:match("%S") then
-      local hashText, path = line:match("^(%d+)\t(quests/[%w_/]+)$")
-      local hash = tonumber(hashText)
-      if not hash or not path or not validHashes[hash] or links[hash] then
-        file:close()
-        return nil, "invalid/duplicate quest link: " .. line:sub(1, 140)
-      end
-      links[hash] = path
-      count = count + 1
-      if validHashes[hash].variant == "HuntForPsychoVariant" then
-        if not path:match("^quests/minor_quest/ma_[%w_]+$") then
-          file:close()
-          return nil, "wrong cyberpsycho quest path " .. path
-        end
-        psychos = psychos + 1
-      end
-    end
-  end
-  file:close()
-  if count ~= EXPECTED_QUEST_LINKS or psychos ~= 17 then
-    return nil, "expected 59 journal quest links including all 17 cyberpsychos; got " .. count .. "/" .. psychos
-  end
-  for _, row in ipairs(rows) do
-    if row.kind.variant == "HuntForPsychoVariant" and not links[row.hash] then
-      return nil, "missing cyberpsycho quest link " .. row.hash
-    end
-    row.questPath = links[row.hash]
-  end
-  return links
-end
-
-local function enumNumber(value)
-  if type(value) == "number" then return value end
-  local ok, number = pcall(EnumInt, value)
-  if ok and type(number) == "number" then return number end
-  return tonumber(value)
-end
-
--- Only reads the game's journal and mappin saved state. Never advances quests,
--- sets facts or changes entries. Completed/failed = no temporary marker.
-local function completionStatus(ms, jm, entry)
-  local okSaved, found, phase, _, active = pcall(function()
-    return ms:GetPointOfInterestMappinSavedState(entry.hash)
-  end)
-  local nativeKnown = okSaved and found == true
-  local completedPhase = enumNumber(gamedataMappinPhase.CompletedPhase)
-  local hiddenPhase = enumNumber(gamedataMappinPhase.UndiscoveredPhase)
-  local n = nativeKnown and enumNumber(phase) or nil
-  if nativeKnown and n == completedPhase then return "completed" end
-  if nativeKnown and n ~= hiddenPhase and active == false then return "completed" end
-  -- Some saves do not expose a JournalManager for the current session.
-  -- Retain the native map state fallback in that case.
-  if not jm then return nativeKnown and "ready" or "unverified" end
-
-  -- A journal entry may remain after the engine removes the saved POI record.
-  local okPoi, poi = pcall(function() return jm:GetEntry(entry.hash) end)
-  local poiVerified = false
-  if okPoi and poi then
-    local ok, state = pcall(function() return jm:GetEntryState(poi) end)
-    local value = ok and enumNumber(state) or nil
-    if value == 3 or value == 4 then return "completed" end
-    if value == 1 or value == 2 then poiVerified = true end
-  end
-
-  -- Cyberpsychos and some NCPD events also have a separate quest journal.
-  -- The mission may be Succeeded while its old map-pin phase is Undiscovered.
-  if entry.questPath then
-    local ok, quest = pcall(function()
-      return jm:GetEntryByString(entry.questPath, "gameJournalQuest")
-    end)
-    if not ok or not quest then return "unverified" end
-    local stateOk, state = pcall(function() return jm:GetEntryState(quest) end)
-    local value = stateOk and enumNumber(state) or nil
-    if value == 3 or value == 4 then return "completed", true end
-    if value ~= 1 and value ~= 2 then return "unverified" end
-    return "ready", true
-  end
-
-  -- Unknown completion state is *not* equivalent to undiscovered. A finished
-  -- NCPD activity may no longer have a saved mappin record. Fail closed.
-  if poiVerified or nativeKnown then return "ready" end
-  return "unverified"
-end
-
 local function existingPins(ms)
   local ok, pins = pcall(function()
     return ms:GetMappins(gamemappinsMappinTargetType.Map)
@@ -164,17 +70,9 @@ end
 
 function Runtime.new(directory, getSetting, log)
   local rows, loadErr = readCatalog(directory .. "catalog.tsv")
-  local linkErr
-  if rows then
-    local links
-    links, linkErr = readQuestLinks(directory .. "quest_links.tsv", rows)
-    if not links then rows = nil end
-  end
-  local self = { rows = rows, owned = {}, ownedId = {}, completedHashes = {}, clock = 0, errorShown = false,
-    enabledLast = false, statistics = { catalog = rows and #rows or 0,
-    added = 0, failed = 0, skipped = 0, completed = 0, unverified = 0,
-    questResolved = 0, questUnknown = 0 } }
-  if not rows then log("Catalog unavailable: " .. tostring(loadErr or linkErr)) end
+  local self = { rows = rows, owned = {}, ownedId = {}, clock = 0, errorShown = false,
+    enabledLast = false, statistics = { catalog = rows and #rows or 0, added = 0, failed = 0, skipped = 0 } }
+  if not rows then log("Catalog unavailable: " .. tostring(loadErr)) end
 
   function self:clear()
     -- Session-end and game shutdown may happen after MappinSystem teardown.
@@ -186,30 +84,20 @@ function Runtime.new(directory, getSetting, log)
     end
     self.ownedId = {}
     self.statistics.added = 0
-    self.statistics.completed = 0
-    self.statistics.unverified = 0
-    self.statistics.questResolved = 0
-    self.statistics.questUnknown = 0
   end
 
   function self:reset()
     self:clear()
-    -- Quest completion cache is save/session-scoped, never written to db.json.
-    self.completedHashes = {}
     self.clock = 0
     self.errorShown = false
     self.registrationErrorShown = false
-    self.journalWarningShown = false
-    self.questWarningShown = false
     self.enabledLast = false
   end
 
   function self:stats()
-    return string.format("catalog=%d active=%d skipped=%d completed=%d unverified=%d questOK=%d questUnknown=%d failed=%d",
+    return string.format("catalog=%d active=%d skipped=%d failed=%d",
       self.statistics.catalog, self.statistics.added,
-      self.statistics.skipped, self.statistics.completed,
-      self.statistics.unverified, self.statistics.questResolved,
-      self.statistics.questUnknown, self.statistics.failed)
+      self.statistics.skipped, self.statistics.failed)
   end
 
   function self:refresh()
@@ -225,14 +113,6 @@ function Runtime.new(directory, getSetting, log)
       return  -- fail closed instead of cloning unknown originals
     end
     self.errorShown = false
-    local okJM, journal = pcall(Game.GetJournalManager)
-    if not okJM or not journal then
-      journal = nil
-      if not self.journalWarningShown then
-        log("JournalManager unavailable; preserving last working map pin behavior")
-        self.journalWarningShown = true
-      end
-    end
     local ep1 = false
     local expansionOk, expansion = pcall(Game.IsEP1)
     if expansionOk and expansion == true then ep1 = true end
@@ -249,31 +129,27 @@ function Runtime.new(directory, getSetting, log)
       end
     end
 
-    local active, skipped, failed, finished, unverified = 0, 0, 0, 0, 0
-    local questResolved, questUnknown = 0, 0
+    local active, skipped, failed = 0, 0, 0
+    local completed = EnumInt(gamedataMappinPhase.CompletedPhase)
+    local undiscovered = EnumInt(gamedataMappinPhase.UndiscoveredPhase)
     for _, entry in ipairs(self.rows) do
-      local allowed = getSetting("enabled") and getSetting(entry.kind.key) and (ep1 or not entry.ep1)
+      -- Fixer POIs are static service_point journal locations, not NPC positions.
+      -- The game already displays their native fixer markers and progress.
+      -- Creating a second runtime fixer pin is misleading (e.g. 0/0 gigs).
+      local allowed = entry.kind.key ~= "fixer"
+        and getSetting("enabled") and getSetting(entry.kind.key)
+        and (ep1 or not entry.ep1)
       if allowed then
-        local status, resolvedQuest
-        if self.completedHashes[entry.hash] then
-          status = "completed"
-        else
-          status, resolvedQuest = completionStatus(ms, journal, entry)
-        end
-        if entry.questPath then
-          if resolvedQuest then questResolved = questResolved + 1
-          else questUnknown = questUnknown + 1 end
-        end
-        if status == "completed" then
-          self.completedHashes[entry.hash] = true
+        local ok, found, phase, _, stateActive = pcall(function()
+          return ms:GetPointOfInterestMappinSavedState(entry.hash)
+        end)
+        if not ok then
+          -- Read-only saved state is mandatory: never expose completed content
+          -- if current game APIs cannot verify its phase.
           allowed = false
-          finished = finished + 1
-        elseif status ~= "ready" then
-          -- PR #14 was a regression because "unverified" removed 203 of
-          -- the 219 pins on the user's save. Unknown != completed.
-          -- Preserve PR #13's confirmed working marker registration until
-          -- the game's quest state can be positively resolved.
-          unverified = unverified + 1
+          failed = failed + 1
+        elseif found == true and (phase == completed or (phase ~= undiscovered and stateActive == false)) then
+          allowed = false
         end
       end
       if allowed then
@@ -328,15 +204,7 @@ function Runtime.new(directory, getSetting, log)
     end
     self.statistics.added = active
     self.statistics.skipped = skipped
-    self.statistics.completed = finished
-    self.statistics.unverified = unverified
-    self.statistics.questResolved = questResolved
-    self.statistics.questUnknown = questUnknown
     self.statistics.failed = failed
-    if questUnknown > 0 and questResolved == 0 and not self.questWarningShown then
-      log("Quest completion lookup unresolved on this save; markers preserved (not treated as completed)")
-      self.questWarningShown = true
-    end
   end
 
   function self:tick(delta)
