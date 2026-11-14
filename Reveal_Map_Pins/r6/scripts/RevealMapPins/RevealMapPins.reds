@@ -101,6 +101,40 @@ public abstract class RMPVanillaGuard {
   }
 }
 
+// Explicit world-map-capable TweakDB records. The previous generic
+// DefaultStaticMappin does not explicitly enable world-map display.
+public abstract class RMPProxyDefinition {
+  public static func TypeFor(group: gamedataWorldMapFilter) -> TweakDBID {
+    if Equals(group, gamedataWorldMapFilter.FastTravel) {
+      return t"Mappins.FastTravelStaticMappin";
+    }
+    if Equals(group, gamedataWorldMapFilter.DropPoint) {
+      return t"Mappins.DropPointStaticMappin";
+    }
+    return t"Mappins.QuestStaticMappinDefinition";
+  }
+
+  // QuestStaticMappinDefinition only allows a subset of marker variants.
+  // Unsupported category variants use a known-allowed visible POI icon.
+  public static func VariantFor(variant: gamedataMappinVariant, group: gamedataWorldMapFilter) -> gamedataMappinVariant {
+    if Equals(group, gamedataWorldMapFilter.FastTravel) || Equals(group, gamedataWorldMapFilter.DropPoint) {
+      return variant;
+    }
+    if Equals(variant, gamedataMappinVariant.DefaultQuestVariant)
+      || Equals(variant, gamedataMappinVariant.QuestGiverVariant)
+      || Equals(variant, gamedataMappinVariant.PointOfInterest_ExclamationMarkVariant)
+      || Equals(variant, gamedataMappinVariant.PointOfInterest_HuntForPsychoVariant)
+      || Equals(variant, gamedataMappinVariant.PointOfInterest_MinorActivityVariant)
+      || Equals(variant, gamedataMappinVariant.NCPDGigVariant)
+      || Equals(variant, gamedataMappinVariant.CarForPurchaseVariant)
+      || Equals(variant, gamedataMappinVariant.MotorcycleForPurchaseVariant)
+      || Equals(variant, gamedataMappinVariant.ApartmentToPurchaseVariant) {
+      return variant;
+    }
+    return gamedataMappinVariant.PointOfInterest_ExclamationMarkVariant;
+  }
+}
+
 public class RMPSystem extends ScriptableSystem {
   private let filters: ref<RMPFilters>;
   private let sourceIds: array<Uint64>;
@@ -144,6 +178,9 @@ public class RMPSystem extends ScriptableSystem {
     if !IsDefined(this.filters) { this.filters = RMPFilters.Build(); }
     let arr: array<ref<IMappin>>;
     ms.GetMappins(gamemappinsMappinTargetType.Map, arr);
+    let hiddenCount = 0;
+    let eligibleCount = 0;
+    let failedCount = 0;
 
     // Remove proxies if source has become visible, disappeared, or is toggled off.
     let i = ArraySize(this.sourceIds) - 1;
@@ -165,21 +202,35 @@ public class RMPSystem extends ScriptableSystem {
 
     // Register proxies only for eligible game-managed sources.
     for source in arr {
+      if IsDefined(source) && !source.IsVisible() { hiddenCount += 1; }
       if RMPVanillaGuard.ShouldReveal(gi, source, this.filters) {
+        eligibleCount += 1;
         let id = source.GetNewMappinID().value;
         if id != 0ul && !this.ContainsSource(id) && !this.ContainsProxy(id) {
           let data: MappinData;
-          data.mappinType = t"Mappins.DefaultStaticMappin";
-          data.variant = source.GetVariant();
+          let category = this.filters.TypeOf(source.GetVariant());
+          data.mappinType = RMPProxyDefinition.TypeFor(category);
+          data.variant = RMPProxyDefinition.VariantFor(source.GetVariant(), category);
           data.visibleThroughWalls = false;
           data.active = true;
           let proxy = ms.RegisterMappin(data, source.GetWorldPosition());
           if proxy.value != 0ul {
             ArrayPush(this.sourceIds, id);
             ArrayPush(this.proxyIds, proxy);
+          } else {
+            failedCount += 1;
           }
         }
       }
+    }
+    // CET diagnostic hotkey reads these separate, non-gameplay counters.
+    let quests = GameInstance.GetQuestsSystem(gi);
+    if IsDefined(quests) {
+      quests.SetFactStr("miso_rmp_diag_seen", ArraySize(arr));
+      quests.SetFactStr("miso_rmp_diag_hidden", hiddenCount);
+      quests.SetFactStr("miso_rmp_diag_eligible", eligibleCount);
+      quests.SetFactStr("miso_rmp_diag_active", ArraySize(this.proxyIds));
+      quests.SetFactStr("miso_rmp_diag_failed", failedCount);
     }
     this.Schedule();
   }
