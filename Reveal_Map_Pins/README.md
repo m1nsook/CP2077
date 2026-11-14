@@ -6,14 +6,27 @@ Requires RED4ext, redscript and Cyber Engine Tweaks. Mod Settings and
 Native Settings UI are optional. Settings are persisted through CET
 `db.json` and an internal quest-fact bridge.
 
+## Current release scope — no fixer markers
+
+This mod intentionally **does not manage fixer locations**. Cyberpunk 2077
+already displays them by default. No additional fixer marker, hide/show logic,
+category switch, or fixer catalog entry is included. The original game fixer
+pins are never modified. The experimental game-derived catalog contains
+**212** candidates: 114 Assault in Progress, 18 Organized Crime, 26 Reported
+Crime, 17 Cyberpsycho Sightings, and 37 Tarot cards.
+
+The prior 219-candidate catalog and PR #13–#16 fixer experiments are retained
+in GitHub history for diagnostic context only. They are not current behavior.
+Completion filtering for activities is still not fully verified on real saves.
+
 ## Confirmed scope (November 2026)
 
-**Only display** missing *vanilla* fast-travel locations, fixers (not their gigs),
+**Only display** missing *vanilla* fast-travel locations,
 NCPD Scanner Hustles (Assault in Progress, Organized Crime, Reported Crime),
 Cyberpsycho Sightings, Tarot cards, and eventually verified Legendary/Iconic
 item locations. **Never display** story/side jobs, fixer gigs (Gun for Hire,
 Search and Recover, Thievery, Agent Saboteur, SOS: Merc Needed, Convoy),
-quest stages/objectives, or service points (vendors, ripperdocs, drop points,
+quest stages/objectives, **all fixers**, or service points (vendors, ripperdocs, drop points,
 Autofixer, apartments, etc.).
 
 The runtime scanner now fails closed by **explicit marker variant + game
@@ -28,8 +41,8 @@ tables alone do not identify every world-placed Legendary/Iconic loot item.
 An independently verified loot-placement dataset will be needed. A misleading
 toggle for unimplemented items has deliberately not been added.
 
-The six active switches are: master, fast travel, fixer, NCPD, cyberpsycho,
-and tarot. Existing `db.json` keys for retained switches are read normally;
+The category controls are: master, experimental catalog, fast travel, NCPD,
+cyberpsycho, and tarot. No fixer setting exists; the game handles fixers. Existing `db.json` keys for retained switches are read normally;
 obsolete job/service keys are ignored. Mod Settings and optional NSUI match
 these switches.
 
@@ -132,7 +145,7 @@ No player should manually visit hundreds of locations.
 
 The earlier PR #8 test build **did not compile** on Cyberpunk 2077 2.5: `gamedataMappinVariant.PointOfInterest_ExclamationMarkVariant` is a TweakDB-style name, **not** a `gamedataMappinVariant` member. The REDscript map-proxy code also had six other mismatched member names, and the CET test used the same invalid exclamation-mark value. These names have been corrected against the generated RED4ext `game::data::MappinVariant` enum, including `Zzz01_`, `Zzz02_`, `Zzz05_` and `Zzz06_` prefixes. No game-side compile has yet been run; recheck `r6/logs/redscript_rCURRENT.log` after installation.
 
-## Experimental game-derived catalog (219 vanilla locations)
+## Experimental game-derived catalog (212 vanilla locations)
 
 The new **classified catalog** is intentionally **off by default**. In CET
 **Bindings**, assign **Reveal Map Pins: toggle classified catalog** and press
@@ -140,14 +153,15 @@ it once after loading a save. Alternatively use the optional Native Settings
 UI switch. Turn it off to remove only the markers registered by this mod.
 
 Catalog categories: **114 Assault in Progress, 18 Organized Crime, 26 Reported
-Crime, 17 Cyberpsycho Sighting, 37 Tarot and 7 Fixer** locations. Categories
-respect existing NCPD/Cyberpsycho/Tarot/Fixer switches. The mod never
-registers quest stages, gigs, shops, or service locations. Fast travel and
-Legendary/Iconic item catalogs remain separate unfinished milestones.
+Crime, 17 Cyberpsycho Sightings, and 37 Tarot** locations. The mod no
+longer includes fixer locations or any fixer setting. Native fixer pins
+are left untouched. No quest stages, gigs, shops or service locations
+are registered. Fast travel and Legendary/Iconic item catalogs remain
+separate unfinished milestones.
 
 Runtime source: the player's WolvenKit game-2500 `03_night_city.poimappins`
 and base+EP1 `cooked_journal.journal` exports. `catalog.tsv` contains only
-219 selected journal hashes, native variant categories, and game coordinates.
+212 selected journal hashes, native variant categories, and game coordinates.
 **The 71 MB journals are not packaged.** This registry is build-specific.
 
 The CET owner reads the game's saved POI phase (completed content is skipped),
