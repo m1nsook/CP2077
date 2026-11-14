@@ -13,7 +13,6 @@ KINDS = {
     "R": ("ncpd_reported_crime", "HiddenStashVariant", 26),
     "C": ("cyberpsycho", "HuntForPsychoVariant", 17),
     "T": ("tarot", "TarotVariant", 37),
-    "F": ("fixer", "FixerVariant", 7),
 }
 
 
@@ -37,7 +36,7 @@ def validate(path: Path, candidates: Path | None = None):
             known.add(h)
             counts[cat] += 1
             rows.append((h, cat, x, y, z, origin))
-    assert len(rows) == 219, f"expected 219 candidates; got {len(rows)}"
+    assert len(rows) == 212, f"expected 212 candidates; got {len(rows)}"
     assert counts == collections.Counter({key: props[2] for key, props in KINDS.items()}), counts
     for idx, a in enumerate(rows):
         for b in rows[idx + 1:]:
@@ -48,7 +47,7 @@ def validate(path: Path, candidates: Path | None = None):
     if candidates:
         original = json.loads(candidates.read_text(encoding="utf-8"))["markers"]
         indexed = {int(p["journalHash"]): p for p in original}
-        assert len(indexed) == len(rows), "candidate list is not 219 unique hashes"
+        assert len(indexed) == 219, "source candidate list must be original 219 hashes"
         for h, cat, x, y, z, origin in rows:
             source = indexed[h]
             assert (source["category"], source["variant"]) == KINDS[cat][:2]
@@ -60,6 +59,6 @@ def validate(path: Path, candidates: Path | None = None):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--catalog", type=Path, default=Path(__file__).parent.parent / "bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins/catalog.tsv")
-    ap.add_argument("--candidates", type=Path, help="optional offline 219-candidate JSON for exact comparison")
+    ap.add_argument("--candidates", type=Path, help="optional offline original 219-candidate JSON; validates 212 selected rows")
     args = ap.parse_args()
     validate(args.catalog, args.candidates)
