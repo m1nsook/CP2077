@@ -154,8 +154,10 @@ The CET owner reads the game's saved POI phase (completed content is skipped),
 compares its candidate positions/variants to visible map pins, and owns its
 registered IDs. It resynchronizes every 12 seconds. If map enumeration or
 saved-state calls fail, it skips marker registration rather than duplicating
-unknown sources. The old REDscript scanning path stands down while the catalog
-is enabled, to avoid registering the same marker twice.
+unknown sources. While the catalog is enabled, the REDscript scanner limits itself to
+registered hidden **fast-travel** markers, avoiding overlap with the 219
+classified POIs. A complete unregistered fast-travel catalog still needs
+separate extraction.
 
 **Native map icons** are selected from the game variant, not shipped as new
 assets. Relevant WolvenKit paths:
