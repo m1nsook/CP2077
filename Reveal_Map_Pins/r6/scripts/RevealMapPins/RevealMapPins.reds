@@ -122,16 +122,16 @@ public abstract class RMPProxyDefinition {
     }
     if Equals(variant, gamedataMappinVariant.DefaultQuestVariant)
       || Equals(variant, gamedataMappinVariant.QuestGiverVariant)
-      || Equals(variant, gamedataMappinVariant.PointOfInterest_ExclamationMarkVariant)
-      || Equals(variant, gamedataMappinVariant.PointOfInterest_HuntForPsychoVariant)
-      || Equals(variant, gamedataMappinVariant.PointOfInterest_MinorActivityVariant)
-      || Equals(variant, gamedataMappinVariant.NCPDGigVariant)
-      || Equals(variant, gamedataMappinVariant.CarForPurchaseVariant)
-      || Equals(variant, gamedataMappinVariant.MotorcycleForPurchaseVariant)
-      || Equals(variant, gamedataMappinVariant.ApartmentToPurchaseVariant) {
+      || Equals(variant, gamedataMappinVariant.ExclamationMarkVariant)
+      || Equals(variant, gamedataMappinVariant.HuntForPsychoVariant)
+      || Equals(variant, gamedataMappinVariant.MinorActivityVariant)
+      || Equals(variant, gamedataMappinVariant.Zzz06_NCPDGigVariant)
+      || Equals(variant, gamedataMappinVariant.Zzz01_CarForPurchaseVariant)
+      || Equals(variant, gamedataMappinVariant.Zzz02_MotorcycleForPurchaseVariant)
+      || Equals(variant, gamedataMappinVariant.Zzz05_ApartmentToPurchaseVariant) {
       return variant;
     }
-    return gamedataMappinVariant.PointOfInterest_ExclamationMarkVariant;
+    return gamedataMappinVariant.ExclamationMarkVariant;
   }
 }
 

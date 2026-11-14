@@ -100,3 +100,7 @@ not redistribute its curated coordinates, code, UI, or assets**.
 For Reveal Map Pins we want a **game-derived** vanilla catalog with automatic
 validation and collision/deduplication against pre-existing map markers.
 No player should manually visit hundreds of locations.
+
+## REDscript enum compatibility (2026-11-14)
+
+The earlier PR #8 test build **did not compile** on Cyberpunk 2077 2.5: `gamedataMappinVariant.PointOfInterest_ExclamationMarkVariant` is a TweakDB-style name, **not** a `gamedataMappinVariant` member. The REDscript map-proxy code also had six other mismatched member names, and the CET test used the same invalid exclamation-mark value. These names have been corrected against the generated RED4ext `game::data::MappinVariant` enum, including `Zzz01_`, `Zzz02_`, `Zzz05_` and `Zzz06_` prefixes. No game-side compile has yet been run; recheck `r6/logs/redscript_rCURRENT.log` after installation.

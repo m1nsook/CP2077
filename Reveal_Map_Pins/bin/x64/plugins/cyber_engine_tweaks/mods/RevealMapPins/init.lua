@@ -219,7 +219,7 @@ registerHotkey(MOD .. "_Preview", TITLE .. ": toggle temporary marker test", fun
   local ok, result = pcall(function()
     local mappin = MappinData.new()
     mappin.mappinType = TweakDBID.new("Mappins.QuestStaticMappinDefinition")
-    mappin.variant = gamedataMappinVariant.PointOfInterest_ExclamationMarkVariant
+    mappin.variant = gamedataMappinVariant.ExclamationMarkVariant
     mappin.active = true
     mappin.visibleThroughWalls = false
     return Game.GetMappinSystem():RegisterMappin(
