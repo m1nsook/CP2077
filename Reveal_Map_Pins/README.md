@@ -200,3 +200,22 @@ does **not** include `db.json`; it preserves your choices.
 
 This is a local Lua startup regression-tested fix, **not** yet an
 in-game confirmation that all 219 markers render correctly.
+
+## CET 1.38.1 sandbox startup repair (Nov 14, 2026)
+
+Both RevealMapPins and NoTrackingPlease were failing to load because their
+`init.lua` files called `debug.getinfo(1,"S")` at startup. The CET
+v1.38.1 Lua sandbox intentionally excludes the `debug` library, so the
+call fails before any hotkeys are registered. This was reproduced in a Lua
+sandbox with `debug=nil` and independently checked against CET source
+`src/scripting/LuaSandbox.cpp`.
+
+The two scripts now use relative files (`db.json`,
+`catalog_runtime.lua`, `catalog.tsv`), and only CET-supported
+`onInit`, `onUpdate` and `onShutdown` events. Session state resets
+on loss of the in-game quest system. Existing user `db.json` is preserved.
+
+Regression tests: the original scripts fail with the matching nil-`debug`
+error; corrected scripts load and register four RevealMapPins bindings
+and one NoTrackingPlease binding, and read all 219 catalog entries.
+Not yet verified in a running 2.5 game.
