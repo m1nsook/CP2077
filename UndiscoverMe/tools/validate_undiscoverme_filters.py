@@ -21,9 +21,15 @@ assert "mappins: []" in tweak
 assert "WorldMap.WorldMapCustomFiltersList.list:" not in tweak
 assert "!prepend" not in tweak
 
-# The new fifth tab must never index the game's four hard-coded dots.
+# Five visible pills, while the original four indexed INK references remain bounded.
 assert "SetQuickFilterIndicator(index: Int32)" in ui
-assert "if index >= count { wrappedMethod(count - 1); return; }" in ui
+assert "UDMCreateFifthIndicator()" in ui
+assert "new inkRectangle()" in ui
+assert "extra.Reparent(parent)" in ui
+assert "index >= count ? count - 1 : index" in ui
+assert "this.m_udmFifthIndicator.SetState(n\"Selected\")" in ui
+assert "fourth.SetState(n\"Default\")" in ui
+assert "m_quickFilterIndicators[4]" not in ui.split("@wrapMethod(WorldMapMenuGameController)\nprivate final func SetQuickFilterIndicator")[1]
 
 # Record-identity-based quick tab, not the shared native CustomFilter bit.
 assert 'Equals(rec.GetID(), t"WorldMap.UndiscoverMeQuickFilter")' in ui
