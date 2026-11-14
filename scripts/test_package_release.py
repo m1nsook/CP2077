@@ -63,6 +63,20 @@ class OneModReleaseTest(unittest.TestCase):
             self.assertEqual(archive.namelist(), ["r6/scripts/UndiscoverMe/core.reds"])
         self.assertEqual(Path("dist/RELEASE_TAG.txt").read_text().strip(), "undiscoverme-v1.0.0")
 
+    def test_version_without_v_prefix_normalizes_to_same_release(self):
+        bare = build("UndiscoverMe", "1.0.0", Path("bare"))
+        prefixed = build("UndiscoverMe", "v1.0.0", Path("prefixed"))
+        self.assertEqual(bare.name, "UndiscoverMe-v1.0.0.zip")
+        self.assertEqual(prefixed.name, bare.name)
+        self.assertEqual(bare.read_bytes(), prefixed.read_bytes())
+        self.assertEqual(Path("bare/RELEASE_TAG.txt").read_text().strip(), "undiscoverme-v1.0.0")
+        self.assertEqual(Path("bare/RELEASE_NOTES.md").read_text(), Path("prefixed/RELEASE_NOTES.md").read_text())
+
+    def test_version_without_v_prefix_accepts_prerelease(self):
+        path = build("UndiscoverMe", "1.0.1-dev.1", Path("prerelease"))
+        self.assertEqual(path.name, "UndiscoverMe-v1.0.1-dev.1.zip")
+        self.assertEqual(Path("prerelease/RELEASE_TAG.txt").read_text().strip(), "undiscoverme-v1.0.1-dev.1")
+
     def test_translation_source_archive_not_game_install(self):
         meta = json.loads(Path(".github/mod-descriptions.json").read_text("utf-8"))
         meta["UndiscoverMe_Translation_Sources"] = {

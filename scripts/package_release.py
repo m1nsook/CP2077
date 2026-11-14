@@ -65,9 +65,18 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def normalize_version(version: str) -> str:
+    """Allow either 1.0.0 or v1.0.0; release tags always use the v prefix."""
+    normalized = version.strip()
+    if not normalized.startswith("v"):
+        normalized = "v" + normalized
+    if not VERSION.fullmatch(normalized):
+        raise ValueError("Version must look like 1.0.0, v1.0.0, or 1.0.0-dev.1")
+    return normalized
+
+
 def build(mod: str, version: str, output: Path) -> Path:
-    if not VERSION.fullmatch(version):
-        raise ValueError("Version must be like v0.1.0 or v0.2.0-dev.1")
+    version = normalize_version(version)
 
     descriptions = json.loads(Path(".github/mod-descriptions.json").read_text("utf-8"))
     if mod not in descriptions:
@@ -129,7 +138,7 @@ def build(mod: str, version: str, output: Path) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mod", required=True, help="One mod directory, e.g. UndiscoverMe_Teleporter")
-    parser.add_argument("--tag", required=True, help="Mod version, e.g. v0.1.0")
+    parser.add_argument("--tag", required=True, help="Mod version, e.g. 1.0.0 or v1.0.0")
     parser.add_argument("--output", default="dist")
     args = parser.parse_args()
     try:

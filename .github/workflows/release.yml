@@ -16,7 +16,7 @@ on:
           - UndiscoverMe_Korean
           - UndiscoverMe_Translation_Sources
       version:
-        description: "Version (v0.1.0 or v0.1.0-dev.1)"
+        description: "Version (1.0.0 or v1.0.0; optional -dev.1)"
         required: true
         type: string
 
