@@ -212,7 +212,12 @@ private final func UDMEnsureFifthPill() -> Void {
   pill.SetAnchorPoint(source.GetAnchorPoint());
   pill.SetHAlign(source.GetHAlign());
   pill.SetVAlign(source.GetVAlign());
-  pill.SetSize(source.GetSize());
+  let nativeSize = source.GetSize();
+  // Some INK templates size children through layout rules, not a fixed
+  // dimension. Keep the extra pill visible if that returns zero.
+  if nativeSize.X <= 0.0 { nativeSize.X = 16.0; }
+  if nativeSize.Y <= 0.0 { nativeSize.Y = 4.0; }
+  pill.SetSize(nativeSize);
   pill.SetMargin(source.GetMargin());
   pill.SetTintColor(source.GetTintColor());
   pill.SetOpacity(source.GetOpacity());
