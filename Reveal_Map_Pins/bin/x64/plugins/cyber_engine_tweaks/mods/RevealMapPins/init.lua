@@ -300,7 +300,9 @@ registerForEvent("onUpdate", function(delta)
     local ok, value = pcall(function() return qs:GetFactStr(item.fact) end)
     if ok and type(value) == "number" and (value == 0 or value == 1) then
       if lastWritten[item.fact] ~= nil and value ~= lastWritten[item.fact] then
-        local enabled = value == 0
+        -- The experimental catalog fact is positive (1=ON), unlike the
+        -- legacy *_disabled facts (0=ON).
+        local enabled = item.key == "catalog" and value == 1 or item.key ~= "catalog" and value == 0
         if db.settings[item.key] ~= enabled then
           db.settings[item.key] = enabled
           changed = true
