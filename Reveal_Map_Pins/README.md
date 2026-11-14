@@ -294,3 +294,34 @@ be detected. The linked quest lookup must still be verified on a real
 completed save. If the new diagnostics show `questOK=0` and a large
 `questUnknown`, that remaining lookup problem requires further work
 without making all map pins disappear again.
+
+## Known regression & safe rendering reset (PR #16)
+
+On a user's Cyberpunk 2077 2.5 save, PR #15 still showed completed
+cyberpsycho markers and misleading fixer overlays. CET reported
+`catalog=219 active=64 skipped=155 completed=0 unverified=194`.
+The quest-status API was not actually verifying completed missions, and
+the newer code is not suitable to ship as a completed-content filter.
+
+**This build restores the exact game-tested PR #13 marker registration
+and conservative saved-POI fallback**, with one new exclusion:
+`points_of_interest/service_points/*_fixer` registry entries will
+**never be registered as additional runtime proxies**. These seven
+records are static service-point map positions, not reliable live
+character coordinates; Cyberpunk itself owns the fixer pins and their
+gig counters. No NCPD, tarot or cyberpsycho coordinates were changed.
+
+This is **not** a fix for completed Cyberpsycho or NCPD quest display.
+The working marker path is restored, but the original completed-quest
+limitation remains until we can validate a true save-aware source.
+The unused `quest_links.tsv` is included only for future development;
+the restored runtime does not parse or require it. The CET diagnostics
+show `catalog=219` and counts from the working runtime, not
+`completed`, `unverified`, or `questOK`.
+
+For reliable completion research, the game's save
+`metadata.*.json` includes `finishedQuests` (quest IDs only).
+Comparing the metadata from a player's completed save with the
+journal classifications can establish known finished missions
+without guessing fact names. Do not mutate player saves or upload
+save data to a public repository.
