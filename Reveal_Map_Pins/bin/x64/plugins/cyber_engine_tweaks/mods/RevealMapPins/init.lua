@@ -6,7 +6,6 @@ local OPTIONS = {
   { key = "enabled", label = "Reveal map pins", desc = "Master switch for selected vanilla categories.", fact = "miso_rmp_all_disabled", default = true },
   { key = "catalog", label = "Use classified map catalog (experimental)", desc = "Display missing verified vanilla POIs using their native icon variants; disable anytime.", fact = "miso_rmp_catalog_enabled", default = false },
   { key = "travel", label = "Fast travel locations", desc = "Display only; does NOT unlock destinations.", fact = "miso_rmp_travel_disabled", default = true },
-  { key = "fixer", label = "Fixers", desc = "Fixer locations only, never gigs or jobs.", fact = "miso_rmp_fixer_disabled", default = true },
   { key = "ncpd", label = "NCPD scanner hustles", desc = "Assault in Progress, Organized Crime and Reported Crime.", fact = "miso_rmp_ncpd_disabled", default = true },
   { key = "psycho", label = "Cyberpsycho sightings", desc = "Cyberpsycho locations, not quest stages.", fact = "miso_rmp_psycho_disabled", default = true },
   { key = "tarot", label = "Tarot cards", desc = "Tarot graffiti markers.", fact = "miso_rmp_tarot_disabled", default = true },
@@ -83,7 +82,7 @@ local function updateOption(key, value)
   end
 end
 
--- Separate CET owner for the 219 journal-classified game-derived POIs.
+-- Separate CET owner for the 212 journal-classified game-derived POIs.
 -- This mode starts disabled until the player explicitly opts in.
 -- Bindings must always register, even if a missing/corrupt catalog fails.
 -- CET exposes RTTI/Game types only after onInit: do not load the catalog
@@ -203,7 +202,7 @@ end)
 
 registerHotkey(MOD .. "_Catalog", TITLE .. ": toggle classified catalog", function()
   updateOption("catalog", not db.settings.catalog)
-  print("[" .. MOD .. "] Classified 219-location catalog " .. (db.settings.catalog and "ON" or "OFF"))
+  print("[" .. MOD .. "] Classified 212-location catalog " .. (db.settings.catalog and "ON" or "OFF"))
 end)
 
 -- CET Bindings -> diagnostic hotkey. This reports whether the game has

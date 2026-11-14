@@ -55,9 +55,6 @@ public abstract class RMPAllowlist {
     if Equals(v, gamedataMappinVariant.FastTravelVariant) {
       return gamedataWorldMapFilter.FastTravel;
     }
-    if Equals(v, gamedataMappinVariant.FixerVariant) {
-      return gamedataWorldMapFilter.Gigs;
-    }
     if Equals(v, gamedataMappinVariant.HuntForPsychoVariant) {
       return gamedataWorldMapFilter.PsychoFilter;
     }
@@ -81,7 +78,6 @@ public abstract class RMPState {
     let q = GameInstance.GetQuestsSystem(gi);
     if !IsDefined(q) || q.GetFactStr("miso_rmp_all_disabled") == 1 { return false; }
     if Equals(t, gamedataWorldMapFilter.FastTravel) { return q.GetFactStr("miso_rmp_travel_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.Gigs) { return q.GetFactStr("miso_rmp_fixer_disabled") != 1; }
     if Equals(t, gamedataWorldMapFilter.Story) { return q.GetFactStr("miso_rmp_ncpd_disabled") != 1; }
     if Equals(t, gamedataWorldMapFilter.PsychoFilter) { return q.GetFactStr("miso_rmp_psycho_disabled") != 1; }
     if Equals(t, gamedataWorldMapFilter.TarotFilter) { return q.GetFactStr("miso_rmp_tarot_disabled") != 1; }
@@ -104,7 +100,7 @@ public abstract class RMPVanillaGuard {
     }
     // The external catalog handles all classified POI types when enabled;
     // keep the registered fast-travel path alive because it is not in that
-    // catalog and its originals cannot conflict with NCPD/Tarot/Fixer pins.
+    // catalog and its originals cannot conflict with NCPD/Tarot pins.
     let facts = GameInstance.GetQuestsSystem(gi);
     if IsDefined(facts) && facts.GetFactStr("miso_rmp_catalog_enabled") == 1
       && !Equals(group, gamedataWorldMapFilter.FastTravel) {
@@ -129,7 +125,7 @@ public abstract class RMPProxyDefinition {
     return t"Mappins.QuestStaticMappinDefinition";
   }
 
-  // Preserve allowed source variants so a fixer, cyberpsycho, tarot or NCPD
+  // Preserve allowed source variants so a cyberpsycho, tarot or NCPD
   // marker isn't misrepresented as a generic quest/exclamation marker.
   public static func VariantFor(variant: gamedataMappinVariant, group: gamedataWorldMapFilter) -> gamedataMappinVariant {
     return variant;
@@ -259,11 +255,6 @@ public class RMPSettings extends ScriptableSystem {
 
   @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
   @runtimeProperty("ModSettings.category", "Exploration")
-  @runtimeProperty("ModSettings.displayName", "Fixer locations (not gigs)")
-  public let fixer: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Exploration")
   @runtimeProperty("ModSettings.displayName", "NCPD scanner hustles")
   public let ncpd: Bool = true;
 
@@ -284,7 +275,6 @@ public class RMPSettings extends ScriptableSystem {
   private func Prepare() {
     ArrayPush(this.keys, "miso_rmp_all_disabled");
     ArrayPush(this.keys, "miso_rmp_travel_disabled");
-    ArrayPush(this.keys, "miso_rmp_fixer_disabled");
     ArrayPush(this.keys, "miso_rmp_ncpd_disabled");
     ArrayPush(this.keys, "miso_rmp_psycho_disabled");
     ArrayPush(this.keys, "miso_rmp_tarot_disabled");
@@ -293,18 +283,16 @@ public class RMPSettings extends ScriptableSystem {
   private func ValueAt(i: Int32) -> Bool {
     if i == 0 { return this.enabled; }
     if i == 1 { return this.travel; }
-    if i == 2 { return this.fixer; }
-    if i == 3 { return this.ncpd; }
-    if i == 4 { return this.psycho; }
+    if i == 2 { return this.ncpd; }
+    if i == 3 { return this.psycho; }
     return this.tarot;
   }
 
   private func SetAt(i: Int32, enabled: Bool) {
     if i == 0 { this.enabled = enabled; }
     else if i == 1 { this.travel = enabled; }
-    else if i == 2 { this.fixer = enabled; }
-    else if i == 3 { this.ncpd = enabled; }
-    else if i == 4 { this.psycho = enabled; }
+    else if i == 2 { this.ncpd = enabled; }
+    else if i == 3 { this.psycho = enabled; }
     else { this.tarot = enabled; }
   }
 

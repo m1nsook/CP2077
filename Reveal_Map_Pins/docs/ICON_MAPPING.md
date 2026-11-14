@@ -36,7 +36,7 @@ All these native texture-part names exist in the extracted
 | Reported Crime | `HiddenStashVariant` | `map_bounty` | `map_bounty.png` |
 | Cyberpsycho Sighting | `HuntForPsychoVariant` | `hunt_for_psycho` | `hunt_for_psycho.png` |
 | Tarot | `TarotVariant` | `tarot_card` | `tarot_card.png` |
-| Fixer | `FixerVariant` | `fixer` | `fixer.png` |
+| Fixer (not used by this mod; vanilla only) | `FixerVariant` | `fixer` | `fixer.png` |
 | Fast travel (not yet in catalog) | `FastTravelVariant` | `fast_travel` | `fast_travel.png` |
 
 `lootIconic.png` also exists in this native atlas but **does not mean

@@ -8,7 +8,6 @@ local TYPES = {
   R = { key = "ncpd", variant = "HiddenStashVariant", name = "Reported Crime" },
   C = { key = "psycho", variant = "HuntForPsychoVariant", name = "Cyberpsycho Sighting" },
   T = { key = "tarot", variant = "TarotVariant", name = "Tarot Card" },
-  F = { key = "fixer", variant = "FixerVariant", name = "Fixer" },
 }
 -- TweakDBID uses game RTTI, which is unavailable before CET onInit.
 -- Construct it during an in-game registration, never at module load time.
@@ -42,7 +41,7 @@ local function readCatalog(filename)
     end
   end
   file:close()
-  if #rows ~= 219 then return nil, "catalog has " .. #rows .. " rows; expected 219" end
+  if #rows ~= 212 then return nil, "catalog has " .. #rows .. " rows; expected 212" end
   return rows
 end
 
@@ -133,11 +132,7 @@ function Runtime.new(directory, getSetting, log)
     local completed = EnumInt(gamedataMappinPhase.CompletedPhase)
     local undiscovered = EnumInt(gamedataMappinPhase.UndiscoveredPhase)
     for _, entry in ipairs(self.rows) do
-      -- Fixer POIs are static service_point journal locations, not NPC positions.
-      -- The game already displays their native fixer markers and progress.
-      -- Creating a second runtime fixer pin is misleading (e.g. 0/0 gigs).
-      local allowed = entry.kind.key ~= "fixer"
-        and getSetting("enabled") and getSetting(entry.kind.key)
+      local allowed = getSetting("enabled") and getSetting(entry.kind.key)
         and (ep1 or not entry.ep1)
       if allowed then
         local ok, found, phase, _, stateActive = pcall(function()
