@@ -62,3 +62,41 @@ warning in the CET console instead of silently doing nothing. The CET
 
 This startup fix doesn't create a complete catalog of undiscovered vanilla
 locations; it first makes the existing registered-marker scanner observable.
+
+
+## Temporary map-rendering test (optional)
+
+This test distinguishes a broken rendering path from a missing location
+catalog. It uses CET directly and **does not require the REDscript scanner**.
+
+1. In CET **Bindings**, assign `Reveal Map Pins: toggle temporary marker test`.
+2. Load a save, press the hotkey **once**, then open the world map near V's
+   apartment (Megabuilding H10, Watson).
+3. Check for a *temporary quest/exclamation-style marker* at
+   `(-1382.2, 1270.6, 123.08)`. This is a verified vanilla coordinate.
+   It may overlap an existing apartment icon, so zoom in if needed.
+4. Press the same hotkey again to remove the test marker. The temporary marker
+   is also removed on session exit or shutdown.
+
+The CET console logs whether the marker registration returned an ID or
+failed. If this probe appears but the regular mod reveals nothing, the
+problem is the vanilla marker source/filter/catalog path, **not** CET's ability
+to register a marker. If it doesn't appear, we must investigate map UI profiles
+or registration before building a large catalog.
+
+This test adds **no** gameplay progression, fast-travel unlocks, permanent
+markers, or third-party dependencies. It is not a replacement for the actual
+vanilla location catalog.
+
+## Implementation reference (research only)
+
+Disclosed Hidden Gems v1.1.1 demonstrates a separate catalog of 313 authored
+world coordinates, a `ScriptableSystem` that registers its own IDs at
+`Session/Ready`, per-marker visibility and completion state, a dedicated
+world-map UI profile, and an additional map filter. It uses a custom marker
+variant and UI/tweak resources. Those techniques inform our design; we **do
+not redistribute its curated coordinates, code, UI, or assets**.
+
+For Reveal Map Pins we want a **game-derived** vanilla catalog with automatic
+validation and collision/deduplication against pre-existing map markers.
+No player should manually visit hundreds of locations.
