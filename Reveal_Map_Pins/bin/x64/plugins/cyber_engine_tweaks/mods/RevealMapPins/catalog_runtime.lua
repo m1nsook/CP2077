@@ -73,7 +73,9 @@ function Runtime.new(directory, getSetting, log)
   if not rows then log("Catalog unavailable: " .. tostring(loadErr)) end
 
   function self:clear()
-    local ms = Game.GetMappinSystem()
+    -- Session-end and game shutdown may happen after MappinSystem teardown.
+    local ok, ms = pcall(Game.GetMappinSystem)
+    if not ok then ms = nil end
     for hash, id in pairs(self.owned) do
       if ms then pcall(function() ms:UnregisterMappin(id) end) end
       self.owned[hash] = nil
@@ -86,6 +88,7 @@ function Runtime.new(directory, getSetting, log)
     self:clear()
     self.clock = 0
     self.errorShown = false
+    self.registrationErrorShown = false
     self.enabledLast = false
   end
 
@@ -183,6 +186,10 @@ function Runtime.new(directory, getSetting, log)
             self.ownedId[key] = true
           else
             failed = failed + 1
+            if not self.registrationErrorShown then
+              log("Map marker registration failed (first error): " .. tostring(ok and key or id))
+              self.registrationErrorShown = true
+            end
           end
         end
         if self.owned[entry.hash] then active = active + 1 end
