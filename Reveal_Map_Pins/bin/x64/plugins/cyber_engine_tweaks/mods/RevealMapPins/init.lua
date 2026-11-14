@@ -188,6 +188,57 @@ registerHotkey(MOD .. "_Status", TITLE .. ": print map scan diagnostics", functi
     .. " | " .. table.concat(values, " | "))
 end)
 
+-- Independent map-rendering probe, inspired by standard CET MappinSystem usage.
+-- This does NOT discover any locations. It is an opt-in, temporary marker
+-- at a user-verified vanilla coordinate, for isolating map UI from REDscript.
+local previewMappinId = nil
+
+local function clearPreviewMappin()
+  if not previewMappinId then return end
+  local id = previewMappinId
+  previewMappinId = nil
+  local ok, err = pcall(function()
+    local ms = Game.GetMappinSystem()
+    if ms then ms:UnregisterMappin(id) end
+  end)
+  if not ok then
+    print("[" .. MOD .. "] Preview cleanup warning: " .. tostring(err))
+  end
+end
+
+registerHotkey(MOD .. "_Preview", TITLE .. ": toggle temporary marker test", function()
+  if previewMappinId then
+    clearPreviewMappin()
+    print("[" .. MOD .. "] Temporary preview marker removed")
+    return
+  end
+  if not Game.GetPlayer() then
+    print("[" .. MOD .. "] Preview unavailable: load a save first")
+    return
+  end
+  local ok, result = pcall(function()
+    local mappin = MappinData.new()
+    mappin.mappinType = TweakDBID.new("Mappins.QuestStaticMappinDefinition")
+    mappin.variant = gamedataMappinVariant.PointOfInterest_ExclamationMarkVariant
+    mappin.active = true
+    mappin.visibleThroughWalls = false
+    return Game.GetMappinSystem():RegisterMappin(
+      mappin, Vector4.new(-1382.2, 1270.6, 123.08, 1)
+    )
+  end)
+  if not ok or not result then
+    print("[" .. MOD .. "] Preview registration FAILED: " .. tostring(result))
+    return
+  end
+  local valid, value = pcall(function() return result.value end)
+  if not valid or value == nil or tostring(value) == "0" then
+    print("[" .. MOD .. "] Preview registration returned invalid marker ID: " .. tostring(value))
+    return
+  end
+  previewMappinId = result
+  print("[" .. MOD .. "] Temporary test marker added near H10 / V's Apartment. Open the world map; press the same binding to remove it.")
+end)
+
 registerForEvent("onSessionStart", function()
   inSession = false
   scannerReady, settingsReady = false, false
@@ -196,6 +247,7 @@ registerForEvent("onSessionStart", function()
   bootstrapSystems()
 end)
 registerForEvent("onSessionEnd", function()
+  clearPreviewMappin()
   inSession = false
   scannerReady, settingsReady = false, false
 end)
@@ -250,4 +302,7 @@ registerForEvent("onUpdate", function(delta)
 end)
 
 -- Optional debugging convenience; no additional dependency.
-registerForEvent("onShutdown", function() saveDB() end)
+registerForEvent("onShutdown", function()
+  clearPreviewMappin()
+  saveDB()
+end)
