@@ -131,3 +131,46 @@ No player should manually visit hundreds of locations.
 ## REDscript enum compatibility (2026-11-14)
 
 The earlier PR #8 test build **did not compile** on Cyberpunk 2077 2.5: `gamedataMappinVariant.PointOfInterest_ExclamationMarkVariant` is a TweakDB-style name, **not** a `gamedataMappinVariant` member. The REDscript map-proxy code also had six other mismatched member names, and the CET test used the same invalid exclamation-mark value. These names have been corrected against the generated RED4ext `game::data::MappinVariant` enum, including `Zzz01_`, `Zzz02_`, `Zzz05_` and `Zzz06_` prefixes. No game-side compile has yet been run; recheck `r6/logs/redscript_rCURRENT.log` after installation.
+
+## Experimental game-derived catalog (219 vanilla locations)
+
+The new **classified catalog** is intentionally **off by default**. In CET
+**Bindings**, assign **Reveal Map Pins: toggle classified catalog** and press
+it once after loading a save. Alternatively use the optional Native Settings
+UI switch. Turn it off to remove only the markers registered by this mod.
+
+Catalog categories: **114 Assault in Progress, 18 Organized Crime, 26 Reported
+Crime, 17 Cyberpsycho Sighting, 37 Tarot and 7 Fixer** locations. Categories
+respect existing NCPD/Cyberpsycho/Tarot/Fixer switches. The mod never
+registers quest stages, gigs, shops, or service locations. Fast travel and
+Legendary/Iconic item catalogs remain separate unfinished milestones.
+
+Runtime source: the player's WolvenKit game-2500 `03_night_city.poimappins`
+and base+EP1 `cooked_journal.journal` exports. `catalog.tsv` contains only
+219 selected journal hashes, native variant categories, and game coordinates.
+**The 71 MB journals are not packaged.** This registry is build-specific.
+
+The CET owner reads the game's saved POI phase (completed content is skipped),
+compares its candidate positions/variants to visible map pins, and owns its
+registered IDs. It resynchronizes every 12 seconds. If map enumeration or
+saved-state calls fail, it skips marker registration rather than duplicating
+unknown sources. While the catalog is enabled, the REDscript scanner limits itself to
+registered hidden **fast-travel** markers, avoiding overlap with the 219
+classified POIs. A complete unregistered fast-travel catalog still needs
+separate extraction.
+
+**Native map icons** are selected from the game variant, not shipped as new
+assets. Relevant WolvenKit paths:
+
+- `base/gameplay/gui/common/icons/mappin_icons.inkatlas`
+- `base/gameplay/gui/widgets/mappins/atlas_map_pins.inkatlas`
+- `base/gameplay/gui/widgets/mappins/quest/default_mappin.inkwidget`
+
+The registration uses the vanilla map-capable
+`Mappins.StaticPointOfInterestMappinDefinition` record.
+
+**Not tested in-game yet:** the marker controller, icon styling, filtering and
+save-state behavior must be smoke-tested on Cyberpunk 2077 2.5. Runtime pins
+are not the same engine type as real journal-owned `PointOfInterestMappin`
+objects, so tooltips and the special fixer profile may differ. The mode is
+opt-in for that reason.

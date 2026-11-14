@@ -102,6 +102,14 @@ public abstract class RMPVanillaGuard {
     if Equals(group, gamedataWorldMapFilter.NoFilter) || !RMPState.Enabled(gi, group) {
       return false;
     }
+    // The external catalog handles all classified POI types when enabled;
+    // keep the registered fast-travel path alive because it is not in that
+    // catalog and its originals cannot conflict with NCPD/Tarot/Fixer pins.
+    let facts = GameInstance.GetQuestsSystem(gi);
+    if IsDefined(facts) && facts.GetFactStr("miso_rmp_catalog_enabled") == 1
+      && !Equals(group, gamedataWorldMapFilter.FastTravel) {
+      return false;
+    }
     if IsDefined(m as FastTravelMappin) {
       return Equals(group, gamedataWorldMapFilter.FastTravel);
     }
