@@ -219,3 +219,47 @@ Regression tests: the original scripts fail with the matching nil-`debug`
 error; corrected scripts load and register four RevealMapPins bindings
 and one NoTrackingPlease binding, and read all 219 catalog entries.
 Not yet verified in a running 2.5 game.
+
+
+## Completed/finished activity filtering — game build 2500
+
+**Fix for completed Cyberpsycho Sightings reappearing as undiscovered**:
+the engine may remove a saved POI marker record after an activity completes.
+`GetPointOfInterestMappinSavedState(hash)` can then return `found=false`;
+the previous code incorrectly treated that as unfinished. The map icon itself
+and the 219-location catalog were already confirmed in-game (PR #13).
+
+The catalog now reads **three independent native sources**:
+
+1. The existing POI marker saved phase (`CompletedPhase`).
+2. The underlying POI's game journal state (`JournalManager.GetEntry` +
+   `GetEntryState`).
+3. If that location corresponds to a quest, its exact journal quest entry
+   (`GetEntryByString(path, "gameJournalQuest")`), so `Succeeded` or
+   `Failed` hides it even if the engine deleted the original map pin.
+
+The bundled `quest_links.tsv` links **59** verified location hashes to
+their original quest entries: all **17 Cyberpsychos**, **26 Reported Crime**,
+**14 Organized Crime**, and **2 Assault in Progress** quests. Other
+NCPD/POI records still use saved pin status and direct POI journal state.
+The links are derived from the user's WolvenKit base+EP1 journals, not
+guessed quest completion facts.
+
+When either quest or POI state is completed/failed, the mod unregisters
+its own marker on its regular 12-second refresh. Unknown critical journal
+states are **unverified and hidden**, not assumed to be unfinished. This
+never writes game quest facts, advances quests, changes original markers,
+or unlocks fast travel. Original native icons are preserved.
+
+The diagnostic hotkey now prints additional catalog counters:
+
+- `completed`: locations hidden due to confirmed completed/failed state.
+- `unverified`: locations hidden because reliable completion state could
+  not be read (e.g. missing journal entry).
+- `skipped`: all excluded locations, including completed/unverified,
+  already-visible pins, missing DLC, and disabled categories.
+
+If `unverified` is unexpectedly high on a save, send that diagnostic
+line before reporting missing icons. This update has passed an offline
+Lua game-system simulation (219 registered; completed and failed quests
+removed; missing journal clears owned pins) but still needs live testing.
