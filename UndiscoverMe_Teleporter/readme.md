@@ -2,7 +2,9 @@
 
 Optional addon for **UndiscoverMe**. Install the UndiscoverMe core first.
 
-Open the world map, hover an **UndiscoverMe-created pin**, then **hold the game's Fast Travel action** (F on the default keyboard layout) until the native hold indicator completes. V teleports to the pin and the map closes.
+Enable **Reveal additional map markers** in core settings (or the core catalog CET binding) to display the classified NCPD/Cyberpsycho/Tarot pins.
+
+Open the world map, hover an **UndiscoverMe-created pin**, then **hold the game's Fast Travel action** (F on the default keyboard layout) until the hold completes. V teleports to the pin and the map closes.
 
 - Only pins actively registered by UndiscoverMe are eligible. Vanilla pins and other mods' pins remain unchanged, even if they share the same icon or coordinates.
 - Regular Fast Travel still works on vanilla fast travel points.
