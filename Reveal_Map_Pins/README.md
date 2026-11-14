@@ -174,3 +174,29 @@ save-state behavior must be smoke-tested on Cyberpunk 2077 2.5. Runtime pins
 are not the same engine type as real journal-owned `PointOfInterestMappin`
 objects, so tooltips and the special fixer profile may differ. The mode is
 opt-in for that reason.
+
+## CET Bindings startup repair (2026-11-14)
+
+The initial 219-pin catalog PR #11 test ZIP could load no **Reveal Map
+Pins** bindings in CET: `catalog_runtime.lua` created a `TweakDBID`
+at Lua module load time, before CET's `onInit` event (when game RTTI
+becomes accessible). If this raised an error, the main `init.lua`
+stopped **before registering its four hotkeys**.
+
+This update moves engine-record creation into the in-game registration
+path, defers catalog loading until `onInit`, and protects it with
+`pcall`. Even if the data or module is missing, all four hotkeys
+remain registered and the CET console explains the catalog error.
+
+**Verify:** After extracting the updated ZIP into the game folder,
+restart the game (not only Reload All Mods) and open CET > Bindings.
+Look for the `Reveal Map Pins` group with master, catalog, diagnostics,
+and temporary-marker-test hotkeys. CET prints
+`[RevealMapPins] CET initialized; four Reveal Map Pins bindings registered`
+when the mod entrypoint executes. If this line is missing, verify
+`bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins/init.lua`
+exists and inspect CET's log for a Lua load failure. The test ZIP
+does **not** include `db.json`; it preserves your choices.
+
+This is a local Lua startup regression-tested fix, **not** yet an
+in-game confirmation that all 219 markers render correctly.
