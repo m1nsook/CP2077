@@ -1,9 +1,10 @@
--- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.3.2-cet1381-sandbox
+-- UndiscoverMe | Cyberpunk 2077 2.5 | 0.4.0-map-filters
 -- CET is the settings/database bridge. Native Settings UI is optional.
+-- Keep the existing CET mod ID and folder to preserve player keybinds and db.json.
 local MOD = "RevealMapPins"
-local TITLE = "Reveal Map Pins"
+local TITLE = "UndiscoverMe"
 local OPTIONS = {
-  { key = "enabled", label = "Reveal map pins", desc = "Master switch for selected vanilla categories.", fact = "miso_rmp_all_disabled", default = true },
+  { key = "enabled", label = "Enable UndiscoverMe", desc = "Master switch for selected vanilla categories.", fact = "miso_rmp_all_disabled", default = true },
   { key = "catalog", label = "Use classified map catalog (experimental)", desc = "Display missing verified vanilla POIs using their native icon variants; disable anytime.", fact = "miso_rmp_catalog_enabled", default = false },
   { key = "travel", label = "Fast travel locations", desc = "Display only; does NOT unlock destinations.", fact = "miso_rmp_travel_disabled", default = true },
   { key = "ncpd", label = "NCPD scanner hustles", desc = "Assault in Progress, Organized Crime and Reported Crime.", fact = "miso_rmp_ncpd_disabled", default = true },
@@ -82,7 +83,7 @@ local function updateOption(key, value)
   end
 end
 
--- Separate CET owner for the 212 journal-classified game-derived POIs.
+-- UndiscoverMe uses the same proven CET owner for 212 classified POIs.
 -- This mode starts disabled until the player explicitly opts in.
 -- Bindings must always register, even if a missing/corrupt catalog fails.
 -- CET exposes RTTI/Game types only after onInit: do not load the catalog
@@ -186,7 +187,7 @@ end
 
 registerForEvent("onInit", function()
   initializeCatalog()
-  print("[" .. MOD .. "] CET initialized; four Reveal Map Pins bindings registered")
+  print("[" .. MOD .. "] CET initialized; four UndiscoverMe bindings registered")
   tryRegisterNativeSettings()
   if not nativeUIReady then
     print("[" .. MOD .. "] Native Settings UI not detected yet; will retry in game")
