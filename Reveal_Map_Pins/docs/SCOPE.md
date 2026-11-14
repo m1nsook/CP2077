@@ -9,7 +9,6 @@ journal state. All runtime proxies must be independently removable.
 | Category | Eligibility | Source |
 | --- | --- | --- |
 | Fast travel | Known and unknown vanilla fast-travel terminal positions; no unlocking | Native fast-travel-point records / placed terminals |
-| Fixers | Fixer *locations* only; never their gigs | Journal-classified vanilla POIs |
 | NCPD Scanner Hustles | Parent category only; don't duplicate its subtypes | Journal-classified vanilla POIs |
 | Assault in Progress | NCPD subset | Journal-classified minor activities |
 | Suspected Organized Crime Activity | NCPD subset | Journal-classified minor activities |
@@ -22,6 +21,7 @@ NCPD Scanner Hustles **is a parent group, not a second marker**.
 
 ## Hard exclusions
 
+- **All fixer locations** — the base game already displays them. Never add, hide, or alter original fixer pins.
 - Main jobs, side jobs and all progress/objective/stage markers.
 - Fixer gig types: Gun for Hire, Search and Recover, Thievery, Agent Saboteur,
   SOS: Merc Needed, Convoy, and any other gig/job.
@@ -44,14 +44,12 @@ WolvenKit 10.0.0-beta.1 exports from Cyberpunk game build 2500:
 Never bulk-render these files or equate coordinate duplicates with duplicates
 of the same journal entry.
 
-### Next classification data needed
+### Journal extraction completed
 
-Ask for WolvenKit JSON exports of
-`base/journal/cooked_journal.journal` and
-`ep1/journal/cooked_journal.journal` (when Phantom Liberty is installed).
-This resolves hashes to journal paths, map variants, and activity type
-(Murmur3-32, seed `0x5EEDBA5E`). A **positive allowlist match** is required
-before a marker can be emitted.
+The base and Phantom Liberty `cooked_journal.journal` JSON exports were
+already provided. They supplied the journal-path classifications for the
+212 retained candidates. The seven fixer service-point entries were dropped.
+A **positive allowlist match** is required before a marker can be emitted.
 
 Fast-travel positions and placed Legendary/Iconic items require separate
 game-derived data. Merely finding an item TweakDB definition does not locate
@@ -62,13 +60,13 @@ rewards are not static collectible markers.
 
 The registered-marker scanner **rejects all generic quest stages, gigs,
 service points and unknown marker variants**. It accepts only registered
-`PointOfInterestMappin` objects with explicit fixer/NCPD/cyberpsycho/tarot
+`PointOfInterestMappin` objects with explicit NCPD/cyberpsycho/tarot
 variants, plus `FastTravelMappin`. This is intentionally conservative and
 may omit valid locations until the journal-derived catalog is integrated.
 It does not currently reveal all of the above list and does not yet
 support world-placed Legendary/Iconic item locations.
 
-Current user-facing toggles: master, fast travel, fixers, NCPD,
+Current category toggles: master, catalog, fast travel, NCPD,
 cyberpsychos, tarot. Item toggles should be added **only after**
 corresponding item marker data is implemented.
 
