@@ -1,4 +1,4 @@
--- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.3.0-catalog-preview
+-- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.3.1-cet-hotkey-fix
 -- CET is the settings/database bridge. Native Settings UI is optional.
 local MOD = "RevealMapPins"
 local TITLE = "Reveal Map Pins"
@@ -87,11 +87,36 @@ end
 
 -- Separate CET owner for the 219 journal-classified game-derived POIs.
 -- This mode starts disabled until the player explicitly opts in.
-local catalogRuntime = dofile(scriptDir() .. "catalog_runtime.lua").new(
-  scriptDir(),
-  function(key) return db.settings[key] == true end,
-  function(message) print("[" .. MOD .. "] " .. message) end
-)
+-- Bindings must always register, even if a missing/corrupt catalog fails.
+-- CET exposes RTTI/Game types only after onInit: do not load the catalog
+-- module at top level, before the hotkeys and onInit event are registered.
+local catalogRuntime = {
+  reset = function() end,
+  tick = function() end,
+  stats = function() return "catalog=not-loaded" end,
+}
+local catalogReady = false
+local function initializeCatalog()
+  local ok, instance = pcall(function()
+    local mod = dofile(scriptDir() .. "catalog_runtime.lua")
+    assert(type(mod) == "table" and type(mod.new) == "function", "catalog module missing constructor")
+    return mod.new(
+      scriptDir(),
+      function(key) return db.settings[key] == true end,
+      function(message) print("[" .. MOD .. "] " .. message) end
+    )
+  end)
+  if ok and type(instance) == "table" and type(instance.tick) == "function"
+    and type(instance.reset) == "function" and type(instance.stats) == "function" then
+    catalogRuntime = instance
+    catalogReady = true
+    print("[" .. MOD .. "] Classified catalog loaded (" .. catalogRuntime:stats() .. ")")
+  else
+    catalogReady = false
+    print("[" .. MOD .. "] Classified catalog startup FAILED: " .. tostring(instance))
+    print("[" .. MOD .. "] CET hotkeys remain available; check catalog_runtime.lua and catalog.tsv")
+  end
+end
 
 -- REDscript ScriptableSystem classes are accessed through the system
 -- container. Explicitly resolve them when a game session is available: if
@@ -163,6 +188,8 @@ local function tryRegisterNativeSettings()
 end
 
 registerForEvent("onInit", function()
+  initializeCatalog()
+  print("[" .. MOD .. "] CET initialized; four Reveal Map Pins bindings registered")
   tryRegisterNativeSettings()
   if not nativeUIReady then
     print("[" .. MOD .. "] Native Settings UI not detected yet; will retry in game")
