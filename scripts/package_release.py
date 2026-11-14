@@ -39,6 +39,24 @@ def tracked_install_files(mod: str) -> list[PurePosixPath]:
     return sorted(paths, key=str)
 
 
+def tracked_source_files(mod: str) -> list[PurePosixPath]:
+    """A non-installable translator ZIP, preserving only checked-in source files."""
+    output = subprocess.check_output(
+        ["git", "ls-files", "-z", "--cached", "--", f"{mod}/"]
+    ).decode("utf-8")
+    result = []
+    for name in output.split("\0"):
+        if not name:
+            continue
+        path = PurePosixPath(name)
+        if len(path.parts) < 2 or path.parts[0] != mod or path.name in IGNORED_NAMES:
+            continue
+        if not Path(name).is_file():
+            raise FileNotFoundError(f"Tracked translation source file is missing: {name}")
+        result.append(path)
+    return sorted(result, key=str)
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as src:
@@ -60,7 +78,8 @@ def build(mod: str, version: str, output: Path) -> Path:
     if not all(isinstance(v, str) and v and "\n" not in v for v in (name, summary)):
         raise ValueError("Mod name and summary must be nonempty, single-line strings")
 
-    files = tracked_install_files(mod)
+    is_sources = metadata.get("package_type") == "sources"
+    files = tracked_source_files(mod) if is_sources else tracked_install_files(mod)
     if not files:
         raise ValueError(f"No tracked installable files in {mod}/")
     output.mkdir(parents=True, exist_ok=True)
@@ -83,13 +102,18 @@ def build(mod: str, version: str, output: Path) -> Path:
         "**Requires:** " + ", ".join(descriptions[req]["name"] for req in requirements) + ".\n\n"
         if requirements else ""
     )
+    install = (
+        "**Type:** Translator source archive. Do NOT extract into the game directory.\n\n"
+        if is_sources else
+        "**Install:** Extract the ZIP into your Cyberpunk 2077 game directory. "
+        "The archive contains game-ready folders only; no tools, docs, or saved settings.\n\n"
+    )
     notes = (
         f"## {name} {version}\n\n"
         f"{summary}\n\n"
         f"{required_line}"
         "**Game:** Cyberpunk 2077 2.5\n\n"
-        "**Install:** Extract the ZIP into your Cyberpunk 2077 game directory. "
-        "The archive contains game-ready folders only; no tools, docs, or saved settings.\n\n"
+        f"{install}"
         "### SHA-256\n\n"
         f"{chr(96)}{digest}  {zip_filename}{chr(96)}\n"
     )

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "locale": "pl-PL",
+  "strings": {
+    "option.enabled.label": "Włącz UndiscoverMe",
+    "option.enabled.desc": "Główny przełącznik wybranych kategorii podstawowej gry.",
+    "option.catalog.label": "Pokaż dodatkowe znaczniki na mapie",
+    "option.catalog.desc": "Wyświetla nieodkryte zdarzenia NCPD, cyberpsychopatów i karty tarota.",
+    "option.travel.label": "Punkty szybkiej podróży",
+    "option.travel.desc": "Tylko wyświetla lokalizacje — nie odblokowuje szybkiej podróży.",
+    "option.ncpd.label": "Zgłoszenia skanera NCPD",
+    "option.ncpd.desc": "Napady w toku, przestępczość zorganizowana i zgłoszone przestępstwa.",
+    "option.psycho.label": "Cyberpsychopaci",
+    "option.psycho.desc": "Lokalizacje cyberpsychopatów, bez etapów zadań.",
+    "option.tarot.label": "Karty tarota",
+    "option.tarot.desc": "Znaczniki graffiti z kartami tarota.",
+    "ui.options": "Opcje",
+    "binding.master": "UndiscoverMe: włącz/wyłącz",
+    "binding.catalog": "UndiscoverMe: przełącz dodatkowe znaczniki",
+    "status.on": "WŁ.",
+    "status.off": "WYŁ.",
+    "log.catalog": "Katalog 212 lokalizacji",
+    "pin.assault": "Napad w toku",
+    "pin.organized": "Przestępczość zorganizowana",
+    "pin.reported": "Zgłoszone przestępstwo",
+    "pin.psycho": "Cyberpsychopata",
+    "pin.tarot": "Karta tarota"
+  }
+}

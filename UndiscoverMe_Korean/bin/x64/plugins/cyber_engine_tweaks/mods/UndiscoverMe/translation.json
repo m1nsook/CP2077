@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "locale": "ko-KR",
+  "strings": {
+    "option.enabled.label": "UndiscoverMe 활성화",
+    "option.enabled.desc": "선택한 기본 게임 범주 전체를 켜거나 끕니다.",
+    "option.catalog.label": "추가 지도 마커 표시",
+    "option.catalog.desc": "아직 발견하지 않은 NCPD 사건, 사이버 사이코, 타로 카드 위치를 표시합니다.",
+    "option.travel.label": "빠른 이동 지점",
+    "option.travel.desc": "위치만 표시하며 빠른 이동 지점을 해금하지 않습니다.",
+    "option.ncpd.label": "NCPD 스캐너 의뢰",
+    "option.ncpd.desc": "진행 중인 습격, 조직범죄, 신고된 범죄.",
+    "option.psycho.label": "사이버 사이코 목격",
+    "option.psycho.desc": "임무 단계가 아닌 사이버 사이코의 위치를 표시합니다.",
+    "option.tarot.label": "타로 카드",
+    "option.tarot.desc": "타로 낙서 위치를 표시합니다.",
+    "ui.options": "옵션",
+    "binding.master": "UndiscoverMe: 전체 켜기/끄기",
+    "binding.catalog": "UndiscoverMe: 추가 마커 켜기/끄기",
+    "status.on": "켜짐",
+    "status.off": "꺼짐",
+    "log.catalog": "212개 위치 목록",
+    "pin.assault": "진행 중인 습격",
+    "pin.organized": "조직범죄",
+    "pin.reported": "신고된 범죄",
+    "pin.psycho": "사이버 사이코 목격",
+    "pin.tarot": "타로 카드"
+  }
+}

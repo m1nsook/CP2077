@@ -63,6 +63,23 @@ class OneModReleaseTest(unittest.TestCase):
             self.assertEqual(archive.namelist(), ["r6/scripts/UndiscoverMe/core.reds"])
         self.assertEqual(Path("dist/RELEASE_TAG.txt").read_text().strip(), "undiscoverme-v1.0.0")
 
+    def test_translation_source_archive_not_game_install(self):
+        meta = json.loads(Path(".github/mod-descriptions.json").read_text("utf-8"))
+        meta["UndiscoverMe_Translation_Sources"] = {
+            "name": "Translation Sources",
+            "summary": "For translators.",
+            "package_type": "sources",
+        }
+        self.make_file(".github/mod-descriptions.json", json.dumps(meta))
+        self.make_file("UndiscoverMe_Translation_Sources/en.json", '{"schema":1}')
+        self.make_file("UndiscoverMe_Translation_Sources/README.md", "instructions")
+        subprocess.check_call(["git", "add", "-A"])
+        path = build("UndiscoverMe_Translation_Sources", "v0.1.0", Path("source-dist"))
+        with ZipFile(path) as archive:
+            self.assertEqual(archive.namelist(), ["README.md", "en.json"])
+        notes = Path("source-dist/RELEASE_NOTES.md").read_text("utf-8")
+        self.assertIn("Do NOT extract into the game directory", notes)
+
     def test_reject_unknown_mod_or_invalid_version(self):
         for mod, version in [("OtherMod", "v0.1.0"), ("UndiscoverMe", "v0.1.0;echo hacked"), ("UndiscoverMe", "../v0.1.0")]:
             with self.subTest(mod=mod, version=version):

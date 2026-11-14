@@ -3,13 +3,35 @@
 -- Keep the existing CET mod ID and folder to preserve player keybinds and db.json.
 local MOD = "RevealMapPins"
 local TITLE = "UndiscoverMe"
+-- Optional language overlay. English stays the default with no translation.json.
+-- A pack never changes gameplay, quest facts, settings or player db.json.
+local translations = {}
+do
+  local file = io.open("translation.json", "rb")
+  if file then
+    local raw = file:read("*a"); file:close()
+    local ok, data = pcall(json.decode, raw)
+    if ok and type(data) == "table" and data.schema == 1
+      and type(data.strings) == "table" then
+      translations = data.strings
+    else
+      print("[" .. MOD .. "] Invalid translation.json; using English")
+    end
+  end
+end
+local function translate(key, english)
+  local value = translations[key]
+  if type(value) == "string" and value ~= "" then return value end
+  return english
+end
+
 local OPTIONS = {
-  { key = "enabled", label = "Enable UndiscoverMe", desc = "Master switch for selected vanilla categories.", fact = "miso_rmp_all_disabled", default = true },
-  { key = "catalog", label = "Reveal additional map markers", desc = "Show undiscovered NCPD, Cyberpsycho and Tarot locations.", fact = "miso_rmp_catalog_enabled", default = false },
-  { key = "travel", label = "Fast travel locations", desc = "Display only; does NOT unlock destinations.", fact = "miso_rmp_travel_disabled", default = true },
-  { key = "ncpd", label = "NCPD scanner hustles", desc = "Assault in Progress, Organized Crime and Reported Crime.", fact = "miso_rmp_ncpd_disabled", default = true },
-  { key = "psycho", label = "Cyberpsycho sightings", desc = "Cyberpsycho locations, not quest stages.", fact = "miso_rmp_psycho_disabled", default = true },
-  { key = "tarot", label = "Tarot cards", desc = "Tarot graffiti markers.", fact = "miso_rmp_tarot_disabled", default = true },
+  { key = "enabled", label = translate("option.enabled.label", "Enable UndiscoverMe"), desc = translate("option.enabled.desc", "Master switch for selected vanilla categories."), fact = "miso_rmp_all_disabled", default = true },
+  { key = "catalog", label = translate("option.catalog.label", "Reveal additional map markers"), desc = translate("option.catalog.desc", "Show undiscovered NCPD, Cyberpsycho and Tarot locations."), fact = "miso_rmp_catalog_enabled", default = false },
+  { key = "travel", label = translate("option.travel.label", "Fast travel locations"), desc = translate("option.travel.desc", "Display only; does NOT unlock destinations."), fact = "miso_rmp_travel_disabled", default = true },
+  { key = "ncpd", label = translate("option.ncpd.label", "NCPD scanner hustles"), desc = translate("option.ncpd.desc", "Assault in Progress, Organized Crime and Reported Crime."), fact = "miso_rmp_ncpd_disabled", default = true },
+  { key = "psycho", label = translate("option.psycho.label", "Cyberpsycho sightings"), desc = translate("option.psycho.desc", "Cyberpsycho locations, not quest stages."), fact = "miso_rmp_psycho_disabled", default = true },
+  { key = "tarot", label = translate("option.tarot.label", "Tarot cards"), desc = translate("option.tarot.desc", "Tarot graffiti markers."), fact = "miso_rmp_tarot_disabled", default = true },
 }
 -- CET 1.38.1 sandbox excludes the Lua debug standard library.
 -- Relative file paths resolve inside the mod sandbox directory.
@@ -113,7 +135,8 @@ local function initializeCatalog()
       "",
       function(key) return db.settings[key] == true end,
       function(message) print("[" .. MOD .. "] " .. message) end,
-      notifyCatalogPin
+      notifyCatalogPin,
+      translate
     )
   end)
   if ok and type(instance) == "table" and type(instance.tick) == "function"
@@ -178,7 +201,7 @@ local function tryRegisterNativeSettings()
   local success, err = pcall(function()
     local path = "/" .. MOD
     module.addTab(path, TITLE)
-    module.addSubcategory(path .. "/general", "Options")
+    module.addSubcategory(path .. "/general", translate("ui.options", "Options"))
     for _, item in ipairs(OPTIONS) do
       local opt = item
       uiOptions[opt.key] = module.addSwitch(path .. "/general", opt.label, opt.desc,
@@ -206,14 +229,15 @@ end)
 
 -- CET's configurable Bindings page provides a working in-game master toggle
 -- even without either of the two optional graphical settings mods.
-registerHotkey(MOD .. "_Toggle", TITLE .. ": master on/off", function()
+registerHotkey(MOD .. "_Toggle", translate("binding.master", TITLE .. ": master on/off"), function()
   updateOption("enabled", not db.settings.enabled)
-  print("[" .. MOD .. "] " .. (db.settings.enabled and "ON" or "OFF"))
+  print("[" .. MOD .. "] " .. (db.settings.enabled and translate("status.on", "ON") or translate("status.off", "OFF")))
 end)
 
-registerHotkey(MOD .. "_Catalog", TITLE .. ": toggle classified catalog", function()
+registerHotkey(MOD .. "_Catalog", translate("binding.catalog", TITLE .. ": toggle classified catalog"), function()
   updateOption("catalog", not db.settings.catalog)
-  print("[" .. MOD .. "] Classified 212-location catalog " .. (db.settings.catalog and "ON" or "OFF"))
+  print("[" .. MOD .. "] " .. translate("log.catalog", "Classified 212-location catalog") .. " "
+    .. (db.settings.catalog and translate("status.on", "ON") or translate("status.off", "OFF")))
 end)
 
 -- CET has no onSessionStart/onSessionEnd events; use onUpdate instead.

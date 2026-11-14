@@ -13,5 +13,24 @@
     "requires": [
       "UndiscoverMe"
     ]
+  },
+  "UndiscoverMe_Polish": {
+    "name": "UndiscoverMe — Polski",
+    "summary": "Polish text overlay for UndiscoverMe Core and its Teleporter addon.",
+    "requires": [
+      "UndiscoverMe"
+    ]
+  },
+  "UndiscoverMe_Korean": {
+    "name": "UndiscoverMe — 한국어",
+    "summary": "Korean text overlay for UndiscoverMe Core and its Teleporter addon.",
+    "requires": [
+      "UndiscoverMe"
+    ]
+  },
+  "UndiscoverMe_Translation_Sources": {
+    "name": "UndiscoverMe Translation Sources",
+    "summary": "Editable English, Polish and Korean JSON dictionaries for community translators; not a game mod.",
+    "package_type": "sources"
   }
 }

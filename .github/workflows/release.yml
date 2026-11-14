@@ -12,6 +12,9 @@ on:
           - No_Tracking_Please
           - UndiscoverMe
           - UndiscoverMe_Teleporter
+          - UndiscoverMe_Polish
+          - UndiscoverMe_Korean
+          - UndiscoverMe_Translation_Sources
       version:
         description: "Version (v0.1.0 or v0.1.0-dev.1)"
         required: true

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "locale": "en-US",
+  "strings": {
+    "option.enabled.label": "Enable UndiscoverMe",
+    "option.enabled.desc": "Master switch for selected vanilla categories.",
+    "option.catalog.label": "Reveal additional map markers",
+    "option.catalog.desc": "Show undiscovered NCPD, Cyberpsycho and Tarot locations.",
+    "option.travel.label": "Fast travel locations",
+    "option.travel.desc": "Display only; does NOT unlock destinations.",
+    "option.ncpd.label": "NCPD scanner hustles",
+    "option.ncpd.desc": "Assault in Progress, Organized Crime and Reported Crime.",
+    "option.psycho.label": "Cyberpsycho sightings",
+    "option.psycho.desc": "Cyberpsycho locations, not quest stages.",
+    "option.tarot.label": "Tarot cards",
+    "option.tarot.desc": "Tarot graffiti markers.",
+    "ui.options": "Options",
+    "binding.master": "UndiscoverMe: master on/off",
+    "binding.catalog": "UndiscoverMe: toggle classified catalog",
+    "status.on": "ON",
+    "status.off": "OFF",
+    "log.catalog": "Classified 212-location catalog",
+    "pin.assault": "Assault in Progress",
+    "pin.organized": "Organized Crime",
+    "pin.reported": "Reported Crime",
+    "pin.psycho": "Cyberpsycho Sighting",
+    "pin.tarot": "Tarot Card"
+  }
+}
