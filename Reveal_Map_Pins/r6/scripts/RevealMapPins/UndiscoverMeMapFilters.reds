@@ -5,17 +5,20 @@ module MisoRevealMapPins
 // UndiscoverMe's own UI records; native/custom third-party filters pass
 // through unchanged. Legacy internal IDs are intentionally retained.
 
-// 0 = vanilla/other mod row, 1 = UndiscoverMe / All,
-// 2 = NCPD, 3 = Cyberpsycho, 4 = Tarot, 5 = Fast Travel.
+// 0 = vanilla/other mod, 1 = collapsible UndiscoverMe header,
+// 2 = All, 3 = NCPD, 4 = Cyberpsycho, 5 = Tarot, 6 = Fast Travel.
+@addField(WorldMapMenuGameController)
+private let m_udmExpanded: Bool;
 @addMethod(WorldMapFiltersListItem)
 public final func UDMFilterSlot() -> Int32 {
   if !IsDefined(this.m_filterGroup) { return 0; }
   let id = this.m_filterGroup.GetID();
-  if Equals(id, t"WorldMap.UndiscoverMeAll") { return 1; }
-  if Equals(id, t"WorldMap.UndiscoverMeNCPD") { return 2; }
-  if Equals(id, t"WorldMap.UndiscoverMePsycho") { return 3; }
-  if Equals(id, t"WorldMap.UndiscoverMeTarot") { return 4; }
-  if Equals(id, t"WorldMap.UndiscoverMeTravel") { return 5; }
+  if Equals(id, t"WorldMap.UndiscoverMeMenu") { return 1; }
+  if Equals(id, t"WorldMap.UndiscoverMeAll") { return 2; }
+  if Equals(id, t"WorldMap.UndiscoverMeNCPD") { return 3; }
+  if Equals(id, t"WorldMap.UndiscoverMePsycho") { return 4; }
+  if Equals(id, t"WorldMap.UndiscoverMeTarot") { return 5; }
+  if Equals(id, t"WorldMap.UndiscoverMeTravel") { return 6; }
   return 0;
 }
 
@@ -26,15 +29,24 @@ public func SetFilterGroup(filterGroup: wref<MappinUIFilterGroup_Record>) -> Voi
   wrappedMethod(filterGroup);
   let slot = this.UDMFilterSlot();
   if slot == 1 {
-    inkTextRef.SetText(this.m_filterName, "UNDISCOVERME / ALL");
+    inkTextRef.SetText(this.m_filterName, "UNDISCOVERME  +");
   } else if slot == 2 {
-    inkTextRef.SetText(this.m_filterName, "   NCPD SCANNER");
+    inkTextRef.SetText(this.m_filterName, "   ALL SUPPORTED PINS");
   } else if slot == 3 {
-    inkTextRef.SetText(this.m_filterName, "   CYBERPSYCHO SIGHTINGS");
+    inkTextRef.SetText(this.m_filterName, "   NCPD SCANNER");
   } else if slot == 4 {
-    inkTextRef.SetText(this.m_filterName, "   TAROT");
+    inkTextRef.SetText(this.m_filterName, "   CYBERPSYCHO SIGHTINGS");
   } else if slot == 5 {
+    inkTextRef.SetText(this.m_filterName, "   TAROT");
+  } else if slot == 6 {
     inkTextRef.SetText(this.m_filterName, "   FAST TRAVEL");
+  }
+}
+
+@addMethod(WorldMapFiltersListItem)
+public final func UDMSetHeaderText(expanded: Bool) -> Void {
+  if this.UDMFilterSlot() == 1 {
+    inkTextRef.SetText(this.m_filterName, expanded ? "UNDISCOVERME  -" : "UNDISCOVERME  +");
   }
 }
 
@@ -44,13 +56,12 @@ private final func UDMIsEnabled(slot: Int32) -> Bool {
   let qs = GameInstance.GetQuestsSystem(this.m_player.GetGame());
   if !IsDefined(qs) || qs.GetFactStr("miso_rmp_all_disabled") == 1 { return false; }
   let catalog = qs.GetFactStr("miso_rmp_catalog_enabled") == 1;
-  if slot == 1 { return catalog; }
-  if slot == 2 { return catalog && qs.GetFactStr("miso_rmp_ncpd_disabled") != 1; }
-  if slot == 3 { return catalog && qs.GetFactStr("miso_rmp_psycho_disabled") != 1; }
-  if slot == 4 { return catalog && qs.GetFactStr("miso_rmp_tarot_disabled") != 1; }
-  // The existing registered fast-travel scanner is separate from the
-  // classified NCPD/Cyberpsycho/Tarot catalog.
-  if slot == 5 { return qs.GetFactStr("miso_rmp_travel_disabled") != 1; }
+  if slot == 2 { return catalog; }
+  if slot == 3 { return catalog && qs.GetFactStr("miso_rmp_ncpd_disabled") != 1; }
+  if slot == 4 { return catalog && qs.GetFactStr("miso_rmp_psycho_disabled") != 1; }
+  if slot == 5 { return catalog && qs.GetFactStr("miso_rmp_tarot_disabled") != 1; }
+  // Existing fast-travel scanner is separate from classified catalog.
+  if slot == 6 { return qs.GetFactStr("miso_rmp_travel_disabled") != 1; }
   return false;
 }
 
@@ -61,7 +72,17 @@ private final func UDMRefreshFilterRows() -> Void {
     let row = this.m_customFiltersList[i];
     if IsDefined(row) {
       let slot = row.UDMFilterSlot();
-      if slot > 0 { row.EnableFilter(this.UDMIsEnabled(slot)); }
+      if slot == 0 {
+        // Hide the game's long filter list only while our submenu is open.
+        row.GetRootWidget().SetVisible(!this.m_udmExpanded);
+      } else if slot == 1 {
+        row.GetRootWidget().SetVisible(true);
+        row.EnableFilter(false); // header is a menu control, not a filter
+        row.UDMSetHeaderText(this.m_udmExpanded);
+      } else {
+        row.GetRootWidget().SetVisible(this.m_udmExpanded);
+        row.EnableFilter(this.UDMIsEnabled(slot));
+      }
     }
     i += 1;
   }
@@ -77,7 +98,7 @@ protected cb func OnFilterListItemSpawned(filterWidget: ref<inkWidget>, userData
     let row = filterWidget.GetController() as WorldMapFiltersListItem;
     if IsDefined(row) {
       let slot = row.UDMFilterSlot();
-      if slot > 0 { row.EnableFilter(this.UDMIsEnabled(slot)); }
+      if slot > 0 { this.UDMRefreshFilterRows(); }
     }
   }
   return true;
@@ -104,17 +125,17 @@ private final func UDMEnableNativeFilter(typ: gamedataWorldMapFilter) -> Void {
 @addMethod(WorldMapMenuGameController)
 private final func UDMSyncNativeFilters(slot: Int32) -> Void {
   if slot == 1 {
-    if this.UDMIsEnabled(2) { this.UDMEnableNativeFilter(gamedataWorldMapFilter.Story); }
-    if this.UDMIsEnabled(3) { this.UDMEnableNativeFilter(gamedataWorldMapFilter.PsychoFilter); }
-    if this.UDMIsEnabled(4) { this.UDMEnableNativeFilter(gamedataWorldMapFilter.TarotFilter); }
-    if this.UDMIsEnabled(5) { this.UDMEnableNativeFilter(gamedataWorldMapFilter.FastTravel); }
-  } else if slot == 2 {
-    this.UDMEnableNativeFilter(gamedataWorldMapFilter.Story);
+    if this.UDMIsEnabled(3) { this.UDMEnableNativeFilter(gamedataWorldMapFilter.Story); }
+    if this.UDMIsEnabled(4) { this.UDMEnableNativeFilter(gamedataWorldMapFilter.PsychoFilter); }
+    if this.UDMIsEnabled(5) { this.UDMEnableNativeFilter(gamedataWorldMapFilter.TarotFilter); }
+    if this.UDMIsEnabled(6) { this.UDMEnableNativeFilter(gamedataWorldMapFilter.FastTravel); }
   } else if slot == 3 {
-    this.UDMEnableNativeFilter(gamedataWorldMapFilter.PsychoFilter);
+    this.UDMEnableNativeFilter(gamedataWorldMapFilter.Story);
   } else if slot == 4 {
-    this.UDMEnableNativeFilter(gamedataWorldMapFilter.TarotFilter);
+    this.UDMEnableNativeFilter(gamedataWorldMapFilter.PsychoFilter);
   } else if slot == 5 {
+    this.UDMEnableNativeFilter(gamedataWorldMapFilter.TarotFilter);
+  } else if slot == 6 {
     this.UDMEnableNativeFilter(gamedataWorldMapFilter.FastTravel);
   }
 }
@@ -125,7 +146,7 @@ private final func UDMToggle(slot: Int32) -> Void {
   let qs = GameInstance.GetQuestsSystem(this.m_player.GetGame());
   if !IsDefined(qs) { return; }
   let turnOn = !this.UDMIsEnabled(slot);
-  if slot == 1 {
+  if slot == 2 {
     // The master row turns on the classified catalog, but switching it OFF
     // only disables our extra markers; game-owned markers stay visible.
     qs.SetFactStr("miso_rmp_all_disabled", turnOn ? 0 : 1);
@@ -135,12 +156,12 @@ private final func UDMToggle(slot: Int32) -> Void {
     // to activate its parent and (for catalog POIs) the catalog itself.
     if turnOn {
       qs.SetFactStr("miso_rmp_all_disabled", 0);
-      if slot != 5 { qs.SetFactStr("miso_rmp_catalog_enabled", 1); }
+      if slot != 6 { qs.SetFactStr("miso_rmp_catalog_enabled", 1); }
     }
-    if slot == 2 { qs.SetFactStr("miso_rmp_ncpd_disabled", turnOn ? 0 : 1); }
-    if slot == 3 { qs.SetFactStr("miso_rmp_psycho_disabled", turnOn ? 0 : 1); }
-    if slot == 4 { qs.SetFactStr("miso_rmp_tarot_disabled", turnOn ? 0 : 1); }
-    if slot == 5 { qs.SetFactStr("miso_rmp_travel_disabled", turnOn ? 0 : 1); }
+    if slot == 3 { qs.SetFactStr("miso_rmp_ncpd_disabled", turnOn ? 0 : 1); }
+    if slot == 4 { qs.SetFactStr("miso_rmp_psycho_disabled", turnOn ? 0 : 1); }
+    if slot == 5 { qs.SetFactStr("miso_rmp_tarot_disabled", turnOn ? 0 : 1); }
+    if slot == 6 { qs.SetFactStr("miso_rmp_travel_disabled", turnOn ? 0 : 1); }
   }
   this.UDMRefreshFilterRows();
   if turnOn { this.UDMSyncNativeFilters(slot); }
@@ -157,7 +178,12 @@ protected cb func OnFilterSwitched(evt: ref<inkPointerEvent>) -> Bool {
       let slot = row.UDMFilterSlot();
       if slot > 0 {
         if evt.IsAction(n"click") || (evt.IsAction(n"tap") && row.IsFilterHovered()) {
-          this.UDMToggle(slot);
+          if slot == 1 {
+            this.m_udmExpanded = !this.m_udmExpanded;
+            this.UDMRefreshFilterRows();
+          } else {
+            this.UDMToggle(slot);
+          }
           evt.Consume();
         }
         return true;
