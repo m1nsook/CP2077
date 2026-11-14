@@ -98,7 +98,7 @@ protected cb func OnFilterListItemSpawned(filterWidget: ref<inkWidget>, userData
     let row = filterWidget.GetController() as WorldMapFiltersListItem;
     if IsDefined(row) {
       let slot = row.UDMFilterSlot();
-      if slot > 0 { this.UDMRefreshFilterRows(); }
+      this.UDMRefreshFilterRows();
     }
   }
   return true;
