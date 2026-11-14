@@ -8,6 +8,11 @@ module MisoRevealMapPins
 @addField(WorldMapMenuGameController)
 private let m_udmQuickActive: Bool;
 
+// The shipped map INK layout has four indicators. This fifth companion is
+// created in the same native INK parent, never in the vanilla fixed array.
+@addField(WorldMapMenuGameController)
+private let m_udmFifthPill: ref<inkRectangle>;
+
 @addField(WorldMapMenuGameController)
 private let m_udmSavedCustom: array<gamedataWorldMapFilter>;
 
@@ -187,16 +192,111 @@ protected cb func OnQuickFilterChanged(filterGroup: wref<MappinUIFilterGroup_Rec
   return true;
 }
 
-// The base map ink widget has FOUR preauthored indicator references. A fifth
-// quick-filter record would index out of bounds and can break the map.
-// Reuse the last indicator safely until an additional native dot is authored.
+// Build an actual fifth pill in the SAME native INK container as the first
+// four. The game owns m_quickFilterIndicators and exposes only four refs, so
+// extending that array would be unsafe; keep the extra widget separate.
+@addMethod(WorldMapMenuGameController)
+private final func UDMEnsureFifthPill() -> Void {
+  if IsDefined(this.m_udmFifthPill) { return; }
+  if ArraySize(this.m_quickFilterIndicators) != 4 { return; }
+
+  let source = inkWidgetRef.Get(this.m_quickFilterIndicators[3]);
+  let previous = inkWidgetRef.Get(this.m_quickFilterIndicators[2]);
+  if !IsDefined(source) || !IsDefined(previous) { return; }
+  let parent = source.GetParentWidget() as inkCompoundWidget;
+  if !IsDefined(parent) || NotEquals(previous.GetParentWidget(), parent) { return; }
+
+  let pill = new inkRectangle();
+  pill.SetName(n"UDM_QuickFilterIndicator5");
+  pill.SetAnchor(source.GetAnchor());
+  pill.SetAnchorPoint(source.GetAnchorPoint());
+  pill.SetHAlign(source.GetHAlign());
+  pill.SetVAlign(source.GetVAlign());
+  pill.SetSize(source.GetSize());
+  pill.SetMargin(source.GetMargin());
+  pill.SetTintColor(source.GetTintColor());
+  pill.SetOpacity(source.GetOpacity());
+  pill.SetInteractive(false);
+  pill.SetVisible(source.IsVisible());
+  pill.Reparent(parent);
+
+  // Horizontal INK panels place the fifth child automatically. Canvas-based
+  // layouts use absolute positions: advance by the existing pill spacing.
+  if IsDefined(parent as inkCanvas) {
+    let sourcePosition = parent.GetChildPosition(source);
+    let previousPosition = parent.GetChildPosition(previous);
+    let advance = sourcePosition.X - previousPosition.X;
+    if advance <= 0.0 { advance = source.GetSize().X + 6.0; }
+    pill.SetTranslation(new Vector2(advance, 0.0));
+  }
+  this.m_udmFifthPill = pill;
+}
+
+@addMethod(WorldMapMenuGameController)
+private final func UDMUpdateFifthPill(index: Int32) -> Void {
+  if !IsDefined(this.m_udmFifthPill) { return; }
+  let count = ArraySize(this.m_quickFilterIndicators);
+  if count != 4 { return; }
+  let fourth = inkWidgetRef.Get(this.m_quickFilterIndicators[3]);
+  if !IsDefined(fourth) { return; }
+
+  if index == 4 {
+    // Read the engine's actual Selected tint before restoring the fourth.
+    let activeTint = fourth.GetTintColor();
+    fourth.SetState(n"Default");
+    this.m_udmFifthPill.SetState(n"Selected");
+    this.m_udmFifthPill.SetTintColor(activeTint);
+  } else {
+    this.m_udmFifthPill.SetState(n"Default");
+    let defaultPill = inkWidgetRef.Get(this.m_quickFilterIndicators[2]);
+    if index != 3 { defaultPill = fourth; }
+    if IsDefined(defaultPill) {
+      this.m_udmFifthPill.SetTintColor(defaultPill.GetTintColor());
+    }
+  }
+  this.m_udmFifthPill.SetVisible(fourth.IsVisible());
+}
+
+// Build after the native layout has initialized, and once again lazily if
+// an external map UI delays its child widgets.
+@wrapMethod(WorldMapMenuGameController)
+protected cb func OnInitialize() -> Bool {
+  wrappedMethod();
+  this.UDMEnsureFifthPill();
+  this.UDMUpdateFifthPill(this.m_currentQuickFilterIndex);
+  return true;
+}
+
+// Retain the original animation and four widget references. When the fifth
+// tab is selected the fourth is reset, and the separate fifth becomes active.
 @wrapMethod(WorldMapMenuGameController)
 private final func SetQuickFilterIndicator(index: Int32) -> Void {
   let count = ArraySize(this.m_quickFilterIndicators);
   if count <= 0 { return; }
-  if index < 0 { wrappedMethod(0); return; }
-  if index >= count { wrappedMethod(count - 1); return; }
+  if index < 0 {
+    wrappedMethod(0);
+    this.UDMUpdateFifthPill(0);
+    return;
+  }
+  if index >= count {
+    wrappedMethod(count - 1);
+    this.UDMEnsureFifthPill();
+    this.UDMUpdateFifthPill(index);
+    return;
+  }
   wrappedMethod(index);
+  this.UDMEnsureFifthPill();
+  this.UDMUpdateFifthPill(index);
+}
+
+// The base game hides/reveals its four indicators as a group. Match that
+// visibility for the additional INK sibling.
+@wrapMethod(WorldMapMenuGameController)
+private final func ToggleQuickFilterIndicatorsVsibility(toggle: Bool) -> Void {
+  wrappedMethod(toggle);
+  if IsDefined(this.m_udmFifthPill) {
+    this.m_udmFifthPill.SetVisible(toggle);
+  }
 }
 
 // Called after each of the game's original Custom filter widgets has spawned.
@@ -284,5 +384,6 @@ private final func NavigateCustomFilters(option: ECustomFilterDPadNavigationOpti
 protected cb func OnUninitialize() -> Bool {
   this.UDMLeave();
   wrappedMethod();
+  this.m_udmFifthPill = null;
   return true;
 }
