@@ -339,3 +339,49 @@ Comparing the metadata from a player's completed save with the
 journal classifications can establish known finished missions
 without guessing fact names. Do not mutate player saves or upload
 save data to a public repository.
+
+
+## Save-aware completed activities (experimental, Cyberpunk 2077 2.5)
+
+A provided `metadata.9.json` from a **game-2500 save** confirms **40 finished
+activities among the 212 current map candidates** (23 Assault in Progress,
+5 Organized Crime, 7 Reported Crime, and 5 Cyberpsychos). That
+**private file is NOT bundled in this mod or committed to GitHub**.
+
+The previous per-POI journal lookup attempts incorrectly hid 203 unknown
+markers or reported zero finished activities. This version uses a different
+read-only approach: the native `JournalManager.GetQuests` call with the
+`succeeded` and `failed` filters, followed by each returned quest's
+`GetId()` and `GetEntryState()`. It matches these real quest IDs against
+`quest_ids.tsv`, an independently generated **175-row game-derived
+catalog** (all NCPD + Cyberpsycho POIs; Tarot has no applicable quest ID).
+
+**Safety behavior:** Only a game-journal quest returned in a terminal
+`Succeeded` or `Failed` state can suppress an extra marker. Unknown
+quests, missing JournalManager, malformed responses, or unavailable
+`quest_ids.tsv` never cause the catalog to be cleared. Positively
+completed entries are remembered for the current game session only;
+no game facts or saves are modified. All native map icons, coordinates
+and four CET bindings stay as in the last tested rendering path.
+
+The CET diagnostics now print:
+
+- `catalog`: 212 total candidates (not a promise of visible count)
+- `completed`: catalog locations skipped because their quest is verified finished
+- `journalQuests`: returned quest entries whose state could be read
+- `journalMatched`: terminal quest IDs matching our map catalog
+- `active`, `skipped`, `failed`: existing marker counters
+
+The uploaded save metadata gives a useful **40-match benchmark**, but the
+runtime number is not guaranteed to equal 40 until tested in-game; some
+finished minor activities may be missing from the journal query. If the
+CET log prints `Live quest completion unavailable`, the original known
+working map behavior is preserved, not an empty map.
+
+To validate the exact catalog without including private progress in source
+control:
+
+`python tools/validate_quest_ids.py --metadata path/to/metadata.9.json`
+
+This reads only the local JSON and prints aggregate counts. Do not
+share or commit other players' save metadata.
