@@ -14,6 +14,7 @@ local TYPES = {
 local POI_DEFINITION = "Mappins.StaticPointOfInterestMappinDefinition"
 local POLL_SECONDS = 12
 local DUPLICATE_METERS = 3
+local JOURNAL_QUEST_IDS = 175
 
 local function ident(id)
   local ok, value = pcall(function() return id.value end)
@@ -45,6 +46,69 @@ local function readCatalog(filename)
   return rows
 end
 
+-- Map only the 175 NCPD/Cyberpsycho candidates to game quest IDs.
+-- These are source-data IDs (ma_*), NOT the user's completed save data.
+local function attachQuestIds(filename, rows)
+  local file, err = io.open(filename, "r")
+  if not file then return false, "quest ID table missing: " .. tostring(err) end
+  local byHash, seenIds, count = {}, {}, 0
+  for _, row in ipairs(rows) do byHash[row.hash] = row end
+  for line in file:lines() do
+    if line:sub(1, 1) ~= "#" and line:match("%S") then
+      local hashText, questId = line:match("^(%d+)\t(ma_[%w_]+)$")
+      local hash = tonumber(hashText)
+      if not hash or not questId or not byHash[hash]
+        or byHash[hash].kind.key == "tarot" or seenIds[questId]
+        or byHash[hash].questId then
+        file:close()
+        return false, "invalid/duplicate quest ID: " .. line:sub(1, 100)
+      end
+      byHash[hash].questId = questId
+      seenIds[questId] = true
+      count = count + 1
+    end
+  end
+  file:close()
+  if count ~= JOURNAL_QUEST_IDS then
+    return false, "expected 175 quest IDs, got " .. count
+  end
+  return true
+end
+
+-- CET supports JournalRequestContext.GetQuests with state filters.
+-- Only positively terminal states are accepted; unavailable/missing APIs
+-- cannot hide otherwise valid map pins (regression safety from PR #14).
+local function readCompletedQuests()
+  local ok, finished, count = pcall(function()
+    local jm = Game.GetJournalManager()
+    if not jm then return nil, 0 end
+    local ctx = JournalRequestContext.new({
+      stateFilter = JournalRequestStateFilter.new({
+        succeeded = true, failed = true,
+      }),
+    })
+    local quests = jm:GetQuests(ctx)
+    if type(quests) ~= "table" then return nil, 0 end
+    local ids, scanned = {}, 0
+    for _, quest in ipairs(quests) do
+      local qok, qid, state = pcall(function()
+        return quest:GetId(), jm:GetEntryState(quest)
+      end)
+      if qok then
+        scanned = scanned + 1
+        local enumOK, numericState = pcall(EnumInt, state)
+        numericState = enumOK and tonumber(numericState) or tonumber(state)
+        if type(qid) == "string" and (numericState == 3 or numericState == 4) then
+          ids[qid] = true
+        end
+      end
+    end
+    return ids, scanned
+  end)
+  if not ok then return nil, 0 end
+  return finished, count or 0
+end
+
 local function existingPins(ms)
   local ok, pins = pcall(function()
     return ms:GetMappins(gamemappinsMappinTargetType.Map)
@@ -69,9 +133,17 @@ end
 
 function Runtime.new(directory, getSetting, log)
   local rows, loadErr = readCatalog(directory .. "catalog.tsv")
-  local self = { rows = rows, owned = {}, ownedId = {}, clock = 0, errorShown = false,
-    enabledLast = false, statistics = { catalog = rows and #rows or 0, added = 0, failed = 0, skipped = 0 } }
+  local questIdsLoaded, questErr = false, nil
+  if rows then questIdsLoaded, questErr = attachQuestIds(directory .. "quest_ids.tsv", rows) end
+  local self = { rows = rows, owned = {}, ownedId = {}, completedKnown = {},
+    clock = 0, errorShown = false, journalWarningIssued = false,
+    enabledLast = false, statistics = { catalog = rows and #rows or 0,
+      added = 0, failed = 0, skipped = 0, completed = 0,
+      journalQuests = 0, journalMatched = 0 } }
   if not rows then log("Catalog unavailable: " .. tostring(loadErr)) end
+  if rows and not questIdsLoaded then
+    log("Completion ID lookup unavailable: " .. tostring(questErr) .. "; existing map pins unaffected")
+  end
 
   function self:clear()
     -- Session-end and game shutdown may happen after MappinSystem teardown.
@@ -87,16 +159,20 @@ function Runtime.new(directory, getSetting, log)
 
   function self:reset()
     self:clear()
+    self.completedKnown = {} -- session scoped, not a cross-save completion list
     self.clock = 0
     self.errorShown = false
     self.registrationErrorShown = false
+    self.journalWarningIssued = false
     self.enabledLast = false
   end
 
   function self:stats()
-    return string.format("catalog=%d active=%d skipped=%d failed=%d",
+    return string.format("catalog=%d active=%d skipped=%d completed=%d journalQuests=%d journalMatched=%d failed=%d",
       self.statistics.catalog, self.statistics.added,
-      self.statistics.skipped, self.statistics.failed)
+      self.statistics.skipped, self.statistics.completed,
+      self.statistics.journalQuests, self.statistics.journalMatched,
+      self.statistics.failed)
   end
 
   function self:refresh()
@@ -128,12 +204,30 @@ function Runtime.new(directory, getSetting, log)
       end
     end
 
-    local active, skipped, failed = 0, 0, 0
+    local finishedIds, scannedQuests = readCompletedQuests()
+    if not finishedIds and not self.journalWarningIssued then
+      log("Live quest completion unavailable; using last confirmed marker behavior")
+      self.journalWarningIssued = true
+    end
+    local matched = 0
+    if finishedIds then
+      for _, row in ipairs(self.rows) do
+        if row.questId and finishedIds[row.questId] then
+          self.completedKnown[row.hash] = true
+          matched = matched + 1
+        end
+      end
+    end
+    local active, skipped, failed, completedCount = 0, 0, 0, 0
     local completed = EnumInt(gamedataMappinPhase.CompletedPhase)
     local undiscovered = EnumInt(gamedataMappinPhase.UndiscoveredPhase)
     for _, entry in ipairs(self.rows) do
       local allowed = getSetting("enabled") and getSetting(entry.kind.key)
         and (ep1 or not entry.ep1)
+      if allowed and self.completedKnown[entry.hash] then
+        allowed = false
+        completedCount = completedCount + 1
+      end
       if allowed then
         local ok, found, phase, _, stateActive = pcall(function()
           return ms:GetPointOfInterestMappinSavedState(entry.hash)
@@ -199,6 +293,9 @@ function Runtime.new(directory, getSetting, log)
     end
     self.statistics.added = active
     self.statistics.skipped = skipped
+    self.statistics.completed = completedCount
+    self.statistics.journalQuests = scannedQuests
+    self.statistics.journalMatched = matched
     self.statistics.failed = failed
   end
 
