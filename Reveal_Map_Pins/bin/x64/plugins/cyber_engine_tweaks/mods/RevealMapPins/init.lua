@@ -1,4 +1,4 @@
--- Reveal Map Pins | Cyberpunk 2077 2.5 | v0.1.0
+-- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.1.1-compat
 -- CET is the settings/database bridge. Native Settings UI is optional.
 local MOD = "RevealMapPins"
 local TITLE = "Reveal Map Pins"
@@ -87,19 +87,39 @@ local function updateOption(key, value)
   end
 end
 
-registerForEvent("onInit", function()
-  ns = GetMod("nativeSettings")
-  if not ns then
-    print("[" .. MOD .. "] Native Settings UI not installed; CET hotkey and db.json remain available")
+local nativeUIReady = false
+local nativeUIPoll = 0
+
+-- NSUI may initialize after this CET mod. Retry its registration until the
+-- API becomes available; neither the game logic nor Mod Settings depends on it.
+local function tryRegisterNativeSettings()
+  if nativeUIReady then return end
+  local ok, module = pcall(GetMod, "nativeSettings")
+  if not ok or not module then return end
+  local success, err = pcall(function()
+    local path = "/" .. MOD
+    module.addTab(path, TITLE)
+    module.addSubcategory(path .. "/general", "Options")
+    for _, item in ipairs(OPTIONS) do
+      local opt = item
+      uiOptions[opt.key] = module.addSwitch(path .. "/general", opt.label, opt.desc,
+        db.settings[opt.key], opt.default,
+        function(value) updateOption(opt.key, value) end)
+    end
+  end)
+  if not success then
+    print("[" .. MOD .. "] Native Settings UI registration failed: " .. tostring(err))
     return
   end
-  local path = "/" .. MOD
-  ns.addTab(path, TITLE)
-  ns.addSubcategory(path .. "/general", "Options")
-  for _, item in ipairs(OPTIONS) do
-    local opt = item
-    uiOptions[opt.key] = ns.addSwitch(path .. "/general", opt.label, opt.desc,
-      db.settings[opt.key], opt.default, function(value) updateOption(opt.key, value) end)
+  ns = module
+  nativeUIReady = true
+  print("[" .. MOD .. "] Native Settings UI tab registered")
+end
+
+registerForEvent("onInit", function()
+  tryRegisterNativeSettings()
+  if not nativeUIReady then
+    print("[" .. MOD .. "] Native Settings UI not detected yet; will retry in game")
   end
 end)
 
@@ -110,10 +130,33 @@ registerHotkey(MOD .. "_Toggle", TITLE .. ": master on/off", function()
   print("[" .. MOD .. "] " .. (db.settings.enabled and "ON" or "OFF"))
 end)
 
+-- CET Bindings -> diagnostic hotkey. This reports whether the game has
+-- hidden eligible sources and whether our own proxy registration succeeded.
+registerHotkey(MOD .. "_Status", TITLE .. ": print map scan diagnostics", function()
+  local qs = questSystem()
+  if not qs then
+    print("[" .. MOD .. "] Diagnostics unavailable: no active game session")
+    return
+  end
+  local values = {}
+  for _, name in ipairs({"seen", "hidden", "eligible", "active", "failed"}) do
+    local ok, value = pcall(function() return qs:GetFactStr("miso_rmp_diag_" .. name) end)
+    values[#values + 1] = name .. "=" .. tostring(ok and value or "?")
+  end
+  print("[" .. MOD .. "] " .. table.concat(values, " | "))
+end)
+
 registerForEvent("onSessionStart", function() inSession = false end)
 registerForEvent("onSessionEnd", function() inSession = false end)
 
 registerForEvent("onUpdate", function(delta)
+  if not nativeUIReady then
+    nativeUIPoll = nativeUIPoll + (delta or 0)
+    if nativeUIPoll >= 4 then
+      nativeUIPoll = 0
+      tryRegisterNativeSettings()
+    end
+  end
   pollTime = pollTime + (delta or 0)
   if pollTime < 0.6 then return end
   pollTime = 0
