@@ -1,4 +1,4 @@
--- Test the last confirmed working catalog behavior with native-only fixers.
+-- Test the last confirmed working catalog behavior with fixers fully excluded.
 -- Run from Reveal_Map_Pins: lua tools/test_completed_catalog.lua
 -- No live game/save required. Does not assume journal APIs work on 2.5.
 local root = (arg and arg[1]) or "bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins/"
@@ -45,14 +45,14 @@ Vector4={new=function(x,y,z,w) return {x=x,y=y,z=z,w=w} end}
 TweakDBID={new=function(x) return x end}
 EnumInt=function(x) return x end
 
-local settings={catalog=true,enabled=true,fixer=true,ncpd=true,psycho=true,tarot=true}
+local settings={catalog=true,enabled=true,ncpd=true,psycho=true,tarot=true}
 local catalog=dofile(root.."catalog_runtime.lua").new(
   root, function(key) return settings[key] end, print)
-assert(catalog.rows and #catalog.rows == 219)
+assert(catalog.rows and #catalog.rows == 212)
 catalog:tick(0)
--- 219 total - 7 service-point fixer proxies - 2 completed native POIs - 1 visible original
+-- 212 non-fixer candidates - 2 completed native POIs - 1 visible original
 assert(catalog.statistics.added == 209, catalog:stats())
-assert(catalog.statistics.skipped == 10)
+assert(catalog.statistics.skipped == 3)
 completed[148304100] = true
 catalog:tick(12)
 assert(catalog.statistics.added == 208, catalog:stats())
@@ -60,4 +60,4 @@ settings.catalog = false
 catalog:tick(0)
 assert(catalog.statistics.added == 0)
 assert(next(owned) == nil)
-print("PASS: native fixers only, no duplicate originals, registration and cleanup intact")
+print("PASS: fixers excluded, native originals untouched, registration and cleanup intact")
