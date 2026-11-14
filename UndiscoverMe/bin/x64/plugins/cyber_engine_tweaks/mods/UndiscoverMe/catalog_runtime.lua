@@ -3,11 +3,11 @@
 local Runtime = {}
 
 local TYPES = {
-  A = { key = "ncpd", variant = "GangWatchVariant", name = "Assault in Progress" },
-  O = { key = "ncpd", variant = "OutpostVariant", name = "Organized Crime" },
-  R = { key = "ncpd", variant = "HiddenStashVariant", name = "Reported Crime" },
-  C = { key = "psycho", variant = "HuntForPsychoVariant", name = "Cyberpsycho Sighting" },
-  T = { key = "tarot", variant = "TarotVariant", name = "Tarot Card" },
+  A = { key = "ncpd", variant = "GangWatchVariant", name = "Assault in Progress", captionKey = "pin.assault" },
+  O = { key = "ncpd", variant = "OutpostVariant", name = "Organized Crime", captionKey = "pin.organized" },
+  R = { key = "ncpd", variant = "HiddenStashVariant", name = "Reported Crime", captionKey = "pin.reported" },
+  C = { key = "psycho", variant = "HuntForPsychoVariant", name = "Cyberpsycho Sighting", captionKey = "pin.psycho" },
+  T = { key = "tarot", variant = "TarotVariant", name = "Tarot Card", captionKey = "pin.tarot" },
 }
 -- TweakDBID uses game RTTI, which is unavailable before CET onInit.
 -- Construct it during an in-game registration, never at module load time.
@@ -131,8 +131,9 @@ local function existingPins(ms)
   return result
 end
 
-function Runtime.new(directory, getSetting, log, onOwnedChanged)
+function Runtime.new(directory, getSetting, log, onOwnedChanged, translate)
   onOwnedChanged = onOwnedChanged or function() end
+  translate = translate or function(_, english) return english end
   local rows, loadErr = readCatalog(directory .. "catalog.tsv")
   local questIdsLoaded, questErr = false, nil
   if rows then questIdsLoaded, questErr = attachQuestIds(directory .. "quest_ids.tsv", rows) end
@@ -276,7 +277,7 @@ function Runtime.new(directory, getSetting, log, onOwnedChanged)
             data.variant = gamedataMappinVariant[entry.kind.variant]
             data.active = true
             data.visibleThroughWalls = false
-            data.debugCaption = entry.kind.name
+            data.debugCaption = translate(entry.kind.captionKey, entry.kind.name)
             return ms:RegisterMappin(data, Vector4.new(entry.x, entry.y, entry.z, 1))
           end)
           local key = ok and ident(id) or nil
