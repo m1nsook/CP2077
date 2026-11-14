@@ -34,16 +34,17 @@ for _, id in ipairs({"RevealMapPins_Toggle","RevealMapPins_Catalog",
                        "RevealMapPins_Status","RevealMapPins_Preview"}) do
   assert(binds[id], "missing " .. id)
 end
-for _, name in ipairs({"onInit","onUpdate","onSessionStart","onSessionEnd","onShutdown"}) do
+for _, name in ipairs({"onInit","onUpdate","onShutdown"}) do
   assert(callbacks[name], "missing event " .. name)
 end
+assert(not callbacks.onSessionStart and not callbacks.onSessionEnd, "CET 1.38.1 does not support session events")
 callbacks.onInit()
 local joined = table.concat(logs, "\n")
 if missing then
   assert(joined:find("catalog startup FAILED", 1, true))
   assert(joined:find("hotkeys remain available", 1, true))
 else
-  assert(joined:find("Classified catalog loaded (catalog=219", 1, true))
+  assert(joined:find("Classified catalog loaded (catalog=212", 1, true))
 end
-assert(joined:find("four Reveal Map Pins bindings registered", 1, true))
+assert(joined:find("four UndiscoverMe bindings registered", 1, true))
 nativePrint("PASS: four CET hotkeys load with " .. (missing and "missing" or "present") .. " catalog")

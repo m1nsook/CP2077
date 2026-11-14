@@ -243,27 +243,27 @@ public class RMPPollTick extends DelayCallback {
 // Optional Mod Settings UI. CET db.json is the persistent source of
 // truth; the fact bridge remains backward-compatible for retained keys.
 public class RMPSettings extends ScriptableSystem {
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
+  @runtimeProperty("ModSettings.mod", "UndiscoverMe")
   @runtimeProperty("ModSettings.category", "General")
   @runtimeProperty("ModSettings.displayName", "Reveal selected vanilla markers")
   public let enabled: Bool = true;
 
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
+  @runtimeProperty("ModSettings.mod", "UndiscoverMe")
   @runtimeProperty("ModSettings.category", "Exploration")
   @runtimeProperty("ModSettings.displayName", "Fast travel locations")
   public let travel: Bool = true;
 
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
+  @runtimeProperty("ModSettings.mod", "UndiscoverMe")
   @runtimeProperty("ModSettings.category", "Exploration")
   @runtimeProperty("ModSettings.displayName", "NCPD scanner hustles")
   public let ncpd: Bool = true;
 
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
+  @runtimeProperty("ModSettings.mod", "UndiscoverMe")
   @runtimeProperty("ModSettings.category", "Exploration")
   @runtimeProperty("ModSettings.displayName", "Cyberpsycho sightings")
   public let psycho: Bool = true;
 
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
+  @runtimeProperty("ModSettings.mod", "UndiscoverMe")
   @runtimeProperty("ModSettings.category", "Exploration")
   @runtimeProperty("ModSettings.displayName", "Tarot cards")
   public let tarot: Bool = true;

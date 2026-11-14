@@ -1,4 +1,4 @@
-# Reveal Map Pins — exact content scope (Cyberpunk 2077 2.5)
+# UndiscoverMe — exact content scope (Cyberpunk 2077 2.5)
 
 This is a **marker-only exploration aid**. Do not replace vanilla game
 discovery, fast travel progression, item collection, quest advancement, or
@@ -67,8 +67,13 @@ It does not currently reveal all of the above list and does not yet
 support world-placed Legendary/Iconic item locations.
 
 Current category toggles: master, catalog, fast travel, NCPD,
-cyberpsychos, tarot. Item toggles should be added **only after**
-corresponding item marker data is implemented.
+cyberpsychos, tarot. The optional World Map -> Custom native
+UndiscoverMe section provides shortcuts for these same switches without
+touching original vanilla markers. Requires TweakXL for the map rows;
+core marker registration has no dependency on TweakXL. The five records
+contain zero mappin variants and are intercepted only by name. Item
+toggles should be added **only after** corresponding item marker data
+is implemented.
 
 ## Automated acceptance
 

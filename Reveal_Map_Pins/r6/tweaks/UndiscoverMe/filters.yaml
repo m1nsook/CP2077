@@ -1,0 +1,55 @@
+# UndiscoverMe's *native* World Map > Custom filter shortcuts.
+# These groups contain no mappin variants. We intercept only their own
+# widget clicks in redscript and use the existing fact-backed category switches.
+# TweakXL is optional for the underlying marker mod.
+WorldMap.UndiscoverMeMenu:
+  $type: gamedataMappinUIFilterGroup_Record
+  filterName: UndiscoverMe-Menu
+  filterType: WorldMap.CustomFilter
+  mappins: []
+  shouldCollectMappins: false
+
+WorldMap.UndiscoverMeAll:
+  $type: gamedataMappinUIFilterGroup_Record
+  filterName: UndiscoverMe-All
+  filterType: WorldMap.CustomFilter
+  mappins: []
+  shouldCollectMappins: false
+
+WorldMap.UndiscoverMeNCPD:
+  $type: gamedataMappinUIFilterGroup_Record
+  filterName: UndiscoverMe-NCPD
+  filterType: WorldMap.CustomFilter
+  mappins: []
+  shouldCollectMappins: false
+
+WorldMap.UndiscoverMePsycho:
+  $type: gamedataMappinUIFilterGroup_Record
+  filterName: UndiscoverMe-Cyberpsycho
+  filterType: WorldMap.CustomFilter
+  mappins: []
+  shouldCollectMappins: false
+
+WorldMap.UndiscoverMeTarot:
+  $type: gamedataMappinUIFilterGroup_Record
+  filterName: UndiscoverMe-Tarot
+  filterType: WorldMap.CustomFilter
+  mappins: []
+  shouldCollectMappins: false
+
+WorldMap.UndiscoverMeTravel:
+  $type: gamedataMappinUIFilterGroup_Record
+  filterName: UndiscoverMe-FastTravel
+  filterType: WorldMap.CustomFilter
+  mappins: []
+  shouldCollectMappins: false
+
+# Each !prepend adds its record at the front. Reverse order here ensures
+# UNDISCOVERME is at the top of Custom filters, with its categories below it.
+WorldMap.WorldMapCustomFiltersList.list:
+  - !prepend WorldMap.UndiscoverMeTravel
+  - !prepend WorldMap.UndiscoverMeTarot
+  - !prepend WorldMap.UndiscoverMePsycho
+  - !prepend WorldMap.UndiscoverMeNCPD
+  - !prepend WorldMap.UndiscoverMeAll
+  - !prepend WorldMap.UndiscoverMeMenu
