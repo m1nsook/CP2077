@@ -168,6 +168,14 @@ public class RMPSystem extends ScriptableSystem {
     if !IsDefined(GetPlayer(gi)) { this.ClearAll(); this.Schedule(); return; }
     let ms = GameInstance.GetMappinSystem(gi);
     if !IsDefined(ms) { this.Schedule(); return; }
+    // The independently classified CET catalog owns its own marker IDs.
+    // Never clone the same hidden original with the legacy scan concurrently.
+    let facts = GameInstance.GetQuestsSystem(gi);
+    if IsDefined(facts) && facts.GetFactStr("miso_rmp_catalog_enabled") == 1 {
+      this.ClearAll();
+      this.Schedule();
+      return;
+    }
     if !IsDefined(this.filters) { this.filters = RMPFilters.Build(); }
     let arr: array<ref<IMappin>>;
     ms.GetMappins(gamemappinsMappinTargetType.Map, arr);
