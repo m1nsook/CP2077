@@ -10,7 +10,9 @@ local TYPES = {
   T = { key = "tarot", variant = "TarotVariant", name = "Tarot Card" },
   F = { key = "fixer", variant = "FixerVariant", name = "Fixer" },
 }
-local POI_DEFINITION = TweakDBID.new("Mappins.StaticPointOfInterestMappinDefinition")
+-- TweakDBID uses game RTTI, which is unavailable before CET onInit.
+-- Construct it during an in-game registration, never at module load time.
+local POI_DEFINITION = "Mappins.StaticPointOfInterestMappinDefinition"
 local POLL_SECONDS = 12
 local DUPLICATE_METERS = 3
 
@@ -173,7 +175,7 @@ function Runtime.new(directory, getSetting, log)
         if not self.owned[entry.hash] then
           local ok, id = pcall(function()
             local data = MappinData.new()
-            data.mappinType = POI_DEFINITION
+            data.mappinType = TweakDBID.new(POI_DEFINITION)
             data.variant = gamedataMappinVariant[entry.kind.variant]
             data.active = true
             data.visibleThroughWalls = false
