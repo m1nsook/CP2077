@@ -1,10 +1,10 @@
 {
   "No_Tracking_Please": {
     "name": "No Tracking Please",
-    "summary": "Experimental protection against enemy position-reveal hacks."
+    "summary": "Blocks enemy position-reveal requests and quickhack trace acceleration."
   },
-  "Reveal_Map_Pins": {
-    "name": "Reveal Map Pins",
-    "summary": "Experimental map marker reveal; does not unlock fast travel or quests."
+  "UndiscoverMe": {
+    "name": "UndiscoverMe",
+    "summary": "Reveals eligible vanilla map markers; experimental fifth world-map filter."
   }
 }
