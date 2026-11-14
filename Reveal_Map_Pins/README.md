@@ -6,20 +6,47 @@ Requires RED4ext, redscript and Cyber Engine Tweaks. Mod Settings and
 Native Settings UI are optional. Settings are persisted through CET
 `db.json` and an internal quest-fact bridge.
 
+## Confirmed scope (November 2026)
+
+**Only display** missing *vanilla* fast-travel locations, fixers (not their gigs),
+NCPD Scanner Hustles (Assault in Progress, Organized Crime, Reported Crime),
+Cyberpsycho Sightings, Tarot cards, and eventually verified Legendary/Iconic
+item locations. **Never display** story/side jobs, fixer gigs (Gun for Hire,
+Search and Recover, Thievery, Agent Saboteur, SOS: Merc Needed, Convoy),
+quest stages/objectives, or service points (vendors, ripperdocs, drop points,
+Autofixer, apartments, etc.).
+
+The runtime scanner now fails closed by **explicit marker variant + game
+mappin class**, instead of cloning a generic WorldMap filter category.
+QuestMappin objects and all unknown sources are excluded; this can miss some
+otherwise eligible markers until the offline journal catalog is ready.
+The installed game registry is still incomplete: none of this promises
+full-map reveal yet. No third-party markers are touched or moved.
+
+**Item markers are not implemented yet.** The game's cooked mappin/POI
+tables alone do not identify every world-placed Legendary/Iconic loot item.
+An independently verified loot-placement dataset will be needed. A misleading
+toggle for unimplemented items has deliberately not been added.
+
+The six active switches are: master, fast travel, fixer, NCPD, cyberpsycho,
+and tarot. Existing `db.json` keys for retained switches are read normally;
+obsolete job/service keys are ignored. Mod Settings and optional NSUI match
+these switches.
+
 ## Vanilla marker compatibility
 
-- Hidden **game-managed** POI, quest, and fast-travel markers are considered
-  for temporary map display proxies.
+- Only explicitly allowlisted **game-managed** POI and fast-travel markers are considered
+  for temporary map display proxies; quest-stage objects are never proxied.
 - Generic runtime markers, stubs, and unknown marker classes are ignored,
   even when they use vanilla icon variants. That protects typical third-party
   garages, chop shops, custom waypoints and other runtime pins.
 - Proxies now use game TweakDB records with **showOnMap = true**, rather than
   the generic static mappin definition.
-- Some unsupported vanilla icon variants appear as a generic POI exclamation
-  mark. This avoids injecting new TweakDB dependencies.
+- The current registry preserves the original variant instead of changing a
+  category into a generic quest/exclamation icon.
 - The master/category switches remove only proxies made by Reveal Map Pins.
 
-**Still not supported:** revealing unregistered future quest content, actual
+**Still not supported:** a complete allowlisted coordinate catalog, actual
 map fog/undiscovered districts, or unlocking fast-travel destinations.
 Third-party mods that inject journal-backed POI/quest markers cannot always be
 distinguished from vanilla sources; complete provenance detection is not
@@ -45,7 +72,7 @@ available independently.
    eligible hidden vanilla markers. If eligible is positive but active is
    zero, registration failed. If active is positive yet nothing is shown,
    investigate visibility filtering / map widget compatibility.
-5. Verify vanilla gigs/NCPD markers and that third-party vehicle shop pins
+5. Verify only allowed vanilla markers and that third-party vehicle shop pins
    do not duplicate.
 6. Toggle the mod off; other mods' original markers must remain.
 

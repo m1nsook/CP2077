@@ -1,23 +1,15 @@
--- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.1.2-bootstrap
+-- Reveal Map Pins | Cyberpunk 2077 2.5 | 0.2.0-allowlist-preview
 -- CET is the settings/database bridge. Native Settings UI is optional.
 local MOD = "RevealMapPins"
 local TITLE = "Reveal Map Pins"
 local OPTIONS = {
-  { key = "enabled", label = "Reveal map pins", desc = "Master switch for all category overrides.", fact = "miso_rmp_all_disabled", default = true },
-  { key = "jobs", label = "Jobs", desc = "Discoverable main and side jobs.", fact = "miso_rmp_jobs_disabled", default = true },
-  { key = "gigs", label = "Gigs", desc = "Gig and fixer pins already registered by the game.", fact = "miso_rmp_gigs_disabled", default = true },
-  { key = "ncpd", label = "NCPD scanners", desc = "NCPD scanner hustles and events.", fact = "miso_rmp_ncpd_disabled", default = true },
-  { key = "psycho", label = "Cyberpsychos", desc = "Cyberpsycho sightings.", fact = "miso_rmp_psycho_disabled", default = true },
-  { key = "travel", label = "Fast travel / NCART", desc = "Markers only; does NOT unlock destinations.", fact = "miso_rmp_travel_disabled", default = true },
-  { key = "ripperdoc", label = "Ripperdocs", desc = "Ripperdoc markers.", fact = "miso_rmp_ripperdoc_disabled", default = true },
-  { key = "vendor", label = "Vendors", desc = "Vendor and market markers.", fact = "miso_rmp_vendor_disabled", default = true },
-  { key = "autofixer", label = "Autofixer", desc = "Car vendor markers.", fact = "miso_rmp_autofixer_disabled", default = true },
-  { key = "drop", label = "Drop points", desc = "Drop point markers.", fact = "miso_rmp_drop_disabled", default = true },
-  { key = "rent", label = "Apartments for rent", desc = "Apartments available for purchase.", fact = "miso_rmp_rent_disabled", default = true },
-  { key = "tarot", label = "Tarot", desc = "Tarot graffiti markers.", fact = "miso_rmp_tarot_disabled", default = true },
-  { key = "property", label = "Owned property", desc = "Your apartments and owned vehicles.", fact = "miso_rmp_property_disabled", default = true },
+  { key = "enabled", label = "Reveal map pins", desc = "Master switch for selected vanilla categories.", fact = "miso_rmp_all_disabled", default = true },
+  { key = "travel", label = "Fast travel locations", desc = "Display only; does NOT unlock destinations.", fact = "miso_rmp_travel_disabled", default = true },
+  { key = "fixer", label = "Fixers", desc = "Fixer locations only, never gigs or jobs.", fact = "miso_rmp_fixer_disabled", default = true },
+  { key = "ncpd", label = "NCPD scanner hustles", desc = "Assault in Progress, Organized Crime and Reported Crime.", fact = "miso_rmp_ncpd_disabled", default = true },
+  { key = "psycho", label = "Cyberpsycho sightings", desc = "Cyberpsycho locations, not quest stages.", fact = "miso_rmp_psycho_disabled", default = true },
+  { key = "tarot", label = "Tarot cards", desc = "Tarot graffiti markers.", fact = "miso_rmp_tarot_disabled", default = true },
 }
-
 local function scriptDir()
   local s = debug.getinfo(1, "S").source or ""
   return s:sub(1, 1) == "@" and (s:sub(2):match("^(.*[\\/])") or "") or ""

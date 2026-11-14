@@ -47,38 +47,58 @@ public class RMPFilters {
   }
 }
 
+// Only explicit marker variants are eligible. A generic quest icon, map
+// filter or position is never evidence that a marker is in scope.
+// Do not create service, gig, job, stage, or player-property proxies.
+public abstract class RMPAllowlist {
+  public static func GroupOf(v: gamedataMappinVariant) -> gamedataWorldMapFilter {
+    if Equals(v, gamedataMappinVariant.FastTravelVariant) {
+      return gamedataWorldMapFilter.FastTravel;
+    }
+    if Equals(v, gamedataMappinVariant.FixerVariant) {
+      return gamedataWorldMapFilter.Gigs;
+    }
+    if Equals(v, gamedataMappinVariant.HuntForPsychoVariant) {
+      return gamedataWorldMapFilter.PsychoFilter;
+    }
+    if Equals(v, gamedataMappinVariant.TarotVariant) {
+      return gamedataWorldMapFilter.TarotFilter;
+    }
+    // Candidate NCPD variants; the offline journal catalog will separate
+    // Assault in Progress, Organized Crime and Reported Crime by journal ID.
+    if Equals(v, gamedataMappinVariant.MinorActivityVariant)
+      || Equals(v, gamedataMappinVariant.Zzz06_NCPDGigVariant)
+      || Equals(v, gamedataMappinVariant.GangWatchVariant)
+      || Equals(v, gamedataMappinVariant.OutpostVariant) {
+      return gamedataWorldMapFilter.Story;
+    }
+    return gamedataWorldMapFilter.NoFilter;
+  }
+}
+
 public abstract class RMPState {
   public static func Enabled(gi: GameInstance, t: gamedataWorldMapFilter) -> Bool {
     let q = GameInstance.GetQuestsSystem(gi);
-    if !IsDefined(q) { return true; }
-    if q.GetFactStr("miso_rmp_all_disabled") == 1 { return false; }
-    if Equals(t, gamedataWorldMapFilter.Quest) { return q.GetFactStr("miso_rmp_jobs_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.Gigs) { return q.GetFactStr("miso_rmp_gigs_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.PsychoFilter) { return q.GetFactStr("miso_rmp_psycho_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.Story) { return q.GetFactStr("miso_rmp_ncpd_disabled") != 1; }
+    if !IsDefined(q) || q.GetFactStr("miso_rmp_all_disabled") == 1 { return false; }
     if Equals(t, gamedataWorldMapFilter.FastTravel) { return q.GetFactStr("miso_rmp_travel_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.RipperdocFilter) { return q.GetFactStr("miso_rmp_ripperdoc_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.VendorFilter) { return q.GetFactStr("miso_rmp_vendor_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.AutofixerFilter) { return q.GetFactStr("miso_rmp_autofixer_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.DropPoint) { return q.GetFactStr("miso_rmp_drop_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.ApartmentToPurchaseFilter) { return q.GetFactStr("miso_rmp_rent_disabled") != 1; }
+    if Equals(t, gamedataWorldMapFilter.Gigs) { return q.GetFactStr("miso_rmp_fixer_disabled") != 1; }
+    if Equals(t, gamedataWorldMapFilter.Story) { return q.GetFactStr("miso_rmp_ncpd_disabled") != 1; }
+    if Equals(t, gamedataWorldMapFilter.PsychoFilter) { return q.GetFactStr("miso_rmp_psycho_disabled") != 1; }
     if Equals(t, gamedataWorldMapFilter.TarotFilter) { return q.GetFactStr("miso_rmp_tarot_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.CommonFilter) { return q.GetFactStr("miso_rmp_property_disabled") != 1; }
-    // Unknown variants are not cloned by default: avoid inventing markers.
     return false;
   }
 }
 
-// Compatibility: only game-managed POI, quest and fast-travel mappins.
-// Generic RuntimeMappin/StubMappin are commonly used by other mods,
-// including those that reuse vanilla icon variants and filter groups.
-// FastTravelMappin inherits RuntimeMappin: check it first.
+// A POI may be displayed as a proxy ONLY if the exact vanilla variant
+// is allowlisted. A QuestMappin is intentionally excluded: these include
+// stage and objective markers, which the user explicitly does not want.
+// FastTravelMappin inherits RuntimeMappin, so test that subtype first.
 public abstract class RMPVanillaGuard {
   public static func ShouldReveal(gi: GameInstance, m: ref<IMappin>, filters: ref<RMPFilters>) -> Bool {
-    if !IsDefined(m) || !IsDefined(filters) || m.IsVisible() || m.IsPlayerTracked() {
+    if !IsDefined(m) || m.IsVisible() || m.IsPlayerTracked() {
       return false;
     }
-    let group = filters.TypeOf(m.GetVariant());
+    let group = RMPAllowlist.GroupOf(m.GetVariant());
     if Equals(group, gamedataWorldMapFilter.NoFilter) || !RMPState.Enabled(gi, group) {
       return false;
     }
@@ -88,50 +108,23 @@ public abstract class RMPVanillaGuard {
     if IsDefined(m as RuntimeMappin) {
       return false;
     }
-    if IsDefined(m as PointOfInterestMappin) {
-      return true;
-    }
-    if IsDefined(m as QuestMappin) {
-      return Equals(group, gamedataWorldMapFilter.Quest)
-        || Equals(group, gamedataWorldMapFilter.Gigs)
-        || Equals(group, gamedataWorldMapFilter.PsychoFilter)
-        || Equals(group, gamedataWorldMapFilter.Story);
-    }
-    return false;
+    // Only registered vanilla POI objects, never arbitrary quest stage pins.
+    return IsDefined(m as PointOfInterestMappin);
   }
 }
 
-// Explicit world-map-capable TweakDB records. The previous generic
-// DefaultStaticMappin does not explicitly enable world-map display.
 public abstract class RMPProxyDefinition {
   public static func TypeFor(group: gamedataWorldMapFilter) -> TweakDBID {
     if Equals(group, gamedataWorldMapFilter.FastTravel) {
       return t"Mappins.FastTravelStaticMappin";
     }
-    if Equals(group, gamedataWorldMapFilter.DropPoint) {
-      return t"Mappins.DropPointStaticMappin";
-    }
     return t"Mappins.QuestStaticMappinDefinition";
   }
 
-  // QuestStaticMappinDefinition only allows a subset of marker variants.
-  // Unsupported category variants use a known-allowed visible POI icon.
+  // Preserve allowed source variants so a fixer, cyberpsycho, tarot or NCPD
+  // marker isn't misrepresented as a generic quest/exclamation marker.
   public static func VariantFor(variant: gamedataMappinVariant, group: gamedataWorldMapFilter) -> gamedataMappinVariant {
-    if Equals(group, gamedataWorldMapFilter.FastTravel) || Equals(group, gamedataWorldMapFilter.DropPoint) {
-      return variant;
-    }
-    if Equals(variant, gamedataMappinVariant.DefaultQuestVariant)
-      || Equals(variant, gamedataMappinVariant.QuestGiverVariant)
-      || Equals(variant, gamedataMappinVariant.ExclamationMarkVariant)
-      || Equals(variant, gamedataMappinVariant.HuntForPsychoVariant)
-      || Equals(variant, gamedataMappinVariant.MinorActivityVariant)
-      || Equals(variant, gamedataMappinVariant.Zzz06_NCPDGigVariant)
-      || Equals(variant, gamedataMappinVariant.Zzz01_CarForPurchaseVariant)
-      || Equals(variant, gamedataMappinVariant.Zzz02_MotorcycleForPurchaseVariant)
-      || Equals(variant, gamedataMappinVariant.Zzz05_ApartmentToPurchaseVariant) {
-      return variant;
-    }
-    return gamedataMappinVariant.ExclamationMarkVariant;
+    return variant;
   }
 }
 
@@ -243,71 +236,38 @@ public class RMPPollTick extends DelayCallback {
 
 // Optional Mod Settings interface. CET JSON database and the Mod Settings panel
 // share an internal fact bridge; no hard dependency on the Mod Settings module.
+// Optional Mod Settings UI. CET db.json is the persistent source of
+// truth; the fact bridge remains backward-compatible for retained keys.
 public class RMPSettings extends ScriptableSystem {
   @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
   @runtimeProperty("ModSettings.category", "General")
-  @runtimeProperty("ModSettings.displayName", "Reveal available map markers")
+  @runtimeProperty("ModSettings.displayName", "Reveal selected vanilla markers")
   public let enabled: Bool = true;
 
   @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Activities")
-  @runtimeProperty("ModSettings.displayName", "Jobs")
-  public let jobs: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Activities")
-  @runtimeProperty("ModSettings.displayName", "Gigs")
-  public let gigs: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Activities")
-  @runtimeProperty("ModSettings.displayName", "NCPD scanner")
-  public let ncpd: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Activities")
-  @runtimeProperty("ModSettings.displayName", "Cyberpsycho")
-  public let psycho: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Travel")
-  @runtimeProperty("ModSettings.displayName", "Fast travel / NCART")
+  @runtimeProperty("ModSettings.category", "Exploration")
+  @runtimeProperty("ModSettings.displayName", "Fast travel locations")
   public let travel: Bool = true;
 
   @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Services")
-  @runtimeProperty("ModSettings.displayName", "Ripperdocs")
-  public let ripperdoc: Bool = true;
+  @runtimeProperty("ModSettings.category", "Exploration")
+  @runtimeProperty("ModSettings.displayName", "Fixer locations (not gigs)")
+  public let fixer: Bool = true;
 
   @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Services")
-  @runtimeProperty("ModSettings.displayName", "Vendors")
-  public let vendor: Bool = true;
+  @runtimeProperty("ModSettings.category", "Exploration")
+  @runtimeProperty("ModSettings.displayName", "NCPD scanner hustles")
+  public let ncpd: Bool = true;
 
   @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Services")
-  @runtimeProperty("ModSettings.displayName", "Autofixer")
-  public let autofixer: Bool = true;
+  @runtimeProperty("ModSettings.category", "Exploration")
+  @runtimeProperty("ModSettings.displayName", "Cyberpsycho sightings")
+  public let psycho: Bool = true;
 
   @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Services")
-  @runtimeProperty("ModSettings.displayName", "Drop points")
-  public let drop: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Misc")
-  @runtimeProperty("ModSettings.displayName", "Apartments for rent")
-  public let rent: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Misc")
-  @runtimeProperty("ModSettings.displayName", "Tarot")
+  @runtimeProperty("ModSettings.category", "Exploration")
+  @runtimeProperty("ModSettings.displayName", "Tarot cards")
   public let tarot: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "Reveal Map Pins")
-  @runtimeProperty("ModSettings.category", "Misc")
-  @runtimeProperty("ModSettings.displayName", "Owned apartments / vehicles")
-  public let ownedProperty: Bool = true;
 
   private let ready: Bool;
   private let previous: array<Bool>;
@@ -315,50 +275,29 @@ public class RMPSettings extends ScriptableSystem {
 
   private func Prepare() {
     ArrayPush(this.keys, "miso_rmp_all_disabled");
-    ArrayPush(this.keys, "miso_rmp_jobs_disabled");
-    ArrayPush(this.keys, "miso_rmp_gigs_disabled");
+    ArrayPush(this.keys, "miso_rmp_travel_disabled");
+    ArrayPush(this.keys, "miso_rmp_fixer_disabled");
     ArrayPush(this.keys, "miso_rmp_ncpd_disabled");
     ArrayPush(this.keys, "miso_rmp_psycho_disabled");
-    ArrayPush(this.keys, "miso_rmp_travel_disabled");
-    ArrayPush(this.keys, "miso_rmp_ripperdoc_disabled");
-    ArrayPush(this.keys, "miso_rmp_vendor_disabled");
-    ArrayPush(this.keys, "miso_rmp_autofixer_disabled");
-    ArrayPush(this.keys, "miso_rmp_drop_disabled");
-    ArrayPush(this.keys, "miso_rmp_rent_disabled");
     ArrayPush(this.keys, "miso_rmp_tarot_disabled");
-    ArrayPush(this.keys, "miso_rmp_property_disabled");
   }
 
   private func ValueAt(i: Int32) -> Bool {
     if i == 0 { return this.enabled; }
-    if i == 1 { return this.jobs; }
-    if i == 2 { return this.gigs; }
+    if i == 1 { return this.travel; }
+    if i == 2 { return this.fixer; }
     if i == 3 { return this.ncpd; }
     if i == 4 { return this.psycho; }
-    if i == 5 { return this.travel; }
-    if i == 6 { return this.ripperdoc; }
-    if i == 7 { return this.vendor; }
-    if i == 8 { return this.autofixer; }
-    if i == 9 { return this.drop; }
-    if i == 10 { return this.rent; }
-    if i == 11 { return this.tarot; }
-    return this.ownedProperty;
+    return this.tarot;
   }
 
   private func SetAt(i: Int32, enabled: Bool) {
     if i == 0 { this.enabled = enabled; }
-    else if i == 1 { this.jobs = enabled; }
-    else if i == 2 { this.gigs = enabled; }
+    else if i == 1 { this.travel = enabled; }
+    else if i == 2 { this.fixer = enabled; }
     else if i == 3 { this.ncpd = enabled; }
     else if i == 4 { this.psycho = enabled; }
-    else if i == 5 { this.travel = enabled; }
-    else if i == 6 { this.ripperdoc = enabled; }
-    else if i == 7 { this.vendor = enabled; }
-    else if i == 8 { this.autofixer = enabled; }
-    else if i == 9 { this.drop = enabled; }
-    else if i == 10 { this.rent = enabled; }
-    else if i == 11 { this.tarot = enabled; }
-    else { this.ownedProperty = enabled; }
+    else { this.tarot = enabled; }
   }
 
   private func OnAttach() {
