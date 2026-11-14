@@ -2,6 +2,13 @@
 # These groups contain no mappin variants. We intercept only their own
 # widget clicks in redscript and use the existing fact-backed category switches.
 # TweakXL is optional for the underlying marker mod.
+WorldMap.UndiscoverMeMenu:
+  $type: gamedataMappinUIFilterGroup_Record
+  filterName: UndiscoverMe-Menu
+  filterType: WorldMap.CustomFilter
+  mappins: []
+  shouldCollectMappins: false
+
 WorldMap.UndiscoverMeAll:
   $type: gamedataMappinUIFilterGroup_Record
   filterName: UndiscoverMe-All
@@ -45,3 +52,4 @@ WorldMap.WorldMapCustomFiltersList.list:
   - !prepend WorldMap.UndiscoverMePsycho
   - !prepend WorldMap.UndiscoverMeNCPD
   - !prepend WorldMap.UndiscoverMeAll
+  - !prepend WorldMap.UndiscoverMeMenu
