@@ -36,5 +36,9 @@
   "Free_Chrome": {
     "name": "Free Chrome — All Cyberware Costs 0 Humanity",
     "summary": "Sets standard cyberware Humanity/Capacity costs to zero, with reversible in-game settings."
+  },
+  "Camera_Killer": {
+    "name": "Camera Killer",
+    "summary": "Shuts down cameras connected to the same access point or surveillance system when V turns off one camera."
   }
 }

@@ -11,6 +11,7 @@ on:
         options:
           - No_Tracking_Please
           - Free_Chrome
+          - Camera_Killer
           - UndiscoverMe
           - UndiscoverMe_Teleporter
           - UndiscoverMe_Polish
