@@ -95,8 +95,10 @@ protected cb func OnPressInput(e: ref<inkPointerEvent>) -> Bool {
 // Reuse the map's existing hold action and progress instead of a new bind.
 @wrapMethod(WorldMapMenuGameController)
 protected cb func OnHoldInput(e: ref<inkPointerEvent>) -> Bool {
-  if e.IsAction(n"world_map_menu_fast_travel") && this.UDMCanTeleportSelected() {
-    // Never complete a hold started on a different pin (or with no press).
+  if e.IsAction(n"world_map_menu_fast_travel") && this.m_udmHeldPinID.value != 0ul {
+    // A hold started on our pin must never fall through to vanilla travel
+    // if the pointer moves onto another pin before releasing the button.
+    if !this.UDMCanTeleportSelected() { return true; }
     let heldPin = this.selectedMappin.GetMappin();
     if !IsDefined(heldPin) || this.m_udmHeldPinID.value == 0ul
       || heldPin.GetNewMappinID().value != this.m_udmHeldPinID.value {
@@ -118,6 +120,10 @@ protected cb func OnHoldInput(e: ref<inkPointerEvent>) -> Bool {
         e.Consume();
       }
     }
+    return true;
+  }
+  // Do not let a hold that was never pressed on an owned pin travel there.
+  if e.IsAction(n"world_map_menu_fast_travel") && this.UDMCanTeleportSelected() {
     return true;
   }
   wrappedMethod(e);
