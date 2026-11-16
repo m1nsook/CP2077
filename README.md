@@ -50,7 +50,9 @@ Download the mod ZIP from [Releases](https://github.com/m1nsook/CP2077/releases)
 
 UndiscoverMe's basic marker functionality works without TweakXL; its separate **Filter: UndiscoverMe** entry requires it. The new map-filter UI is not yet confirmed working in-game.
 
-Free Chrome patches the base game's cyberware cost variants (internally called Humanity); it does not remove the separate Humanity/psychosis mechanics introduced by other mods.\n\nThe Teleporter addon is a separate download, never bundled into the core ZIP. It uses the native hold action and does not alter map filter pills. Test on a manual save: ground safety checks are not yet implemented.
+Free Chrome patches the base game's cyberware cost variants (internally called Humanity); it does not remove the separate Humanity/psychosis mechanics introduced by other mods.
+
+The Teleporter addon is a separate download, never bundled into the core ZIP. It uses the native hold action and does not alter map filter pills. Test on a manual save: ground safety checks are not yet implemented.
 
 ## Publish one mod (maintainers)
 
