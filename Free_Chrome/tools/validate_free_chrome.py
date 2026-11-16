@@ -24,10 +24,11 @@ for snippet in (
     '"Cyberware"',
     'id + ("." .. property)',
     'TweakDB:GetFlat(id + ("." .. property))',
-    'TweakDB:SetFlat(id + ".variants", newVariants)',
-    'TweakDB:SetFlat(original.id + ".variants", original.variants)',
-    'self.originals[key] = { id = id, variants = variants }',
-    'if not self.originals[key] then',
+    'TweakDB:SetFlat(id + ".variants", variants)',
+    'sameArray(safeGetFlat(id, "variants"), variants)',
+    'if setVerified(id, zero) then',
+    'if setVerified(original.id, original.variants) then',
+    'self.originals[key] = { id = id, variants = current }',
 ):
     require(snippet in patch, f"patcher missing {snippet}")
 
