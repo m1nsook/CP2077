@@ -6,12 +6,13 @@ Free Chrome makes the game's **cyberware Humanity/Capacity cost** equal to **0**
 
 ## Features
 
-- Automatically scans vanilla, Phantom Liberty, and *standardly registered* third-party cyberware records, instead of shipping a hardcoded list of item IDs.
-- Changes only the TweakDB `variants` flat for recognized cyberware to `Variants.Humanity0Cost`.
+- Targets the shared TweakDB **Humanity/Capacity cost modifier values**, which the game uses to calculate implant cost.
+- Generates cost flat paths for standard `Variants.Humanity1Cost` through `Variants.Humanity200Cost`, including Tinkerer variants and compatible standard-named modded costs.
+- Uses only `TweakDB:GetFlat()` and `TweakDB:SetFlat()` on relevant numeric `.value` fields; it does **not** modify cyberware item variants or every item's individual stats.
 - **On/off switch** in **Native Settings UI** and **Mod Settings**, plus a fallback CET Bindings hotkey (`FreeChrome_Toggle`).
-- Persistent setting in an unshipped `db.json`. A switch to **OFF** restores the variant arrays captured before this mod changed them. No saved file is overwritten by the release.
-- Re-scans at a modest interval for cyberware added after initial startup.
-- Developer-friendly patch logic in `patch.lua`: change recognized cyberware areas / item types / tags without editing settings or packaging scripts.
+- Persistent preference in an unshipped `db.json`. Switching **OFF** attempts to restore the numeric values captured before Free Chrome zeroed them.
+- Rechecks the shared cost fields periodically (not per frame) to accommodate other mods changing cost values after startup.
+- Developer-friendly `patch.lua` with `MAX_HUMANITY_COST` and `patch:addCostFlat("Your.CustomCost_inline1.value")` for alternate custom cost records.
 
 ## Important distinction
 
@@ -26,33 +27,35 @@ Zero cost does **not** increase your maximum Cyberware Capacity; it reduces the 
 3. Launch the game and open **Native Settings UI → Free Chrome → General** or **Mod Settings → Free Chrome → General**. Both UIs are optional; CET's **Bindings** page provides a fallback toggle.
 4. For reliable validation, visit a ripperdoc and check at least one installed/available implant. If an already equipped implant retains a cached cost, unequip and re-equip it to refresh the loadout view.
 
-**To uninstall:** disable the mod first to restore the captured variant values in the running session, then exit and remove `bin/x64/plugins/cyber_engine_tweaks/mods/FreeChrome/` and `r6/scripts/FreeChrome/FreeChromeSettings.reds`. TweakDB runtime changes do not persist across full game restarts.
+**To uninstall:** disable the mod first to restore the captured modifier values in the running session, then exit and remove `bin/x64/plugins/cyber_engine_tweaks/mods/FreeChrome/` and `r6/scripts/FreeChrome/FreeChromeSettings.reds`. TweakDB runtime changes do not persist across full game restarts.
 
 ## Compatibility and limits
 
-- **Vanilla + Phantom Liberty:** intended support for cyberware using normal TweakDB variant costs.
-- **Modded cyberware:** recognized by standard cyberware equipment areas, `Cyb_` item types, or `Cyberware` tags. Mods defining new record types or entirely custom cost systems may need a patch.
-- **Arms cyberware:** some have separate holstered-form capacity modifiers; the game may apply a cost from those separately. This first version does not rewrite those stats or promise to solve every special-case form.
-- **Competing patches:** a different mod may change the same `.variants` flat. For reliable results, let Free Chrome apply *after* other cost patches; toggling back off restores the values captured when it applied.
-- **Performance:** record enumeration is periodic (not every frame), and already-captured records aren't rewritten on every poll.
-- **No change:** eddie purchase prices, implant stats, maximum Capacity, vendor inventory, equipment slots, or independent cyberpsychosis systems.
+- **Vanilla + Phantom Liberty:** covers the standard, shared Humanity-cost modifier naming family.
+- **Modded cyberware:** works when the mod uses the shared `Variants.Humanity<number>Cost` records. Custom cost records require explicitly registering their numeric paths with `addCostFlat()`.
+- **Other Humanity/psychosis mods:** not affected if they use a separate meter or rule system.
+- **Competing cost changes:** other mods writing the same shared `.value` flats can conflict. For consistent results, Free Chrome should apply last; disabling restores the last nonzero values it captured, except values subsequently taken over by other mods.
+- **No change:** eddie purchase prices, cyberware item stats, maximum Capacity, inventory/vendor availability, or implant slot limits.
+- **Performance:** scans a finite family of numeric modifier paths on startup and periodically thereafter, not every frame.
 
-## Troubleshooting — 2.5 / Cyberware-EX
+## Troubleshooting — game 2.5 / Cyberware-EX
 
-Seeing both settings switches ON does **not** prove the gameplay patch succeeded. The first in-game screenshot had functioning **Mod Settings + Native Settings UI**, but an equipped Defenzikov/Kerenzikov still showed a **16 Humanity/Capacity cost**. This branch includes a scanner correction for `gamedataItemType.Cyberware`, safer TweakDB IDs, and clearer patch diagnostics.
+The first in-game screenshots showed both switches ON, but Defenzikov/Kerenzikov still displayed a **16** Humanity/Capacity cost. That initial patcher targeted **individual cyberware item variants**, which did not demonstrate a working cost change.
 
-Check `bin/x64/plugins/cyber_engine_tweaks/cyber_engine_tweaks.log` and/or `bin/x64/plugins/cyber_engine_tweaks/mods/FreeChrome/scripting.log` depending on CET's logging configuration for messages like:
+The old 2.0-era `##ZeroHumanityCost` source supplied by the user instead changed numeric `Variants.Humanity*Cost*_inline*.value` modifiers directly, in 131 entries. Free Chrome now independently generates the equivalent family, with **129 nonzero/other relevant legacy paths covered**; the remaining two legacy paths were already Humanity 0.
+
+Look for log lines such as:
 
 ```text
-[FreeChrome] records scanned=..., cyberware=..., matching Humanity variants=..., newly zeroed=..., failed=...
+[FreeChrome] Humanity modifier fields found=..., newly zeroed=..., write failures=... (scanned ... candidate flats)
 ```
 
-A **zero** value for `cyberware` or `matching Humanity variants` means the mod could not find usable records. **0 newly zeroed** can also mean all eligible records were already zeroed on a prior pass. A nonzero `failed` indicates writes rejected or not verified.
+If `found=0`, the candidate records aren't available to CET. If `write failures` is nonzero, some writes weren't confirmed. If `newly zeroed=0` but `found` is positive, those fields may already have been set to zero on an earlier scan.
 
-Reload the save/reopen the cyberware screen after switching. This runtime patch cannot promise that Cyberware-EX or a different UI immediately refreshes cached equipped-item Capacity.
+Close and reopen the cyberware screen after toggling. Existing implants or Cyberware-EX may have cached stat calculations, so test an **unequip/re-equip** at a ripperdoc if the UI remains stale. **The latest change has not yet been tested in the game.**
 
 ## Status
 
-**Experimental source build — in-game test required** before a public 1.0.0 release. Static checks cannot verify that every game/modded cyberware record is found or that the ripperdoc UI immediately refreshes on toggle.
+**Experimental source build — in-game test required** before a public 1.0.0 release. Static checks cannot verify in-game 2.5 modifier compatibility, or that the ripperdoc/Cyberware-EX UI immediately refreshes on toggle.
 
 The code is original to this repository; no assets or code are copied from other Humanity-cost mods.
