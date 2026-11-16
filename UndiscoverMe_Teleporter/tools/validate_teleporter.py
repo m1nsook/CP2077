@@ -10,13 +10,17 @@ assert "UDMOwnsPin(pin.GetNewMappinID())" in addon
 assert all(v in core for v in ("UDMRegisterCatalogPin", "UDMUnregisterCatalogPin", "UDMOwnsPin"))
 assert "onOwnedChanged(id, false)" in runtime
 assert "onOwnedChanged(self.owned[entry.hash], true)" in runtime
-assert "world_map_menu_fast_travel" in addon and "e.GetHoldProgress() >= 1.0" in addon
+assert "world_map_menu_fast_travel" in addon
+assert "private final func HandlePressInput(e: ref<inkPointerEvent>) -> Void" in addon
+assert "private final func TryFastTravel() -> Void" in addon
+assert "this.m_startedFastTraveling = true" in addon
+assert "this.m_isPanning = true" in addon
+assert "this.m_audioSystem.Play(n\"ui_menu_item_crafting_done\")" in addon
+assert "wrappedMethod();" in addon, "Non-UndiscoverMe native travel must pass through"
 assert "UDMCanTeleportPin(controller.GetMappin())" in addon
-assert "m_udmHeldPinID" not in addon, "Extra press gate blocks native hold callbacks"
-assert "this.m_startedFastTraveling = true" not in addon, "Do not alter vanilla hold flags"
-assert "protected cb func OnPressInput(e: ref<inkPointerEvent>)" in addon
-assert "protected cb func OnHoldInput(e: ref<inkPointerEvent>)" in addon
-assert "protected cb func OnReleaseInput(e: ref<inkPointerEvent>)" in addon
+assert "m_udmHeldPinID" not in addon, "Extra user-defined hold gate is unnecessary"
+assert "func OnPressInput(" not in addon and "func OnHoldInput(" not in addon
+assert "func OnReleaseInput(" not in addon
 assert "if e.IsAction(n\"world_map_menu_fast_travel\") && this.UDMCanTeleportSelected()" in addon
 assert "tooltipData.fastTravelEnabled = true" in addon
 assert "this.m_tooltipController.SetData(tooltipType, tooltipData, this)" in addon
@@ -28,4 +32,4 @@ assert "wrappedMethod(e)" in addon and "GameInstance.GetTeleportationFacility" i
 assert not any(s in addon for s in ("RegisterMappin(", "UnregisterMappin(", "SetFactStr("))
 assert 'MOD .. "_Status"' not in cet and 'MOD .. "_Preview"' not in cet
 assert "miso_rmp_diag_seen" not in core
-print("PASS: owned-pin native tooltip, restored working hold input and core cleanup")
+print("PASS: owned-pin native tooltip, HandlePressInput -> TryFastTravel routing, and core cleanup")
