@@ -16,6 +16,14 @@ assert "private final func TryFastTravel() -> Void" in addon
 assert "this.m_startedFastTraveling = true" in addon
 assert "this.m_isPanning = true" in addon
 assert "this.m_audioSystem.Play(n\"ui_menu_item_crafting_done\")" in addon
+# A direct world-position teleport is not enough: the fast-travel transition
+# must explicitly close the hub menu and restore first-person camera state.
+assert "nextLoadingTypeEvt.SetNextLoadingScreenType(inkLoadingScreenType.FastTravel)" in addon
+assert "this.QueueBroadcastEvent(nextLoadingTypeEvt)" in addon
+assert "this.QueueBroadcastEvent(new ForceCloseHubMenuEvent())" in addon
+assert 'this.m_menuEventDispatcher.SpawnEvent(n"OnBack")' in addon
+assert "playerPuppet.GetFPPCameraComponent().ResetPitch()" in addon
+assert 'this.m_menuEventDispatcher.SpawnEvent(n"OnCloseHubMenu")' not in addon
 assert "wrappedMethod();" in addon, "Non-UndiscoverMe native travel must pass through"
 assert "UDMCanTeleportPin(controller.GetMappin())" in addon
 assert "m_udmHeldPinID" not in addon, "Extra user-defined hold gate is unnecessary"
@@ -32,4 +40,4 @@ assert "wrappedMethod(e)" in addon and "GameInstance.GetTeleportationFacility" i
 assert not any(s in addon for s in ("RegisterMappin(", "UnregisterMappin(", "SetFactStr("))
 assert 'MOD .. "_Status"' not in cet and 'MOD .. "_Preview"' not in cet
 assert "miso_rmp_diag_seen" not in core
-print("PASS: owned-pin native tooltip, HandlePressInput -> TryFastTravel routing, and core cleanup")
+print("PASS: owned-pin tooltip, native hold, full travel menu/camera cleanup and core guards")
