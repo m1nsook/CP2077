@@ -39,6 +39,27 @@ require('TweakDBID.new' not in patch, "Do not replace item variant array")
 require('".variants"' not in patch, "Do not change implant variants")
 require('MAX_HUMANITY_COST = 200' in patch, "Unexpected Humanity scan bound")
 
+# CET 1.38.1 / CP2077 2.5: TweakDB:SetFlat fails when called from Lua
+# pcall, including indirect pcall wrappers around patch:setEnabled/scan/restore.
+# See https://github.com/maximegmd/CyberEngineTweaks/issues/1081
+require('local result = TweakDB:SetFlat(path, value)' in patch,
+        "TweakDB:SetFlat must be a direct call")
+require('pcall(function() return TweakDB:SetFlat(' not in patch,
+        "TweakDB write must not be directly wrapped in pcall")
+require('pcall(function() patch:' not in main,
+        "TweakDB patch lifecycle must not be indirectly wrapped in pcall")
+require('xpcall(function() patch:' not in main,
+        "TweakDB patch lifecycle must not be indirectly wrapped in xpcall")
+require('patch:setEnabled(state.settings.enabled)' in main,
+        "Startup patch must run outside pcall")
+require('patch:setEnabled(enabled)' in main,
+        "Settings toggles must patch outside pcall")
+require(main.count('patch:scan()') == 2,
+        "Session and periodic rescan should both be direct calls")
+require('pcall(function() return TweakDB:GetFlat(path) end)' in patch,
+        "Read-only TweakDB lookups may remain protected")
+
+
 for snippet in (
     'registerForEvent("onInit"',
     'registerForEvent("onUpdate"',
@@ -67,4 +88,4 @@ require('          - Free_Chrome\n' in workflow, "Manual release dropdown missin
 require('workflow_dispatch:' in workflow and 'push:' not in workflow and
         'pull_request:' not in workflow, "Do not add automatic Actions triggers")
 require(not (cet / "db.json").exists(), "Do not ship player settings")
-print("PASS: shared Humanity modifier zeroing, read-back, reversible settings, and manual packaging")
+print("PASS: Humanity modifier writes outside pcall, reversible settings, and manual packaging")
