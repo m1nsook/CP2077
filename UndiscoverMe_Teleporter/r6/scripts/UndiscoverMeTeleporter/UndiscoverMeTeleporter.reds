@@ -107,8 +107,22 @@ private final func TryFastTravel() -> Void {
   let target = pin.GetWorldPosition();
   target.Z += 1.5;
   facility.Teleport(player, target, Vector4.ToRotation(player.GetWorldForward()));
-  this.m_audioSystem.Play(n"ui_menu_item_crafting_done");
+
+  // A raw Teleport call leaves the world map's fast-travel transition active
+  // unless the same closing events as the game's FastTravel() are sent.
+  // Follow the reference FastTravelFromAnywhereToAnyMapPin.reds sequence.
+  let nextLoadingTypeEvt: ref<inkSetNextLoadingScreenEvent>;
+  nextLoadingTypeEvt = new inkSetNextLoadingScreenEvent();
+  nextLoadingTypeEvt.SetNextLoadingScreenType(inkLoadingScreenType.FastTravel);
+  this.QueueBroadcastEvent(nextLoadingTypeEvt);
+  this.QueueBroadcastEvent(new ForceCloseHubMenuEvent());
   if IsDefined(this.m_menuEventDispatcher) {
-    this.m_menuEventDispatcher.SpawnEvent(n"OnCloseHubMenu");
+    this.m_menuEventDispatcher.SpawnEvent(n"OnBack");
   }
+  let playerPuppet = player as PlayerPuppet;
+  if IsDefined(playerPuppet) {
+    playerPuppet.GetFPPCameraComponent().ResetPitch();
+  }
+
+  this.m_audioSystem.Play(n"ui_menu_item_crafting_done");
 }
