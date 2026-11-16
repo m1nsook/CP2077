@@ -12,7 +12,7 @@ Source code and releases for my Cyberpunk 2077 mods.
 | Mod | Description | Status |
 | --- | --- | --- |
 | [No Tracking Please](No_Tracking_Please) | Blocks enemy netrunner/police position reveals and quickhack trace acceleration. | Active |
-| [Free Chrome](Free_Chrome) | Sets standard cyberware Humanity/Capacity costs to zero with reversible Mod Settings and NSUI controls. | Experimental |
+| [Free Chrome](Free_Chrome) | Sets standard cyberware Humanity/Capacity costs to zero with reversible Mod Settings and NSUI controls. | ON/OFF in-game tested |
 | [UndiscoverMe](UndiscoverMe) | Reveals eligible NCPD Scanner, Cyberpsycho and Tarot map markers without reopening completed activities. | Active |
 | [UndiscoverMe Teleporter](UndiscoverMe_Teleporter) | Optional addon: hold the map's Fast Travel action on an UndiscoverMe pin to teleport. Requires UndiscoverMe core. | In-game tested |
 
