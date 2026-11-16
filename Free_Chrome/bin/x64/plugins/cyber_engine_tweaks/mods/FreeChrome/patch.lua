@@ -56,7 +56,7 @@ end
 -- Chrome restores the value that was present when this mod first patched it,
 -- including values already added by TweakXL/other mods.
 function M.new(logger)
-  local self = { enabled = false, originals = {}, logger = logger or function() end }
+  local self = { enabled = false, originals = {}, scanCount = 0, logger = logger or function() end }
 
   function self:scan()
     if not self.enabled then return 0, 0 end
@@ -103,7 +103,10 @@ function M.new(logger)
         end
       end
     end
-    self.logger("cyberware records found=" .. matched .. ", newly zeroed=" .. applied)
+    if self.scanCount == 0 or applied > 0 then
+      self.logger("cyberware records found=" .. matched .. ", newly zeroed=" .. applied)
+    end
+    self.scanCount = self.scanCount + 1
     return matched, applied
   end
 
