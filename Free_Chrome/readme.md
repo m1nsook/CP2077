@@ -54,6 +54,20 @@ If `found=0`, the candidate records aren't available to CET. If `write failures`
 
 Close and reopen the cyberware screen after toggling. Existing implants or Cyberware-EX may have cached stat calculations, so test an **unequip/re-equip** at a ripperdoc if the UI remains stale. **The latest change has not yet been tested in the game.**
 
+### CET 1.38.1 write regression (identified November 16, 2026)
+
+In the first 2.5 gameplay test, CET reported **129 modifier fields found, 0 newly zeroed, and 129 failed writes**. A direct read of `Variants.Humanity16Cost_inline2.value` still returned `16`. That rules out missing cost records.
+
+CET issue [#1081](https://github.com/maximegmd/CyberEngineTweaks/issues/1081) reports that **`TweakDB:SetFlat()` inside Lua `pcall()` fails in CET 1.38.1**, even when the same call succeeds outside it. The previous Free Chrome patch accidentally wrapped writes inside `pcall()` at **two levels**: the TweakDB helper and the settings bridge (`init.lua`). Both have been corrected.
+
+**Install both updated Lua files**, `init.lua` and `patch.lua`, from the same Free Chrome test branch. Restart the game completely. The ON scan should now report successful writes rather than 129 failures; test `print(TweakDB:GetFlat("Variants.Humanity16Cost_inline2.value"))` in CET:
+
+- With Free Chrome **ON**, expect `0`.
+- With Free Chrome **OFF**, expect the previous value (for this record, `16`).
+- If a direct write now throws an error, CET will surface it instead of silently marking all 129 operations as failed. Capture that error for diagnosis.
+
+This is a **source-level fix based on a reported CET defect**, not yet a confirmed game-tested repair.
+
 ## Status
 
 **Experimental source build — in-game test required** before a public 1.0.0 release. Static checks cannot verify in-game 2.5 modifier compatibility, or that the ripperdoc/Cyberware-EX UI immediately refreshes on toggle.
