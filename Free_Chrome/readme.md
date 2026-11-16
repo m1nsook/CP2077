@@ -52,7 +52,7 @@ Look for log lines such as:
 
 If `found=0`, the candidate records aren't available to CET. If `write failures` is nonzero, some writes weren't confirmed. If `newly zeroed=0` but `found` is positive, those fields may already have been set to zero on an earlier scan.
 
-Close and reopen the cyberware screen after toggling. Existing implants or Cyberware-EX may have cached stat calculations, so test an **unequip/re-equip** at a ripperdoc if the UI remains stale. **Live test update (Nov 16, 2026):** The revised patch now shows **0 Humanity/Capacity cost** on equipped **FEEN-X Tier 5++** in the user's cyberware screen. Toggling OFF, restoring original cost values, and broader implant coverage still require verification.
+Close and reopen the cyberware screen after toggling. Existing implants or Cyberware-EX may have cached stat calculations, so test an **unequip/re-equip** at a ripperdoc if the UI remains stale. **Live test update (Nov 16, 2026):** The revised patch now shows **0 Humanity/Capacity cost** on equipped **FEEN-X Tier 5++** in the user's cyberware screen. The user also confirmed that switching Free Chrome **OFF restores the original cost**. Broader implant coverage, persistence after game reload, and third-party cyberware compatibility have not been exhaustively tested.
 
 ### CET 1.38.1 write regression (identified November 16, 2026)
 
@@ -66,10 +66,10 @@ CET issue [#1081](https://github.com/maximegmd/CyberEngineTweaks/issues/1081) re
 - With Free Chrome **OFF**, expect the previous value (for this record, `16`).
 - If a direct write now throws an error, CET will surface it instead of silently marking all 129 operations as failed. Capture that error for diagnosis.
 
-**In-game confirmation:** With the corrected Lua files installed, FEEN-X Tier 5++ visibly shows **0** Humanity/Capacity cost. The restored cost with the mod OFF has not yet been confirmed.
+**In-game confirmation:** With the corrected Lua files installed, FEEN-X Tier 5++ visibly shows **0** Humanity/Capacity cost. The user subsequently verified that the original cost returns when Free Chrome is disabled.
 
 ## Status
 
-**Partially verified in Cyberpunk 2077 2.5:** ON now shows a 0-cost equipped FEEN-X Tier 5++. Before a public release, test OFF restoration, persistence, more vanilla/Phantom Liberty implants, and Cyberware-EX compatibility.
+**In-game verified for ON/OFF in Cyberpunk 2077 2.5:** FEEN-X Tier 5++ displays 0 Humanity/Capacity cost with Free Chrome enabled, and its original cost returns after disabling it. Broad coverage, game-reload persistence, and third-party cyberware still need separate testing.
 
 The code is original to this repository; no assets or code are copied from other Humanity-cost mods.
