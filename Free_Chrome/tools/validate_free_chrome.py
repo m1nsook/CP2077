@@ -82,6 +82,14 @@ require('ModSettings.RegisterListenerToClass(s)' in reds and
         'ModSettings.UnregisterListenerToClass(s)' in reds,
         "Mod Settings registration missing")
 require('ModuleExists("ModSettingsModule")' in reds, "Mod Settings must be optional")
+require('"Zero Humanity cost (reload save)"' in main,
+        "Native Settings UI must tell players to reload a save")
+require('"Zero Humanity cost (reload save)"' in reds,
+        "Mod Settings must visibly tell players to reload a save")
+reload_hint = "After switching ON or OFF, reload a save to apply the change."
+require(reload_hint in main and reload_hint in reds,
+        "Both settings descriptions must explain when to reload")
+
 
 require('Free_Chrome' in metadata, "Release metadata missing")
 require('          - Free_Chrome\n' in workflow, "Manual release dropdown missing")
