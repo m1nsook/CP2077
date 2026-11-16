@@ -1,204 +1,127 @@
--- Free Chrome - runtime TweakDB patcher (CET 1.38+, CP2077 2.5).
--- This module is intentionally separate from the settings so new cyberware
--- record types/slots can be supported without rewriting the UI.
+-- Free Chrome | cyberware Humanity / Capacity cost modifiers
+-- Cyberpunk 2077 2.5 + Phantom Liberty | CET
+--
+-- The game uses shared "Variants.Humanity*Cost*_inline*.value" numeric TweakDB
+-- modifier flats to calculate Capacity costs. Modifying an individual item's
+-- variants does not reliably update the underlying stat calculation.
+--
+-- Original implementation, informed by comparing the 2.0-era ZeroHumanityCost
+-- source supplied by the user. We generate potential cost flat paths rather
+-- than copy its hardcoded 131 individual write statements.
 local M = {}
 
-local ZERO_VARIANT = "Variants.Humanity0Cost"
--- All standard cyberware items are gamedataItem_Record, not Cyberware_Record.
--- Use the second type only as a fallback for custom registrations.
-local RECORD_TYPES = { "gamedataItem_Record", "gamedataCyberware_Record" }
+-- Covers the stock 0-60 cost family and additional standard-named mod costs.
+-- Developers can raise this or add custom paths using addCostFlat().
+local MAX_HUMANITY_COST = 200
+local TINKERER_SUFFIX = "TinkererVariant"
 
--- Standard implant slots, including Phantom Liberty and operating systems.
--- The fallback *CW suffix and Cyb_ item types cover many added implant slots.
-local CYBERWARE_AREAS = {
-  FrontalCortexCW = true, ArmsCW = true, MusculoskeletalSystemCW = true,
-  NervousSystemCW = true, IntegumentarySystemCW = true,
-  SystemReplacementCW = true, EyesCW = true, HandsCW = true,
-  CardiovascularSystemCW = true, LegsCW = true,
-}
-
-local function idName(id)
-  if type(id) == "string" then return id end
-  -- CET exposes record:GetID().value as a readable TweakDB record name.
-  local ok, value = pcall(function() return id.value end)
-  if ok and type(value) == "string" and value ~= "" then return value end
-  local debugOK, debugName = pcall(function() return TDBID.ToStringDEBUG(id) end)
-  if debugOK and type(debugName) == "string" and debugName ~= "" then return debugName end
+local function getNumber(path)
+  local ok, result = pcall(function() return TweakDB:GetFlat(path) end)
+  if ok and type(result) == "number" then return result end
   return nil
 end
 
-local function copyArray(value)
-  if type(value) ~= "table" or #value == 0 then return nil end
-  local out = {}
-  for i = 1, #value do out[i] = value[i] end
-  return out
+local function setNumber(path, value)
+  local ok, result = pcall(function() return TweakDB:SetFlat(path, value) end)
+  if not ok or result == false then return false end
+  -- Read back the numeric cost. Do not report success merely because CET did
+  -- not throw: the live value must really be 0 (or the restored original).
+  return getNumber(path) == value
 end
 
-local function sameArray(a, b)
-  if type(a) ~= "table" or type(b) ~= "table" or #a ~= #b then return false end
-  for i = 1, #a do
-    local av, bv = idName(a[i]), idName(b[i])
-    if av and bv then
-      if av ~= bv then return false end
-    elseif a[i] ~= b[i] and tostring(a[i]) ~= tostring(b[i]) then
+local function iterPaths(visit)
+  for cost = 1, MAX_HUMANITY_COST do
+    local family = "Variants.Humanity" .. cost .. "Cost"
+    for index = 1, 2 do
+      visit(family .. "_inline" .. index .. ".value")
+    end
+    for index = 1, 5 do
+      visit(family .. TINKERER_SUFFIX .. "_inline" .. index .. ".value")
+    end
+  end
+end
+
+function M.new(logger)
+  local self = {
+    enabled = false,
+    originals = {},    -- session-only, never included in db.json
+    additional = {},   -- optional explicit cost flats from other mods
+    firstScan = true,
+    logger = logger or function() end,
+  }
+
+  -- For custom mod-defined Humanity records that do not use the standard
+  -- naming family. Developers may add only numeric cost-related .value flats.
+  function self:addCostFlat(path)
+    if type(path) ~= "string" or not path:match("%.value$") then
       return false
     end
+    self.additional[path] = true
+    if self.enabled then self:scan() end
+    return true
   end
-  return true
-end
-
--- Preserve every unrelated item variant, including variants supplied by other
--- mods. Only replace standard Humanity-cost entries.
-local function zeroCostVariants(current)
-  local output = copyArray(current)
-  if not output then return nil end
-  local found = false
-  for i = 1, #output do
-    local name = idName(output[i])
-    if name and name:match("^Variants%.Humanity%d+Cost") then
-      output[i] = TweakDBID.new(ZERO_VARIANT)
-      found = true
-    end
-  end
-  return found and output or nil
-end
-
-local function flatPath(id, property)
-  local name = idName(id)
-  if not name or name == "" then return nil end
-  return name .. "." .. property
-end
-
-local function safeGetFlat(id, property)
-  local path = flatPath(id, property)
-  if not path then return nil end
-  local ok, value = pcall(function() return TweakDB:GetFlat(path) end)
-  return ok and value or nil
-end
-
-local function setVerified(id, variants)
-  local path = flatPath(id, "variants")
-  if not path then return false end
-  local ok, result = pcall(function() return TweakDB:SetFlat(path, variants) end)
-  return ok and result ~= false and sameArray(safeGetFlat(id, "variants"), variants)
-end
-
-local function recordName(value)
-  if not value then return "" end
-  return idName(value) or tostring(value)
-end
-
-local function isCyberware(record, id)
-  -- The common item type is exactly gamedataItemType.Cyberware.
-  -- The earlier scanner mistakenly looked for a Cyb_ prefix instead.
-  local okItem, itemType = pcall(function() return record:ItemType():Type() end)
-  if okItem and itemType then
-    if itemType == gamedataItemType.Cyberware then return true end
-    local kind = recordName(itemType)
-    if kind == "Cyberware" or kind:match("^Cyb_") then return true end
-  end
-
-  local ok, area = pcall(function() return record:EquipArea() end)
-  if ok and area then
-    local okType, kind = pcall(function() return recordName(area:Type()) end)
-    if okType and (CYBERWARE_AREAS[kind] or kind:match("CW$")) then return true end
-  end
-
-  local tags = safeGetFlat(id, "tags")
-  if type(tags) == "table" then
-    for _, tag in ipairs(tags) do
-      if recordName(tag) == "Cyberware" then return true end
-    end
-  end
-  return false
-end
-
--- Stored originals are SESSION-ONLY, never saved to db.json. Disabling Free
--- Chrome restores the value that was present when this mod first patched it,
--- including values already added by TweakXL/other mods.
-function M.new(logger)
-  local self = { enabled = false, originals = {}, scanCount = 0, logger = logger or function() end }
 
   function self:scan()
     if not self.enabled then return 0, 0 end
-    if not TweakDB or not TweakDB.GetRecords or not TweakDB.SetFlat then
-      self.logger("TweakDB API unavailable; skipped patch")
-      return 0, 0
-    end
-    local exists = pcall(function()
-      assert(TweakDB:GetRecord(ZERO_VARIANT), "Variants.Humanity0Cost is missing")
-    end)
-    if not exists then
-      self.logger("Missing " .. ZERO_VARIANT .. "; no records were changed")
+    if not TweakDB or not TweakDB.GetFlat or not TweakDB.SetFlat then
+      self.logger("ERROR: CET TweakDB flat API unavailable")
       return 0, 0
     end
 
-    local visited, scanned, matched, eligible, applied, failed = {}, 0, 0, 0, 0, 0
-    for _, recordType in ipairs(RECORD_TYPES) do
-      local ok, records = pcall(function() return TweakDB:GetRecords(recordType) end)
-      if ok and type(records) == "table" then
-        for _, record in ipairs(records) do
-          scanned = scanned + 1
-          local valid, id = pcall(function() return record:GetID() end)
-          if not valid or not id then
-            valid, id = pcall(function() return record:GetRecordID() end)
-          end
-          if valid and id then
-            local key = idName(id)
-            if key and not visited[key] then
-              visited[key] = true
-              if isCyberware(record, id) then
-                matched = matched + 1
-                local current = copyArray(safeGetFlat(id, "variants"))
-                if current then
-                  local zero = zeroCostVariants(current)
-                  if zero then eligible = eligible + 1 end
-                  if zero and not sameArray(current, zero) then
-                    -- Capture the latest externally changed cost, preserving
-                    -- every non-Humanity variant while Free Chrome is enabled.
-                    if setVerified(id, zero) then
-                      self.originals[key] = { id = id, variants = current }
-                      applied = applied + 1
-                    else
-                      failed = failed + 1
-                    end
-                  end
-                end
-              end
-            end
-          end
-        end
-      end
-    end
-    if self.scanCount == 0 or applied > 0 or failed > 0 then
-      self.logger("records scanned=" .. scanned .. ", cyberware=" .. matched
-        .. ", matching Humanity variants=" .. eligible
-        .. ", newly zeroed=" .. applied .. ", failed=" .. failed)
-      if scanned == 0 or matched == 0 then
-        self.logger("WARNING: no usable cyberware records found; check CET TweakDB API")
-      elseif matched > 0 and eligible == 0 then
-        self.logger("WARNING: no readable Humanity cost variants found; scanner did not modify costs")
-      elseif failed > 0 then
-        self.logger("WARNING: some variant writes were rejected; check CET scripting.log")
-      end
-    end
-    self.scanCount = self.scanCount + 1
-    return matched, applied
-  end
-
-  function self:restore()
-    local restored, failed = 0, 0
-    for key, original in pairs(self.originals) do
-      if setVerified(original.id, original.variants) then
-        self.originals[key] = nil
-        restored = restored + 1
+    local scanned, found, newlyZeroed, failed = 0, 0, 0, 0
+    local function apply(path)
+      scanned = scanned + 1
+      local value = getNumber(path)
+      if value == nil then return end
+      found = found + 1
+      if value == 0 then return end
+      if setNumber(path, 0) then
+        -- Keep original values for OFF. If a different mod edits the same
+        -- value while Free Chrome is enabled, retain the latest nonzero value.
+        self.originals[path] = value
+        newlyZeroed = newlyZeroed + 1
       else
         failed = failed + 1
       end
     end
-    if restored > 0 or failed > 0 then
-      self.logger("original cyberware variants restored=" .. restored .. ", failed=" .. failed)
+
+    iterPaths(apply)
+    for path in pairs(self.additional) do apply(path) end
+
+    if self.firstScan or newlyZeroed > 0 or failed > 0 then
+      self.logger("Humanity modifier fields found=" .. found ..
+        ", newly zeroed=" .. newlyZeroed .. ", write failures=" .. failed ..
+        " (scanned " .. scanned .. " candidate flats)")
+      if found == 0 then
+        self.logger("WARNING: no standard Humanity fields found; check game version / CET log")
+      elseif failed > 0 then
+        self.logger("WARNING: some Humanity fields could not be patched")
+      end
     end
+    self.firstScan = false
+    return found, newlyZeroed
+  end
+
+  function self:restore()
+    local restored, skipped, failed = 0, 0, 0
+    for path, oldValue in pairs(self.originals) do
+      local current = getNumber(path)
+      if current == 0 then
+        if setNumber(path, oldValue) then
+          self.originals[path] = nil
+          restored = restored + 1
+        else
+          failed = failed + 1
+        end
+      else
+        -- An external mod modified it after our last scan; don't overwrite
+        -- its new value or treat it as our own original anymore.
+        self.originals[path] = nil
+        skipped = skipped + 1
+      end
+    end
+    self.logger("Humanity costs restored=" .. restored ..
+      ", left to other mods=" .. skipped .. ", restore failures=" .. failed)
     return restored, failed
   end
 
