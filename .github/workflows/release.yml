@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - No_Tracking_Please
+          - Free_Chrome
           - UndiscoverMe
           - UndiscoverMe_Teleporter
           - UndiscoverMe_Polish
