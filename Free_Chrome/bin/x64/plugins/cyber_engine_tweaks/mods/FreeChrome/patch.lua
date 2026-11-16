@@ -4,6 +4,8 @@
 local M = {}
 
 local ZERO_VARIANT = "Variants.Humanity0Cost"
+-- All standard cyberware items are gamedataItem_Record, not Cyberware_Record.
+-- Use the second type only as a fallback for custom registrations.
 local RECORD_TYPES = { "gamedataItem_Record", "gamedataCyberware_Record" }
 
 -- Standard implant slots, including Phantom Liberty and operating systems.
@@ -15,6 +17,16 @@ local CYBERWARE_AREAS = {
   CardiovascularSystemCW = true, LegsCW = true,
 }
 
+local function idName(id)
+  if type(id) == "string" then return id end
+  -- CET exposes record:GetID().value as a readable TweakDB record name.
+  local ok, value = pcall(function() return id.value end)
+  if ok and type(value) == "string" and value ~= "" then return value end
+  local debugOK, debugName = pcall(function() return TDBID.ToStringDEBUG(id) end)
+  if debugOK and type(debugName) == "string" and debugName ~= "" then return debugName end
+  return nil
+end
+
 local function copyArray(value)
   if type(value) ~= "table" or #value == 0 then return nil end
   local out = {}
@@ -22,42 +34,59 @@ local function copyArray(value)
   return out
 end
 
-local function safeGetFlat(id, property)
-  local ok, value = pcall(function() return TweakDB:GetFlat(id + ("." .. property)) end)
-  return ok and value or nil
-end
-
 local function sameArray(a, b)
   if type(a) ~= "table" or type(b) ~= "table" or #a ~= #b then return false end
   for i = 1, #a do
-    if a[i] ~= b[i] then return false end
+    local av, bv = idName(a[i]), idName(b[i])
+    if av and bv then
+      if av ~= bv then return false end
+    elseif a[i] ~= b[i] and tostring(a[i]) ~= tostring(b[i]) then
+      return false
+    end
   end
   return true
 end
 
--- Only claim a successful patch after checking the live TweakDB value.
+local function flatPath(id, property)
+  local name = idName(id)
+  if not name or name == "" then return nil end
+  return name .. "." .. property
+end
+
+local function safeGetFlat(id, property)
+  local path = flatPath(id, property)
+  if not path then return nil end
+  local ok, value = pcall(function() return TweakDB:GetFlat(path) end)
+  return ok and value or nil
+end
+
 local function setVerified(id, variants)
-  local ok, result = pcall(function()
-    return TweakDB:SetFlat(id + ".variants", variants)
-  end)
+  local path = flatPath(id, "variants")
+  if not path then return false end
+  local ok, result = pcall(function() return TweakDB:SetFlat(path, variants) end)
   return ok and result ~= false and sameArray(safeGetFlat(id, "variants"), variants)
 end
 
 local function recordName(value)
   if not value then return "" end
-  if type(value) == "string" then return value end
-  local ok, v = pcall(function() return value.value end)
-  return ok and type(v) == "string" and v or tostring(value)
+  return idName(value) or tostring(value)
 end
 
 local function isCyberware(record, id)
+  -- The common item type is exactly gamedataItemType.Cyberware.
+  -- The earlier scanner mistakenly looked for a Cyb_ prefix instead.
+  local okItem, itemType = pcall(function() return record:ItemType():Type() end)
+  if okItem and itemType then
+    if itemType == gamedataItemType.Cyberware then return true end
+    local kind = recordName(itemType)
+    if kind == "Cyberware" or kind:match("^Cyb_") then return true end
+  end
+
   local ok, area = pcall(function() return record:EquipArea() end)
   if ok and area then
-    local okType, name = pcall(function() return recordName(area:Type()) end)
-    if okType and (CYBERWARE_AREAS[name] or name:match("CW$")) then return true end
+    local okType, kind = pcall(function() return recordName(area:Type()) end)
+    if okType and (CYBERWARE_AREAS[kind] or kind:match("CW$")) then return true end
   end
-  local okItem, itemType = pcall(function() return recordName(record:ItemType():Type()) end)
-  if okItem and itemType:match("^Cyb_") then return true end
 
   local tags = safeGetFlat(id, "tags")
   if type(tags) == "table" then
@@ -88,15 +117,16 @@ function M.new(logger)
       return 0, 0
     end
 
-    local visited, matched, applied = {}, 0, 0
+    local visited, scanned, matched, applied, failed = {}, 0, 0, 0, 0
     for _, recordType in ipairs(RECORD_TYPES) do
       local ok, records = pcall(function() return TweakDB:GetRecords(recordType) end)
       if ok and type(records) == "table" then
         for _, record in ipairs(records) do
+          scanned = scanned + 1
           local valid, id = pcall(function() return record:GetID() end)
           if valid and id then
-            local key = tostring(id)
-            if not visited[key] then
+            local key = idName(id)
+            if key and not visited[key] then
               visited[key] = true
               if isCyberware(record, id) then
                 matched = matched + 1
@@ -109,6 +139,8 @@ function M.new(logger)
                     if setVerified(id, zero) then
                       self.originals[key] = { id = id, variants = current }
                       applied = applied + 1
+                    else
+                      failed = failed + 1
                     end
                   end
                 end
@@ -118,8 +150,14 @@ function M.new(logger)
         end
       end
     end
-    if self.scanCount == 0 or applied > 0 then
-      self.logger("cyberware records found=" .. matched .. ", newly zeroed=" .. applied)
+    if self.scanCount == 0 or applied > 0 or failed > 0 then
+      self.logger("records scanned=" .. scanned .. ", cyberware=" .. matched
+        .. ", newly zeroed=" .. applied .. ", failed=" .. failed)
+      if scanned == 0 or matched == 0 then
+        self.logger("WARNING: no usable cyberware records found; check CET TweakDB API")
+      elseif failed > 0 then
+        self.logger("WARNING: some variant writes were rejected; check CET scripting.log")
+      end
     end
     self.scanCount = self.scanCount + 1
     return matched, applied
