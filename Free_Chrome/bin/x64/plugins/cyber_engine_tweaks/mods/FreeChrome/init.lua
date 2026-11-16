@@ -57,8 +57,9 @@ local function setEnabled(enabled)
     state.settings.enabled = enabled
     save()
     if patch then
-      local ok, err = pcall(function() patch:setEnabled(enabled) end)
-      if not ok then log("Patch toggle failed: " .. tostring(err)) end
+      -- Never wrap a TweakDB write in pcall, even indirectly through this
+      -- settings callback (CET 1.38.1 issue #1081).
+      patch:setEnabled(enabled)
     end
   end
   setFact()
@@ -102,8 +103,8 @@ registerForEvent("onInit", function()
     return
   end
   patch = obj.new(log)
-  local applied, failure = pcall(function() patch:setEnabled(state.settings.enabled) end)
-  if not applied then log("TweakDB patch failed: " .. tostring(failure)) end
+  -- CET's SetFlat fails inside pcall; launch the patch directly.
+  patch:setEnabled(state.settings.enabled)
   save()
   registerNSUI()
 end)
@@ -131,8 +132,7 @@ registerForEvent("onUpdate", function(delta)
       lastFact = nil
       setFact() -- db.json wins when a save is loaded
       if patch and state.settings.enabled then
-        local ok, err = pcall(function() patch:scan() end)
-        if not ok then log("Session scan failed: " .. tostring(err)) end
+        patch:scan()
       end
     else
       local ok, value = pcall(function() return qs:GetFactStr(FACT) end)
@@ -154,8 +154,7 @@ registerForEvent("onUpdate", function(delta)
   if scanClock >= 30 then
     scanClock = 0
     if patch and state.settings.enabled then
-      local ok, err = pcall(function() patch:scan() end)
-      if not ok then log("Refresh scan failed: " .. tostring(err)) end
+      patch:scan()
     end
   end
 end)
