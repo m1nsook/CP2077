@@ -10,11 +10,11 @@ The prompt uses Cyberpunk 2077's **own localized Fast Travel UI**. It automatica
 
 - Only pins actively registered by UndiscoverMe are eligible. Vanilla pins and other mods' pins remain unchanged, even if they share the same icon or coordinates.
 - Regular Fast Travel still works on vanilla fast travel points. The addon never enables its tooltip on third-party or unrelated vanilla pins.
-- The hold must start and finish on the **same** UndiscoverMe pin; releasing early cancels it.
+- Hold the game's Fast Travel action while an UndiscoverMe pin is selected. The addon uses the original Teleporter's hold-to-teleport handler; releasing early does not complete travel.
 - Works with the core's NCPD, Cyberpsycho and Tarot catalog proxies, plus its registered fast-travel proxies.
 - Direct teleportation does not unlock locations, track quests or change discovery/completion state.
 - Landing position is offset 1.5 meters above the pin. **There is no terrain/ground check yet.** Make a manual save before testing.
-- The native-tooltip/hold update targets Cyberpunk 2077 2.5; REDscript compilation and in-game tooltip/input behavior **need testing** before treating this update as verified.
+- Cyberpunk 2077 2.5 test: the Fast Travel tooltip is **confirmed visible**, but teleport did not fire in the first iteration. The input handlers have now been restored to the earlier user-tested version. **Retest teleportation in game** before merging or releasing.
 
 ## Install
 
@@ -24,4 +24,4 @@ Requires UndiscoverMe core, redscript, and core dependencies. No separate CET ho
 
 ## Credits
 
-Native tooltip and hold-input implementation informed by the supplied **FastTravelFromAnywhereToAnyMapPin.reds** and **AccidentalFastTravelBugFix.reds** examples by **yakuzadeso**. UndiscoverMe only enables the action on its own registered pins.
+Native tooltip implementation informed by the supplied **FastTravelFromAnywhereToAnyMapPin.reds** and **AccidentalFastTravelBugFix.reds** examples by **yakuzadeso**. UndiscoverMe only enables the action on its own registered pins.
