@@ -37,6 +37,20 @@ Zero cost does **not** increase your maximum Cyberware Capacity; it reduces the 
 - **Performance:** record enumeration is periodic (not every frame), and already-captured records aren't rewritten on every poll.
 - **No change:** eddie purchase prices, implant stats, maximum Capacity, vendor inventory, equipment slots, or independent cyberpsychosis systems.
 
+## Troubleshooting — 2.5 / Cyberware-EX
+
+Seeing both settings switches ON does **not** prove the gameplay patch succeeded. The first in-game screenshot had functioning **Mod Settings + Native Settings UI**, but an equipped Defenzikov/Kerenzikov still showed a **16 Humanity/Capacity cost**. This branch includes a scanner correction for `gamedataItemType.Cyberware`, safer TweakDB IDs, and clearer patch diagnostics.
+
+Check `bin/x64/plugins/cyber_engine_tweaks/cyber_engine_tweaks.log` and/or `bin/x64/plugins/cyber_engine_tweaks/mods/FreeChrome/scripting.log` depending on CET's logging configuration for messages like:
+
+```text
+[FreeChrome] records scanned=..., cyberware=..., matching Humanity variants=..., newly zeroed=..., failed=...
+```
+
+A **zero** value for `cyberware` or `matching Humanity variants` means the mod could not find usable records. **0 newly zeroed** can also mean all eligible records were already zeroed on a prior pass. A nonzero `failed` indicates writes rejected or not verified.
+
+Reload the save/reopen the cyberware screen after switching. This runtime patch cannot promise that Cyberware-EX or a different UI immediately refreshes cached equipped-item Capacity.
+
 ## Status
 
 **Experimental source build — in-game test required** before a public 1.0.0 release. Static checks cannot verify that every game/modded cyberware record is found or that the ripperdoc UI immediately refreshes on toggle.
