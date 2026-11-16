@@ -47,6 +47,22 @@ local function sameArray(a, b)
   return true
 end
 
+-- Preserve every unrelated item variant, including variants supplied by other
+-- mods. Only replace standard Humanity-cost entries.
+local function zeroCostVariants(current)
+  local output = copyArray(current)
+  if not output then return nil end
+  local found = false
+  for i = 1, #output do
+    local name = idName(output[i])
+    if name and name:match("^Variants%.Humanity%d+Cost") then
+      output[i] = TweakDBID.new(ZERO_VARIANT)
+      found = true
+    end
+  end
+  return found and output or nil
+end
+
 local function flatPath(id, property)
   local name = idName(id)
   if not name or name == "" then return nil end
@@ -132,10 +148,10 @@ function M.new(logger)
                 matched = matched + 1
                 local current = copyArray(safeGetFlat(id, "variants"))
                 if current then
-                  local zero = { TweakDBID.new(ZERO_VARIANT) }
-                  if not sameArray(current, zero) then
-                    -- If another mod changed a record after our previous scan,
-                    -- the latest external variant becomes the restore baseline.
+                  local zero = zeroCostVariants(current)
+                  if zero and not sameArray(current, zero) then
+                    -- Capture the latest externally changed cost, preserving
+                    -- every non-Humanity variant while Free Chrome is enabled.
                     if setVerified(id, zero) then
                       self.originals[key] = { id = id, variants = current }
                       applied = applied + 1
