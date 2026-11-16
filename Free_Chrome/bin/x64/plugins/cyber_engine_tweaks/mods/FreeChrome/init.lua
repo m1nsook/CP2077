@@ -78,8 +78,8 @@ local function registerNSUI()
     api.addTab("/" .. MOD, TITLE)
     api.addSubcategory("/" .. MOD .. "/general", "General")
     nsSwitch = api.addSwitch("/" .. MOD .. "/general",
-      "Zero Humanity cost",
-      "Set cyberware's Humanity/Capacity cost to 0. Does not alter prices, maximum Capacity, or stats.",
+      "Zero Humanity cost (reload save)",
+      "After switching ON or OFF, reload a save to apply the change. Eddies, maximum Capacity, and implant stats stay unchanged.",
       state.settings.enabled, true,
       function(value) setEnabled(value) end)
   end)
