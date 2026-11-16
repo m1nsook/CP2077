@@ -1,8 +1,4 @@
-// Camera Killer v0.1.0 (tested gameplay baseline)
-// When a surveillance camera is turned OFF, shut down cameras on the
-// same access-point network. If no direct AP exists, use the nearest
-// surveillance system (or ancestor AP). No CET, custom DLL, or REDmod required.
-
+// m1nsook
 // Stops our propagated OFF events from creating another wave.
 @addField(SurveillanceCameraControllerPS)
 public let m_cameraKillerIncoming: Bool;
