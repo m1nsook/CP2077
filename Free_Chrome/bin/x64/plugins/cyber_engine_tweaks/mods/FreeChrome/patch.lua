@@ -22,10 +22,14 @@ local function getNumber(path)
 end
 
 local function setNumber(path, value)
-  local ok, result = pcall(function() return TweakDB:SetFlat(path, value) end)
-  if not ok or result == false then return false end
-  -- Read back the numeric cost. Do not report success merely because CET did
-  -- not throw: the live value must really be 0 (or the restored original).
+  -- CET 1.38.1 / game 2.5 bug: TweakDB writes executed INSIDE pcall()
+  -- fail with "expected userdata, received nil" (CET issue #1081).
+  -- Call SetFlat directly. The caller verifies that the numeric flat exists
+  -- before writing, and this read-back confirms that the change applied.
+  -- Do not add pcall around this function OR any patch:scan/setEnabled/restore
+  -- caller: that indirectly puts SetFlat inside pcall and breaks every write.
+  local result = TweakDB:SetFlat(path, value)
+  if result == false then return false end
   return getNumber(path) == value
 end
 
