@@ -133,13 +133,16 @@ function M.new(logger)
       return 0, 0
     end
 
-    local visited, scanned, matched, applied, failed = {}, 0, 0, 0, 0
+    local visited, scanned, matched, eligible, applied, failed = {}, 0, 0, 0, 0, 0
     for _, recordType in ipairs(RECORD_TYPES) do
       local ok, records = pcall(function() return TweakDB:GetRecords(recordType) end)
       if ok and type(records) == "table" then
         for _, record in ipairs(records) do
           scanned = scanned + 1
           local valid, id = pcall(function() return record:GetID() end)
+          if not valid or not id then
+            valid, id = pcall(function() return record:GetRecordID() end)
+          end
           if valid and id then
             local key = idName(id)
             if key and not visited[key] then
@@ -149,6 +152,7 @@ function M.new(logger)
                 local current = copyArray(safeGetFlat(id, "variants"))
                 if current then
                   local zero = zeroCostVariants(current)
+                  if zero then eligible = eligible + 1 end
                   if zero and not sameArray(current, zero) then
                     -- Capture the latest externally changed cost, preserving
                     -- every non-Humanity variant while Free Chrome is enabled.
@@ -168,9 +172,12 @@ function M.new(logger)
     end
     if self.scanCount == 0 or applied > 0 or failed > 0 then
       self.logger("records scanned=" .. scanned .. ", cyberware=" .. matched
+        .. ", matching Humanity variants=" .. eligible
         .. ", newly zeroed=" .. applied .. ", failed=" .. failed)
       if scanned == 0 or matched == 0 then
         self.logger("WARNING: no usable cyberware records found; check CET TweakDB API")
+      elseif matched > 0 and eligible == 0 then
+        self.logger("WARNING: no readable Humanity cost variants found; scanner did not modify costs")
       elseif failed > 0 then
         self.logger("WARNING: some variant writes were rejected; check CET scripting.log")
       end
