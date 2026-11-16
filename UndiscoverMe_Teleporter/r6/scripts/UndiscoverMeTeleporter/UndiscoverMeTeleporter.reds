@@ -29,7 +29,7 @@ public final func UDMCanTeleportPin(pin: ref<IMappin>) -> Bool {
 // For the map action, the pin must also be selected and the map ready.
 @addMethod(WorldMapMenuGameController)
 private final func UDMCanTeleportSelected() -> Bool {
-  return this.m_readyToZoom && IsDefined(this.selectedMappin)
+  return this.HasSelectedMappin() && IsDefined(this.selectedMappin)
     && this.UDMCanTeleportPin(this.selectedMappin.GetMappin());
 }
 
@@ -73,47 +73,42 @@ public func SetData(const data: script_ref<WorldMapTooltipData>, menu: ref<World
   }
 }
 
-// Suppress native fast-travel preparation ONLY for core-owned markers.
+// The world map routes the mouse/keyboard fast-travel hold through
+// HandlePressInput -> HandleHoldInput -> TryFastTravel. Intercept those
+// NATIVE methods, not OnPressInput / OnHoldInput pointer callbacks.
+// Setting the start flags lets the vanilla hold machinery run and also
+// works with the optional Accidental Fast Travel Bug Fix's hold guard.
 @wrapMethod(WorldMapMenuGameController)
-protected cb func OnPressInput(e: ref<inkPointerEvent>) -> Bool {
+private final func HandlePressInput(e: ref<inkPointerEvent>) -> Void {
   if e.IsAction(n"world_map_menu_fast_travel") && this.UDMCanTeleportSelected() {
-    return true;
+    this.m_audioSystem.Play(n"ui_menu_item_crafting_start");
+    this.m_startedFastTraveling = true;
+    this.m_isPanning = true;
   }
   wrappedMethod(e);
-  return true;
 }
 
-// Reuse the map's existing hold action and progress instead of a new bind.
+// Let the game's normal hold progress and release/cancel rules run.
+// At completion, redirect ONLY UndiscoverMe-owned pins to our teleport.
 @wrapMethod(WorldMapMenuGameController)
-protected cb func OnHoldInput(e: ref<inkPointerEvent>) -> Bool {
-  if e.IsAction(n"world_map_menu_fast_travel") && this.UDMCanTeleportSelected() {
-    if !this.m_udmTeleportTriggered && e.GetHoldProgress() >= 1.0 {
-      let pin = this.selectedMappin.GetMappin();
-      let player = GameInstance.GetPlayerSystem(this.m_player.GetGame()).GetLocalPlayerMainGameObject();
-      let facility = GameInstance.GetTeleportationFacility(this.m_player.GetGame());
-      if IsDefined(pin) && IsDefined(player) && IsDefined(facility) {
-        let target = pin.GetWorldPosition();
-        target.Z += 1.5;
-        this.m_udmTeleportTriggered = true;
-        facility.Teleport(player, target, Vector4.ToRotation(player.GetWorldForward()));
-        if IsDefined(this.m_menuEventDispatcher) {
-          this.m_menuEventDispatcher.SpawnEvent(n"OnCloseHubMenu");
-        }
-        e.Handle();
-        e.Consume();
-      }
-    }
-    return true;
+private final func TryFastTravel() -> Void {
+  if !this.UDMCanTeleportSelected() {
+    wrappedMethod();
+    return;
   }
-  wrappedMethod(e);
-  return true;
-}
 
-@wrapMethod(WorldMapMenuGameController)
-protected cb func OnReleaseInput(e: ref<inkPointerEvent>) -> Bool {
-  if e.IsAction(n"world_map_menu_fast_travel") {
-    this.m_udmTeleportTriggered = false;
+  let pin = this.selectedMappin.GetMappin();
+  let player = GameInstance.GetPlayerSystem(this.m_player.GetGame()).GetLocalPlayerMainGameObject();
+  let facility = GameInstance.GetTeleportationFacility(this.m_player.GetGame());
+  if !IsDefined(pin) || !IsDefined(player) || !IsDefined(facility) {
+    return;
   }
-  wrappedMethod(e);
-  return true;
+
+  let target = pin.GetWorldPosition();
+  target.Z += 1.5;
+  facility.Teleport(player, target, Vector4.ToRotation(player.GetWorldForward()));
+  this.m_audioSystem.Play(n"ui_menu_item_crafting_done");
+  if IsDefined(this.m_menuEventDispatcher) {
+    this.m_menuEventDispatcher.SpawnEvent(n"OnCloseHubMenu");
+  }
 }
