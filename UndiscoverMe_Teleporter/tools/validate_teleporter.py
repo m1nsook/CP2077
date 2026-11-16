@@ -18,6 +18,9 @@ assert "menu.UDMCanTeleportPin(Deref(data).mappin)" in addon
 assert "inkWidgetRef.SetVisible(this.m_inputInteractContainer" in addon
 assert "this.m_startedFastTraveling = true" in addon
 assert "m_udmHeldPinID.value" in addon
+assert "heldPin.GetNewMappinID().value != this.m_udmHeldPinID.value" in addon
+assert "if !this.UDMCanTeleportSelected() { return true; }" in addon
+assert "this.m_udmHeldPinID.value = 0ul" in addon
 assert "UDMCanTeleportPin(pin.GetNewMappinID())" not in addon
 assert "this.UDMCanTeleportPin(this.selectedMappin.GetMappin())" in addon
 assert "wrappedMethod(e)" in addon and "GameInstance.GetTeleportationFacility" in addon
