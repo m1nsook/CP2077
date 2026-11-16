@@ -6,9 +6,6 @@ import MisoRevealMapPins.*
 @addField(WorldMapMenuGameController)
 private let m_udmTeleportTriggered: Bool;
 
-@addField(WorldMapMenuGameController)
-private let m_udmHeldPinID: NewMappinID;
-
 // Check the hovered pin itself. A variant or a coordinate is not proof
 // that the marker belongs to UndiscoverMe.
 @addMethod(WorldMapMenuGameController)
@@ -80,12 +77,6 @@ public func SetData(const data: script_ref<WorldMapTooltipData>, menu: ref<World
 @wrapMethod(WorldMapMenuGameController)
 protected cb func OnPressInput(e: ref<inkPointerEvent>) -> Bool {
   if e.IsAction(n"world_map_menu_fast_travel") && this.UDMCanTeleportSelected() {
-    // Start the same native hold action used by regular fast-travel pins.
-    this.m_udmHeldPinID = this.selectedMappin.GetMappin().GetNewMappinID();
-    this.m_udmTeleportTriggered = false;
-    this.m_audioSystem.Play(n"ui_menu_item_crafting_start");
-    this.m_startedFastTraveling = true;
-    this.m_isPanning = true;
     return true;
   }
   wrappedMethod(e);
@@ -95,15 +86,7 @@ protected cb func OnPressInput(e: ref<inkPointerEvent>) -> Bool {
 // Reuse the map's existing hold action and progress instead of a new bind.
 @wrapMethod(WorldMapMenuGameController)
 protected cb func OnHoldInput(e: ref<inkPointerEvent>) -> Bool {
-  if e.IsAction(n"world_map_menu_fast_travel") && this.m_udmHeldPinID.value != 0ul {
-    // A hold started on our pin must never fall through to vanilla travel
-    // if the pointer moves onto another pin before releasing the button.
-    if !this.UDMCanTeleportSelected() { return true; }
-    let heldPin = this.selectedMappin.GetMappin();
-    if !IsDefined(heldPin) || this.m_udmHeldPinID.value == 0ul
-      || heldPin.GetNewMappinID().value != this.m_udmHeldPinID.value {
-      return true;
-    }
+  if e.IsAction(n"world_map_menu_fast_travel") && this.UDMCanTeleportSelected() {
     if !this.m_udmTeleportTriggered && e.GetHoldProgress() >= 1.0 {
       let pin = this.selectedMappin.GetMappin();
       let player = GameInstance.GetPlayerSystem(this.m_player.GetGame()).GetLocalPlayerMainGameObject();
@@ -122,21 +105,14 @@ protected cb func OnHoldInput(e: ref<inkPointerEvent>) -> Bool {
     }
     return true;
   }
-  // Do not let a hold that was never pressed on an owned pin travel there.
-  if e.IsAction(n"world_map_menu_fast_travel") && this.UDMCanTeleportSelected() {
-    return true;
-  }
   wrappedMethod(e);
   return true;
 }
 
 @wrapMethod(WorldMapMenuGameController)
 protected cb func OnReleaseInput(e: ref<inkPointerEvent>) -> Bool {
-  if e.IsAction(n"world_map_menu_fast_travel") && this.m_udmHeldPinID.value != 0ul {
-    this.m_udmHeldPinID.value = 0ul;
+  if e.IsAction(n"world_map_menu_fast_travel") {
     this.m_udmTeleportTriggered = false;
-    this.m_startedFastTraveling = false;
-    this.m_isPanning = false;
   }
   wrappedMethod(e);
   return true;
