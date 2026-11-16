@@ -1,7 +1,8 @@
 # UndiscoverMe — Translation Sources
 
-These are editable UTF-8 JSON dictionaries for the **UndiscoverMe Core** and **UndiscoverMe Teleporter**.
-Teleporter adds no standalone text: it reuses the game's native Fast Travel action and map UI.
+These are editable UTF-8 JSON dictionaries for **UndiscoverMe Core**. The optional **UndiscoverMe Teleporter** displays the game's **native Fast Travel tooltip, hold icon and progress ring** on its registered markers. Those words and button prompts belong to Cyberpunk 2077 and automatically follow the **game's interface language** (and current input binding), not the Core translation JSON.
+
+**No Teleporter-only keys need translation.** Do not add unused `teleporter.*` keys: they would not change the native tooltip.
 
 ## Translate
 
@@ -21,7 +22,7 @@ Teleporter adds no standalone text: it reuses the game's native Fast Travel acti
 - New community languages can use the same JSON schema without changing game scripts.
 - CET binding labels, Native Settings UI labels/descriptions and UndiscoverMe marker captions are localized.
 - **Mod Settings** (the separate REDscript-based mod) currently has static English annotations; its labels are not changed by these JSON overlays.
-- The game-owned Teleporter hold instruction follows Cyberpunk 2077's language and is not overridden.
+- The Teleporter's visible Fast Travel label, button glyph and hold-progress UI use the game's own localization. To see Polish/Korean here, set the **game's interface language** to Polish/Korean; installing a Core `translation.json` overlay alone does not change the game's Fast Travel tooltip.
 - Korean characters may require CET's Korean font support. Check your CET font configuration if text shows as boxes.
 
 ## Keys
