@@ -14,7 +14,7 @@ The prompt uses Cyberpunk 2077's **own localized Fast Travel UI**. It automatica
 - Works with the core's NCPD, Cyberpsycho and Tarot catalog proxies, plus its registered fast-travel proxies.
 - Direct teleportation does not unlock locations, track quests or change discovery/completion state.
 - Landing position is offset 1.5 meters above the pin. **There is no terrain/ground check yet.** Make a manual save before testing.
-- Cyberpunk 2077 2.5 test: the Fast Travel tooltip is **confirmed visible**, but holding the **mouse button** did not teleport in the first iteration. The input hooks are now routed through the game's actual `HandlePressInput`/`TryFastTravel` path based on the supplied REDscript references. **Retest mouse-hold teleportation in game** before merging or releasing.
+- Cyberpunk 2077 2.5 test: the Fast Travel tooltip is **confirmed visible**, and the user confirmed that **holding the mouse button successfully teleports V**. However, the first working teleport left the game **blurred and movement locked**. This follow-up now queues the native Fast Travel loading-screen event, forces the hub menu to close, sends `OnBack`, and resets the first-person camera pitch, following the supplied REDscript reference. **This cleanup fix is not yet tested in game**.
 
 ## Install
 
