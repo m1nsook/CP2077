@@ -11,8 +11,17 @@ assert all(v in core for v in ("UDMRegisterCatalogPin", "UDMUnregisterCatalogPin
 assert "onOwnedChanged(id, false)" in runtime
 assert "onOwnedChanged(self.owned[entry.hash], true)" in runtime
 assert "world_map_menu_fast_travel" in addon and "e.GetHoldProgress() >= 1.0" in addon
+assert "UDMCanTeleportPin(controller.GetMappin())" in addon
+assert "tooltipData.fastTravelEnabled = true" in addon
+assert "this.m_tooltipController.SetData(tooltipType, tooltipData, this)" in addon
+assert "menu.UDMCanTeleportPin(Deref(data).mappin)" in addon
+assert "inkWidgetRef.SetVisible(this.m_inputInteractContainer" in addon
+assert "this.m_startedFastTraveling = true" in addon
+assert "m_udmHeldPinID.value" in addon
+assert "UDMCanTeleportPin(pin.GetNewMappinID())" not in addon
+assert "this.UDMCanTeleportPin(this.selectedMappin.GetMappin())" in addon
 assert "wrappedMethod(e)" in addon and "GameInstance.GetTeleportationFacility" in addon
 assert not any(s in addon for s in ("RegisterMappin(", "UnregisterMappin(", "SetFactStr("))
 assert 'MOD .. "_Status"' not in cet and 'MOD .. "_Preview"' not in cet
 assert "miso_rmp_diag_seen" not in core
-print("PASS: optional teleporter owner check, hold input and core cleanup")
+print("PASS: owned-pin native tooltip/hold, hold cancellation and core cleanup")
