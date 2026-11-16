@@ -65,7 +65,8 @@ local function setEnabled(enabled)
   if ns and nsSwitch then
     pcall(function() ns.setOption(nsSwitch, enabled) end)
   end
-  log(enabled and "ON: zero-cost cyberware" or "OFF: restore original implant costs")
+  log(enabled and "Enabled: requested zero Humanity modifiers (see scan results)"
+    or "Disabled: requested restoration of original Humanity modifiers (see restore results)")
 end
 
 local function registerNSUI()
