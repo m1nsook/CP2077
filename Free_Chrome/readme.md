@@ -9,7 +9,7 @@ Free Chrome makes the game's **cyberware Humanity/Capacity cost** equal to **0**
 - Targets the shared TweakDB **Humanity/Capacity cost modifier values**, which the game uses to calculate implant cost.
 - Generates cost flat paths for standard `Variants.Humanity1Cost` through `Variants.Humanity200Cost`, including Tinkerer variants and compatible standard-named modded costs.
 - Uses only `TweakDB:GetFlat()` and `TweakDB:SetFlat()` on relevant numeric `.value` fields; it does **not** modify cyberware item variants or every item's individual stats.
-- **On/off switch** in **Native Settings UI** and **Mod Settings**, plus a fallback CET Bindings hotkey (`FreeChrome_Toggle`).
+- **On/off switch** in **Native Settings UI** and **Mod Settings**, plus a fallback CET Bindings hotkey (`FreeChrome_Toggle`). Both settings labels explicitly say **reload save**, and both descriptions explain that a save must be loaded after switching ON or OFF.
 - Persistent preference in an unshipped `db.json`. Switching **OFF** attempts to restore the numeric values captured before Free Chrome zeroed them.
 - Rechecks the shared cost fields periodically (not per frame) to accommodate other mods changing cost values after startup.
 - Developer-friendly `patch.lua` with `MAX_HUMANITY_COST` and `patch:addCostFlat("Your.CustomCost_inline1.value")` for alternate custom cost records.
