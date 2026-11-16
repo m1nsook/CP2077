@@ -32,5 +32,9 @@
     "name": "UndiscoverMe Translation Sources",
     "summary": "Editable English, Polish and Korean JSON dictionaries for community translators; not a game mod.",
     "package_type": "sources"
+  },
+  "Free_Chrome": {
+    "name": "Free Chrome — All Cyberware Costs 0 Humanity",
+    "summary": "Sets standard cyberware Humanity/Capacity costs to zero, with reversible in-game settings."
   }
 }
