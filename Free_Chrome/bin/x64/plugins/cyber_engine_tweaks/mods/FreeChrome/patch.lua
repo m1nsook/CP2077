@@ -27,6 +27,22 @@ local function safeGetFlat(id, property)
   return ok and value or nil
 end
 
+local function sameArray(a, b)
+  if type(a) ~= "table" or type(b) ~= "table" or #a ~= #b then return false end
+  for i = 1, #a do
+    if a[i] ~= b[i] then return false end
+  end
+  return true
+end
+
+-- Only claim a successful patch after checking the live TweakDB value.
+local function setVerified(id, variants)
+  local ok, result = pcall(function()
+    return TweakDB:SetFlat(id + ".variants", variants)
+  end)
+  return ok and result ~= false and sameArray(safeGetFlat(id, "variants"), variants)
+end
+
 local function recordName(value)
   if not value then return "" end
   if type(value) == "string" then return value end
@@ -84,15 +100,14 @@ function M.new(logger)
               visited[key] = true
               if isCyberware(record, id) then
                 matched = matched + 1
-                if not self.originals[key] then
-                  local variants = copyArray(safeGetFlat(id, "variants"))
-                  if variants then
-                    local newVariants = { TweakDBID.new(ZERO_VARIANT) }
-                    local changed, result = pcall(function()
-                      return TweakDB:SetFlat(id + ".variants", newVariants)
-                    end)
-                    if changed and result ~= false then
-                      self.originals[key] = { id = id, variants = variants }
+                local current = copyArray(safeGetFlat(id, "variants"))
+                if current then
+                  local zero = { TweakDBID.new(ZERO_VARIANT) }
+                  if not sameArray(current, zero) then
+                    -- If another mod changed a record after our previous scan,
+                    -- the latest external variant becomes the restore baseline.
+                    if setVerified(id, zero) then
+                      self.originals[key] = { id = id, variants = current }
                       applied = applied + 1
                     end
                   end
@@ -113,17 +128,16 @@ function M.new(logger)
   function self:restore()
     local restored, failed = 0, 0
     for key, original in pairs(self.originals) do
-      local ok, result = pcall(function()
-        return TweakDB:SetFlat(original.id + ".variants", original.variants)
-      end)
-      if ok and result ~= false then
+      if setVerified(original.id, original.variants) then
         self.originals[key] = nil
         restored = restored + 1
       else
         failed = failed + 1
       end
     end
-    self.logger("original cyberware variants restored=" .. restored .. ", failed=" .. failed)
+    if restored > 0 or failed > 0 then
+      self.logger("original cyberware variants restored=" .. restored .. ", failed=" .. failed)
+    end
     return restored, failed
   end
 
