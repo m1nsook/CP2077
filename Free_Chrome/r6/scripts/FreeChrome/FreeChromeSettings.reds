@@ -14,8 +14,8 @@ public abstract class FreeChromeState {
 public class FreeChromeSettings extends ScriptableSystem {
   @runtimeProperty("ModSettings.mod", "Free Chrome")
   @runtimeProperty("ModSettings.category", "General")
-  @runtimeProperty("ModSettings.displayName", "Zero Humanity cost")
-  @runtimeProperty("ModSettings.description", "Set implant Humanity/Capacity cost to zero. Does not change prices, maximum Capacity, or implant stats.")
+  @runtimeProperty("ModSettings.displayName", "Zero Humanity cost (reload save)")
+  @runtimeProperty("ModSettings.description", "After switching ON or OFF, reload a save to apply the change. Eddies, maximum Capacity, and implant stats stay unchanged.")
   public let enabled: Bool = true;
 
   private let previous: Bool;
