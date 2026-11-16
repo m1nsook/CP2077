@@ -23,7 +23,7 @@ local function copyArray(value)
 end
 
 local function safeGetFlat(id, property)
-  local ok, value = pcall(function() return TweakDB:GetFlat(id + "." .. property) end)
+  local ok, value = pcall(function() return TweakDB:GetFlat(id + ("." .. property)) end)
   return ok and value or nil
 end
 
