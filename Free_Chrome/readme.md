@@ -25,7 +25,7 @@ Zero cost does **not** increase your maximum Cyberware Capacity; it reduces the 
 1. Install **Cyber Engine Tweaks** and **redscript** compatible with game 2.5 (and their prerequisites).
 2. Extract the future **Free Chrome** release ZIP directly into the Cyberpunk 2077 game directory, preserving the `bin/` and `r6/` paths.
 3. Launch the game and open **Native Settings UI → Free Chrome → General** or **Mod Settings → Free Chrome → General**. Both UIs are optional; CET's **Bindings** page provides a fallback toggle.
-4. For reliable validation, visit a ripperdoc and check at least one installed/available implant. If an already equipped implant retains a cached cost, unequip and re-equip it to refresh the loadout view.
+4. **After turning Free Chrome ON or OFF, load/reload a save** to apply the change to the equipped cyberware's Capacity calculation. Then open the cyberware screen or visit a ripperdoc to check implant costs.
 
 **To uninstall:** disable the mod first to restore the captured modifier values in the running session, then exit and remove `bin/x64/plugins/cyber_engine_tweaks/mods/FreeChrome/` and `r6/scripts/FreeChrome/FreeChromeSettings.reds`. TweakDB runtime changes do not persist across full game restarts.
 
@@ -52,7 +52,7 @@ Look for log lines such as:
 
 If `found=0`, the candidate records aren't available to CET. If `write failures` is nonzero, some writes weren't confirmed. If `newly zeroed=0` but `found` is positive, those fields may already have been set to zero on an earlier scan.
 
-Close and reopen the cyberware screen after toggling. Existing implants or Cyberware-EX may have cached stat calculations, so test an **unequip/re-equip** at a ripperdoc if the UI remains stale. **Live test update (Nov 16, 2026):** The revised patch now shows **0 Humanity/Capacity cost** on equipped **FEEN-X Tier 5++** in the user's cyberware screen. The user also confirmed that switching Free Chrome **OFF restores the original cost**. Broader implant coverage, persistence after game reload, and third-party cyberware compatibility have not been exhaustively tested.
+**Important: reload a save after each toggle.** Changing the TweakDB values is not enough to recalculate the cost of already-equipped cyberware in the current game session. The user confirmed that loading a save applies ON and OFF correctly. **Live test update (Nov 16, 2026):** The revised patch now shows **0 Humanity/Capacity cost** on equipped **FEEN-X Tier 5++** in the user's cyberware screen. The user also confirmed that switching Free Chrome **OFF restores the original cost**. Broader implant coverage and third-party cyberware compatibility have not been exhaustively tested.
 
 ### CET 1.38.1 write regression (identified November 16, 2026)
 
@@ -70,6 +70,6 @@ CET issue [#1081](https://github.com/maximegmd/CyberEngineTweaks/issues/1081) re
 
 ## Status
 
-**In-game verified for ON/OFF in Cyberpunk 2077 2.5:** FEEN-X Tier 5++ displays 0 Humanity/Capacity cost with Free Chrome enabled, and its original cost returns after disabling it. Broad coverage, game-reload persistence, and third-party cyberware still need separate testing.
+**In-game verified for ON/OFF in Cyberpunk 2077 2.5:** After loading a save, FEEN-X Tier 5++ displays 0 Humanity/Capacity cost with Free Chrome enabled, and its original cost returns when disabled and the save is loaded again. The toggle is **not instant** for already-equipped implant capacity calculations. Broader implant coverage and third-party cyberware still need testing.
 
 The code is original to this repository; no assets or code are copied from other Humanity-cost mods.
