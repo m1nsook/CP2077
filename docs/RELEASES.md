@@ -5,16 +5,17 @@ Release notes are short: one sentence per mod and SHA-256 for every ZIP.
 ## Publish
 
 1. Merge changes into `main`.
-2. Create a `vX.Y.Z` tag from the desired commit (GitHub **Releases → Draft a new release → Choose a tag**).
-3. The **Publish mod releases** workflow packages all mods and publishes or updates that tag's GitHub release.
+2. Open **Actions → Release a mod → Run workflow** from `main`.
+3. Choose one mod and enter a version such as `0.1.0` or `v0.1.0`.
+4. The workflow publishes only the selected mod, with a game-root install ZIP, SHA-256 checksum, and mod-specific version tag.
 
 Regular commits do not run release builds. Issue/PR labeling runs only when those items change.
 
 ## New mods
 
 Create a top-level mod folder containing installable files under `bin/`, `r6/`, `archive/`, `red4ext/`, `engine/`, `mods/`, or `dlc/`.
-Every such folder is included automatically in the next release. Each ZIP contains game-root-relative paths.
-Add an optional one-line name/summary to `.github/mod-descriptions.json` for nicer release notes.
+Register each new mod in `.github/mod-descriptions.json` and the `release.yml` workflow choice list. Each ZIP contains game-root-relative paths.
+Provide a one-line name/summary in `.github/mod-descriptions.json` for its release notes.
 The workflow includes only tracked install files and excludes runtime `db.json`.
 
 ## Verify a download

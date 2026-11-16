@@ -13,6 +13,7 @@ Source code and releases for my Cyberpunk 2077 mods.
 | --- | --- | --- |
 | [No Tracking Please](No_Tracking_Please) | Blocks enemy netrunner/police position reveals and quickhack trace acceleration. | Active |
 | [Free Chrome](Free_Chrome) | Sets standard cyberware Humanity/Capacity costs to zero with reversible Mod Settings and NSUI controls. | ON/OFF in-game tested |
+| [Camera Killer](Camera_Killer) | Shuts down cameras connected to the same network when V disables one camera. | In-game tested |
 | [UndiscoverMe](UndiscoverMe) | Reveals eligible NCPD Scanner, Cyberpsycho and Tarot map markers without reopening completed activities. | Active |
 | [UndiscoverMe Teleporter](UndiscoverMe_Teleporter) | Optional addon: hold the map's Fast Travel action on an UndiscoverMe pin to teleport. Requires UndiscoverMe core. | In-game tested |
 
@@ -37,16 +38,16 @@ Download the mod ZIP from [Releases](https://github.com/m1nsook/CP2077/releases)
 
 ## Dependencies
 
-| Dependency | No Tracking Please | Free Chrome | UndiscoverMe | Teleporter addon |
-| --- | --- | --- | --- | --- |
-| UndiscoverMe core | — | — | — | Required |
-| RED4ext | Required | Via CET | Required | Via core |
-| redscript | Required | Required | Required | Required |
-| Cyber Engine Tweaks (CET) | Required | Required | Required | Via core |
-| TweakXL | Not required | Not required | Required for extra map filter | Not required |
-| Mod Settings | Optional | Optional | Optional | Not required |
-| Native Settings UI | Optional | Optional | Optional | Not required |
-| ArchiveXL / Codeware | Not required | Not required | Not required | Not required |
+| Dependency | No Tracking Please | Free Chrome | Camera Killer | UndiscoverMe | Teleporter addon |
+| --- | --- | --- | --- | --- | --- |
+| UndiscoverMe core | — | — | — | — | Required |
+| RED4ext | Required | Via CET | Required | Required | Via core |
+| redscript | Required | Required | Required | Required | Required |
+| Cyber Engine Tweaks (CET) | Required | Required | Not required | Required | Via core |
+| TweakXL | Not required | Not required | Not required | Required for extra map filter | Not required |
+| Mod Settings | Optional | Optional | Not required | Optional | Not required |
+| Native Settings UI | Optional | Optional | Not required | Optional | Not required |
+| ArchiveXL / Codeware | Not required | Not required | Not required | Not required | Not required |
 
 UndiscoverMe's basic marker functionality works without TweakXL; its separate **Filter: UndiscoverMe** entry requires it. The new map-filter UI is not yet confirmed working in-game.
 
