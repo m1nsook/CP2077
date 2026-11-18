@@ -90,8 +90,8 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("ArraySize(queue) < 64", R)
         self.assertIn("ArrayContains(result.seen, obj)", R)
         self.assertIn("NetDeckEnqueueMaster(", R)
-        self.assertIn("NetDeckSpread(this.GetGameInstance(), source)", R)
-        self.assertIn("NetDeckSpread(this.GetGameInstance(), puppet)", R)
+        self.assertIn("NetDeckSpread(this.GetGameInstance(), source, true)", R)
+        self.assertIn("NetDeckSpread(this.GetGameInstance(), puppet, false)", R)
         self.assertIn('loc.GetText("NetDeckDevicesAffected")', R)
         self.assertIn('loc.GetText("NetDeckEddiesStolen")', R)
         self.assertIn('loc.GetText("NetDeckStolenTargets")', R)
@@ -100,6 +100,7 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("let barrier: ref<RoadBlockControllerPS>", R)
         self.assertIn("this.QueuePSEvent(barrier, toggle)", R)
         self.assertIn("NetDeckSiphon(", R)
+        self.assertIn("if fromDevice { result.netrunners += NetDeckBurnoutNearbyNetrunners(ps); }", R)
         self.assertIn("Items.money", R)
         self.assertIn("if result.eddies >= 1500", R)
 
