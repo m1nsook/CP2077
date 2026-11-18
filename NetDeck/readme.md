@@ -1,9 +1,45 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.6 FAST NATIVE UPLOAD HUD TEST · NOT game-compiler verified.**
+**Cyberpunk 2077 2.5 · v0.6.7 SCOPED BLUE NETWORM HUD ICON TEST · NOT game-compiler verified.**
 
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
+
+## v0.6.7 — scoped blue HUD and actual NETWORM icon (UNVERIFIED)
+
+The player's WolvenKit 10.0.0-beta.1 CP2077 2.5 export
+`hud_progress_bar.inkwidget.json` shows the neutral slot contains
+multiple separate layers: `Neutral_Triangle_Icon`,
+`Neutral_Exlmtion_Icon`, `Neutral_Background_Icon`,
+`Neurtral_Small_Icon`, and `Neutral_Triangle_Icon_GHOST`.
+The exported `progress_bar.inkstyle` maps state `Neutral` to
+`MainColors.Blue` and `MainColors.ActiveBlue`. The player's
+private `networm_icons.inkatlas` has texture part **`networmhack`**,
+with 32x32/64x64 variants.
+
+A separate `NetDeckHudSkin.reds` adds one **NETWORM-only**
+`HUDProgressBarController.UpdateTimerHeader` wrapper. After the
+native method, it checks the progress bar's actual header and active
+state for NETWORM; only then does it swap the existing neutral icon
+image to `m1nsook\\netdeck\\ui\\networm_icons.inkatlas`,
+part `networmhack`, hide four triangle layers, and bind the
+main bar and icon to `MainColors.ActiveBlue`. If the atlas
+part cannot be used, it restores the vanilla symbol. When another
+quest uses the progress bar, it restores the original icon,
+triangle visibility, and `Bar.Red`/`Bar.ProgressLine` bindings.
+
+**We do NOT patch or ship the game's base HUD .inkwidget/.inkstyle,**
+which would unintentionally recolor mission and hacking HUDs.
+This uses the user's **existing** local `NetDeck.archive`; the
+public source-only ZIP intentionally does not redistribute it.
+
+**New experimental risk:** even a scoped HUD controller wrap changes
+the code path for all HUD progress bar header changes. It is not
+REDscript compiler-verified or tested in-game. To isolate a new crash,
+remove ONLY `r6/scripts/NetDeck/NetDeckHudSkin.reds` while keeping the
+rest of v0.6.7 and the archived icons in place; then repeat the same
+save/map test. Do not merge/release. Existing 3-second native HUD
+timing, infection fanout and entity streaming safeguards remain.
 
 ## v0.6.6 — faster, neutral-tone NETWORM upload bar (UNVERIFIED)
 
