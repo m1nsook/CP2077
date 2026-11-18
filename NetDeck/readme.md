@@ -56,8 +56,7 @@ The user-supplied `HeatSpread Files(1).zip` contained:
 - Money: 65% chance to grant a small virtual €$ siphon reward from each
   eligible NPC or computer/terminal, capped at €$1,500 per upload. This does
   NOT deduct money from a real NPC wallet.
-- Random crafting component rewards retained; **strict no-XP remains
-  unimplemented** because game-originated kill/quickhack XP can still occur.
+- Random crafting component rewards retained. **Normal Netrunner XP is allowed** when using NETWORM; no XP suppression is required.
 
 This version does not yet render an actual traveling beam between **NPCs**;
 the visible changes are staggered native Weapon Glitch effects, device
@@ -98,7 +97,7 @@ Keep the user's privately packed `.archive` with the working icon art.
 8. **€$ siphon**: check displayed credits against V's money before/after.
 9. **Vanilla**: normal Ping, weapon hacking, existing icons, cyberdeck stats
    and other cyberdecks must continue working.
-10. **XP**: check if XP/skill XP grows (still an open requirement).
+10. **XP**: normal Netrunner XP gain is expected and allowed; do not treat it as a bug.
 
 **Keep PR #36 draft. REDscript compilation and gameplay results are
 required before describing this feature as working.**
