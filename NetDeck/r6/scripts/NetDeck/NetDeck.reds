@@ -407,12 +407,6 @@ private let netDeckWavePendingCursor: Int32;
 private let netDeckWaveTicks: Int32;
 @addField(PlayerPuppet)
 private let netDeckWaveResult: ref<NetDeckSpreadResult>;
-@addField(PlayerPuppet)
-private let netDeckHudOwned: Bool;
-@addField(PlayerPuppet)
-private let netDeckHudHeader: String;
-@addField(PlayerPuppet)
-private let netDeckHudProgress: Float;
 
 @addMethod(PlayerPuppet)
 private func NetDeckWaveHasSeen(id: EntityID) -> Bool {
@@ -557,81 +551,6 @@ private func NetDeckWaveInfect(obj: ref<GameObject>, depth: Int32) -> Void {
   // Emit a single outcome at the end, not a repeating reward chime.
 }
 
-// Native mission-style transfer bar. Shared globally with quests: never
-// overwrite a bar that is already active. Track the exact header as an
-// ownership token so a quest taking it over cannot be closed by NETWORM.
-@addMethod(PlayerPuppet)
-private func NetDeckHudStart() -> Void {
-  this.netDeckHudOwned = false;
-  let bb: ref<IBlackboard> =
-    GameInstance.GetBlackboardSystem(this.GetGame()).Get(
-      GetAllBlackboardDefs().UI_HUDProgressBar
-    );
-  if !IsDefined(bb) { return; }
-  let d: ref<UI_HUDProgressBarDef> = GetAllBlackboardDefs().UI_HUDProgressBar;
-  if bb.GetBool(d.Active) { return; }
-  this.netDeckHudOwned = true;
-  this.netDeckHudProgress = 0.0;
-  this.netDeckHudHeader = "NETWORM";
-  bb.SetString(d.Header, this.netDeckHudHeader, true);
-  bb.SetString(d.BottomText, "", true);
-  let loc: ref<LocalizationSystem> =
-    LocalizationSystem.GetInstance(this.GetGame());
-  if IsDefined(loc) {
-    bb.SetString(d.CompletedText, loc.GetText("NetDeckSpreadComplete"), true);
-  } else {
-    bb.SetString(d.CompletedText, "NETWORM COMPLETE", true);
-  }
-  bb.SetFloat(d.Progress, 0.0, true);
-  bb.SetBool(d.Active, true, true);
-  this.NetDeckHudUpdate();
-}
-
-@addMethod(PlayerPuppet)
-private func NetDeckHudUpdate() -> Void {
-  if !this.netDeckHudOwned || !IsDefined(this.netDeckWaveResult) { return; }
-  let bb: ref<IBlackboard> =
-    GameInstance.GetBlackboardSystem(this.GetGame()).Get(
-      GetAllBlackboardDefs().UI_HUDProgressBar
-    );
-  if !IsDefined(bb) { this.netDeckHudOwned = false; return; }
-  let d: ref<UI_HUDProgressBarDef> = GetAllBlackboardDefs().UI_HUDProgressBar;
-  if !bb.GetBool(d.Active) ||
-     !Equals(bb.GetString(d.Header), this.netDeckHudHeader) {
-    // The quest system or another mod owns the bar now. Don't touch it.
-    this.netDeckHudOwned = false;
-    return;
-  }
-  let loc: ref<LocalizationSystem> =
-    LocalizationSystem.GetInstance(this.GetGame());
-  if !IsDefined(loc) { return; }
-  let r: ref<NetDeckSpreadResult> = this.netDeckWaveResult;
-  let count: Int32 = r.npcs + r.vehicles + r.netrunners + r.devices;
-  this.netDeckHudHeader = loc.GetText("NetDeckUploadProgress") + " " +
-    IntToString(count) + " " + loc.GetText("NetDeckTargetsAffected");
-  bb.SetString(d.Header, this.netDeckHudHeader, true);
-  bb.SetString(d.BottomText, loc.GetText("NetDeckDevicesAffected") +
-    ": " + IntToString(r.devices), true);
-  bb.SetFloat(d.Progress, this.netDeckHudProgress, true);
-}
-
-@addMethod(PlayerPuppet)
-private func NetDeckHudFinish() -> Void {
-  if !this.netDeckHudOwned { return; }
-  this.netDeckHudOwned = false;
-  let bb: ref<IBlackboard> =
-    GameInstance.GetBlackboardSystem(this.GetGame()).Get(
-      GetAllBlackboardDefs().UI_HUDProgressBar
-    );
-  if !IsDefined(bb) { return; }
-  let d: ref<UI_HUDProgressBarDef> = GetAllBlackboardDefs().UI_HUDProgressBar;
-  if bb.GetBool(d.Active) &&
-     Equals(bb.GetString(d.Header), this.netDeckHudHeader) {
-    bb.SetFloat(d.Progress, 1.0, true);
-    bb.SetBool(d.Active, false, true);
-  }
-}
-
 @addMethod(PlayerPuppet)
 private func NetDeckWaveSchedule() -> Void {
   let evt: ref<NetDeckWaveTickEvent> = new NetDeckWaveTickEvent();
@@ -641,7 +560,6 @@ private func NetDeckWaveSchedule() -> Void {
 
 @addMethod(PlayerPuppet)
 private func NetDeckWaveFinish() -> Void {
-  this.NetDeckHudFinish();
   let r: ref<NetDeckSpreadResult> = this.netDeckWaveResult;
   if !IsDefined(r) { return; }
   let affected: Int32 = r.devices + r.npcs + r.vehicles + r.netrunners;
@@ -658,8 +576,7 @@ private func NetDeckWaveFinish() -> Void {
 public func NetDeckWaveStart(root: ref<GameObject>, fromDevice: Bool) -> Void {
   if !IsDefined(root) || !IsEquipped(this.GetGame()) { return; }
 
-  // Each upload supersedes old ticks and stops its previous HUD bar.
-  this.NetDeckHudFinish();
+  // Each upload supersedes any old ticks and starts a new wave.
   this.netDeckWaveGeneration += 1;
   let initialVehicle: wref<VehicleObject> = root as VehicleObject;
   if IsDefined(initialVehicle) { this.NetDeckRegisterVehicle(initialVehicle); }
@@ -677,7 +594,6 @@ public func NetDeckWaveStart(root: ref<GameObject>, fromDevice: Bool) -> Void {
   ArrayClear(this.netDeckWavePending);
   ArrayClear(this.netDeckWavePendingDepths);
   this.NetDeckWaveInfect(root, 0);
-  this.NetDeckHudStart();
   this.NetDeckWaveSchedule();
 }
 
@@ -685,15 +601,11 @@ public func NetDeckWaveStart(root: ref<GameObject>, fromDevice: Bool) -> Void {
 protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool {
   if evt.generation != this.netDeckWaveGeneration { return true; }
   if !IsEquipped(this.GetGame()) {
-    this.NetDeckHudFinish();
     return true;
   }
   // Hard safety stop: max 16 scheduled jumps (32 seconds) in this test
   // build, even if native targeting starts returning phantom candidates.
   this.netDeckWaveTicks += 1;
-  if this.netDeckHudProgress < 1.0 {
-    this.netDeckHudProgress += 0.0625;
-  }
   if this.netDeckWaveTicks > 16 || ArraySize(this.netDeckWaveSeen) >= 40 {
     this.NetDeckWaveFinish();
     return true;
@@ -849,7 +761,6 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
 
   if IsDefined(selected) {
     this.NetDeckWaveInfect(selected, depth);
-    this.NetDeckHudUpdate();
     this.NetDeckWaveSchedule();
   } else {
     this.NetDeckWaveFinish();
