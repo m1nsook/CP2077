@@ -116,7 +116,7 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertNotIn("PingNetworkGrid_Event(", R)
         self.assertNotIn("NetDeckPulseNetwork(ps)", R)
         self.assertNotIn("notification.m_text = loc.GetText(\"NetDeckWaveProgress\")", R)
-        self.assertIn("r.robbedTargets, affected", R)
+        self.assertIn("r.robbedTargets, r.npcs + r.vehicles", R)
 
     def test_scoped_trace_hook(self):
         self.assertIn("NetDeck.ZeroAwareness:", Y)
