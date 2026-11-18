@@ -9,17 +9,17 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 MOD = Path(__file__).resolve().parents[1]
 ROOT_FILES = (
-    "r6/scripts/NEST/NEST.reds",
-    "r6/tweaks/NEST/NEST.yaml",
+    "r6/scripts/NetDeck/NetDeck.reds",
+    "r6/tweaks/NetDeck/NetDeck.yaml",
 )
-TESTING = """NΣT — EXPERIMENTAL GAMEPLAY TEST — NOT A RELEASE
+TESTING = """Infiltration — NΣT GAMEPLAY TEST — NOT A RELEASE
 
 Requires Cyberpunk 2077 2.5, RED4ext, redscript and TweakXL.
 
 INSTALL:
 1. Back up the save you will use for testing and CLOSE THE GAME.
 2. Extract this ZIP into the Cyberpunk 2077 game root.
-3. Make sure r6/scripts/NEST/NEST.reds and r6/tweaks/NEST/NEST.yaml exist.
+3. Make sure r6/scripts/NetDeck/NetDeck.reds and r6/tweaks/NetDeck/NetDeck.yaml exist.
 4. Launch the game. If REDscript compilation or TweakXL loading fails,
    send the r6/logs/redscript* and red4ext/plugins/TweakXL/TweakXL.log errors.
 5. To add the experimental deck through CET console:
@@ -30,15 +30,14 @@ INSTALL:
 
 IMPORTANT LIMITATIONS:
 - Not verified in Cyberpunk 2077; further REDscript fixes may be needed.
-- The custom NΣT name, Infiltration text and icon require a packed
-  WolvenKit/ArchiveXL archive. The test build deliberately contains no
-  .archive or .archive.xl file; missing names are EXPECTED.
+- The native UI label/icon are not cooked yet; the game may show inherited
+  Ping/Netdriver text. This ZIP deliberately contains no fake asset manifest.
 - Robotic NPCs, drones and mechs are not yet covered.
 - Infiltration does not need Camera Killer; test with or without it.
 - Do not publish this ZIP as a Nexus Mods release.
 
 REMOVE:
-Delete r6/scripts/NEST and r6/tweaks/NEST.
+Delete r6/scripts/NetDeck and r6/tweaks/NetDeck.
 """.replace("\n", "\n")
 
 def build(output: Path) -> None:
@@ -53,17 +52,17 @@ def build(output: Path) -> None:
             info.compress_type = ZIP_DEFLATED
             info.external_attr = 0o644 << 16
             package.writestr(info, data)
-        info = ZipInfo("NEST-READ-FIRST.txt", date_time=(2026, 11, 18, 0, 0, 0))
+        info = ZipInfo("NetDeck-READ-FIRST.txt", date_time=(2026, 11, 18, 0, 0, 0))
         info.compress_type = ZIP_DEFLATED
         info.external_attr = 0o644 << 16
         package.writestr(info, TESTING.encode("utf-8"))
 
     with ZipFile(output) as package:
         names = set(package.namelist())
-        assert names == set(ROOT_FILES) | {"NEST-READ-FIRST.txt"}, names
+        assert names == set(ROOT_FILES) | {"NetDeck-READ-FIRST.txt"}, names
         assert package.testzip() is None
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
-    sums = output.with_name("NEST-TEST-SHA256SUMS.txt")
+    sums = output.with_name("NetDeck-TEST-SHA256SUMS.txt")
     sums.write_text(f"{digest}  {output.name}\n", encoding="utf-8")
     print(f"Created {output} ({output.stat().st_size} bytes)")
     print(f"SHA-256: {digest}")
@@ -71,6 +70,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NEST-v0.2.0-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.2.0-TEST.zip")
     args = parser.parse_args()
     build(args.output)

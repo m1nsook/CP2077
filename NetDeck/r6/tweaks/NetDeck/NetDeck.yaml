@@ -1,12 +1,10 @@
-# NΣT iconic cyberdeck — standalone TweakXL prototype, v0.1.0
-# Independent of Camera Killer. The name/icon localization must be packaged
-# through WolvenKit/ArchiveXL before an end-user release.
+# Infiltration — NΣT iconic cyberdeck, TweakXL game-root test build
+# Keep Items.NESTCyberdeck stable for existing saves.
+
 
 Items.NESTCyberdeck:
   $base: Items.AdvancedNetwatchNetdriverMKLegendaryPlusPlus
   friendlyName: NΣT
-  displayName: l"NESTDeckName"
-  localizedDescription: l"NESTDeckDescription"
   quality: Quality.LegendaryPlusPlus
   blueprint: Items.CyberdeckBlueprint4Slots
   variants:
@@ -16,17 +14,17 @@ Items.NESTCyberdeck:
   OnEquip:
     - Items.BaseDeck_inline0
     - Items.BaseDeck_inline3
-    - NEST.RAM15Buffer4
+    - NetDeck.RAM15Buffer4
     - Items.HackDecreasedAwarenessGainAbility
     - Items.DecreasedHacksCostOnDevicesAbility
     - Items.IncreaseDamageDealtWhileControllingDeviceAbilityLegendaryPlusPlus
   objectActions:
-    - !append-once DeviceAction.NESTInfiltration
+    - !append-once DeviceAction.NetDeckInfiltration
   tags:
     - !remove Iconic_Netdriver_Cyberdeck
-    - !append-once NEST_Cyberdeck
+    - !append-once NetDeck_Cyberdeck
 
-NEST.RAM15Buffer4:
+NetDeck.RAM15Buffer4:
   $type: gamedataGameplayLogicPackage_Record
   stats:
     - $type: gamedataConstantStatModifier_Record
@@ -39,31 +37,32 @@ NEST.RAM15Buffer4:
       value: 4
 
 # Native scanner entry, not a standalone inventory quickhack.
-DeviceAction.NESTInfiltration:
-  $base: DeviceAction.ToggleStateClassHack
-  actionName: NESTInfiltration
-  objectActionUI: Interactions.NESTInfiltration
+DeviceAction.NetDeckInfiltration:
+  $base: DeviceAction.PingDevice
+  actionName: NetDeckInfiltration
+  objectActionUI: Interactions.NetDeckInfiltration
+  isQuickHack: true
   objectActionType: ObjectActionType.DeviceQuickHack
   startEffects: []
   completionEffects: []
   targetPrereqs: []
   targetActivePrereqs: []
 
-Interactions.NESTInfiltration:
-  $base: Interactions.TakeControlCameraHack
-  caption: l"NESTInfiltrationName"
-  description: l"NESTInfiltrationDescription"
+Interactions.NetDeckInfiltration:
+  $base: Interactions.PingHack
+  # The native name requires a cooked WolvenKit on-screen localization asset.
+  # Do not ship an .archive.xl pointing at an uncooked JSON source.
 
 # One guaranteed stock record, appended to all known Night City / Dogtown
 # ripperdoc lists. This does not replace any existing stock.
-NEST.RipperdocStock:
+NetDeck.RipperdocStock:
   $type: gamedataVendorItem_Record
   item: Items.NESTCyberdeck
   quantity:
     - Vendors.Always_Present
 
 Vendors.AdvancedCollectiveRipperDoc.itemStock: &NESTVendor
-  - !append-once NEST.RipperdocStock
+  - !append-once NetDeck.RipperdocStock
 Vendors.AdvancedCollectiveRipperDocDogtown.itemStock: *NESTVendor
 Vendors.AdvancedCollectiveRipperDocGeneral.itemStock: *NESTVendor
 Vendors.AdvancedCollectiveRipperDocVictor.itemStock: *NESTVendor

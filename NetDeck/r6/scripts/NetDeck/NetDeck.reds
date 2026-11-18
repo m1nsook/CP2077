@@ -1,11 +1,11 @@
-// NΣT — Infiltration (experimental v0.1.0)
+// Infiltration — NΣT iconic cyberdeck (Cyberpunk 2077 2.5; test build)
 // This is deliberately self-contained. It does not require Camera Killer
 // or alter its hooks; Infiltration runs only while the NΣT deck is installed.
-module NEST
+module NetDeck
 
-public class NESTInfiltration extends ActionBool {
+public class NetDeckInfiltration extends ActionBool {
   public final func SetProperties() -> Void {
-    this.actionName = n"NESTInfiltration";
+    this.actionName = n"NetDeckInfiltration";
     this.prop = DeviceActionPropertyFunctions.SetUpProperty_Bool(
       this.actionName, true, this.actionName, this.actionName
     );
@@ -36,7 +36,7 @@ public func IsEquipped(game: GameInstance) -> Bool {
 }
 
 @addMethod(ScriptableDeviceComponentPS)
-public const func NESTNetworkMaster() -> ref<MasterControllerPS> {
+public const func NetDeckNetworkMaster() -> ref<MasterControllerPS> {
   let accessPoints: array<ref<AccessPointControllerPS>> = this.GetAccessPoints();
   let i: Int32 = 0;
   while i < ArraySize(accessPoints) {
@@ -72,47 +72,77 @@ public const func NESTNetworkMaster() -> ref<MasterControllerPS> {
 }
 
 @addMethod(ScriptableDeviceComponentPS)
-public func NESTActionInfiltration() -> ref<NESTInfiltration> {
-  let action: ref<NESTInfiltration> = new NESTInfiltration();
+public func NetDeckActionInfiltration() -> ref<NetDeckInfiltration> {
+  let action: ref<NetDeckInfiltration> = new NetDeckInfiltration();
   action.clearanceLevel = DefaultActionsParametersHolder.GetInteractiveClearance();
   action.SetUp(this);
   action.SetProperties();
   action.AddDeviceName(this.m_deviceName);
+  action.SetObjectActionID(t"DeviceAction.NetDeckInfiltration");
   action.CreateInteraction();
-  action.SetObjectActionID(t"DeviceAction.NESTInfiltration");
   action.SetExecutor(GetPlayer(this.GetGameInstance()));
   return action;
 }
 
-// The custom entry appears in the vanilla scanner only on a real linked
-// device, with NΣT equipped. Leave other decks' quickhack lists alone.
+// GetQuickHackActions is where the native scanner builds device commands.
+// GetRemoteActions contains ordinary remote interactions and is not enough
+// for an independent built-in quickhack to appear in the player's wheel.
 @wrapMethod(ScriptableDeviceComponentPS)
-public func GetRemoteActions(
-  out outActions: array<ref<DeviceAction>>,
-  const context: script_ref<GetActionsContext>
+protected func GetQuickHackActions(
+  out actions: array<ref<DeviceAction>>,
+  context: GetActionsContext
 ) -> Void {
-  wrappedMethod(outActions, context);
+  wrappedMethod(actions, context);
   if !IsEquipped(this.GetGameInstance()) ||
     !this.IsON() || this.IsMarkedAsQuest() ||
-    !IsDefined(this.NESTNetworkMaster()) {
+    !IsDefined(this.NetDeckNetworkMaster()) {
     return;
   }
 
   let i: Int32 = 0;
-  while i < ArraySize(outActions) {
-    let existing: ref<ScriptableDeviceAction> = outActions[i] as ScriptableDeviceAction;
+  while i < ArraySize(actions) {
+    let existing: ref<ScriptableDeviceAction> = actions[i] as ScriptableDeviceAction;
     if IsDefined(existing) {
       let record: wref<ObjectAction_Record> = existing.GetObjectActionRecord();
-      if IsDefined(record) && Equals(record.ActionName(), n"NESTInfiltration") {
+      if IsDefined(record) && Equals(record.ActionName(), n"NetDeckInfiltration") {
         return;
       }
     }
     i += 1;
   }
 
-  ArrayPush(outActions, this.NESTActionInfiltration());
-  this.MarkActionsAsQuickHacks(outActions);
-  this.SetActionsQuickHacksExecutioner(outActions);
+  ArrayPush(actions, this.NetDeckActionInfiltration());
+}
+
+// The scanner intersects device actions with the player's quickhack list.
+// A cyberdeck's bare objectActions list does not reliably populate that
+// list. Inject a virtual built-in program only while NΣT is equipped.
+// It consumes none of the four physical program slots.
+@wrapMethod(RPGManager)
+public final static func GetPlayerQuickHackListWithQuality(
+  player: wref<PlayerPuppet>
+) -> array<PlayerQuickhackData> {
+  let hacks: array<PlayerQuickhackData> = wrappedMethod(player);
+  if !IsDefined(player) || !IsEquipped(player.GetGame()) {
+    return hacks;
+  }
+
+  let record: wref<ObjectAction_Record> =
+    TweakDBInterface.GetObjectActionRecord(t"DeviceAction.NetDeckInfiltration");
+  if !IsDefined(record) {
+    return hacks;
+  }
+
+  let i: Int32 = 0;
+  while i < ArraySize(hacks) {
+    if IsDefined(hacks[i].actionRecord) &&
+      Equals(hacks[i].actionRecord.ActionName(), n"NetDeckInfiltration") {
+      return hacks;
+    }
+    i += 1;
+  }
+  ArrayPush(hacks, PlayerQuickhackData(ItemID.None(), record, 5));
+  return hacks;
 }
 
 @wrapMethod(ScriptableDeviceComponentPS)
@@ -122,13 +152,13 @@ public const func IsPotentiallyQuickHackable() -> Bool {
   }
   return IsEquipped(this.GetGameInstance()) &&
     this.IsON() && !this.IsMarkedAsQuest() &&
-    IsDefined(this.NESTNetworkMaster());
+    IsDefined(this.NetDeckNetworkMaster());
 }
 
 // Only act on actual links. Cameras on a neighboring network are untouched.
 // Multiple APs sharing one target are deduplicated, not processed twice.
 @addMethod(ScriptableDeviceComponentPS)
-public func NESTInfiltrateNetwork() -> Void {
+public func NetDeckInfiltrateNetwork() -> Void {
   if !IsEquipped(this.GetGameInstance()) || this.IsMarkedAsQuest() {
     return;
   }
@@ -140,19 +170,19 @@ public func NESTInfiltrateNetwork() -> Void {
   while i < ArraySize(accessPoints) {
     if IsDefined(accessPoints[i]) {
       foundAP = true;
-      this.NESTInfiltrateMaster(accessPoints[i], seen);
+      this.NetDeckInfiltrateMaster(accessPoints[i], seen);
     }
     i += 1;
   }
 
   // Devices on a virtual surveillance system may not have an explicit AP.
   if !foundAP {
-    this.NESTInfiltrateMaster(this.NESTNetworkMaster(), seen);
+    this.NetDeckInfiltrateMaster(this.NetDeckNetworkMaster(), seen);
   }
 }
 
 @addMethod(ScriptableDeviceComponentPS)
-private func NESTInfiltrateMaster(
+private func NetDeckInfiltrateMaster(
   master: ref<MasterControllerPS>,
   out seen: array<ref<ScriptableDeviceComponentPS>>
 ) -> Void {
@@ -168,7 +198,7 @@ private func NESTInfiltrateMaster(
     if IsDefined(member) && !ArrayContains(seen, member) {
       ArrayPush(seen, member);
       if member.IsON() && !member.IsMarkedAsQuest() {
-        this.NESTApplyToMember(member);
+        this.NetDeckApplyToMember(member);
       }
     }
     i += 1;
@@ -176,7 +206,7 @@ private func NESTInfiltrateMaster(
 }
 
 @addMethod(ScriptableDeviceComponentPS)
-private func NESTApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Void {
+private func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Void {
   if IsDefined(member as SurveillanceCameraControllerPS) ||
     IsDefined(member as SecurityTurretControllerPS) ||
     IsDefined(member as ExplosiveTriggerDeviceControllerPS) {
@@ -218,7 +248,7 @@ private func NESTApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Void
 // The game's action dispatcher is responsible for invoking this after the
 // quickhack action is accepted. Do not set scanner or breach blackboards.
 @addMethod(ScriptableDeviceComponentPS)
-public func OnNESTInfiltration(evt: ref<NESTInfiltration>) -> EntityNotificationType {
-  this.NESTInfiltrateNetwork();
+protected cb func OnNetDeckInfiltration(evt: ref<NetDeckInfiltration>) -> EntityNotificationType {
+  this.NetDeckInfiltrateNetwork();
   return EntityNotificationType.DoNotNotifyEntity;
 }

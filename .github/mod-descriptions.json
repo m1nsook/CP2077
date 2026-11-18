@@ -41,8 +41,8 @@
     "name": "Camera Killer",
     "summary": "Shuts down cameras connected to the same access point or surveillance system when V turns off one camera."
   },
-  "NEST": {
-    "name": "NΣT — Iconic Cyberdeck",
-    "summary": "Network-infiltration cyberdeck with an exclusive Infiltration quickhack (experimental; not for release)."
+  "NetDeck": {
+    "name": "Infiltration",
+    "summary": "Standalone NΣT iconic cyberdeck with a built-in network Infiltration quickhack (gameplay test; unverified)."
   }
 }
