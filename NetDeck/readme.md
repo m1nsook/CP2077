@@ -1,109 +1,128 @@
-# Infiltration — NetWatch Σ MK.1 iconic cyberdeck
+# Infiltration — NetWatch Σ MK.1 / NETWORM
 
-Cyberpunk 2077 2.5 development test. **v0.5.4 device-count feedback update is not REDscript-compiler verified yet.**
-NetWatch Σ MK.1 is an iconic Tier 5++ cyberdeck with the built-in NETWORM quickhack.
-The saved item ID remains `Items.NESTCyberdeck`; the directory and new
-internal prefixes are `NetDeck`.
+**Cyberpunk 2077 2.5 · v0.6.0 development source test · NOT compiler/gameplay verified.**
 
-## User-confirmed baseline (v0.2.1)
-* Capacity **5**, RAM **15**, **4** quickhack slots, **4** buffer.
-* Existing Netdriver perks.
-* Same-network cameras/turrets/mines shut down; unrelated network and quest devices unaffected.
-* Night City and Dogtown ripperdoc stock.
-* Camera Killer not required, and not modified.
+This folder contains the **public REDscript and TweakXL source only** for the
+Infiltration mod and its built-in NETWORM quickhack. The cyberdeck display name
+is **NetWatch Σ MK.1** (Tier 5++ iconic). The save-compatible item TweakDB ID
+**must remain `Items.NESTCyberdeck`**. Internal source prefix: `NetDeck`.
 
-## v0.5.4 target eligibility, takeover and feedback
+## Confirmed baseline (player-tested)
 
-**NETWORM should be offered on anything vanilla Ping can target.** A
-camera, access point or surveillance system is no longer required.
+- The custom cyberdeck and quickhack icons work in-game using the player's
+  privately packed original-resolution CDPR assets.
+- Cyberdeck: capacity 5, RAM 15, four quickhack slots, buffer 4, existing
+  Netdriver perks; stocked at 26 Night City / Dogtown ripperdocs.
+- Early same-network camera/turret/mine shutdown was tested in an earlier build.
+- Normal Ping is a separate vanilla quickhack; never replace its action ID.
 
-* Native quickhackable **devices**, even without a network master, offer
-  NETWORM. A standalone device receives only a native supported shutdown
-  or distraction, never cross-network effects.
-* **NPCs** with a Ping action in the native puppet scanner list now get an
-  independent PuppetQuickHack form of NETWORM. On upload, the linked
-  PuppetDeviceLinkPS is traversed through its real access point(s), then
-  connected security devices are disabled/distracted.
-* NPCs without a real device network link can receive the upload, but no
-  surrounding devices are affected; the mod never guesses nearby connections.
-* Quest-critical entities are skipped, and only actual linked network
-  descendants are affected.
-* Robots, drones and mechs are **not shut down yet** as NPCs, even though a
-  pingable robotic puppet could be an entry point. That needs a separate
-  safe puppet shutdown implementation.
+## v0.6.0 experimental features
 
-Normal **Ping must remain separate and functional**. NETWORM uses a
-unique action name and a dedicated device and puppet action record, not
-`DeviceAction.PingDevice`. The actual quickhack UI is localized using
-Codeware's provider (19 UI languages with English fallback). Cyberdeck and NETWORM icon paths are defined in TweakXL, but their separately cooked private atlas and texture files are **not** in this repository.
+### One-upload multi-hop propagation
 
-The 26 ripperdoc records and NetWatch Σ MK.1 gameplay stat packages are **unchanged**.
+One NETWORM upload now traverses a shared queue of **nearby hostile NPCs,
+vehicles, and controllable devices**, plus the actual access-point descendants
+of infected devices or NPCs. It can hop **18 meters per hop, four hops maximum**,
+and processes **no more than 64 loaded entities per upload**. A visited list
+prevents re-hacking one target twice within that upload. Because this version
+deliberately supports radio/proximity jumps, it is no longer limited to the
+single connected-device network of the original mod.
 
-NETWORM's network feedback remains a short native pulse plus a localized upload result.
-**v0.5.4 adds a per-upload device counter** to that existing notification, e.g.
-`NETWORM: NETWORK INFILTRATED | DEVICES: 4`. The label is translated in all
-19 UI languages. Only device-controller actions accepted for dispatch through
-the traversed network are counted; NPC Weapon Glitch, netrunner Synapse
-Burnout and vehicle braking do **not** increase this count. The current
-counter represents queued device actions, **not a separate game-engine
-confirmation** that every action finished successfully. A NETWORM upload
-that affects only an NPC may show `DEVICES: 0`. Empty-result feedback
-is unchanged.
+- **NPCs:** nearby hostile gang members, NCPD and NetWatch are individually
+  affected by a **nonlethal Weapon Glitch**. One uploaded hack can reach several.
+  Ordinary civilians are not deliberately damaged.
+- **Vehicles:** eligible non-quest/non-player moving vehicles receive the
+  native `ForceBrakesFor(4.0)` effect. Parked vehicles can relay a nearby hop.
+- **Devices:** linked or nearby compatible cameras, turrets and mines are
+  shut down; native device distraction may be dispatched on supported hardware.
+  **RoadBlockControllerPS** blockades can be lowered via the game's native
+  `ToggleBlockade` event; suitable connected, non-quest doors/windows may be
+  unlocked and opened. Not every map object has a hackable game controller.
+- **Enemy netrunners:** DEVICE-origin waves apply Synapse Burnout near each
+  infected device (25 m); NPC-origin waves do not directly damage ordinary NPCs.
+- **NetWatch retaliation:** when an infected NPC is affiliated with NetWatch,
+  issue native five-star pursuit and a position-reveal attempt.
+- **Access points:** no scanner quickhack action is added to access points;
+  vanilla access-point breach mechanics remain intact.
 
-### v0.5.3 takeover rules (experimental)
-- **Access-point scanner quickhacking removed.** Vanilla access-point breach interactions remain unchanged; regular device NETWORM can still traverse connected controllers.
-- **Device-origin NETWORM:** cameras/turrets/mines and other compatible network electronics remain targets. Enemy **netrunners within 25 m of the infected device** receive a Tier 5 Synapse Burnout status effect. Ordinary NPCs are never damaged by this device-origin path.
-- **NPC-origin NETWORM:** non-damaging Weapon Glitch (lower-tier Weapon Malfunction status) on hostile/NCPD/NetWatch targets; attempts Emergency Brake on eligible nearby vehicles within 25 m. No direct lethal action on the NPC, and the linked electronic network can still be affected.
-- **NetWatch NPC upload:** issues the native five-star pursuit request and starts the game's position-reveal/trace path immediately. This relies on vanilla police/story constraints and may not equal an already completed trace in every state.
-- **Doors/windows:** opens connected non-quest/non-sealed/non-disabled/non-elevator door/window controllers using native toggle-lock and open actions. Scripted quest barriers remain untouched.
-- **Data extraction:** a successful upload gives 1–4 randomly selected item-crafting or quickhack-crafting components; the game's reward notification remains visible.
-- **XP:** this mod explicitly awards **no XP**. However, engine-originated combat/skill XP (especially after Synapse Burnout kills) has **not** yet been suppressed and must be checked in-game. Do not claim XP-free until confirmed.
+### Stealth and feedback
 
-### What has and has not been tested
-- **Confirmed in-game:** NetWatch Σ MK.1 cyberdeck icon and NETWORM icon display correctly when the user packs their private original-resolution artwork.
-- **Compiler:** v0.5.1 failed due to invalid casts and a wrong method signature; v0.5.2 source corrected the reported signatures, but a subsequent successful game build has not been reported.
-- **Door screenshot:** a user screenshot shows NETWORM's network-infiltrated message while a nearby door still reads `Open [AUTHORIZATION NOT FOUND]`. This does not prove the door is a linked, eligible network descendant; door unlock remains unverified. The counter does not fix or bypass door authorization.
-- **New in v0.5.3, not verified:** remote door opening, vehicle braking, nonlethal Weapon Glitch, netrunner burnout, NetWatch full pursuit and trace, loot, and XP suppression.
-- **Safety:** no quest-marked devices, sealed doors, quest/scene vehicles, or quest NPCs should be forcibly modified. Test with a backed-up save.
+NETWORM's own device and puppet quickhack records now use a dedicated
+zero-awareness stat modifier group. CDPR's native virtual-program trace check
+uses the quickhack's `awarenessCost`: intended result is untraceable NETWORM
+for ordinary targets, **without changing any other quickhack's tracing**.
+NetWatch's explicit five-star/reveal branch is retained. This behavior **still
+needs an in-game test**; status-effect-triggered AI responses may differ.
 
-## Install
-Requires RED4ext, redscript, TweakXL, Codeware and Cyberpunk 2077 2.5.
+Feedback uses the existing native `EXTRACTED DATA` notification and localized
+text for **19 supported UI languages**. The message includes the count of
+queued affected device actions, plus siphoned Eurodollars and the number of
+sources if credits were collected. The counter measures queued actions, not
+confirmed game-engine completion.
 
-**Public source only:** GitHub ZIPs do **not** include original PNGs, `.inkatlas`, `.xbm`, `.archive`, or the WolvenKit project. The original user's working icons remain local. If testing icons, use your separately packed private WolvenKit archive.
-Back up a save, close the game and remove old `r6/scripts/NEST` and
-`r6/tweaks/NEST` directories (if present). Extract the test ZIP to the
-game root. Replace existing `r6/scripts/NetDeck` and `r6/tweaks/NetDeck`
-files, leaving Camera Killer and other mods untouched.
+### Eurodollar siphon / pickpocket-style reward
 
-CET item command:
-```lua
-Game.AddToInventory("Items.NESTCyberdeck", 1)
-```
+Each newly visited eligible NPC or computer/terminal has a **65% chance** to
+yield a small random amount of €$. A single upload is capped at **€$1,500**.
+The game credits the player through its transaction system, but it is a
+**virtual data-siphon gameplay reward**: it does not decrement a real target
+inventory or bank account. Repeating uploads can generate more money; a
+per-target persistent cooldown is not implemented yet.
 
-## Focused v0.5.3 game test
-1. Confirm REDscript compiles. Send `r6/logs/redscript_rCURRENT.log` if not.
-2. Confirm NETWORM remains separate from normal Ping on standalone devices and regular NPCs.
-3. Scan a vanilla access point: the failed experimental NETWORM entry **must not appear**.
-4. Upload to a device near an enemy netrunner: verify Synapse Burnout hits **only netrunners**, not other NPCs; test >25 m too.
-5. Upload to a hostile NPC/NCPD/NetWatch: weapon glitches without damage; a nearby non-quest vehicle brakes, an unrelated vehicle does not.
-6. Upload to a NetWatch NPC: check five-star pursuit and whether reveal/trace truly finishes instantly.
-7. Test a regular network-connected closed door/window vs a quest/sealed door.
-8. Verify occasional crafting/quickhack component rewards on successful upload and check both Netrunner XP and kill XP changes.
-9. Confirm no unrelated-network shutdown, vanilla Ping regression, or private atlas changes.
+Existing random crafting/quickhack component rewards on successful hacks are
+preserved. NETWORM source explicitly does **not** award XP, but native
+quickhack/kill/skill XP has **not** been suppressed; this remains an unmet
+strict no-XP requirement until game-tested and fixed.
 
+## Install and tests
 
-Previous gameplay results do not establish that this new NPC scanner hook,
-standalone targeting, access-point actions, feedback or localization work.
-Keep PR #36 in draft until verified.
+Requires Cyberpunk 2077 2.5, RED4ext, REDscript, TweakXL and Codeware.
+Back up your save and close the game first.
 
-## Naming and compatibility
+Source ZIPs from GitHub include only these game-root files:
+- `r6/scripts/NetDeck/NetDeck.reds`
+- `r6/scripts/NetDeck/Localization.reds`
+- `r6/tweaks/NetDeck/NetDeck.yaml`
 
-**Mod:** Infiltration (repository project directory `NetDeck`).
-**Cyberdeck shown in the game:** `NetWatch Σ MK.1`.
-**Quickhack shown in the scanner:** `NETWORM`.
+Extract to the game root and replace previous `NetDeck` script and tweak
+files. Do not leave duplicate old `NEST` scripts/tweaks installed.
+**Keep your existing privately cooked atlas .archive installed.** The GitHub
+artifacts do **not** include PNG, `.inkatlas`, `.xbm`, `.archive`, raw/ArchiveXL
+artwork or the WolvenKit project. Neither the assets nor the project should be
+uploaded to this repo.
 
-The technical action IDs `NetDeckInfiltration`, `DeviceAction.NetDeckInfiltration`,
-and `QuickHack.NetDeckPuppetInfiltration` have **not** been renamed: their
-user-facing labels come from Codeware localization. The existing item ID
-`Items.NESTCyberdeck` also stays the same to avoid breaking saved equipment.
-The rename does not alter cyberware stats, perks, network traversal or Ping.
+Test in this order using a backed-up save:
+
+1. Game startup: check `r6/logs/redscript_rCURRENT.log` for compilation
+   errors and `red4ext/plugins/TweakXL/TweakXL.log` for tweak failures.
+2. Normal Ping still works; NETWORM appears only with NetWatch Σ MK.1 equipped.
+3. One hack on a group of gang enemies: multiple nearby hostiles get Weapon
+   Glitch; unrelated civilians are not damaged.
+4. One hack on a moving vehicle: it brakes, and nearby NPCs/vehicles/devices
+   can also be affected. Test stationary cars as potential relays.
+5. One hack on a computer or nearby camera: connected and nearby devices
+   respond; enemy netrunners near the infected DEVICE receive Synapse Burnout.
+6. Try the road barrier shown in the test screenshot, plus a normal door and
+   a quest-locked/sealed door. Quest barriers must stay protected.
+7. Confirm ordinary gangs and NCPD do **not** trace NETWORM; NetWatch
+   triggers the five-star pursuit and reveal attempt.
+8. Confirm `EXTRACTED DATA` reports device count plus e.g. `€$250 / 3 TARGETS`
+   when siphoning succeeds. Check actual €$ inventory balance.
+9. Check earned XP after infiltration and any Synapse Burnout casualties.
+10. Swap to a different deck; NETWORM should no longer be available.
+
+**These are target behaviors, not confirmed results.** The v0.6.0 source has
+not been compiled by the player's game yet. Static source tests in GitHub
+Actions cannot verify REDscript signatures, availability of targeted world
+objects or runtime effects. Keep PR #36 in draft until tested.
+
+## Stable names and IDs
+
+- Mod: **Infiltration**
+- Cyberdeck: **NetWatch Σ MK.1**
+- Quickhack: **NETWORM**
+- Source directory: `NetDeck`
+- Item: `Items.NESTCyberdeck` (preserved for saved equipment)
+- Action IDs: `NetDeckInfiltration`,
+  `DeviceAction.NetDeckInfiltration`, `QuickHack.NetDeckPuppetInfiltration`
+  (all preserved for compatibility)
