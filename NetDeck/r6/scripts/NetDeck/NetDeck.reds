@@ -128,6 +128,14 @@ protected final func FinalizeGetQuickHackActions(
         !vehicle.IsPlayerVehicle() && !vehicle.IsInQuestOrScenePhysicsState();
     }
     if eligible {
+    // Lazy registration after the native vehicle scanner has selected
+    // a valid quickhack target; never during global vehicle world loading.
+    if IsDefined(vehicle) {
+      let netDeckPlayer: ref<PlayerPuppet> = GetPlayer(this.GetGameInstance());
+      if IsDefined(netDeckPlayer) {
+        netDeckPlayer.NetDeckRegisterVehicle(vehicle);
+      }
+    }
     let exists: Bool = false;
     let i: Int32 = 0;
     while i < ArraySize(Deref(outActions)) {
@@ -306,24 +314,11 @@ public func NetDeckUnregisterVehicle(id: EntityID) -> Void {
   }
 }
 
-@wrapMethod(VehicleObject)
-protected cb func OnGameAttached() -> Bool {
-  let result: Bool = wrappedMethod();
-  let player: ref<PlayerPuppet> = GetPlayer(this.GetGame());
-  if IsDefined(player) {
-    player.NetDeckRegisterVehicle(this);
-  }
-  return result;
-}
-
-@wrapMethod(VehicleObject)
-protected cb func OnDetach() -> Bool {
-  let player: ref<PlayerPuppet> = GetPlayer(this.GetGame());
-  if IsDefined(player) {
-    player.NetDeckUnregisterVehicle(this.GetEntityID());
-  }
-  return wrappedMethod();
-}
+// Map-load safety: do not wrap every VehicleObject's attach/detach here.
+// The crash reporter repeatedly encountered the engine allocator while
+// vehiclePersistentDataPS and NPCPuppet were being loaded. NETWORM now
+// registers only explicitly targeted / scanned vehicles. Unscanned nearby
+// vehicle spread may regress until a world-stream-safe query is verified.
 
 // The targeting query can miss nearby NPCs even when the initial upload
 // succeeded. Keep a bounded weak-ref fallback for loaded puppets, as for cars.
