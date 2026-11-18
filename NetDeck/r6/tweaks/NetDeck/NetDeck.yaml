@@ -95,11 +95,14 @@ Interactions.NetDeckInfiltration:
   description: l"NetDeckInfiltrationDescription"
   captionIcon: ChoiceCaptionParts.NetDeckNetwormIcon
 
-# The NPC scanner uses PuppetQuickHack actions, unlike devices.
-# FreePingHack is a known puppet action base (not PingDevice).
-# Its unique actionName keeps vanilla Ping selectable independently.
+# Enemy-targeting action derives from the Militech Canto Mk.6's native
+# Blackwall Gateway base, NOT from Ping. This inherits a native hostile
+# quickhack targeting/action classification while keeping a unique record.
+# Native Blackwall visuals and lethal game effects are explicitly cleared;
+# NETWORM applies its own nonlethal script effects after the upload.
+# Requires Phantom Liberty (Canto/Blackwall records).
 QuickHack.NetDeckPuppetInfiltration:
-  $base: QuickHack.FreePingHack
+  $base: QuickHack.BaseBlackWallHack
   awarenessCost: NetDeck.ZeroAwareness
   actionName: NetDeckInfiltration
   objectActionUI: Interactions.NetDeckInfiltration
