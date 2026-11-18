@@ -10,16 +10,18 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 MOD = Path(__file__).resolve().parents[1]
 ROOT_FILES = (
     "r6/scripts/NetDeck/NetDeck.reds",
+    "r6/scripts/NetDeck/Localization.reds",
     "r6/tweaks/NetDeck/NetDeck.yaml",
 )
 TESTING = """Infiltration — NΣT GAMEPLAY TEST — NOT A RELEASE
 
-Requires Cyberpunk 2077 2.5, RED4ext, redscript and TweakXL.
+Requires Cyberpunk 2077 2.5, RED4ext, redscript, TweakXL and Codeware.
 
 INSTALL:
 1. Back up the save you will use for testing and CLOSE THE GAME.
 2. Extract this ZIP into the Cyberpunk 2077 game root.
-3. Make sure r6/scripts/NetDeck/NetDeck.reds and r6/tweaks/NetDeck/NetDeck.yaml exist.
+3. Make sure r6/scripts/NetDeck/NetDeck.reds,
+   r6/scripts/NetDeck/Localization.reds and r6/tweaks/NetDeck/NetDeck.yaml exist.
 4. Launch the game. If REDscript compilation or TweakXL loading fails,
    send the r6/logs/redscript* and red4ext/plugins/TweakXL/TweakXL.log errors.
 5. To add the experimental deck through CET console:
@@ -29,9 +31,12 @@ INSTALL:
 7. Check another network to confirm it was not affected.
 
 IMPORTANT LIMITATIONS:
-- Not verified in Cyberpunk 2077; further REDscript fixes may be needed.
-- The native UI label/icon are not cooked yet; the game may show inherited
-  Ping/Netdriver text. This ZIP deliberately contains no fake asset manifest.
+- This regression fix is source/package tested but NOT reverified in game 2.5.
+- Previous build's network shutdown, vendor and stats were user-confirmed.
+- The custom NΣT and Infiltration names/descriptions use Codeware's native
+  localization provider. The icon still uses an existing vanilla asset.
+- Infiltration no longer inherits PingDevice, so vanilla Ping must remain
+  an independent, functioning quickhack when NΣT is installed.
 - Robotic NPCs, drones and mechs are not yet covered.
 - Infiltration does not need Camera Killer; test with or without it.
 - Do not publish this ZIP as a Nexus Mods release.
@@ -70,6 +75,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.2.0-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.3.0-TEST.zip")
     args = parser.parse_args()
     build(args.output)

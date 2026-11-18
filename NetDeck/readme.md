@@ -28,7 +28,7 @@ With NΣT installed, the scanner should offer the **built-in** Infiltration devi
 * Infiltration is now offered via `GetQuickHackActions` instead of ordinary `GetRemoteActions`.
 * The player list is extended with a virtual built-in Infiltration action only while NΣT is installed, so the native scanner can match the command to the target action.
 * Action completion uses a REDscript event callback.
-* The custom action inherits vanilla Ping's device quickhack processing rather than the old Toggle State template.
+* In v0.3, the custom action uses a separate Toggle State quickhack record, not Ping's record.
 * Removed the unusable ArchiveXL manifest and uncooked localization JSON. **As a result, native UI name and icon are not finished**: inherited game text/icon may be displayed. Real NΣT/Infiltration UI texts require a cooked WolvenKit localization archive. Do not mistake a test ZIP for a finished release.
 
 ### Vendor stock
@@ -37,7 +37,7 @@ The same 26 TweakXL ripperdoc vendor records are patched, including Dogtown. Thi
 
 ## Install this test ZIP
 
-Close the game. **Remove older `r6/scripts/NEST` and `r6/tweaks/NEST` folders** so previous wrappers are not loaded twice. Extract the test ZIP to the Cyberpunk 2077 game root. Requires RED4ext, redscript and TweakXL. Cyberware-EX is supported by the 0–3 system-replacement equip-slot check (not independently validated).
+Close the game. **Remove older `r6/scripts/NEST` and `r6/tweaks/NEST` folders** so previous wrappers are not loaded twice. Extract the test ZIP to the Cyberpunk 2077 game root. Requires RED4ext, redscript, TweakXL and Codeware. Cyberware-EX is supported by the 0–3 system-replacement equip-slot check (not independently validated).
 
 Add the deck with CET:
 ```lua
@@ -60,3 +60,11 @@ This build has **not** passed a 2.5 game or REDscript compiler check. Static tes
 ### 2026-11-18 REDscript compiler correction
 
 The previous NetDeck test failed to compile because the base-class `GetQuickHackActions` wrapper signature does not match the 2.5 method. The corrected hook uses the 2.5 `FinalizeGetQuickHackActions` signature with script references. An impossible `PuppetDeviceLinkPS` cast was also removed. Source correction only; this is not an in-game success claim.
+
+### 2026-11-18 Ping regression fix (v0.3 test)
+
+**User-tested baseline:** 5/15/4/4, existing Netdriver perks, network shutdown, safety isolation, Night City and Dogtown vendors **pass**. The custom action was displayed as **PING**, and the actual vanilla Ping stopped working. Those are **confirmed regressions**, not harmless placeholder text.
+
+This candidate stops inheriting `DeviceAction.PingDevice` and `Interactions.PingHack`; it uses a separate device quickhack action and interaction while retaining `NetDeckInfiltration` and the working network dispatcher. It supplies the custom name and description through a **Codeware script localization provider** (English fallback), not an unfinished ArchiveXL manifest. It does not patch `DeviceAction.PingDevice`, nor any vanilla scanner record. The real original Ping must remain functional. The inherited vanilla quickhack icon is still temporary. This changed action needs a new 2.5 in-game verification; the successful earlier gameplay test does not validate this regression fix.
+
+Test both **separate** scanner entries on a camera: Infiltration should shut down only linked security devices; original Ping should still ping/reveal nearby network targets without causing shutdown. With a normal deck, Infiltration must disappear and Ping should still work.

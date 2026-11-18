@@ -7,6 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 R = (ROOT / "r6/scripts/NetDeck/NetDeck.reds").read_text("utf-8")
 Y = (ROOT / "r6/tweaks/NetDeck/NetDeck.yaml").read_text("utf-8")
+L = (ROOT / "r6/scripts/NetDeck/Localization.reds").read_text("utf-8")
 VENDORS = 26
 
 class InfiltrationSourceTests(unittest.TestCase):
@@ -49,7 +50,20 @@ class InfiltrationSourceTests(unittest.TestCase):
     def test_no_uncooked_placeholders(self):
         self.assertFalse((ROOT / "source").exists())
         self.assertNotIn('l"NetDeckInfiltrationName"', Y)
-        self.assertIn("$base: DeviceAction.PingDevice", Y)
+        self.assertNotIn("$base: DeviceAction.PingDevice", Y)
+        self.assertNotIn("$base: Interactions.PingHack", Y)
+        self.assertIn("$base: DeviceAction.ToggleStateClassHack", Y)
+        self.assertIn("$base: Interactions.TakeControlCameraHack", Y)
+
+    def test_independent_native_labels(self):
+        for key in ("NetDeckDeckName", "NetDeckDeckDescription",
+                    "NetDeckInfiltrationName", "NetDeckInfiltrationDescription"):
+            self.assertIn('l"' + key + '"', Y)
+            self.assertIn('this.Text("' + key + '"', L)
+        self.assertIn("extends ModLocalizationProvider", L)
+        self.assertIn('return n"en-us"', L)
+        self.assertNotIn("PingDevice", L)
+        self.assertNotIn("PingDevice", Y)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

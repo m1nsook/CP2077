@@ -5,6 +5,8 @@
 Items.NESTCyberdeck:
   $base: Items.AdvancedNetwatchNetdriverMKLegendaryPlusPlus
   friendlyName: NΣT
+  displayName: l"NetDeckDeckName"
+  localizedDescription: l"NetDeckDeckDescription"
   quality: Quality.LegendaryPlusPlus
   blueprint: Items.CyberdeckBlueprint4Slots
   variants:
@@ -36,9 +38,10 @@ NetDeck.RAM15Buffer4:
       modifierType: Additive
       value: 4
 
-# Native scanner entry, not a standalone inventory quickhack.
+# Separate native device quickhack action. Never derive from PingDevice:
+# doing so duplicated Ping UI semantics and broke normal Ping selection.
 DeviceAction.NetDeckInfiltration:
-  $base: DeviceAction.PingDevice
+  $base: DeviceAction.ToggleStateClassHack
   actionName: NetDeckInfiltration
   objectActionUI: Interactions.NetDeckInfiltration
   isQuickHack: true
@@ -49,9 +52,9 @@ DeviceAction.NetDeckInfiltration:
   targetActivePrereqs: []
 
 Interactions.NetDeckInfiltration:
-  $base: Interactions.PingHack
-  # The native name requires a cooked WolvenKit on-screen localization asset.
-  # Do not ship an .archive.xl pointing at an uncooked JSON source.
+  $base: Interactions.TakeControlCameraHack
+  caption: l"NetDeckInfiltrationName"
+  description: l"NetDeckInfiltrationDescription"
 
 # One guaranteed stock record, appended to all known Night City / Dogtown
 # ripperdoc lists. This does not replace any existing stock.
@@ -61,30 +64,30 @@ NetDeck.RipperdocStock:
   quantity:
     - Vendors.Always_Present
 
-Vendors.AdvancedCollectiveRipperDoc.itemStock: &NESTVendor
+Vendors.AdvancedCollectiveRipperDoc.itemStock: &NetDeckVendor
   - !append-once NetDeck.RipperdocStock
-Vendors.AdvancedCollectiveRipperDocDogtown.itemStock: *NESTVendor
-Vendors.AdvancedCollectiveRipperDocGeneral.itemStock: *NESTVendor
-Vendors.AdvancedCollectiveRipperDocVictor.itemStock: *NESTVendor
-Vendors.AdvancedOSAndSkeletalRipperDoc.itemStock: *NESTVendor
-Vendors.AdvancedSkeletalRipperDoc.itemStock: *NESTVendor
-Vendors.bls_ina_se1_ripperdoc_01.itemStock: *NESTVendor
-Vendors.bls_ina_se1_ripperdoc_02.itemStock: *NESTVendor
-Vendors.cz_monument_ripperdoc_anderson.itemStock: *NESTVendor
-Vendors.cz_monument_ripperdoc_farida.itemStock: *NESTVendor
-Vendors.cz_stadium_ripperdoc_01.itemStock: *NESTVendor
-Vendors.EarlyGameRipperdoc.itemStock: *NESTVendor
-Vendors.EndGameRipperdoc.itemStock: *NESTVendor
-Vendors.hey_spr_ripperdoc_01.itemStock: *NESTVendor
-Vendors.MidGameRipperdoc.itemStock: *NESTVendor
-Vendors.pac_wwd_ripperdoc_01.itemStock: *NESTVendor
-Vendors.Ripperdoc_HUB.itemStock: *NESTVendor
-Vendors.std_arr_ripperdoc_01.itemStock: *NESTVendor
-Vendors.std_rcr_ripperdoc_01.itemStock: *NESTVendor
-Vendors.wat_kab_ripperdoc_01.itemStock: *NESTVendor
-Vendors.wat_kab_ripperdoc_02.itemStock: *NESTVendor
-Vendors.wat_kab_ripperdoc_03.itemStock: *NESTVendor
-Vendors.wat_lch_ripperdoc_01.itemStock: *NESTVendor
-Vendors.wat_nid_ripperdoc_01.itemStock: *NESTVendor
-Vendors.wbr_jpn_ripperdoc_01.itemStock: *NESTVendor
-Vendors.wbr_jpn_ripperdoc_02.itemStock: *NESTVendor
+Vendors.AdvancedCollectiveRipperDocDogtown.itemStock: *NetDeckVendor
+Vendors.AdvancedCollectiveRipperDocGeneral.itemStock: *NetDeckVendor
+Vendors.AdvancedCollectiveRipperDocVictor.itemStock: *NetDeckVendor
+Vendors.AdvancedOSAndSkeletalRipperDoc.itemStock: *NetDeckVendor
+Vendors.AdvancedSkeletalRipperDoc.itemStock: *NetDeckVendor
+Vendors.bls_ina_se1_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.bls_ina_se1_ripperdoc_02.itemStock: *NetDeckVendor
+Vendors.cz_monument_ripperdoc_anderson.itemStock: *NetDeckVendor
+Vendors.cz_monument_ripperdoc_farida.itemStock: *NetDeckVendor
+Vendors.cz_stadium_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.EarlyGameRipperdoc.itemStock: *NetDeckVendor
+Vendors.EndGameRipperdoc.itemStock: *NetDeckVendor
+Vendors.hey_spr_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.MidGameRipperdoc.itemStock: *NetDeckVendor
+Vendors.pac_wwd_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.Ripperdoc_HUB.itemStock: *NetDeckVendor
+Vendors.std_arr_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.std_rcr_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.wat_kab_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.wat_kab_ripperdoc_02.itemStock: *NetDeckVendor
+Vendors.wat_kab_ripperdoc_03.itemStock: *NetDeckVendor
+Vendors.wat_lch_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.wat_nid_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.wbr_jpn_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.wbr_jpn_ripperdoc_02.itemStock: *NetDeckVendor
