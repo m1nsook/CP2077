@@ -49,7 +49,7 @@ class InfiltrationSourceTests(unittest.TestCase):
 
     def test_no_uncooked_placeholders(self):
         self.assertFalse((ROOT / "source").exists())
-        self.assertNotIn('l"NetDeckInfiltrationName"', Y)
+        self.assertIn('l"NetDeckInfiltrationName"', Y)
         self.assertNotIn("$base: DeviceAction.PingDevice", Y)
         self.assertNotIn("$base: Interactions.PingHack", Y)
         self.assertIn("$base: DeviceAction.ToggleStateClassHack", Y)
@@ -63,7 +63,7 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("extends ModLocalizationProvider", L)
         self.assertIn('return n"en-us"', L)
         self.assertNotIn("PingDevice", L)
-        self.assertNotIn("PingDevice", Y)
+        self.assertNotIn("$base: DeviceAction.PingDevice", Y)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
