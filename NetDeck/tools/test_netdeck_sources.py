@@ -89,6 +89,8 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("depth < 4", R)
         self.assertIn("ArraySize(queue) < 64", R)
         self.assertIn("ArrayContains(result.seen, obj)", R)
+        self.assertNotRegex(R, r"\\bcontinue\\s*;")
+        self.assertIn("if IsDefined(obj) && !ArrayContains(result.seen, obj) {", R)
         self.assertIn("NetDeckEnqueueMaster(", R)
         self.assertIn("NetDeckSpread(this.GetGameInstance(), source, true)", R)
         self.assertIn("NetDeckSpread(this.GetGameInstance(), puppet, false)", R)
