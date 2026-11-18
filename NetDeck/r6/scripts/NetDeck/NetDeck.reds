@@ -226,7 +226,7 @@ public func NetDeckBurnoutNearbyNetrunners(source: ref<ScriptableDeviceComponent
       if IsDefined(target) && !ArrayContains(seen, target) {
         ArrayPush(seen, target);
         if target.IsNetrunnerPuppet() && !target.IsQuest() &&
-          GameObject.GetAttitudeTowards(target, player) == EAIAttitude.AIA_Hostile &&
+          EnumInt(GameObject.GetAttitudeTowards(target, player)) == EnumInt(EAIAttitude.AIA_Hostile) &&
           !StatusEffectSystem.ObjectHasStatusEffect(target, t"BaseStatusEffect.BrainMeltLevel4") {
           StatusEffectHelper.ApplyStatusEffect(
             target, t"BaseStatusEffect.BrainMeltLevel4", player.GetEntityID()
@@ -272,7 +272,7 @@ public func NetDeckDisruptNpcVicinity(puppet: ref<ScriptedPuppet>) -> Int32 {
   let affected: Int32 = 0;
   let npc: ref<NPCPuppet> = puppet as NPCPuppet;
   if IsDefined(npc) &&
-     (GameObject.GetAttitudeTowards(npc, player) == EAIAttitude.AIA_Hostile ||
+     (EnumInt(GameObject.GetAttitudeTowards(npc, player)) == EnumInt(EAIAttitude.AIA_Hostile) ||
       npc.IsCharacterPolice() || NetDeckIsNetWatch(puppet)) &&
      !StatusEffectSystem.ObjectHasStatusEffect(npc, t"BaseStatusEffect.WeaponMalfunctionLvl2") {
     StatusEffectHelper.ApplyStatusEffect(
