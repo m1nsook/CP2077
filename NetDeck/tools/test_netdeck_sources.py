@@ -149,6 +149,25 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("Vector4.Distance(this.netDeckWaveHosts[host], car.GetWorldPosition())", R)
         self.assertNotIn("TSFMV.Obj_Vehicle", R)
 
+    def test_canto_enemy_action_not_ping_derived(self):
+        # Clones Canto's attack-class targeting record, never Blackwall's
+        # lethal gameplay effects. Real gameplay still requires manual tests.
+        self.assertIn("$base: QuickHack.BaseBlackWallHack", Y)
+        self.assertNotIn("$base: QuickHack.FreePingHack", Y)
+        self.assertIn("QuickHack.NetDeckPuppetInfiltration:\n", Y)
+        self.assertIn("startEffects: []", Y)
+        self.assertIn("completionEffects: []", Y)
+        self.assertIn("targetPrereqs: []", Y)
+        self.assertIn("targetActivePrereqs: []", Y)
+        self.assertNotIn("let pingable: Bool", R)
+        self.assertNotIn("if !pingable", R)
+        self.assertIn("let npc: ref<NPCPuppet> = owner as NPCPuppet;", R)
+        self.assertIn("npc.IsQuest() || npc.IsDead() || npc.IsCrowd()", R)
+        self.assertIn("ScriptedPuppet.IsPlayerCompanion(npc)", R)
+        self.assertIn("npc.GetRecord().IsChild()", R)
+        self.assertIn("NetDeckPuppetInfiltration extends PuppetAction", R)
+        self.assertIn("OnNetDeckPuppetInfiltration", R)
+
     def test_loaded_npc_fallback_and_civilian_safety(self):
         # This only inspects the source. The actual hooks and chain must still
         # compile and be confirmed by a Cyberpunk 2077 in-game test.
