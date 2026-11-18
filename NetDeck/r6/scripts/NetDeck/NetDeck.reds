@@ -279,7 +279,6 @@ public class NetDeckWaveTickEvent extends Event {
 // slow and bounded event chain; its timers must never hold the HUD open.
 public class NetDeckHudTickEvent extends Event {
   public let generation: Int32;
-  public let step: Int32;
 }
 
 // TSFMV does not expose Obj_Vehicle. Track loaded VehicleObjects through
@@ -401,6 +400,84 @@ private let netDeckHudOwned: Bool;
 private let netDeckHudHeader: String;
 @addField(PlayerPuppet)
 private let netDeckHudProgress: Float;
+@addField(PlayerPuppet)
+private let netDeckHudStartTime: Float;
+@addField(PlayerPuppet)
+private let netDeckWavePreviewCount: Int32;
+
+// Live CET settings; safe defaults are used if the optional menu is absent.
+@addField(PlayerPuppet)
+private let netDeckSettingsApplied: Bool;
+@addField(PlayerPuppet)
+private let netDeckUploadSeconds: Float;
+@addField(PlayerPuppet)
+private let netDeckScanDistance: Float;
+@addField(PlayerPuppet)
+private let netDeckHopDistance: Float;
+@addField(PlayerPuppet)
+private let netDeckSpreadInterval: Float;
+@addField(PlayerPuppet)
+private let netDeckMaxJumps: Int32;
+@addField(PlayerPuppet)
+private let netDeckMaxAffected: Int32;
+@addField(PlayerPuppet)
+private let netDeckMaxFanout: Int32;
+
+@addMethod(PlayerPuppet)
+public func NetDeckConfigure(
+  uploadSeconds: Float, scanRadius: Float, hopRadius: Float,
+  spreadInterval: Float, maxJumps: Int32, maxTargets: Int32, fanout: Int32
+) -> Void {
+  this.netDeckUploadSeconds = MaxF(0.7, MinF(4.5, uploadSeconds));
+  this.netDeckScanDistance = MaxF(30.0, MinF(180.0, scanRadius));
+  this.netDeckHopDistance = MaxF(15.0, MinF(130.0, hopRadius));
+  this.netDeckSpreadInterval = MaxF(0.10, MinF(2.5, spreadInterval));
+  this.netDeckMaxJumps = maxJumps;
+  if this.netDeckMaxJumps < 4 { this.netDeckMaxJumps = 4; }
+  if this.netDeckMaxJumps > 150 { this.netDeckMaxJumps = 150; }
+  this.netDeckMaxAffected = maxTargets;
+  if this.netDeckMaxAffected < 8 { this.netDeckMaxAffected = 8; }
+  if this.netDeckMaxAffected > 160 { this.netDeckMaxAffected = 160; }
+  this.netDeckMaxFanout = fanout;
+  if this.netDeckMaxFanout < 1 { this.netDeckMaxFanout = 1; }
+  if this.netDeckMaxFanout > 16 { this.netDeckMaxFanout = 16; }
+  this.netDeckSettingsApplied = true;
+}
+@addMethod(PlayerPuppet)
+private func NetDeckUploadDuration() -> Float {
+  if this.netDeckSettingsApplied { return this.netDeckUploadSeconds; }
+  return 2.0;
+}
+@addMethod(PlayerPuppet)
+private func NetDeckScanRadius() -> Float {
+  if this.netDeckSettingsApplied { return this.netDeckScanDistance; }
+  return 105.0;
+}
+@addMethod(PlayerPuppet)
+private func NetDeckHopRadius() -> Float {
+  if this.netDeckSettingsApplied { return this.netDeckHopDistance; }
+  return 75.0;
+}
+@addMethod(PlayerPuppet)
+private func NetDeckTickInterval() -> Float {
+  if this.netDeckSettingsApplied { return this.netDeckSpreadInterval; }
+  return 0.25;
+}
+@addMethod(PlayerPuppet)
+private func NetDeckJumpLimit() -> Int32 {
+  if this.netDeckSettingsApplied { return this.netDeckMaxJumps; }
+  return 100;
+}
+@addMethod(PlayerPuppet)
+private func NetDeckTargetLimit() -> Int32 {
+  if this.netDeckSettingsApplied { return this.netDeckMaxAffected; }
+  return 120;
+}
+@addMethod(PlayerPuppet)
+private func NetDeckFanoutLimit() -> Int32 {
+  if this.netDeckSettingsApplied { return this.netDeckMaxFanout; }
+  return 10;
+}
 
 @addMethod(PlayerPuppet)
 private func NetDeckWaveHasSeen(id: EntityID) -> Bool {
@@ -560,6 +637,7 @@ private func NetDeckHudStart() -> Void {
   if bb.GetBool(d.Active) { return; }
   this.netDeckHudOwned = true;
   this.netDeckHudProgress = 0.0;
+  this.netDeckHudStartTime = EngineTime.ToFloat(GameInstance.GetSimTime(this.GetGame()));
   this.netDeckHudHeader = "NETWORM";
   bb.SetString(d.Header, this.netDeckHudHeader, true);
   bb.SetString(d.BottomText, "", true);
@@ -578,7 +656,7 @@ private func NetDeckHudStart() -> Void {
   // and switches the widget to its native neutral color theme.
   // This affects only the bar that NETWORM has claimed.
   bb.SetVariant(d.MessageType, SimpleMessageType.Neutral, true);
-  this.NetDeckHudSchedule(1);
+  this.NetDeckHudSchedule();
 }
 
 @addMethod(PlayerPuppet)
@@ -600,7 +678,8 @@ private func NetDeckHudUpdate() -> Void {
     LocalizationSystem.GetInstance(this.GetGame());
   if !IsDefined(loc) { return; }
   let r: ref<NetDeckSpreadResult> = this.netDeckWaveResult;
-  let count: Int32 = r.npcs + r.vehicles + r.netrunners + r.devices;
+  // Target estimate is collected before uploading. No fake 0/1 during spread.
+  let count: Int32 = this.netDeckWavePreviewCount;
   let nextHeader: String = loc.GetText("NetDeckUploadProgress") + " " +
     IntToString(count) + " " + loc.GetText("NetDeckTargetsAffected");
   if !Equals(nextHeader, this.netDeckHudHeader) {
@@ -631,32 +710,30 @@ private func NetDeckHudFinish() -> Void {
   }
 }
 
-// Short independent 3-second animation: 20 steps * 0.15 seconds.
-// Does not change the 2.0-second gameplay propagation tick below.
+// Native HUD progress follows elapsed time, not discrete 5% increments.
 @addMethod(PlayerPuppet)
-private func NetDeckHudSchedule(step: Int32) -> Void {
+private func NetDeckHudSchedule() -> Void {
   let evt: ref<NetDeckHudTickEvent> = new NetDeckHudTickEvent();
   evt.generation = this.netDeckWaveGeneration;
-  evt.step = step;
-  GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, 0.15);
+  GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, 0.033);
 }
 
 @addMethod(PlayerPuppet)
 protected cb func OnNetDeckHudTickEvent(evt: ref<NetDeckHudTickEvent>) -> Bool {
-  if evt.generation != this.netDeckWaveGeneration || !this.netDeckHudOwned {
-    return true;
-  }
+  if evt.generation != this.netDeckWaveGeneration || !this.netDeckHudOwned { return true; }
   if !IsEquipped(this.GetGame()) {
     this.NetDeckHudFinish();
     return true;
   }
-  // A ~3-second initial upload, independent of the longer self-spreading wave.
-  this.netDeckHudProgress = Cast<Float>(evt.step) / 20.0;
+  let elapsed: Float =
+    EngineTime.ToFloat(GameInstance.GetSimTime(this.GetGame())) -
+    this.netDeckHudStartTime;
+  this.netDeckHudProgress = MaxF(0.0, MinF(1.0, elapsed / this.NetDeckUploadDuration()));
   this.NetDeckHudUpdate();
-  if evt.step >= 20 {
+  if this.netDeckHudProgress >= 1.0 {
     this.NetDeckHudFinish();
   } else {
-    this.NetDeckHudSchedule(evt.step + 1);
+    this.NetDeckHudSchedule();
   }
   return true;
 }
@@ -665,12 +742,12 @@ protected cb func OnNetDeckHudTickEvent(evt: ref<NetDeckHudTickEvent>) -> Bool {
 private func NetDeckWaveSchedule() -> Void {
   let evt: ref<NetDeckWaveTickEvent> = new NetDeckWaveTickEvent();
   evt.generation = this.netDeckWaveGeneration;
-  GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, 2.0);
+  GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, this.NetDeckTickInterval());
 }
 
 @addMethod(PlayerPuppet)
 private func NetDeckWaveFinish() -> Void {
-  this.NetDeckHudFinish();
+  // Let the separate upload timer finish; even one-target uploads reach 100%.
   let r: ref<NetDeckSpreadResult> = this.netDeckWaveResult;
   if !IsDefined(r) { return; }
   let affected: Int32 = r.devices + r.npcs + r.vehicles + r.netrunners;
@@ -717,10 +794,10 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
     this.NetDeckHudFinish();
     return true;
   }
-  // Hard safety stop: max 16 scheduled jumps (32 seconds) in this test
-  // build, even if native targeting starts returning phantom candidates.
+  // Bound the fast propagation by configurable target/jump limits.
   this.netDeckWaveTicks += 1;
-  if this.netDeckWaveTicks > 16 || ArraySize(this.netDeckWaveSeen) >= 40 {
+  if this.netDeckWaveTicks > this.NetDeckJumpLimit() ||
+     ArraySize(this.netDeckWaveSeen) >= this.NetDeckTargetLimit() {
     this.NetDeckWaveFinish();
     return true;
   }
@@ -730,7 +807,7 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
   // showing many visited devices while only one gang member was glitched.
   let selected: ref<GameObject>;
   let depth: Int32 = 0;
-  let nearestNpc: Float = 25.0;
+  let nearestNpc: Float = this.NetDeckHopRadius();
   let selectedNpcHost: Int32 = -1;
   let p: Int32 = 0;
   while p < ArraySize(this.netDeckLoadedPuppets) {
@@ -769,14 +846,14 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
       TSF_Any(TSFMV.Obj_Puppet | TSFMV.Obj_Device | TSFMV.Obj_Other);
     query.includeSecondaryTargets = false;
     query.ignoreInstigator = true;
-    query.maxDistance = 55.0;
+    query.maxDistance = this.NetDeckScanRadius();
     query.filterObjectByDistance = true;
     let parts: array<TS_TargetPartInfo>;
     GameInstance.GetTargetingSystem(this.GetGame()).GetTargetParts(
       this, query, parts
     );
 
-    let nearest: Float = 25.0;
+    let nearest: Float = this.NetDeckHopRadius();
     let selectedHost: Int32 = -1;
     let i: Int32 = 0;
     while i < ArraySize(parts) && i < 250 {
