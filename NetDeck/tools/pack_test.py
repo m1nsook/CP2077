@@ -52,7 +52,7 @@ IMPORTANT LIMITATIONS:
 - Native Blackwall start/completion effects are cleared; confirm no lethal effect.
 - Repeating Ping network grid audio/VFX and per-hop reward notifications are removed.
 - Jumps run every 2.0 seconds and stop after at most 16 scheduled jumps.
-- The reported target count reflects dispatched effects, not all discovered relays.
+- The TARGETS count is NPCs + moving cars with dispatched effects; device actions have their own count.
 - Loaded hostile-NPC registry fallback is experimental and not compiler verified.
 - Previous build's network shutdown, vendor and stats were user-confirmed.
 - Codeware interface-language packages cover 19 UI languages, with English fallback.
