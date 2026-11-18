@@ -476,7 +476,7 @@ private func NetDeckWaveAddMaster(
 }
 
 // Every affected entity is dispatched on a DIFFERENT timed tick.
-// This produces visible, sequential weapon glitches and network pulses.
+// Native Tier 5 Sonic Shock (communications disruption and sensory cloak).
 @addMethod(PlayerPuppet)
 private func NetDeckWaveInfect(obj: ref<GameObject>, depth: Int32) -> Void {
   if !this.NetDeckWaveValid(obj) { return; }
@@ -495,9 +495,9 @@ private func NetDeckWaveInfect(obj: ref<GameObject>, depth: Int32) -> Void {
     if EnumInt(GameObject.GetAttitudeTowards(npc, this)) !=
        EnumInt(EAIAttitude.AIA_Friendly) {
       if !StatusEffectSystem.ObjectHasStatusEffect(
-          npc, t"BaseStatusEffect.WeaponMalfunctionLvl2") {
+          npc, t"BaseStatusEffect.CommsNoiseLevel4") {
         StatusEffectHelper.ApplyStatusEffect(
-          npc, t"BaseStatusEffect.WeaponMalfunctionLvl2", this.GetEntityID()
+          npc, t"BaseStatusEffect.CommsNoiseLevel4", this.GetEntityID()
         );
         this.netDeckWaveResult.npcs += 1;
       }
@@ -881,7 +881,7 @@ public func NetDeckTriggerNetWatchPursuit(puppet: ref<ScriptedPuppet>) -> Void {
   NPCPuppet.RevealPlayerPositionIfNeeded(puppet, player.GetEntityID(), false);
 }
 
-// NPC-origin NETWORM is non-lethal: interfere with hostile weapons and brake
+// NPC-origin NETWORM is non-lethal: disrupt hostile communications and brake
 // nearby non-quest vehicles. No damage, incapacitation or radius-based
 // network shutdown is applied to any civilian or hostile puppet.
 public func NetDeckDisruptNpcVicinity(puppet: ref<ScriptedPuppet>) -> Int32 {
@@ -893,9 +893,9 @@ public func NetDeckDisruptNpcVicinity(puppet: ref<ScriptedPuppet>) -> Int32 {
   if IsDefined(npc) &&
      (EnumInt(GameObject.GetAttitudeTowards(npc, player)) == EnumInt(EAIAttitude.AIA_Hostile) ||
       npc.IsCharacterPolice() || NetDeckIsNetWatch(puppet)) &&
-     !StatusEffectSystem.ObjectHasStatusEffect(npc, t"BaseStatusEffect.WeaponMalfunctionLvl2") {
+     !StatusEffectSystem.ObjectHasStatusEffect(npc, t"BaseStatusEffect.CommsNoiseLevel4") {
     StatusEffectHelper.ApplyStatusEffect(
-      npc, t"BaseStatusEffect.WeaponMalfunctionLvl2", player.GetEntityID()
+      npc, t"BaseStatusEffect.CommsNoiseLevel4", player.GetEntityID()
     );
     affected += 1;
   }
