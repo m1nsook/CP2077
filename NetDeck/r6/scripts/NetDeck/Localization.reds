@@ -15,6 +15,8 @@ public class NetDeckEnglish extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: NETWORK INFILTRATED");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NO COMPATIBLE DEVICES");
     this.Text("NetDeckDevicesAffected", "DEVICES");
+    this.Text("NetDeckEddiesStolen", "STOLE");
+    this.Text("NetDeckStolenTargets", "TARGETS");
   }
 }
 
@@ -27,6 +29,8 @@ public class NetDeckArabic extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: تم اختراق الشبكة");
     this.Text("NetDeckSpreadEmpty", "NETWORM: لا توجد أجهزة متوافقة");
     this.Text("NetDeckDevicesAffected", "الأجهزة");
+    this.Text("NetDeckEddiesStolen", "سُرِقَ");
+    this.Text("NetDeckStolenTargets", "أهداف");
   }
 }
 
@@ -39,6 +43,8 @@ public class NetDeckChineseSimplified extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM：网络入侵成功");
     this.Text("NetDeckSpreadEmpty", "NETWORM：没有兼容设备");
     this.Text("NetDeckDevicesAffected", "设备");
+    this.Text("NetDeckEddiesStolen", "窃取");
+    this.Text("NetDeckStolenTargets", "目标");
   }
 }
 
@@ -51,6 +57,8 @@ public class NetDeckChineseTraditional extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM：網路入侵成功");
     this.Text("NetDeckSpreadEmpty", "NETWORM：沒有相容裝置");
     this.Text("NetDeckDevicesAffected", "裝置");
+    this.Text("NetDeckEddiesStolen", "竊取");
+    this.Text("NetDeckStolenTargets", "目標");
   }
 }
 
@@ -63,6 +71,8 @@ public class NetDeckCzech extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: SÍŤ INFILTROVÁNA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: ŽÁDNÁ KOMPATIBILNÍ ZAŘÍZENÍ");
     this.Text("NetDeckDevicesAffected", "ZAŘÍZENÍ");
+    this.Text("NetDeckEddiesStolen", "UKRADENO");
+    this.Text("NetDeckStolenTargets", "CÍLŮ");
   }
 }
 
@@ -75,6 +85,8 @@ public class NetDeckFrench extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM : RÉSEAU INFILTRÉ");
     this.Text("NetDeckSpreadEmpty", "NETWORM : AUCUN APPAREIL COMPATIBLE");
     this.Text("NetDeckDevicesAffected", "APPAREILS");
+    this.Text("NetDeckEddiesStolen", "VOLÉS");
+    this.Text("NetDeckStolenTargets", "CIBLES");
   }
 }
 
@@ -87,6 +99,8 @@ public class NetDeckGerman extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: NETZWERK INFILTRIERT");
     this.Text("NetDeckSpreadEmpty", "NETWORM: KEINE KOMPATIBLEN GERÄTE");
     this.Text("NetDeckDevicesAffected", "GERÄTE");
+    this.Text("NetDeckEddiesStolen", "GESTOHLEN");
+    this.Text("NetDeckStolenTargets", "ZIELE");
   }
 }
 
@@ -99,6 +113,8 @@ public class NetDeckHungarian extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: HÁLÓZAT FELTÖRVE");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NINCS KOMPATIBILIS ESZKÖZ");
     this.Text("NetDeckDevicesAffected", "ESZKÖZÖK");
+    this.Text("NetDeckEddiesStolen", "ELLOPVA");
+    this.Text("NetDeckStolenTargets", "CÉLPONT");
   }
 }
 
@@ -111,6 +127,8 @@ public class NetDeckItalian extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: RETE INFILTRATA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NESSUN DISPOSITIVO COMPATIBILE");
     this.Text("NetDeckDevicesAffected", "DISPOSITIVI");
+    this.Text("NetDeckEddiesStolen", "RUBATI");
+    this.Text("NetDeckStolenTargets", "BERSAGLI");
   }
 }
 
@@ -123,6 +141,8 @@ public class NetDeckJapanese extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM：ネットワークへの侵入成功");
     this.Text("NetDeckSpreadEmpty", "NETWORM：対応する機器なし");
     this.Text("NetDeckDevicesAffected", "デバイス");
+    this.Text("NetDeckEddiesStolen", "奪取");
+    this.Text("NetDeckStolenTargets", "対象");
   }
 }
 
@@ -135,6 +155,8 @@ public class NetDeckKorean extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: 네트워크 침투 성공");
     this.Text("NetDeckSpreadEmpty", "NETWORM: 호환 장치 없음");
     this.Text("NetDeckDevicesAffected", "장치");
+    this.Text("NetDeckEddiesStolen", "탈취");
+    this.Text("NetDeckStolenTargets", "대상");
   }
 }
 
@@ -147,6 +169,8 @@ public class NetDeckPolish extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: SIEĆ ZINFILTROWANA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: BRAK ZGODNYCH URZĄDZEŃ");
     this.Text("NetDeckDevicesAffected", "URZĄDZENIA");
+    this.Text("NetDeckEddiesStolen", "SKRADZIONO");
+    this.Text("NetDeckStolenTargets", "CELÓW");
   }
 }
 
@@ -159,6 +183,8 @@ public class NetDeckPortugueseBrazil extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: REDE INFILTRADA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NENHUM DISPOSITIVO COMPATÍVEL");
     this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
+    this.Text("NetDeckEddiesStolen", "ROUBADOS");
+    this.Text("NetDeckStolenTargets", "ALVOS");
   }
 }
 
@@ -171,6 +197,8 @@ public class NetDeckRussian extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: СЕТЬ ВЗЛОМАНА");
     this.Text("NetDeckSpreadEmpty", "NETWORM: НЕТ СОВМЕСТИМЫХ УСТРОЙСТВ");
     this.Text("NetDeckDevicesAffected", "УСТРОЙСТВА");
+    this.Text("NetDeckEddiesStolen", "ПОХИЩЕНО");
+    this.Text("NetDeckStolenTargets", "ЦЕЛЕЙ");
   }
 }
 
@@ -183,6 +211,8 @@ public class NetDeckSpanishSpain extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: RED INFILTRADA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NO HAY DISPOSITIVOS COMPATIBLES");
     this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
+    this.Text("NetDeckEddiesStolen", "ROBADOS");
+    this.Text("NetDeckStolenTargets", "OBJETIVOS");
   }
 }
 
@@ -195,6 +225,8 @@ public class NetDeckSpanishLatinAmerica extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: RED INFILTRADA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NO HAY DISPOSITIVOS COMPATIBLES");
     this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
+    this.Text("NetDeckEddiesStolen", "ROBADOS");
+    this.Text("NetDeckStolenTargets", "OBJETIVOS");
   }
 }
 
@@ -207,6 +239,8 @@ public class NetDeckThai extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: แทรกซึมเครือข่ายสำเร็จ");
     this.Text("NetDeckSpreadEmpty", "NETWORM: ไม่พบอุปกรณ์ที่รองรับ");
     this.Text("NetDeckDevicesAffected", "อุปกรณ์");
+    this.Text("NetDeckEddiesStolen", "ขโมย");
+    this.Text("NetDeckStolenTargets", "เป้าหมาย");
   }
 }
 
@@ -219,6 +253,8 @@ public class NetDeckTurkish extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: AĞA SIZILDI");
     this.Text("NetDeckSpreadEmpty", "NETWORM: UYUMLU CİHAZ BULUNAMADI");
     this.Text("NetDeckDevicesAffected", "CİHAZLAR");
+    this.Text("NetDeckEddiesStolen", "ÇALINDI");
+    this.Text("NetDeckStolenTargets", "HEDEF");
   }
 }
 
@@ -231,6 +267,8 @@ public class NetDeckUkrainian extends ModLocalizationPackage {
     this.Text("NetDeckSpreadComplete", "NETWORM: МЕРЕЖУ ЗЛАМАНО");
     this.Text("NetDeckSpreadEmpty", "NETWORM: НЕМАЄ СУМІСНИХ ПРИСТРОЇВ");
     this.Text("NetDeckDevicesAffected", "ПРИСТРОЇ");
+    this.Text("NetDeckEddiesStolen", "ВИКРАДЕНО");
+    this.Text("NetDeckStolenTargets", "ЦІЛЕЙ");
   }
 }
 
