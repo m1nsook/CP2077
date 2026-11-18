@@ -78,8 +78,24 @@ class InfiltrationSourceTests(unittest.TestCase):
         for path in paths:
             self.assertNotRegex(path, r'(?<!\\)\\(?!\\)')
 
+    def test_settings_window_only_draws_with_cet_overlay(self):
+        # Regression: previous floating CET ImGui window blocked gameplay input.
+        self.assertIn('registerForEvent("onOverlayOpen"', SETTINGS)
+        self.assertIn('registerForEvent("onOverlayClose"', SETTINGS)
+        self.assertIn('overlayOpen = false', SETTINGS)
+        self.assertIn('windowOpen = false', SETTINGS)
+        self.assertIn('if not loaded or not overlayOpen or not windowOpen then return end', SETTINGS)
+        self.assertIn('windowOpen, shouldDraw = ImGui.Begin("NETWORM - Test Settings", windowOpen)', SETTINGS)
+        self.assertIn('if shouldDraw then', SETTINGS)
+        self.assertIn('ImGui.End()', SETTINGS)
+        self.assertIn('local value, wasChanged = ImGui.SliderFloat(', SETTINGS)
+        self.assertIn('local value, wasChanged = ImGui.SliderInt(', SETTINGS)
+        self.assertIn('if wasChanged then changed(key, value) end', SETTINGS)
+        self.assertNotIn('local yes, value = ImGui.SliderFloat', SETTINGS)
+        self.assertNotIn('local yes, value = ImGui.SliderInt', SETTINGS)
+
     def test_crash_diagnostic_is_observer_only(self):
-        self.assertIn('PREFIX = "[NetDeck/DIAG v0.6.9]"', D)
+        self.assertIn('PREFIX = "[NetDeck/DIAG v0.6.10]"', D)
         self.assertIn('registerForEvent("onInit"', D)
         self.assertIn('registerForEvent("onUpdate"', D)
         self.assertIn('registerForEvent("onShutdown"', D)
