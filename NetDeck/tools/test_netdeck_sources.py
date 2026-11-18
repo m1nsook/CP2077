@@ -76,6 +76,11 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertNotIn("$base: Interactions.PingHack", Y)
         self.assertNotIn('IsDefined(this.NetDeckNetworkMaster()) {', R)
 
+    def test_valid_native_target_mask(self):
+        # TSFMV is the Cyberpunk targeting mask; it has Obj_Other, not Obj_Vehicle.
+        self.assertNotIn("TSFMV.Obj_Vehicle", R)
+        self.assertIn("TSFMV.Obj_Puppet | TSFMV.Obj_Device | TSFMV.Obj_Other", R)
+
     def test_timed_wave_spreading(self):
         self.assertNotIn("@wrapMethod(AccessPointControllerPS)", R)
         self.assertNotIn("public func GetRemoteActions(", R)
