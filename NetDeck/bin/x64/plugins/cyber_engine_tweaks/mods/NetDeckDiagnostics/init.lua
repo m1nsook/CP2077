@@ -40,9 +40,36 @@ local function observe(className, methodName, callback)
   end
 end
 
+-- Observe() runs BEFORE the NetDeck method and therefore leaves evidence
+-- even if the engine crashes *inside* the upload or HUD method.
+local function observeBefore(className, methodName, callback)
+  local ok, err = pcall(function()
+    Observe(className, methodName, function(...)
+      local worked, failure = pcall(callback, ...)
+      if not worked and observerErrors < 5 then
+        observerErrors = observerErrors + 1
+        log("observer_error", methodName .. ": " .. tostring(failure))
+      end
+    end)
+  end)
+  if ok then
+    log("observer_ready_before", className .. "." .. methodName)
+  else
+    log("observer_unavailable_before", className .. "." .. methodName .. ": " .. tostring(err))
+  end
+end
+
 registerForEvent("onInit", function()
   log("session_start", "CET logging active; this file only observes NetDeck methods")
-  log("startup_probe", "any crash before wave_start is not triggered by an active NETWORM upload")
+  log("startup_probe", "if no wave_request appears, the crash was not preceded by a detected NETWORM upload")
+
+  observeBefore("PlayerPuppet", "NetDeckWaveStart", function(_, target, fromDevice)
+    log("wave_request", "target=" .. targetInfo(target)
+      .. " fromDevice=" .. tostring(fromDevice))
+  end)
+  observeBefore("PlayerPuppet", "NetDeckHudStart", function()
+    log("hud_request", "wave=" .. waves)
+  end)
 
   observe("PlayerPuppet", "NetDeckWaveStart", function(_, target, fromDevice)
     waves = waves + 1
