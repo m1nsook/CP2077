@@ -288,7 +288,7 @@ public final const func GetAllChoices(
   puppetActions: script_ref<array<ref<PuppetAction>>>
 ) -> Void {
   wrappedMethod(actions, context, puppetActions);
-  if !IsEquipped(this.GetGameInstance()) || this.IsMarkedAsQuest() {
+  if !IsEquipped(this.GetGameInstance()) {
     return;
   }
   let owner: ref<ScriptedPuppet> = this.GetOwnerEntityWeak() as ScriptedPuppet;
