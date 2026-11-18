@@ -35,12 +35,14 @@ INSTALL:
 8. Confirm the original Ping is offered and works separately.
 9. Test connected security effects without any camera in the network.
 10. Check an unrelated network remains unaffected.
+11. Test nonlethal Weapon Glitch, vehicle brake, NetWatch pursuit and linked door unlocking.
+12. Watch for XP on netrunner burnout or hacking, and check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.5.2 corrects REDscript signature errors but is NOT game-compiler verified.
+- v0.5.3 corrects REDscript signature errors but is NOT game-compiler verified.
 - Previous build's network shutdown, vendor and stats were user-confirmed.
 - Codeware interface-language packages cover 19 UI languages, with English fallback.
-- Access-point NETWORM scanner support and spread FX are experimental.
+- No NETWORM access-point scanner actions. NPC/vehicle/door/network effects are experimental.
 - No copyrighted or private icon/ArchiveXL/WolvenKit binary assets are distributed.
 - NETWORM no longer inherits PingDevice, so vanilla Ping must remain
   an independent, functioning quickhack when NetWatch Σ MK.1 is installed.
@@ -85,6 +87,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.5.2-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.5.3-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
