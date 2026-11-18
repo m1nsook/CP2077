@@ -1,9 +1,38 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.9 HUD WRAPPER COMPILATION FIX TEST · NOT game-compiler verified.**
+**Cyberpunk 2077 2.5 · v0.6.10 CET INPUT/OVERLAY FIX TEST · NOT game-compiler verified.**
 
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
+
+## v0.6.10 — CET settings window must not block gameplay (UNVERIFIED)
+
+The player reported that the previous `NetDeckSettings` ImGui window
+stayed on screen and intercepted gameplay input while the CET overlay was
+closed; attempting to open CET made the settings window unusable.
+**Emergency recovery without changing anything else:** close the game,
+rename or delete
+`bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings`, relaunch.
+Only the optional settings UI is disabled; NETWORM's REDscript default
+values and all cyberdeck features remain installed.
+
+**Fixed:** The CET Lua settings module now requires both explicit
+`onOverlayOpen` state AND an open window to render, and resets both on
+`onOverlayClose`. It begins hidden until CET itself opens and closes
+when CET closes. Using CET's `ImGui.Begin(title, windowOpen)` overload
+provides an X close button, with the correct `windowOpen, shouldDraw`
+return order; `ImGui.End()` is still unconditional after Begin.
+The UI does not draw, and therefore should not capture gameplay input,
+when the CET overlay is closed.
+
+**Also fixed:** `ImGui.SliderFloat`/`ImGui.SliderInt` return
+`newValue, wasChanged` in CET, not `wasChanged, newValue`; the old
+order prevented sliders from updating. They now use the documented
+return order. Values still persist to the existing `settings.json`.
+
+Only `NetDeckSettings/init.lua` (plus tests/build metadata/docs)
+changed. REDscript, HUD icon skin, quickhack mechanics and scan/spread
+settings are unchanged. Player has not yet retested v0.6.10 in the game.
 
 ## v0.6.9 — REDscript HUD wrapper signature fix (UNVERIFIED)
 
