@@ -1,7 +1,7 @@
-# Infiltration — NΣT iconic cyberdeck
+# Infiltration — NetWatch Σ MK.1 iconic cyberdeck
 
 Cyberpunk 2077 2.5 development test. **Not verified in game for v0.4.**
-NΣT is an iconic Tier 5++ NetWatch Netdriver Mk.2 cyberdeck.
+NetWatch Σ MK.1 is an iconic Tier 5++ cyberdeck with the built-in NETWORM quickhack.
 The saved item ID remains `Items.NESTCyberdeck`; the directory and new
 internal prefixes are `NetDeck`.
 
@@ -14,14 +14,14 @@ internal prefixes are `NetDeck`.
 
 ## v0.4 target eligibility
 
-**Infiltration should be offered on anything vanilla Ping can target.** A
+**NETWORM should be offered on anything vanilla Ping can target.** A
 camera, access point or surveillance system is no longer required.
 
 * Native quickhackable **devices**, even without a network master, offer
-  Infiltration. A standalone device receives only a native supported shutdown
+  NETWORM. A standalone device receives only a native supported shutdown
   or distraction, never cross-network effects.
 * **NPCs** with a Ping action in the native puppet scanner list now get an
-  independent PuppetQuickHack form of Infiltration. On upload, the linked
+  independent PuppetQuickHack form of NETWORM. On upload, the linked
   PuppetDeviceLinkPS is traversed through its real access point(s), then
   connected security devices are disabled/distracted.
 * NPCs without a real device network link can receive the upload, but no
@@ -32,12 +32,12 @@ camera, access point or surveillance system is no longer required.
   pingable robotic puppet could be an entry point. That needs a separate
   safe puppet shutdown implementation.
 
-Normal **Ping must remain separate and functional**. Infiltration uses a
+Normal **Ping must remain separate and functional**. NETWORM uses a
 unique action name and a dedicated device and puppet action record, not
 `DeviceAction.PingDevice`. The actual quickhack UI is localized using
 Codeware's provider (English fallback). The icon is still vanilla.
 
-The 26 ripperdoc records and NΣT gameplay stat packages are **unchanged**.
+The 26 ripperdoc records and NetWatch Σ MK.1 gameplay stat packages are **unchanged**.
 
 ## Install
 Requires RED4ext, redscript, TweakXL, Codeware and Cyberpunk 2077 2.5.
@@ -53,12 +53,24 @@ Game.AddToInventory("Items.NESTCyberdeck", 1)
 
 ## Focused live test for this build
 1. Confirm no REDscript compiler/TweakXL error.
-2. Scan a standalone pingable device **without a camera**. Infiltration must appear.
-3. Scan a pingable hostile NPC; Infiltration must appear alongside normal Ping.
-4. With a real access point link (camera or no camera), upload Infiltration and
+2. Scan a standalone pingable device **without a camera**. NETWORM must appear.
+3. Scan a pingable hostile NPC; NETWORM must appear alongside normal Ping.
+4. With a real access point link (camera or no camera), upload NETWORM and
    confirm devices on that network shut down, and unrelated networks do not.
-5. Confirm **normal Ping still works** with NΣT and a vanilla cyberdeck.
+5. Confirm **normal Ping still works** with NetWatch Σ MK.1 and a vanilla cyberdeck.
 
 Previous gameplay results do not establish that this new NPC scanner hook,
 standalone targeting, localization or the v0.3 Ping regression fix work.
 Keep PR #36 in draft until verified.
+
+## Naming and compatibility
+
+**Mod:** Infiltration (repository project directory `NetDeck`).
+**Cyberdeck shown in the game:** `NetWatch Σ MK.1`.
+**Quickhack shown in the scanner:** `NETWORM`.
+
+The technical action IDs `NetDeckInfiltration`, `DeviceAction.NetDeckInfiltration`,
+and `QuickHack.NetDeckPuppetInfiltration` have **not** been renamed: their
+user-facing labels come from Codeware localization. The existing item ID
+`Items.NESTCyberdeck` also stays the same to avoid breaking saved equipment.
+The rename does not alter cyberware stats, perks, network traversal or Ping.

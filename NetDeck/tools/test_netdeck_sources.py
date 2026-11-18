@@ -18,6 +18,15 @@ class InfiltrationSourceTests(unittest.TestCase):
                   "statType: BaseStats.BufferSize", "value: 4"]:
             self.assertIn(s, Y)
 
+    def test_names_are_display_only_and_save_compatible(self):
+        self.assertIn('friendlyName: "NetWatch Σ MK.1"', Y)
+        self.assertIn('this.Text("NetDeckDeckName", "NetWatch Σ MK.1")', L)
+        self.assertIn('this.Text("NetDeckInfiltrationName", "NETWORM")', L)
+        self.assertIn('caption: l"NetDeckInfiltrationName"', Y)
+        self.assertIn('Items.NESTCyberdeck:', Y)
+        self.assertIn('actionName: NetDeckInfiltration', Y)
+        self.assertNotIn('this.Text("NetDeckInfiltrationName", "Infiltration")', L)
+
     def test_vendor_coverage(self):
         self.assertEqual(len(set(re.findall(r"^Vendors\.(\w+)\.itemStock:", Y, re.M))), VENDORS)
         self.assertIn("Vendors.AdvancedCollectiveRipperDocDogtown.itemStock:", Y)
@@ -40,6 +49,7 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("protected final func FinalizeGetQuickHackActions(", R)
         self.assertIn("wrappedMethod(outActions, context);", R)
         self.assertIn("Items.NESTCyberdeck", R)
+        self.assertIn("NetDeckInfiltration", R)
 
     def test_network_safety(self):
         for s in ["this.GetAccessPoints()", "GetAllDescendants(members)",

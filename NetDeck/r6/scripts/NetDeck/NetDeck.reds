@@ -1,6 +1,6 @@
-// Infiltration — NΣT iconic cyberdeck (Cyberpunk 2077 2.5; test build)
+// NETWORM — NetWatch Σ MK.1 iconic cyberdeck (Cyberpunk 2077 2.5; test build)
 // This is deliberately self-contained. It does not require Camera Killer
-// or alter its hooks; Infiltration runs only while the NΣT deck is installed.
+// or alter its hooks; NETWORM runs only while NetWatch Σ MK.1 is installed.
 module NetDeck
 
 public class NetDeckInfiltration extends ActionBool {

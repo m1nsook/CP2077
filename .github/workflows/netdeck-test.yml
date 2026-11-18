@@ -1,4 +1,4 @@
-name: Infiltration — NΣT test package
+name: Infiltration — NetWatch Σ MK.1 test package
 
 # Builds a game-root ZIP for the draft PR. DOES NOT publish a GitHub release.
 on:
@@ -21,13 +21,13 @@ jobs:
       - name: Validate source invariants
         run: python3 NetDeck/tools/test_netdeck_sources.py
       - name: Build game-root test ZIP
-        run: python3 NetDeck/tools/pack_test.py --output dist/NetDeck-v0.4.0-TEST.zip
+        run: python3 NetDeck/tools/pack_test.py --output dist/NetDeck-v0.4.1-TEST.zip
       - name: Upload test ZIP and checksum
         uses: actions/upload-artifact@v4
         with:
-          name: NetDeck-v0.4.0-TEST
+          name: NetDeck-v0.4.1-TEST
           path: |
-            dist/NetDeck-v0.4.0-TEST.zip
+            dist/NetDeck-v0.4.1-TEST.zip
             dist/NetDeck-TEST-SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30

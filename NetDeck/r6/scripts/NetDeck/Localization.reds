@@ -1,4 +1,4 @@
-// Native Codeware localization for Infiltration.
+// Native Codeware localization for NetWatch Σ MK.1 and NETWORM.
 // This is a real, loaded REDscript localization provider, not an uncooked
 // WolvenKit/ArchiveXL source placeholder. The provider supplies en-us as
 // fallback to all supported UI languages until translations are available.
@@ -8,10 +8,10 @@ import Codeware.Localization.*
 
 public class NetDeckEnglish extends ModLocalizationPackage {
   protected func DefineTexts() -> Void {
-    this.Text("NetDeckDeckName", "NΣT");
+    this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription",
-      "NetWatch Netdriver Mk.2. Iconic network-infiltration cyberdeck with a built-in Infiltration quickhack.");
-    this.Text("NetDeckInfiltrationName", "Infiltration");
+      "NetWatch Σ MK.1. Iconic cyberdeck with a built-in NETWORM quickhack that propagates through connected systems.");
+    this.Text("NetDeckInfiltrationName", "NETWORM");
     this.Text("NetDeckInfiltrationDescription",
       "Upload to any Ping-capable target. Disable connected cameras, turrets and mines, or distract compatible electronics. Unlinked targets affect only their own supported functions.");
   }

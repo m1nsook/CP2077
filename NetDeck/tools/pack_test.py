@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a standalone GAME-ROOT NΣT development ZIP (no publishing)."""
+"""Build a standalone GAME-ROOT NetWatch Σ MK.1 development ZIP (no publishing)."""
 from __future__ import annotations
 
 import argparse
@@ -13,7 +13,7 @@ ROOT_FILES = (
     "r6/scripts/NetDeck/Localization.reds",
     "r6/tweaks/NetDeck/NetDeck.yaml",
 )
-TESTING = """Infiltration — NΣT GAMEPLAY TEST — NOT A RELEASE
+TESTING = """Infiltration — NetWatch Σ MK.1 / NETWORM GAMEPLAY TEST — NOT A RELEASE
 
 Requires Cyberpunk 2077 2.5, RED4ext, redscript, TweakXL and Codeware.
 
@@ -26,7 +26,7 @@ INSTALL:
    send the r6/logs/redscript* and red4ext/plugins/TweakXL/TweakXL.log errors.
 5. To add the experimental deck through CET console:
    Game.AddToInventory("Items.NESTCyberdeck", 1)
-6. Equip NΣT; test Infiltration on a camera, terminal, isolated device,
+6. Equip NetWatch Σ MK.1; test NETWORM on a camera, terminal, isolated device,
    and pingable hostile NPC. A camera is NOT required as an entry point.
 7. Confirm the original Ping is offered and works separately.
 8. Test connected security effects without any camera in the network.
@@ -35,15 +35,15 @@ INSTALL:
 IMPORTANT LIMITATIONS:
 - This regression fix is source/package tested but NOT reverified in game 2.5.
 - Previous build's network shutdown, vendor and stats were user-confirmed.
-- The custom NΣT and Infiltration names/descriptions use Codeware's native
+- The custom NetWatch Σ MK.1 and NETWORM names/descriptions use Codeware's native
   localization provider. The icon still uses an existing vanilla asset.
-- Infiltration no longer inherits PingDevice, so vanilla Ping must remain
-  an independent, functioning quickhack when NΣT is installed.
+- NETWORM no longer inherits PingDevice, so vanilla Ping must remain
+  an independent, functioning quickhack when NetWatch Σ MK.1 is installed.
 - NPCs are new entry points via PuppetQuickHack. Their connected devices
   are affected if they have a real network link. No link means no devices
   to shut down; we never invent nearby connections.
 - Robotic NPC shutdown, drones and mechs are NOT yet covered.
-- Infiltration does not need Camera Killer; test with or without it.
+- NETWORM does not need Camera Killer; test with or without it.
 - Do not publish this ZIP as a Nexus Mods release.
 
 REMOVE:
@@ -80,6 +80,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.4.0-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.4.1-TEST.zip")
     args = parser.parse_args()
     build(args.output)
