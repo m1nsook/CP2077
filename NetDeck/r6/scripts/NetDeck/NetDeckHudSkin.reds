@@ -86,12 +86,19 @@ private func NetDeckHudSkinApply(enable: Bool) -> Void {
   }
 }
 
-// Controller's own header update is the only place we touch HUD visuals.
-// All quest bars run the unmodified wrappedMethod first. Never access
-// streamed NPC/VehicleObject instances or global entity lifecycle callbacks.
+// Use the same known, game-compatible HUD progress activation hook as
+// Dark Future's REDscript integration. Unlike UpdateTimerHeader, this native
+// method accepts Bool and has no String vs script_ref<String> discrepancy.
+// Never replace the base game's .inkwidget or alter non-NETWORM HUD visuals.
 @wrapMethod(HUDProgressBarController)
-public func UpdateTimerHeader(const label: ref<String>) -> Void {
-  wrappedMethod(label);
+public final func UpdateProgressBarActive(active: Bool) -> Void {
+  wrappedMethod(active);
+
+  if !active {
+    // NETWORM is done, or another quest has taken the progress widget.
+    this.NetDeckHudSkinApply(false);
+    return;
+  }
 
   let bb: ref<IBlackboard> =
     GameInstance.GetBlackboardSystem(this.GetGameInstance()).Get(
@@ -100,7 +107,5 @@ public func UpdateTimerHeader(const label: ref<String>) -> Void {
   if !IsDefined(bb) { return; }
   let d: ref<UI_HUDProgressBarDef> = GetAllBlackboardDefs().UI_HUDProgressBar;
   let header: String = bb.GetString(d.Header);
-  let isNetworm: Bool = bb.GetBool(d.Active) &&
-    StrBeginsWith(header, "NETWORM");
-  this.NetDeckHudSkinApply(isNetworm);
+  this.NetDeckHudSkinApply(StrBeginsWith(header, "NETWORM"));
 }
