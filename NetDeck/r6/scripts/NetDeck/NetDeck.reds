@@ -531,7 +531,7 @@ private func NetDeckWaveAddMaster(
   let children: array<ref<DeviceComponentPS>>;
   master.GetAllDescendants(children);
   let i: Int32 = 0;
-  while i < ArraySize(children) && ArraySize(this.netDeckWavePending) < 64 {
+  while i < ArraySize(children) && ArraySize(this.netDeckWavePending) < this.NetDeckTargetLimit() {
     let ps: ref<ScriptableDeviceComponentPS> =
       children[i] as ScriptableDeviceComponentPS;
     if IsDefined(ps) && !ps.IsMarkedAsQuest() {
@@ -620,6 +620,72 @@ private func NetDeckWaveInfect(obj: ref<GameObject>, depth: Int32) -> Void {
 
   // No per-hop notifications: the native reward event may play UI audio.
   // Emit a single outcome at the end, not a repeating reward chime.
+}
+
+// Safe pre-upload discovery using only the game's native targeting query
+// and previously scanned weak-reference candidates. No NPC/vehicle attach hooks.
+// Discovered candidates join the same timed infection queue, so the club can
+// receive one NETWORM cast instead of repeatedly hacking each NPC manually.
+@addMethod(PlayerPuppet)
+private func NetDeckQueuePreviewCandidate(obj: ref<GameObject>) -> Void {
+  if !this.NetDeckWaveValid(obj) ||
+     ArraySize(this.netDeckWavePending) >= this.NetDeckTargetLimit() ||
+     ArrayContains(this.netDeckWavePending, obj) {
+    return;
+  }
+  if Vector4.Distance(this.netDeckWaveOrigin, obj.GetWorldPosition()) >
+     this.NetDeckScanRadius() {
+    return;
+  }
+  let npc: ref<NPCPuppet> = obj as NPCPuppet;
+  let vehicle: ref<VehicleObject> = obj as VehicleObject;
+  if !IsDefined(npc) && !IsDefined(vehicle) { return; }
+  ArrayPush(this.netDeckWavePending, obj);
+  ArrayPush(this.netDeckWavePendingDepths, 1);
+}
+
+@addMethod(PlayerPuppet)
+private func NetDeckPreviewNetwork() -> Void {
+  // Already-infected root and any real linked device members are in these
+  // arrays from NetDeckWaveInfect(root, 0). Count them once.
+  let query: TargetSearchQuery;
+  query.testedSet = TargetingSet.Complete;
+  query.searchFilter =
+    TSF_Any(TSFMV.Obj_Puppet | TSFMV.Obj_Device | TSFMV.Obj_Other);
+  query.includeSecondaryTargets = true;
+  query.ignoreInstigator = true;
+  query.maxDistance = this.NetDeckScanRadius();
+  query.filterObjectByDistance = true;
+  let parts: array<TS_TargetPartInfo>;
+  GameInstance.GetTargetingSystem(this.GetGame()).GetTargetParts(
+    this, query, parts
+  );
+  let i: Int32 = 0;
+  while i < ArraySize(parts) && i < 400 &&
+        ArraySize(this.netDeckWavePending) < this.NetDeckTargetLimit() {
+    let comp: wref<TargetingComponent> = TS_TargetPartInfo.GetComponent(parts[i]);
+    if IsDefined(comp) {
+      this.NetDeckQueuePreviewCandidate(comp.GetEntity() as GameObject);
+    }
+    i += 1;
+  }
+  i = 0;
+  while i < ArraySize(this.netDeckLoadedPuppets) &&
+        ArraySize(this.netDeckWavePending) < this.NetDeckTargetLimit() {
+    let npc: ref<NPCPuppet> = this.netDeckLoadedPuppets[i];
+    if IsDefined(npc) { this.NetDeckQueuePreviewCandidate(npc); }
+    i += 1;
+  }
+  i = 0;
+  while i < ArraySize(this.netDeckLoadedVehicles) &&
+        ArraySize(this.netDeckWavePending) < this.NetDeckTargetLimit() {
+    let vehicle: ref<VehicleObject> = this.netDeckLoadedVehicles[i];
+    if IsDefined(vehicle) { this.NetDeckQueuePreviewCandidate(vehicle); }
+    i += 1;
+  }
+  this.netDeckWavePreviewCount =
+    ArraySize(this.netDeckWaveSeen) + ArraySize(this.netDeckWavePending);
+  if this.netDeckWavePreviewCount < 1 { this.netDeckWavePreviewCount = 1; }
 }
 
 // Native mission-style transfer bar. Shared globally with quests: never
@@ -783,6 +849,7 @@ public func NetDeckWaveStart(root: ref<GameObject>, fromDevice: Bool) -> Void {
   ArrayClear(this.netDeckWavePending);
   ArrayClear(this.netDeckWavePendingDepths);
   this.NetDeckWaveInfect(root, 0);
+  this.NetDeckPreviewNetwork();
   this.NetDeckHudStart();
   this.NetDeckWaveSchedule();
 }
@@ -807,16 +874,31 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
   // showing many visited devices while only one gang member was glitched.
   let selected: ref<GameObject>;
   let depth: Int32 = 0;
+  // First use the pre-scanned hostile queue. This is not line-of-sight
+  // limited per hop: every eligible target within scan radius can be
+  // infected in one cast, but still on its own bounded timing tick.
+  let pre: Int32 = 0;
+  while pre < ArraySize(this.netDeckWavePending) && !IsDefined(selected) {
+    let candidate: ref<GameObject> = this.netDeckWavePending[pre];
+    let candidateNpc: ref<NPCPuppet> = candidate as NPCPuppet;
+    let candidateVehicle: ref<VehicleObject> = candidate as VehicleObject;
+    if (IsDefined(candidateNpc) || IsDefined(candidateVehicle)) &&
+       this.NetDeckWaveValid(candidate) {
+      selected = candidate;
+      depth = this.netDeckWavePendingDepths[pre];
+    }
+    pre += 1;
+  }
   let nearestNpc: Float = this.NetDeckHopRadius();
   let selectedNpcHost: Int32 = -1;
   let p: Int32 = 0;
-  while p < ArraySize(this.netDeckLoadedPuppets) {
+  while p < ArraySize(this.netDeckLoadedPuppets) && !IsDefined(selected) {
     let npcCandidate: ref<NPCPuppet> = this.netDeckLoadedPuppets[p];
     if IsDefined(npcCandidate) && this.NetDeckWaveValid(npcCandidate) &&
-       Vector4.Distance(this.netDeckWaveOrigin, npcCandidate.GetWorldPosition()) <= 55.0 {
+       Vector4.Distance(this.netDeckWaveOrigin, npcCandidate.GetWorldPosition()) <= this.NetDeckScanRadius() {
       let h: Int32 = 0;
       while h < ArraySize(this.netDeckWaveHosts) {
-        if this.netDeckWaveLinks[h] < 4 && this.netDeckWaveDepths[h] < 4 {
+        if this.netDeckWaveLinks[h] < this.NetDeckFanoutLimit() && this.netDeckWaveDepths[h] < 4 {
           let d: Float =
             Vector4.Distance(this.netDeckWaveHosts[h], npcCandidate.GetWorldPosition());
           if d <= nearestNpc {
@@ -863,10 +945,10 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
         let candidate: ref<GameObject> =
           component.GetEntity() as GameObject;
         if this.NetDeckWaveValid(candidate) &&
-           Vector4.Distance(this.netDeckWaveOrigin, candidate.GetWorldPosition()) <= 55.0 {
+           Vector4.Distance(this.netDeckWaveOrigin, candidate.GetWorldPosition()) <= this.NetDeckScanRadius() {
           let j: Int32 = 0;
           while j < ArraySize(this.netDeckWaveHosts) {
-            if this.netDeckWaveLinks[j] < 4 &&
+            if this.netDeckWaveLinks[j] < this.NetDeckFanoutLimit() &&
                this.netDeckWaveDepths[j] < 4 {
               let distance: Float =
                 Vector4.Distance(this.netDeckWaveHosts[j], candidate.GetWorldPosition());
@@ -889,10 +971,10 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
     while p < ArraySize(this.netDeckLoadedPuppets) {
       let loadedNpc: ref<NPCPuppet> = this.netDeckLoadedPuppets[p];
       if IsDefined(loadedNpc) && this.NetDeckWaveValid(loadedNpc) &&
-         Vector4.Distance(this.netDeckWaveOrigin, loadedNpc.GetWorldPosition()) <= 55.0 {
+         Vector4.Distance(this.netDeckWaveOrigin, loadedNpc.GetWorldPosition()) <= this.NetDeckScanRadius() {
         let hostNpc: Int32 = 0;
         while hostNpc < ArraySize(this.netDeckWaveHosts) {
-          if this.netDeckWaveLinks[hostNpc] < 4 &&
+          if this.netDeckWaveLinks[hostNpc] < this.NetDeckFanoutLimit() &&
              this.netDeckWaveDepths[hostNpc] < 4 {
             let npcDistance: Float =
               Vector4.Distance(this.netDeckWaveHosts[hostNpc], loadedNpc.GetWorldPosition());
@@ -913,10 +995,10 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
     while k < ArraySize(this.netDeckLoadedVehicles) {
       let car: ref<VehicleObject> = this.netDeckLoadedVehicles[k];
       if IsDefined(car) && this.NetDeckWaveValid(car) &&
-         Vector4.Distance(this.netDeckWaveOrigin, car.GetWorldPosition()) <= 55.0 {
+         Vector4.Distance(this.netDeckWaveOrigin, car.GetWorldPosition()) <= this.NetDeckScanRadius() {
         let host: Int32 = 0;
         while host < ArraySize(this.netDeckWaveHosts) {
-          if this.netDeckWaveLinks[host] < 4 &&
+          if this.netDeckWaveLinks[host] < this.NetDeckFanoutLimit() &&
              this.netDeckWaveDepths[host] < 4 {
             let distance: Float =
               Vector4.Distance(this.netDeckWaveHosts[host], car.GetWorldPosition());
