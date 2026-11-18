@@ -219,119 +219,324 @@ public func NetDeckSiphon(
   result.robbedTargets += 1;
 }
 
-public func NetDeckSpread(
-  game: GameInstance, root: ref<GameObject>, fromDevice: Bool
-) -> ref<NetDeckSpreadResult> {
-  let result: ref<NetDeckSpreadResult> = new NetDeckSpreadResult();
-  if !IsDefined(root) || !IsEquipped(game) { return result; }
+// A real timed chain: each upload starts exactly one wave on the player.
+// Searching from the player (TargetingSet.Complete) follows Echo EMP's
+// full-3D search pattern; searching from arbitrary hacked NPCs did not work.
+public class NetDeckWaveTickEvent extends Event {
+  public let generation: Int32;
+}
 
-  // Up to 4 hops of 18 m each; at most 64 unique loaded world objects.
-  let queue: array<ref<GameObject>>;
-  let levels: array<Int32>;
-  ArrayPush(queue, root);
-  ArrayPush(levels, 0);
+@addField(PlayerPuppet)
+private let netDeckWaveGeneration: Int32;
+@addField(PlayerPuppet)
+private let netDeckWaveFromDevice: Bool;
+@addField(PlayerPuppet)
+private let netDeckWaveOrigin: Vector4;
+@addField(PlayerPuppet)
+private let netDeckWaveSeen: array<EntityID>;
+@addField(PlayerPuppet)
+private let netDeckWaveHosts: array<Vector4>;
+@addField(PlayerPuppet)
+private let netDeckWaveDepths: array<Int32>;
+@addField(PlayerPuppet)
+private let netDeckWaveLinks: array<Int32>;
+@addField(PlayerPuppet)
+private let netDeckWavePending: array<ref<GameObject>>;
+@addField(PlayerPuppet)
+private let netDeckWavePendingDepths: array<Int32>;
+@addField(PlayerPuppet)
+private let netDeckWavePendingCursor: Int32;
+@addField(PlayerPuppet)
+private let netDeckWaveResult: ref<NetDeckSpreadResult>;
+
+@addMethod(PlayerPuppet)
+private func NetDeckWaveHasSeen(id: EntityID) -> Bool {
   let i: Int32 = 0;
-  while i < ArraySize(queue) && i < 64 {
-    let obj: ref<GameObject> = queue[i];
-    let depth: Int32 = levels[i];
+  while i < ArraySize(this.netDeckWaveSeen) {
+    if Equals(this.netDeckWaveSeen[i], id) { return true; }
     i += 1;
-    if IsDefined(obj) && !ArrayContains(result.seen, obj) {
-      ArrayPush(result.seen, obj);
+  }
+  return false;
+}
 
-    let npc: ref<ScriptedPuppet> = obj as ScriptedPuppet;
-    let vehicle: ref<VehicleObject> = obj as VehicleObject;
-    let device: ref<Device> = obj as Device;
+@addMethod(PlayerPuppet)
+private func NetDeckWaveValid(obj: ref<GameObject>) -> Bool {
+  if !IsDefined(obj) || this.NetDeckWaveHasSeen(obj.GetEntityID()) {
+    return false;
+  }
+  let npc: ref<NPCPuppet> = obj as NPCPuppet;
+  if IsDefined(npc) {
+    if !npc.IsActive() || npc.IsDead() || npc.IsQuest() ||
+       npc.IsCrowd() || ScriptedPuppet.IsPlayerCompanion(npc) {
+      return false;
+    }
+    if !IsDefined(npc.GetRecord()) || npc.GetRecord().IsChild() {
+      return false;
+    }
+    return true;
+  }
+  let vehicle: ref<VehicleObject> = obj as VehicleObject;
+  if IsDefined(vehicle) {
+    return !vehicle.IsQuest() && !vehicle.IsPlayerVehicle() &&
+      !vehicle.IsInQuestOrScenePhysicsState();
+  }
+  let device: ref<Device> = obj as Device;
+  if IsDefined(device) {
+    let ps: ref<ScriptableDeviceComponentPS> =
+      device.GetDevicePS() as ScriptableDeviceComponentPS;
+    return IsDefined(ps) && !ps.IsMarkedAsQuest() && !ps.IsDisabled();
+  }
+  return false;
+}
 
-    if IsDefined(npc) && !npc.IsQuest() && !npc.IsPlayer() {
-      let player: ref<PlayerPuppet> = GetPlayer(game);
-      let hostile: Bool = IsDefined(player) &&
-        EnumInt(GameObject.GetAttitudeTowards(npc, player)) ==
-        EnumInt(EAIAttitude.AIA_Hostile);
-      if hostile || npc.IsCharacterPolice() || NetDeckIsNetWatch(npc) {
-        // Gang and police members in range now all receive the nonlethal
-        // glitch, rather than only the selected scanner target.
-        if !StatusEffectSystem.ObjectHasStatusEffect(
-            npc, t"BaseStatusEffect.WeaponMalfunctionLvl2") {
-          StatusEffectHelper.ApplyStatusEffect(
-            npc, t"BaseStatusEffect.WeaponMalfunctionLvl2", player.GetEntityID()
-          );
-          result.npcs += 1;
-        }
-        NetDeckTriggerNetWatchPursuit(npc);
-      }
-      // Connected NPCs expose their access point's actual descendants too.
-      let link: ref<PuppetDeviceLinkPS> =
-        PuppetDeviceLinkPS.AcquirePuppetDeviceLink(game, npc.GetEntityID());
-      if IsDefined(link) {
-        let aps: array<ref<AccessPointControllerPS>> = link.GetAccessPoints();
-        let j: Int32 = 0;
-        while j < ArraySize(aps) {
-          NetDeckEnqueueMaster(aps[j], queue, levels, depth + 1);
-          j += 1;
-        }
-      }
-      NetDeckSiphon(game, result, false);
-    } else if IsDefined(vehicle) && !vehicle.IsQuest() &&
-       !vehicle.IsPlayerVehicle() && !vehicle.IsInQuestOrScenePhysicsState() {
-      // A stationary car can relay the worm even though it can't brake.
-      if !vehicle.IsVehicleParked() {
-        vehicle.ForceBrakesFor(4.0);
-        result.vehicles += 1;
-      }
-    } else if IsDefined(device) {
-      let ps: ref<ScriptableDeviceComponentPS> =
-        device.GetDevicePS() as ScriptableDeviceComponentPS;
-      if IsDefined(ps) && !ps.IsMarkedAsQuest() {
-        if result.pulses < 8 {
-          NetDeckPulseNetwork(ps);
-          result.pulses += 1;
-        }
-        if fromDevice { result.netrunners += NetDeckBurnoutNearbyNetrunners(ps); }
-        if ps.IsON() && ps.NetDeckApplyToMember(ps) {
-          result.devices += 1;
-        }
-        // Jump to physical/virtual AP descendants even if this device
-        // itself has no supported action.
-        let aps: array<ref<AccessPointControllerPS>> = ps.GetAccessPoints();
-        let j: Int32 = 0;
-        while j < ArraySize(aps) {
-          NetDeckEnqueueMaster(aps[j], queue, levels, depth + 1);
-          j += 1;
-        }
-        NetDeckEnqueueMaster(ps.NetDeckNetworkMaster(), queue, levels, depth + 1);
-        if IsDefined(ps as ComputerControllerPS) ||
-           IsDefined(ps as TerminalControllerPS) {
-          NetDeckSiphon(game, result, true);
-        }
+@addMethod(PlayerPuppet)
+private func NetDeckWaveAddMaster(
+  master: ref<MasterControllerPS>, depth: Int32
+) -> Void {
+  if !IsDefined(master) || depth > 4 { return; }
+  let children: array<ref<DeviceComponentPS>>;
+  master.GetAllDescendants(children);
+  let i: Int32 = 0;
+  while i < ArraySize(children) && ArraySize(this.netDeckWavePending) < 64 {
+    let ps: ref<ScriptableDeviceComponentPS> =
+      children[i] as ScriptableDeviceComponentPS;
+    if IsDefined(ps) && !ps.IsMarkedAsQuest() {
+      let obj: ref<GameObject> = ps.GetOwnerEntityWeak() as GameObject;
+      if IsDefined(obj) && !this.NetDeckWaveHasSeen(obj.GetEntityID()) &&
+         !ArrayContains(this.netDeckWavePending, obj) {
+        ArrayPush(this.netDeckWavePending, obj);
+        ArrayPush(this.netDeckWavePendingDepths, depth);
       }
     }
+    i += 1;
+  }
+}
 
-    if depth < 4 && ArraySize(queue) < 64 {
-      let query: TargetSearchQuery;
-      query.testedSet = TargetingSet.Complete;
-      query.searchFilter =
-        TSF_Any(TSFMV.Obj_Puppet | TSFMV.Obj_Device | TSFMV.Obj_Other);
-      query.includeSecondaryTargets = true;
-      query.maxDistance = 18.0;
-      query.filterObjectByDistance = true;
-      let parts: array<TS_TargetPartInfo>;
-      GameInstance.GetTargetingSystem(game).GetTargetParts(obj, query, parts);
-      let k: Int32 = 0;
-      while k < ArraySize(parts) && ArraySize(queue) < 64 {
-        let part: wref<TargetingComponent> = TS_TargetPartInfo.GetComponent(parts[k]);
-        if IsDefined(part) {
-          let next: ref<GameObject> = part.GetEntity() as GameObject;
-          if IsDefined(next) && !ArrayContains(queue, next) {
-            ArrayPush(queue, next);
-            ArrayPush(levels, depth + 1);
-          }
-        }
-        k += 1;
+// Every affected entity is dispatched on a DIFFERENT timed tick.
+// This produces visible, sequential weapon glitches and network pulses.
+@addMethod(PlayerPuppet)
+private func NetDeckWaveInfect(obj: ref<GameObject>, depth: Int32) -> Void {
+  if !this.NetDeckWaveValid(obj) { return; }
+  ArrayPush(this.netDeckWaveSeen, obj.GetEntityID());
+  ArrayPush(this.netDeckWaveHosts, obj.GetWorldPosition());
+  ArrayPush(this.netDeckWaveDepths, depth);
+  ArrayPush(this.netDeckWaveLinks, 0);
+
+  let npc: ref<NPCPuppet> = obj as NPCPuppet;
+  let vehicle: ref<VehicleObject> = obj as VehicleObject;
+  let device: ref<Device> = obj as Device;
+
+  if IsDefined(npc) {
+    let hostile: Bool =
+      EnumInt(GameObject.GetAttitudeTowards(npc, this)) ==
+      EnumInt(EAIAttitude.AIA_Hostile);
+    if hostile || npc.IsCharacterPolice() || NetDeckIsNetWatch(npc) {
+      if !StatusEffectSystem.ObjectHasStatusEffect(
+          npc, t"BaseStatusEffect.WeaponMalfunctionLvl2") {
+        StatusEffectHelper.ApplyStatusEffect(
+          npc, t"BaseStatusEffect.WeaponMalfunctionLvl2", this.GetEntityID()
+        );
+        this.netDeckWaveResult.npcs += 1;
+      }
+      NetDeckTriggerNetWatchPursuit(npc);
+    }
+    let link: ref<PuppetDeviceLinkPS> = npc.GetDeviceLink();
+    if IsDefined(link) {
+      let aps: array<ref<AccessPointControllerPS>> = link.GetAccessPoints();
+      let j: Int32 = 0;
+      while j < ArraySize(aps) {
+        this.NetDeckWaveAddMaster(aps[j], depth + 1);
+        j += 1;
       }
     }
+    NetDeckSiphon(this.GetGame(), this.netDeckWaveResult, false);
+  } else if IsDefined(vehicle) {
+    if !vehicle.IsVehicleParked() {
+      vehicle.ForceBrakesFor(4.0);
+      this.netDeckWaveResult.vehicles += 1;
+    }
+  } else if IsDefined(device) {
+    let ps: ref<ScriptableDeviceComponentPS> =
+      device.GetDevicePS() as ScriptableDeviceComponentPS;
+    if IsDefined(ps) {
+      if this.netDeckWaveResult.pulses < 8 {
+        NetDeckPulseNetwork(ps);
+        this.netDeckWaveResult.pulses += 1;
+      }
+      if this.netDeckWaveFromDevice {
+        this.netDeckWaveResult.netrunners += NetDeckBurnoutNearbyNetrunners(ps);
+      }
+      if ps.IsON() && ps.NetDeckApplyToMember(ps) {
+        this.netDeckWaveResult.devices += 1;
+      }
+      let aps: array<ref<AccessPointControllerPS>> = ps.GetAccessPoints();
+      let j: Int32 = 0;
+      while j < ArraySize(aps) {
+        this.NetDeckWaveAddMaster(aps[j], depth + 1);
+        j += 1;
+      }
+      this.NetDeckWaveAddMaster(ps.NetDeckNetworkMaster(), depth + 1);
+      if IsDefined(ps as ComputerControllerPS) ||
+         IsDefined(ps as TerminalControllerPS) {
+        NetDeckSiphon(this.GetGame(), this.netDeckWaveResult, true);
+      }
     }
   }
-  return result;
+
+  // One progress message every 4 infected targets: visibly confirms each
+  // successive set of jumps without 40 notification popups.
+  if ArraySize(this.netDeckWaveSeen) % 4 == 0 {
+    let loc: ref<LocalizationSystem> =
+      LocalizationSystem.GetInstance(this.GetGame());
+    if IsDefined(loc) {
+      let notification: ref<HackingRewardNotificationEvent> =
+        new HackingRewardNotificationEvent();
+      notification.m_text = loc.GetText("NetDeckWaveProgress") +
+        " " + IntToString(ArraySize(this.netDeckWaveSeen));
+      GameInstance.GetUISystem(this.GetGame()).QueueEvent(notification);
+    }
+  }
+}
+
+@addMethod(PlayerPuppet)
+private func NetDeckWaveSchedule() -> Void {
+  let evt: ref<NetDeckWaveTickEvent> = new NetDeckWaveTickEvent();
+  evt.generation = this.netDeckWaveGeneration;
+  GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, 0.45);
+}
+
+@addMethod(PlayerPuppet)
+private func NetDeckWaveFinish() -> Void {
+  let r: ref<NetDeckSpreadResult> = this.netDeckWaveResult;
+  if !IsDefined(r) { return; }
+  let affected: Int32 = r.devices + r.npcs + r.vehicles + r.netrunners;
+  if affected > 0 { NetDeckGiveDataComponents(this.GetGame()); }
+  NetDeckNotify(
+    this.GetGame(), affected + r.robbedTargets, r.devices, r.eddies,
+    r.robbedTargets, ArraySize(this.netDeckWaveSeen)
+  );
+}
+
+@addMethod(PlayerPuppet)
+public func NetDeckWaveStart(root: ref<GameObject>, fromDevice: Bool) -> Void {
+  if !IsDefined(root) || !IsEquipped(this.GetGame()) { return; }
+
+  // Each upload supersedes any old ticks and starts a new wave.
+  this.netDeckWaveGeneration += 1;
+  this.netDeckWaveFromDevice = fromDevice;
+  this.netDeckWaveOrigin = root.GetWorldPosition();
+  this.netDeckWavePendingCursor = 0;
+  this.netDeckWaveResult = new NetDeckSpreadResult();
+  ArrayClear(this.netDeckWaveSeen);
+  ArrayClear(this.netDeckWaveHosts);
+  ArrayClear(this.netDeckWaveDepths);
+  ArrayClear(this.netDeckWaveLinks);
+  ArrayClear(this.netDeckWavePending);
+  ArrayClear(this.netDeckWavePendingDepths);
+  this.NetDeckWaveInfect(root, 0);
+  this.NetDeckWaveSchedule();
+}
+
+@addMethod(PlayerPuppet)
+protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool {
+  if evt.generation != this.netDeckWaveGeneration { return true; }
+  if !IsEquipped(this.GetGame()) {
+    return true;
+  }
+  if ArraySize(this.netDeckWaveSeen) >= 40 { this.NetDeckWaveFinish(); return true; }
+
+  // First process genuine connected network descendants, one at a time.
+  let selected: ref<GameObject>;
+  let depth: Int32 = 0;
+  while this.netDeckWavePendingCursor < ArraySize(this.netDeckWavePending) &&
+        !IsDefined(selected) {
+    let index: Int32 = this.netDeckWavePendingCursor;
+    this.netDeckWavePendingCursor += 1;
+    let candidate: ref<GameObject> = this.netDeckWavePending[index];
+    if this.NetDeckWaveValid(candidate) {
+      selected = candidate;
+      depth = this.netDeckWavePendingDepths[index];
+    }
+  }
+
+  if !IsDefined(selected) {
+    // Echo EMP's robust approach: query one full 3D area around V,
+    // then select the nearest candidate within hop distance of any
+    // already infected host. Querying arbitrary device-origin targets
+    // previously returned no candidates in the player's game.
+    let query: TargetSearchQuery;
+    query.testedSet = TargetingSet.Complete;
+    query.searchFilter =
+      TSF_Any(TSFMV.Obj_Puppet | TSFMV.Obj_Device | TSFMV.Obj_Vehicle);
+    query.includeSecondaryTargets = false;
+    query.ignoreInstigator = true;
+    query.maxDistance = 55.0;
+    query.filterObjectByDistance = true;
+    let parts: array<TS_TargetPartInfo>;
+    GameInstance.GetTargetingSystem(this.GetGame()).GetTargetParts(
+      this, query, parts
+    );
+
+    let nearest: Float = 25.0;
+    let selectedHost: Int32 = -1;
+    let i: Int32 = 0;
+    while i < ArraySize(parts) && i < 250 {
+      let component: wref<TargetingComponent> =
+        TS_TargetPartInfo.GetComponent(parts[i]);
+      if IsDefined(component) {
+        let candidate: ref<GameObject> =
+          component.GetEntity() as GameObject;
+        if this.NetDeckWaveValid(candidate) &&
+           Vector4.Distance(this.netDeckWaveOrigin, candidate.GetWorldPosition()) <= 55.0 {
+          let j: Int32 = 0;
+          while j < ArraySize(this.netDeckWaveHosts) {
+            if this.netDeckWaveLinks[j] < 4 &&
+               this.netDeckWaveDepths[j] < 4 {
+              let distance: Float =
+                Vector4.Distance(this.netDeckWaveHosts[j], candidate.GetWorldPosition());
+              if distance <= nearest {
+                nearest = distance;
+                selected = candidate;
+                selectedHost = j;
+              }
+            }
+            j += 1;
+          }
+        }
+      }
+      i += 1;
+    }
+    if IsDefined(selected) && selectedHost >= 0 {
+      this.netDeckWaveLinks[selectedHost] += 1;
+      depth = this.netDeckWaveDepths[selectedHost] + 1;
+    }
+  }
+
+  if IsDefined(selected) {
+    this.NetDeckWaveInfect(selected, depth);
+    this.NetDeckWaveSchedule();
+  } else {
+    this.NetDeckWaveFinish();
+  }
+  return true;
+}
+
+// Scope trace suppression strictly to NETWORM. A proven game-compatible
+// wrapper signature is also used by other REDscript quickhack mods.
+@wrapMethod(QuickHackableHelper)
+public final static func WillHackRevealPlayer(
+  playerRef: ref<PlayerPuppet>,
+  targetRecordId: TweakDBID,
+  action: ref<ScriptableDeviceAction>,
+  opt programItemID: ItemID
+) -> Bool {
+  if IsDefined(action) {
+    let record: wref<ObjectAction_Record> = action.GetObjectActionRecord();
+    if IsDefined(record) && Equals(record.ActionName(), n"NetDeckInfiltration") {
+      return false;
+    }
+  }
+  return wrappedMethod(playerRef, targetRecordId, action, programItemID);
 }
 
 // Use the game's existing network visual for a short propagation pulse.
@@ -353,7 +558,7 @@ public func NetDeckPulseNetwork(source: ref<ScriptableDeviceComponentPS>) -> Voi
 // Report upload outcome once, using Codeware's interface language.
 public func NetDeckNotify(
   game: GameInstance, affected: Int32, deviceCount: Int32,
-  stolen: Int32, robbedTargets: Int32
+  stolen: Int32, robbedTargets: Int32, totalTargets: Int32
 ) -> Void {
   let loc: ref<LocalizationSystem> = LocalizationSystem.GetInstance(game);
   if !IsDefined(loc) {
@@ -366,6 +571,8 @@ public func NetDeckNotify(
     notification.m_text =
       loc.GetText("NetDeckSpreadComplete") + " | " +
       loc.GetText("NetDeckDevicesAffected") + ": " + IntToString(deviceCount);
+    notification.m_text += " | " + loc.GetText("NetDeckTargetsAffected") +
+      ": " + IntToString(totalTargets);
     if stolen > 0 {
       notification.m_text += " | " + loc.GetText("NetDeckEddiesStolen") +
         " €$" + IntToString(stolen) + " / " + IntToString(robbedTargets) +
@@ -657,16 +864,9 @@ public func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Bo
 // quickhack action is accepted. Do not set scanner or breach blackboards.
 @addMethod(ScriptableDeviceComponentPS)
 protected cb func OnNetDeckInfiltration(evt: ref<NetDeckInfiltration>) -> EntityNotificationType {
-  NetDeckPulseNetwork(this);
   let source: ref<GameObject> = this.GetOwnerEntityWeak() as GameObject;
-  let result: ref<NetDeckSpreadResult> = NetDeckSpread(this.GetGameInstance(), source, true);
-  // Only device-origin chains can inflict Synapse Burnout on netrunners.
-  let affected: Int32 = result.devices + result.npcs + result.vehicles + result.netrunners;
-  if affected > 0 { NetDeckGiveDataComponents(this.GetGameInstance()); }
-  NetDeckNotify(
-    this.GetGameInstance(), affected + result.robbedTargets,
-    result.devices, result.eddies, result.robbedTargets
-  );
+  let player: ref<PlayerPuppet> = GetPlayer(this.GetGameInstance());
+  if IsDefined(player) { player.NetDeckWaveStart(source, true); }
   return EntityNotificationType.DoNotNotifyEntity;
 }
 
@@ -770,14 +970,8 @@ protected cb func OnNetDeckPuppetInfiltration(
   if IsEquipped(this.GetGameInstance()) {
     let puppet: ref<ScriptedPuppet> = this.GetOwnerEntityWeak() as ScriptedPuppet;
     if IsDefined(puppet) && !puppet.IsQuest() {
-      let result: ref<NetDeckSpreadResult> =
-        NetDeckSpread(this.GetGameInstance(), puppet, false);
-      let affected: Int32 = result.devices + result.npcs + result.vehicles;
-      if affected > 0 { NetDeckGiveDataComponents(this.GetGameInstance()); }
-      NetDeckNotify(
-        this.GetGameInstance(), affected + result.robbedTargets,
-        result.devices, result.eddies, result.robbedTargets
-      );
+      let player: ref<PlayerPuppet> = GetPlayer(this.GetGameInstance());
+      if IsDefined(player) { player.NetDeckWaveStart(puppet, false); }
     }
   }
   return EntityNotificationType.DoNotNotifyEntity;
