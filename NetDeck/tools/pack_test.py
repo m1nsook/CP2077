@@ -35,25 +35,26 @@ INSTALL:
 8. Confirm the original Ping is offered and works separately.
 9. Test connected security effects without any camera in the network.
 10. Check an unrelated network remains unaffected.
-11. Test one-upload multi-hop NETWORM spreading to multiple NPCs/vehicles/devices.
-    Try an ordinary road blockade and a linked door; don't modify quest doors.
-    Check that feedback device counts match dispatched device actions.
+11. Test ONE upload against a gang: multiple nearby hostiles should receive
+    staggered Weapon Glitch effects approximately every 0.45 seconds.
+    Check a moving car, a road barrier, and a non-quest door too.
+    Check that progress notifications and final target counts match.
     Check that only the logged network devices appear in the feedback device count.
-12. Verify NETWORM is untraceable on ordinary targets but triggers NetWatch five stars.
+12. Confirm ordinary NETWORM is not traced; NetWatch still triggers five stars.
 13. Check €$ siphon totals and number of sources in the feedback.
 14. Watch for native XP on netrunner burnout or hacking and check components.
 
 IMPORTANT LIMITATIONS:
-- v0.6.0 corrects REDscript signature errors but is NOT game-compiler verified.
+- v0.6.1 corrects REDscript signature errors but is NOT game-compiler verified.
 - Previous build's network shutdown, vendor and stats were user-confirmed.
 - Codeware interface-language packages cover 19 UI languages, with English fallback.
 - No NETWORM access-point scanner actions. NPC/vehicle/door/network effects are experimental.
 - No copyrighted or private icon/ArchiveXL/WolvenKit binary assets are distributed.
 - NETWORM no longer inherits PingDevice, so vanilla Ping must remain
   an independent, functioning quickhack when NetWatch Σ MK.1 is installed.
-- NETWORM can jump up to 4 hops of 18m (max 64 visited world objects) and
-  also follows actual connected device descendants. Proximity spread crosses
-  native network boundaries by design; this is an unverified experimental build.
+- Timed PlayerPuppet wave, 0.45s per target, 4 hops of up to 25m, max 40
+  affected loaded entities. Native network descendants also join the queue.
+- This is an unverified experimental build, not a confirmed gameplay fix.
 - Eurodollar siphon is a capped gameplay reward; it does not drain actual
   NPC inventories. Native XP suppression still needs implementation.
 - Robotic NPC shutdown, drones and mechs are NOT yet covered.
@@ -94,6 +95,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.0-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.1-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
