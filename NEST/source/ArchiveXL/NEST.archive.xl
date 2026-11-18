@@ -1,0 +1,5 @@
+# Source manifest: this needs a WolvenKit-packed .archive containing
+# mod\nest\localization\en-us.json before custom text can appear in-game.
+localization:
+  onscreens:
+    en-us: mod\nest\localization\en-us.json

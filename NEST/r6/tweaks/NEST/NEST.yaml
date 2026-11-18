@@ -1,0 +1,91 @@
+# NΣT iconic cyberdeck — standalone TweakXL prototype, v0.1.0
+# Independent of Camera Killer. The name/icon localization must be packaged
+# through WolvenKit/ArchiveXL before an end-user release.
+
+Items.NESTCyberdeck:
+  $base: Items.AdvancedNetwatchNetdriverMKLegendaryPlusPlus
+  friendlyName: NΣT
+  displayName: l"NESTDeckName"
+  localizedDescription: l"NESTDeckDescription"
+  quality: Quality.LegendaryPlusPlus
+  blueprint: Items.CyberdeckBlueprint4Slots
+  variants:
+    - Variants.Humanity5Cost
+  nextUpgradeItem: ''
+  OnLooted: []
+  OnEquip:
+    - Items.BaseDeck_inline0
+    - Items.BaseDeck_inline3
+    - NEST.RAM15Buffer4
+    - Items.HackDecreasedAwarenessGainAbility
+    - Items.DecreasedHacksCostOnDevicesAbility
+    - Items.IncreaseDamageDealtWhileControllingDeviceAbilityLegendaryPlusPlus
+  objectActions:
+    - !append-once DeviceAction.NESTInfiltration
+  tags:
+    - !remove Iconic_Netdriver_Cyberdeck
+    - !append-once NEST_Cyberdeck
+
+NEST.RAM15Buffer4:
+  $type: gamedataGameplayLogicPackage_Record
+  stats:
+    - $type: gamedataConstantStatModifier_Record
+      statType: BaseStats.Memory
+      modifierType: Additive
+      value: 15
+    - $type: gamedataConstantStatModifier_Record
+      statType: BaseStats.BufferSize
+      modifierType: Additive
+      value: 4
+
+# Native scanner entry, not a standalone inventory quickhack.
+DeviceAction.NESTInfiltration:
+  $base: DeviceAction.ToggleStateClassHack
+  actionName: NESTInfiltration
+  objectActionUI: Interactions.NESTInfiltration
+  objectActionType: ObjectActionType.DeviceQuickHack
+  startEffects: []
+  completionEffects: []
+  targetPrereqs: []
+  targetActivePrereqs: []
+
+Interactions.NESTInfiltration:
+  $base: Interactions.TakeControlCameraHack
+  caption: l"NESTInfiltrationName"
+  description: l"NESTInfiltrationDescription"
+
+# One guaranteed stock record, appended to all known Night City / Dogtown
+# ripperdoc lists. This does not replace any existing stock.
+NEST.RipperdocStock:
+  $type: gamedataVendorItem_Record
+  item: Items.NESTCyberdeck
+  quantity:
+    - Vendors.Always_Present
+
+Vendors.AdvancedCollectiveRipperDoc.itemStock: &NESTVendor
+  - !append-once NEST.RipperdocStock
+Vendors.AdvancedCollectiveRipperDocDogtown.itemStock: *NESTVendor
+Vendors.AdvancedCollectiveRipperDocGeneral.itemStock: *NESTVendor
+Vendors.AdvancedCollectiveRipperDocVictor.itemStock: *NESTVendor
+Vendors.AdvancedOSAndSkeletalRipperDoc.itemStock: *NESTVendor
+Vendors.AdvancedSkeletalRipperDoc.itemStock: *NESTVendor
+Vendors.bls_ina_se1_ripperdoc_01.itemStock: *NESTVendor
+Vendors.bls_ina_se1_ripperdoc_02.itemStock: *NESTVendor
+Vendors.cz_monument_ripperdoc_anderson.itemStock: *NESTVendor
+Vendors.cz_monument_ripperdoc_farida.itemStock: *NESTVendor
+Vendors.cz_stadium_ripperdoc_01.itemStock: *NESTVendor
+Vendors.EarlyGameRipperdoc.itemStock: *NESTVendor
+Vendors.EndGameRipperdoc.itemStock: *NESTVendor
+Vendors.hey_spr_ripperdoc_01.itemStock: *NESTVendor
+Vendors.MidGameRipperdoc.itemStock: *NESTVendor
+Vendors.pac_wwd_ripperdoc_01.itemStock: *NESTVendor
+Vendors.Ripperdoc_HUB.itemStock: *NESTVendor
+Vendors.std_arr_ripperdoc_01.itemStock: *NESTVendor
+Vendors.std_rcr_ripperdoc_01.itemStock: *NESTVendor
+Vendors.wat_kab_ripperdoc_01.itemStock: *NESTVendor
+Vendors.wat_kab_ripperdoc_02.itemStock: *NESTVendor
+Vendors.wat_kab_ripperdoc_03.itemStock: *NESTVendor
+Vendors.wat_lch_ripperdoc_01.itemStock: *NESTVendor
+Vendors.wat_nid_ripperdoc_01.itemStock: *NESTVendor
+Vendors.wbr_jpn_ripperdoc_01.itemStock: *NESTVendor
+Vendors.wbr_jpn_ripperdoc_02.itemStock: *NESTVendor
