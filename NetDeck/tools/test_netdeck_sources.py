@@ -112,13 +112,34 @@ class InfiltrationSourceTests(unittest.TestCase):
 
     def test_scoped_trace_hook(self):
         self.assertIn("NetDeck.ZeroAwareness:", Y)
-        self.assertEqual(Y.count("awarenessCost: NetDeck.ZeroAwareness"), 2)
+        self.assertEqual(Y.count("awarenessCost: NetDeck.ZeroAwareness"), 3)
         self.assertIn("@wrapMethod(QuickHackableHelper)", R)
         self.assertIn("public final static func WillHackRevealPlayer(", R)
         self.assertIn('Equals(record.ActionName(), n"NetDeckInfiltration")', R)
         self.assertIn("return wrappedMethod(playerRef, targetRecordId, action, programItemID);", R)
         self.assertIn("wanted.m_wantedLevel = EPreventionHeatStage.Heat_5", R)
         self.assertIn("NetDeckTriggerNetWatchPursuit(npc)", R)
+
+    def test_native_vehicle_actions_and_world_registry(self):
+        self.assertIn("DeviceAction.NetDeckVehicleInfiltration:", Y)
+        self.assertIn("$base: DeviceAction.VehicleForceBrakesClassHack", Y)
+        self.assertIn("objectActionType: ObjectActionType.VehicleQuickHack", Y)
+        self.assertIn("NetDeckVehicleActionInfiltration()", R)
+        self.assertIn("VehicleComponentPS", R)
+        self.assertIn("gamedataNewPerkType.Intelligence_Right_Milestone_1", R)
+        self.assertIn("vehicle.IsHackable()", R)
+        self.assertIn("PlayerQuickhackData(ItemID.None(), vehicleRecord, 5)", R)
+        self.assertIn("netDeckLoadedVehicles: array<wref<VehicleObject>>", R)
+        self.assertIn("public func NetDeckRegisterVehicle(", R)
+        self.assertIn("public func NetDeckUnregisterVehicle(", R)
+        self.assertIn("@wrapMethod(VehicleObject)", R)
+        self.assertIn("protected cb func OnGameAttached() -> Bool", R)
+        self.assertIn("protected cb func OnDetach() -> Bool", R)
+        self.assertIn("VehicleNetrunnerQuickhackType.ForceBrakes", R)
+        self.assertIn("vehicle.ActivateNetrunnerQuickhack(", R)
+        self.assertIn("this.netDeckLoadedVehicles[k]", R)
+        self.assertIn("Vector4.Distance(this.netDeckWaveHosts[host], car.GetWorldPosition())", R)
+        self.assertNotIn("TSFMV.Obj_Vehicle", R)
 
     def test_reward_and_feedback(self):
         self.assertIn("HackingRewardNotificationEvent", R)
