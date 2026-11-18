@@ -19,10 +19,12 @@ class InfiltrationSourceTests(unittest.TestCase):
         # The exported 2.5 HUD has separate neutral triangle/ghost layers;
         # do not ship a base .inkwidget replacement or modify all quest bars.
         self.assertIn("@wrapMethod(HUDProgressBarController)", SKIN)
-        self.assertIn("public func UpdateTimerHeader(const label: ref<String>)", SKIN)
-        self.assertIn("wrappedMethod(label);", SKIN)
+        self.assertIn("public final func UpdateProgressBarActive(active: Bool)", SKIN)
+        self.assertIn("wrappedMethod(active);", SKIN)
+        self.assertNotIn("UpdateTimerHeader(", SKIN)
+        self.assertIn("this.NetDeckHudSkinApply(false);", SKIN)
         self.assertIn('StrBeginsWith(header, "NETWORM")', SKIN)
-        self.assertIn("this.NetDeckHudSkinApply(isNetworm);", SKIN)
+        self.assertIn('this.NetDeckHudSkinApply(StrBeginsWith(header, "NETWORM"));', SKIN)
         self.assertIn(r'r"m1nsook\\netdeck\\ui\\networm_icons.inkatlas"', SKIN)
         self.assertIn('n"networmhack"', SKIN)
         self.assertIn(r'r"base\\gameplay\\gui\\quests\\assets\\personal_link.inkatlas"', SKIN)
