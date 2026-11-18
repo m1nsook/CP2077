@@ -86,6 +86,22 @@ public func NetDeckActionInfiltration() -> ref<NetDeckInfiltration> {
   return action;
 }
 
+// VehicleComponentPS uses its own GetQuickHackActions path and
+// finalizes through ScriptableDeviceComponentPS. Reuse that native vehicle
+// scanner pathway, but supply a VehicleQuickHack action type.
+@addMethod(ScriptableDeviceComponentPS)
+public func NetDeckVehicleActionInfiltration() -> ref<NetDeckInfiltration> {
+  let action: ref<NetDeckInfiltration> = new NetDeckInfiltration();
+  action.clearanceLevel = DefaultActionsParametersHolder.GetInteractiveClearance();
+  action.SetUp(this);
+  action.SetProperties();
+  action.AddDeviceName(this.m_deviceName);
+  action.SetObjectActionID(t"DeviceAction.NetDeckVehicleInfiltration");
+  action.CreateInteraction();
+  action.SetExecutor(GetPlayer(this.GetGameInstance()));
+  return action;
+}
+
 // Use the known ScriptableDeviceComponentPS finalizer signature.
 // GetQuickHackActions on this base class cannot be wrapped with the old signature.
 // Insert before vanilla finalization so it processes the injected action.
@@ -98,8 +114,20 @@ protected final func FinalizeGetQuickHackActions(
   // A camera, surveillance master or access point is NOT required.
   if IsEquipped(this.GetGameInstance()) &&
     !this.IsMarkedAsQuest() &&
-    !IsDefined(this as AccessPointControllerPS) &&
-    this.IsPotentiallyQuickHackable() {
+    !IsDefined(this as AccessPointControllerPS) {
+    let vehicle: ref<VehicleObject> = this.GetOwnerEntityWeak() as VehicleObject;
+    let eligible: Bool = this.IsPotentiallyQuickHackable();
+    if IsDefined(vehicle) {
+      // Native vehicle quickhacks require the Carhacker perk. Do not
+      // modify the perk requirement on other cyberdecks.
+      let player: ref<PlayerPuppet> = GetPlayer(this.GetGameInstance());
+      eligible = IsDefined(player) &&
+        PlayerDevelopmentSystem.GetData(player).IsNewPerkBoughtAnyLevel(
+          gamedataNewPerkType.Intelligence_Right_Milestone_1
+        ) && vehicle.IsHackable() && !vehicle.IsQuest() &&
+        !vehicle.IsPlayerVehicle() && !vehicle.IsInQuestOrScenePhysicsState();
+    }
+    if eligible {
     let exists: Bool = false;
     let i: Int32 = 0;
     while i < ArraySize(Deref(outActions)) {
@@ -114,7 +142,12 @@ protected final func FinalizeGetQuickHackActions(
       i += 1;
     }
     if !exists {
-      ArrayPush(Deref(outActions), this.NetDeckActionInfiltration());
+      if IsDefined(vehicle) {
+        ArrayPush(Deref(outActions), this.NetDeckVehicleActionInfiltration());
+      } else {
+        ArrayPush(Deref(outActions), this.NetDeckActionInfiltration());
+      }
+    }
     }
   }
   wrappedMethod(outActions, context);
@@ -140,9 +173,12 @@ public final static func GetPlayerQuickHackListWithQuality(
     TweakDBInterface.GetObjectActionRecord(t"DeviceAction.NetDeckInfiltration");
   let puppetRecord: wref<ObjectAction_Record> =
     TweakDBInterface.GetObjectActionRecord(t"QuickHack.NetDeckPuppetInfiltration");
+  let vehicleRecord: wref<ObjectAction_Record> =
+    TweakDBInterface.GetObjectActionRecord(t"DeviceAction.NetDeckVehicleInfiltration");
   let i: Int32 = 0;
   let hasDevice: Bool = false;
   let hasPuppet: Bool = false;
+  let hasVehicle: Bool = false;
   while i < ArraySize(hacks) {
     if IsDefined(hacks[i].actionRecord) {
       let actionID: TweakDBID = hacks[i].actionRecord.GetID();
@@ -152,6 +188,9 @@ public final static func GetPlayerQuickHackListWithQuality(
       if Equals(actionID, t"QuickHack.NetDeckPuppetInfiltration") {
         hasPuppet = true;
       }
+      if Equals(actionID, t"DeviceAction.NetDeckVehicleInfiltration") {
+        hasVehicle = true;
+      }
     }
     i += 1;
   }
@@ -160,6 +199,9 @@ public final static func GetPlayerQuickHackListWithQuality(
   }
   if IsDefined(puppetRecord) && !hasPuppet {
     ArrayPush(hacks, PlayerQuickhackData(ItemID.None(), puppetRecord, 5));
+  }
+  if IsDefined(vehicleRecord) && !hasVehicle {
+    ArrayPush(hacks, PlayerQuickhackData(ItemID.None(), vehicleRecord, 5));
   }
   return hacks;
 }
@@ -224,6 +266,64 @@ public func NetDeckSiphon(
 // full-3D search pattern; searching from arbitrary hacked NPCs did not work.
 public class NetDeckWaveTickEvent extends Event {
   public let generation: Int32;
+}
+
+// TSFMV does not expose Obj_Vehicle. Track loaded VehicleObjects through
+// their native attach/detach events, and inspect them separately from the
+// generic targeting query. Weak refs avoid keeping streamed-out cars alive.
+@addField(PlayerPuppet)
+private let netDeckLoadedVehicles: array<wref<VehicleObject>>;
+
+@addMethod(PlayerPuppet)
+public func NetDeckRegisterVehicle(vehicle: wref<VehicleObject>) -> Void {
+  if !IsDefined(vehicle) { return; }
+  let i: Int32 = 0;
+  while i < ArraySize(this.netDeckLoadedVehicles) {
+    if !IsDefined(this.netDeckLoadedVehicles[i]) {
+      ArrayErase(this.netDeckLoadedVehicles, i);
+    } else {
+      if this.netDeckLoadedVehicles[i].GetEntityID() == vehicle.GetEntityID() {
+        return;
+      }
+      i += 1;
+    }
+  }
+  if ArraySize(this.netDeckLoadedVehicles) >= 256 {
+    ArrayErase(this.netDeckLoadedVehicles, 0);
+  }
+  ArrayPush(this.netDeckLoadedVehicles, vehicle);
+}
+
+@addMethod(PlayerPuppet)
+public func NetDeckUnregisterVehicle(id: EntityID) -> Void {
+  let i: Int32 = 0;
+  while i < ArraySize(this.netDeckLoadedVehicles) {
+    if !IsDefined(this.netDeckLoadedVehicles[i]) ||
+       Equals(this.netDeckLoadedVehicles[i].GetEntityID(), id) {
+      ArrayErase(this.netDeckLoadedVehicles, i);
+    } else {
+      i += 1;
+    }
+  }
+}
+
+@wrapMethod(VehicleObject)
+protected cb func OnGameAttached() -> Bool {
+  let result: Bool = wrappedMethod();
+  let player: ref<PlayerPuppet> = GetPlayer(this.GetGame());
+  if IsDefined(player) {
+    player.NetDeckRegisterVehicle(this);
+  }
+  return result;
+}
+
+@wrapMethod(VehicleObject)
+protected cb func OnDetach() -> Bool {
+  let player: ref<PlayerPuppet> = GetPlayer(this.GetGame());
+  if IsDefined(player) {
+    player.NetDeckUnregisterVehicle(this.GetEntityID());
+  }
+  return wrappedMethod();
 }
 
 @addField(PlayerPuppet)
@@ -352,7 +452,9 @@ private func NetDeckWaveInfect(obj: ref<GameObject>, depth: Int32) -> Void {
     NetDeckSiphon(this.GetGame(), this.netDeckWaveResult, false);
   } else if IsDefined(vehicle) {
     if !vehicle.IsVehicleParked() {
-      vehicle.ForceBrakesFor(4.0);
+      // Same native command as the game's VehicleComponentPS
+      // OnVehicleOverrideForceBrakes callback. No TSFMV vehicle mask.
+      vehicle.ActivateNetrunnerQuickhack(VehicleNetrunnerQuickhackType.ForceBrakes);
       this.netDeckWaveResult.vehicles += 1;
     }
   } else if IsDefined(device) {
@@ -423,6 +525,8 @@ public func NetDeckWaveStart(root: ref<GameObject>, fromDevice: Bool) -> Void {
 
   // Each upload supersedes any old ticks and starts a new wave.
   this.netDeckWaveGeneration += 1;
+  let initialVehicle: wref<VehicleObject> = root as VehicleObject;
+  if IsDefined(initialVehicle) { this.NetDeckRegisterVehicle(initialVehicle); }
   this.netDeckWaveFromDevice = fromDevice;
   this.netDeckWaveOrigin = root.GetWorldPosition();
   this.netDeckWavePendingCursor = 0;
@@ -505,6 +609,30 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
         }
       }
       i += 1;
+    }
+    // Cars are not reliably returned by TSFMV's generic object mask.
+    // Match loaded VehicleObjects explicitly using their world positions.
+    let k: Int32 = 0;
+    while k < ArraySize(this.netDeckLoadedVehicles) {
+      let car: ref<VehicleObject> = this.netDeckLoadedVehicles[k];
+      if IsDefined(car) && this.NetDeckWaveValid(car) &&
+         Vector4.Distance(this.netDeckWaveOrigin, car.GetWorldPosition()) <= 55.0 {
+        let host: Int32 = 0;
+        while host < ArraySize(this.netDeckWaveHosts) {
+          if this.netDeckWaveLinks[host] < 4 &&
+             this.netDeckWaveDepths[host] < 4 {
+            let distance: Float =
+              Vector4.Distance(this.netDeckWaveHosts[host], car.GetWorldPosition());
+            if distance <= nearest {
+              nearest = distance;
+              selected = car;
+              selectedHost = host;
+            }
+          }
+          host += 1;
+        }
+      }
+      k += 1;
     }
     if IsDefined(selected) && selectedHost >= 0 {
       this.netDeckWaveLinks[selectedHost] += 1;
