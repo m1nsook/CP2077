@@ -14,7 +14,7 @@ VENDORS = 26
 
 class InfiltrationSourceTests(unittest.TestCase):
     def test_crash_diagnostic_is_observer_only(self):
-        self.assertIn('PREFIX = "[NetDeck/DIAG v0.6.5]"', D)
+        self.assertIn('PREFIX = "[NetDeck/DIAG v0.6.6]"', D)
         self.assertIn('registerForEvent("onInit"', D)
         self.assertIn('registerForEvent("onUpdate"', D)
         self.assertIn('registerForEvent("onShutdown"', D)
