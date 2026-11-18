@@ -14,6 +14,7 @@ public class NetDeckEnglish extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Upload to any Ping-capable target. Disable connected cameras, turrets and mines, or distract compatible electronics. Unlinked targets affect only their own supported functions.");
     this.Text("NetDeckSpreadComplete", "NETWORM: NETWORK INFILTRATED");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NO COMPATIBLE DEVICES");
+    this.Text("NetDeckDevicesAffected", "DEVICES");
   }
 }
 
@@ -25,6 +26,7 @@ public class NetDeckArabic extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "ارفع الاختراق إلى أي هدف يدعم Ping. عطّل الكاميرات والأبراج والألغام المتصلة أو شتّت الأجهزة الإلكترونية المتوافقة. الأهداف غير المتصلة تؤثر في وظائفها المدعومة فقط.");
     this.Text("NetDeckSpreadComplete", "NETWORM: تم اختراق الشبكة");
     this.Text("NetDeckSpreadEmpty", "NETWORM: لا توجد أجهزة متوافقة");
+    this.Text("NetDeckDevicesAffected", "الأجهزة");
   }
 }
 
@@ -36,6 +38,7 @@ public class NetDeckChineseSimplified extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "可上传至任何支持 Ping 的目标。关闭联网的摄像头、炮塔和地雷，或干扰兼容的电子设备。未联网的目标只会受到其自身支持的效果。");
     this.Text("NetDeckSpreadComplete", "NETWORM：网络入侵成功");
     this.Text("NetDeckSpreadEmpty", "NETWORM：没有兼容设备");
+    this.Text("NetDeckDevicesAffected", "设备");
   }
 }
 
@@ -47,6 +50,7 @@ public class NetDeckChineseTraditional extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "可上傳至任何支援 Ping 的目標。關閉相連的攝影機、砲塔和地雷，或干擾相容的電子裝置。未連線的目標僅會觸發自身支援的效果。");
     this.Text("NetDeckSpreadComplete", "NETWORM：網路入侵成功");
     this.Text("NetDeckSpreadEmpty", "NETWORM：沒有相容裝置");
+    this.Text("NetDeckDevicesAffected", "裝置");
   }
 }
 
@@ -58,6 +62,7 @@ public class NetDeckCzech extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Nahraj do libovolného cíle podporujícího Ping. Vyřaď propojené kamery, věže a miny nebo rozptyl kompatibilní elektroniku. Nepropojené cíle ovlivní jen své podporované funkce.");
     this.Text("NetDeckSpreadComplete", "NETWORM: SÍŤ INFILTROVÁNA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: ŽÁDNÁ KOMPATIBILNÍ ZAŘÍZENÍ");
+    this.Text("NetDeckDevicesAffected", "ZAŘÍZENÍ");
   }
 }
 
@@ -69,6 +74,7 @@ public class NetDeckFrench extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Téléchargez-le sur toute cible compatible avec Ping. Neutralisez caméras, tourelles et mines connectées, ou distrayez les appareils compatibles. Les cibles isolées ne subissent que leurs effets pris en charge.");
     this.Text("NetDeckSpreadComplete", "NETWORM : RÉSEAU INFILTRÉ");
     this.Text("NetDeckSpreadEmpty", "NETWORM : AUCUN APPAREIL COMPATIBLE");
+    this.Text("NetDeckDevicesAffected", "APPAREILS");
   }
 }
 
@@ -80,6 +86,7 @@ public class NetDeckGerman extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Auf jedes Ping-fähige Ziel hochladen. Verbundene Kameras, Geschütze und Minen abschalten oder kompatible Elektronik ablenken. Isolierte Ziele sind nur von ihren unterstützten Funktionen betroffen.");
     this.Text("NetDeckSpreadComplete", "NETWORM: NETZWERK INFILTRIERT");
     this.Text("NetDeckSpreadEmpty", "NETWORM: KEINE KOMPATIBLEN GERÄTE");
+    this.Text("NetDeckDevicesAffected", "GERÄTE");
   }
 }
 
@@ -91,6 +98,7 @@ public class NetDeckHungarian extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Feltölthető bármely Ping-kompatibilis célpontra. Kikapcsolja a csatlakoztatott kamerákat, tornyokat és aknákat, vagy megzavarja a kompatibilis elektronikát. Az elszigetelt célpontokra csak a támogatott hatások érvényesek.");
     this.Text("NetDeckSpreadComplete", "NETWORM: HÁLÓZAT FELTÖRVE");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NINCS KOMPATIBILIS ESZKÖZ");
+    this.Text("NetDeckDevicesAffected", "ESZKÖZÖK");
   }
 }
 
@@ -102,6 +110,7 @@ public class NetDeckItalian extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Caricalo su qualsiasi bersaglio compatibile con Ping. Disattiva telecamere, torrette e mine collegate o distrae i dispositivi compatibili. I bersagli isolati subiscono solo gli effetti supportati.");
     this.Text("NetDeckSpreadComplete", "NETWORM: RETE INFILTRATA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NESSUN DISPOSITIVO COMPATIBILE");
+    this.Text("NetDeckDevicesAffected", "DISPOSITIVI");
   }
 }
 
@@ -113,6 +122,7 @@ public class NetDeckJapanese extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Ping可能な対象にアップロード。接続されたカメラ、タレット、地雷を停止し、対応する電子機器をかく乱する。孤立した対象には、その機器が対応する効果のみが適用される。");
     this.Text("NetDeckSpreadComplete", "NETWORM：ネットワークへの侵入成功");
     this.Text("NetDeckSpreadEmpty", "NETWORM：対応する機器なし");
+    this.Text("NetDeckDevicesAffected", "デバイス");
   }
 }
 
@@ -124,6 +134,7 @@ public class NetDeckKorean extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Ping이 가능한 대상에 업로드합니다. 연결된 카메라, 포탑, 지뢰를 비활성화하거나 호환되는 전자 장치를 교란합니다. 연결되지 않은 대상에는 해당 장치가 지원하는 효과만 적용됩니다.");
     this.Text("NetDeckSpreadComplete", "NETWORM: 네트워크 침투 성공");
     this.Text("NetDeckSpreadEmpty", "NETWORM: 호환 장치 없음");
+    this.Text("NetDeckDevicesAffected", "장치");
   }
 }
 
@@ -135,6 +146,7 @@ public class NetDeckPolish extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Wgraj na dowolny cel obsługujący Ping. Wyłącz połączone kamery, wieżyczki i miny albo odwróć uwagę zgodnych urządzeń. Odizolowane cele podlegają tylko obsługiwanym przez nie efektom.");
     this.Text("NetDeckSpreadComplete", "NETWORM: SIEĆ ZINFILTROWANA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: BRAK ZGODNYCH URZĄDZEŃ");
+    this.Text("NetDeckDevicesAffected", "URZĄDZENIA");
   }
 }
 
@@ -146,6 +158,7 @@ public class NetDeckPortugueseBrazil extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Envie para qualquer alvo compatível com Ping. Desative câmeras, torretas e minas conectadas ou distraia dispositivos compatíveis. Alvos isolados recebem apenas os efeitos que suportam.");
     this.Text("NetDeckSpreadComplete", "NETWORM: REDE INFILTRADA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NENHUM DISPOSITIVO COMPATÍVEL");
+    this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
   }
 }
 
@@ -157,6 +170,7 @@ public class NetDeckRussian extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Загрузите на любую цель, поддерживающую Ping. Отключайте связанные камеры, турели и мины или отвлекайте совместимую электронику. На изолированные цели действуют только поддерживаемые ими эффекты.");
     this.Text("NetDeckSpreadComplete", "NETWORM: СЕТЬ ВЗЛОМАНА");
     this.Text("NetDeckSpreadEmpty", "NETWORM: НЕТ СОВМЕСТИМЫХ УСТРОЙСТВ");
+    this.Text("NetDeckDevicesAffected", "УСТРОЙСТВА");
   }
 }
 
@@ -168,6 +182,7 @@ public class NetDeckSpanishSpain extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Cárgalo en cualquier objetivo compatible con Ping. Desactiva cámaras, torretas y minas conectadas o distrae dispositivos compatibles. Los objetivos aislados solo reciben los efectos que admiten.");
     this.Text("NetDeckSpreadComplete", "NETWORM: RED INFILTRADA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NO HAY DISPOSITIVOS COMPATIBLES");
+    this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
   }
 }
 
@@ -179,6 +194,7 @@ public class NetDeckSpanishLatinAmerica extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Súbelo a cualquier objetivo compatible con Ping. Desactiva cámaras, torretas y minas conectadas o distrae dispositivos compatibles. Los objetivos aislados solo reciben los efectos que admiten.");
     this.Text("NetDeckSpreadComplete", "NETWORM: RED INFILTRADA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NO HAY DISPOSITIVOS COMPATIBLES");
+    this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
   }
 }
 
@@ -190,6 +206,7 @@ public class NetDeckThai extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "อัปโหลดไปยังเป้าหมายที่ใช้ Ping ได้ ปิดกล้อง ป้อมปืน และทุ่นระเบิดที่เชื่อมต่อกัน หรือรบกวนอุปกรณ์อิเล็กทรอนิกส์ที่รองรับ เป้าหมายที่ไม่เชื่อมต่อจะได้รับผลเฉพาะที่อุปกรณ์รองรับ");
     this.Text("NetDeckSpreadComplete", "NETWORM: แทรกซึมเครือข่ายสำเร็จ");
     this.Text("NetDeckSpreadEmpty", "NETWORM: ไม่พบอุปกรณ์ที่รองรับ");
+    this.Text("NetDeckDevicesAffected", "อุปกรณ์");
   }
 }
 
@@ -201,6 +218,7 @@ public class NetDeckTurkish extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Ping destekleyen herhangi bir hedefe yükle. Bağlı kameraları, taretleri ve mayınları devre dışı bırak veya uyumlu elektronik cihazları şaşırt. Bağlantısız hedeflerde yalnızca desteklenen etkiler uygulanır.");
     this.Text("NetDeckSpreadComplete", "NETWORM: AĞA SIZILDI");
     this.Text("NetDeckSpreadEmpty", "NETWORM: UYUMLU CİHAZ BULUNAMADI");
+    this.Text("NetDeckDevicesAffected", "CİHAZLAR");
   }
 }
 
@@ -212,6 +230,7 @@ public class NetDeckUkrainian extends ModLocalizationPackage {
     this.Text("NetDeckInfiltrationDescription", "Завантажуйте на будь-яку ціль, що підтримує Ping. Вимикайте підключені камери, турелі та міни або відволікайте сумісну електроніку. На ізольовані цілі діють лише підтримувані ними ефекти.");
     this.Text("NetDeckSpreadComplete", "NETWORM: МЕРЕЖУ ЗЛАМАНО");
     this.Text("NetDeckSpreadEmpty", "NETWORM: НЕМАЄ СУМІСНИХ ПРИСТРОЇВ");
+    this.Text("NetDeckDevicesAffected", "ПРИСТРОЇ");
   }
 }
 
