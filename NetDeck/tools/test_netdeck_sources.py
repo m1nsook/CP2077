@@ -141,6 +141,24 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("Vector4.Distance(this.netDeckWaveHosts[host], car.GetWorldPosition())", R)
         self.assertNotIn("TSFMV.Obj_Vehicle", R)
 
+    def test_loaded_npc_fallback_and_civilian_safety(self):
+        # This only inspects the source. The actual hooks and chain must still
+        # compile and be confirmed by a Cyberpunk 2077 in-game test.
+        self.assertIn("netDeckLoadedPuppets: array<wref<NPCPuppet>>", R)
+        self.assertIn("public func NetDeckRegisterPuppet(", R)
+        self.assertIn("public func NetDeckUnregisterPuppet(", R)
+        self.assertIn("@wrapMethod(NPCPuppet)", R)
+        self.assertIn("let initialPuppet: wref<NPCPuppet> = root as NPCPuppet;", R)
+        self.assertIn("this.netDeckLoadedPuppets[p]", R)
+        self.assertIn("this.NetDeckWaveValid(loadedNpc)", R)
+        self.assertIn("Vector4.Distance(this.netDeckWaveHosts[hostNpc], loadedNpc.GetWorldPosition())", R)
+        self.assertIn("this.netDeckWaveLinks[hostNpc] < 4", R)
+        self.assertIn("this.netDeckWaveDepths[hostNpc] < 4", R)
+        self.assertIn("return EnumInt(GameObject.GetAttitudeTowards(npc, this)) ==", R)
+        self.assertIn("npc.IsCharacterPolice() || NetDeckIsNetWatch(npc)", R)
+        self.assertEqual(R.count("protected cb func OnGameAttached() -> Bool"), 2)
+        self.assertEqual(R.count("protected cb func OnDetach() -> Bool"), 2)
+
     def test_reward_and_feedback(self):
         self.assertIn("HackingRewardNotificationEvent", R)
         self.assertIn('loc.GetText("NetDeckDevicesAffected")', R)
