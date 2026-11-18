@@ -83,6 +83,14 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("NetDeckPulseNetwork(", R)
         self.assertIn("NetDeckNotify(", R)
         self.assertIn("HackingRewardNotificationEvent", R)
+        self.assertIn("public func NetDeckNotify(game: GameInstance, affected: Int32, deviceCount: Int32)", R)
+        self.assertIn('loc.GetText("NetDeckDevicesAffected")', R)
+        self.assertIn("IntToString(deviceCount)", R)
+        self.assertIn("let deviceCount: Int32 = this.NetDeckInfiltrateNetwork();", R)
+        self.assertIn("let deviceCount: Int32 = link.NetDeckInfiltrateLinkedDevices();", R)
+        self.assertIn("NetDeckNotify(this.GetGameInstance(), affected, 0);", R)
+        self.assertIn("deviceCount + NetDeckBurnoutNearbyNetrunners(this)", R)
+        self.assertIn("deviceCount + NetDeckDisruptNpcVicinity(puppet)", R)
 
     def test_networm_takeover_rules(self):
         self.assertIn("NetDeckBurnoutNearbyNetrunners(", R)
@@ -116,6 +124,7 @@ class InfiltrationSourceTests(unittest.TestCase):
         })
         self.assertEqual(L.count('this.Text("NetDeckSpreadComplete"'), 19)
         self.assertEqual(L.count('this.Text("NetDeckSpreadEmpty"'), 19)
+        self.assertEqual(L.count('this.Text("NetDeckDevicesAffected"'), 19)
 
     def test_no_uncooked_placeholders(self):
         self.assertFalse((ROOT / "source").exists())
