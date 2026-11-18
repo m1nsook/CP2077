@@ -14,6 +14,7 @@ ROOT_FILES = (
     "r6/scripts/NetDeck/Localization.reds",
     "r6/tweaks/NetDeck/NetDeck.yaml",
     "bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua",
+    "bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings/init.lua",
 )
 TESTING = """Infiltration — NetWatch Σ MK.1 / NETWORM SOURCE-ONLY TEST — NOT A RELEASE
 
@@ -25,9 +26,11 @@ INSTALL:
 3. Make sure r6/scripts/NetDeck/NetDeck.reds,
    r6/scripts/NetDeck/NetDeckHudSkin.reds,
    r6/scripts/NetDeck/Localization.reds and r6/tweaks/NetDeck/NetDeck.yaml exist.
-4. This diagnostic artifact contains only REDscript, TweakXL and a small
-   CET diagnostic Lua script (no binary assets). The optional diagnostic
-   script is bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua.
+4. This diagnostic artifact contains REDscript, TweakXL and CET Lua (no binary
+   assets). Diagnostics: bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua
+   SETTINGS: bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings/init.lua
+   Open the CET overlay and adjust the NETWORM - Test Settings sliders.
+   Values are saved next to the Lua script in settings.json on disk.
    Advanced Crash Reporter reads its [NetDeck/DIAG] output from CET scripting.log.
    Original icon PNGs, WolvenKit raw project, .inkatlas, .xbm and compiled
    .archive are PRIVATE and NOT included. A separate locally packed archive
@@ -59,7 +62,7 @@ INSTALL:
 15. Normal Netrunner XP is allowed. Check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.6.7 removes global NPCPuppet AND VehicleObject attach/detach wrappers
+- v0.6.8 removes global NPCPuppet AND VehicleObject attach/detach wrappers
   to isolate repeated map-loading crashes after installing NetDeck.
   This is NOT compiler-verified and not a confirmed crash fix.
 - CET logging is optional: it observes our upload/HUD methods (if available)
@@ -67,8 +70,17 @@ IMPORTANT LIMITATIONS:
   Advanced Crash Reporter 1.6 collects CET scripting.log automatically.
   If CET cannot observe a method, observer_unavailable is logged instead.
 - Confirm map stability BEFORE trying hacks. If still crashing, remove NetDeck.
-- Native HUD is a separate ~3-second upload animation (20 steps at 0.15s).
-  The infection wave still runs separately every 2 seconds for up to 16 jumps.
+- Native HUD is an independent elapsed-time upload (default 2s) with
+  ~30Hz updates. It finishes separately from the infection wave.
+- CET settings provide upload duration, scan radius, relay-hop radius,
+  infection interval, max infections, maximum targets, and max fanout.
+  Default scan 105m, jump radius 75m, interval 0.25s; "Club takeover"
+  preset scans 145m and infects every 0.14s. Settings are live and persistent.
+- A bounded native pre-scan queues eligible loaded hostile NPCs/vehicles
+  before the upload bar shows its discovered-target estimate. This is not
+  a guarantee every NPC in the building is loaded/visible to the game.
+- The native quickhack's internal uploadTime/activationTime TweakDB property
+  is not changed by the HUD slider; it affects our separate presentation.
 - NetDeckHudSkin.reds applies a NETWORM-only blue skin to the native Neutral
   widget and swaps its layered triangle for the real "networmhack" atlas part.
   The icon appears only if you keep your privately packed NetDeck.archive.
@@ -82,16 +94,18 @@ IMPORTANT LIMITATIONS:
 - Repeating Ping network grid audio/VFX and per-hop reward notifications are removed.
 - Jumps run every 2.0 seconds and stop after at most 16 scheduled jumps.
 - The TARGETS count is NPCs + moving cars with dispatched effects; device actions have their own count.
-- Loaded hostile-NPC fallback now registers scanned or explicit-upload NPCs only,
-  not every NPC on world attachment. Unscanned-NPC spread may regress.
+- Loaded hostile-NPC fallback registers scanned or explicitly uploaded NPCs.
+  Large-area pre-scan uses the native targeting system without world hooks.
 - Previous build's network shutdown, vendor and stats were user-confirmed.
 - Codeware interface-language packages cover 19 UI languages, with English fallback.
 - No NETWORM access-point scanner actions. NPC/vehicle/door/network effects are experimental.
 - No copyrighted or private icon/ArchiveXL/WolvenKit binary assets are distributed.
 - NETWORM no longer inherits PingDevice, so vanilla Ping must remain
   an independent, functioning quickhack when NetWatch Σ MK.1 is installed.
-- Timed PlayerPuppet wave, 2.0s per target, 4 hops of up to 25m, max 40
-  affected loaded entities. Native network descendants also join the queue.
+- Timed PlayerPuppet worm wave defaults to a 0.25s infection interval, 105m
+  pre-scan, 75m native relay hops, 100 steps and 120 affected entities.
+  Change these values live using the CET overlay. Native network descendants
+  also join the queue.
 - Loaded cars are registered on native vehicle scanner actions and direct
   uploads, NOT global attach/detach. Unscanned car spread may regress.
 - Dedicated VehicleQuickHack requires Carhacker and equipped NetWatch Σ MK.1.
@@ -104,7 +118,8 @@ IMPORTANT LIMITATIONS:
 
 REMOVE:
 Delete r6/scripts/NetDeck and r6/tweaks/NetDeck, and optionally
-bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics.
+bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics and
+bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings.
 If you installed a separate local NetDeck.archive, disable it too.
 """.replace("\n", "\n")
 
@@ -138,6 +153,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.7-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.8-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
