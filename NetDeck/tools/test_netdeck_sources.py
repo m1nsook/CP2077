@@ -76,7 +76,7 @@ class InfiltrationSourceTests(unittest.TestCase):
             self.assertNotRegex(path, r'(?<!\\)\\(?!\\)')
 
     def test_crash_diagnostic_is_observer_only(self):
-        self.assertIn('PREFIX = "[NetDeck/DIAG v0.6.8]"', D)
+        self.assertIn('PREFIX = "[NetDeck/DIAG v0.6.9]"', D)
         self.assertIn('registerForEvent("onInit"', D)
         self.assertIn('registerForEvent("onUpdate"', D)
         self.assertIn('registerForEvent("onShutdown"', D)
