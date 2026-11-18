@@ -30,6 +30,8 @@ INSTALL:
    assets). Diagnostics: bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua
    SETTINGS: bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings/init.lua
    Open the CET overlay and adjust the NETWORM - Test Settings sliders.
+   The settings window only appears while the CET overlay is open, never
+   in gameplay. Its close button hides it until CET is reopened.
    Values are saved next to the Lua script in settings.json on disk.
    Advanced Crash Reporter reads its [NetDeck/DIAG] output from CET scripting.log.
    Original icon PNGs, WolvenKit raw project, .inkatlas, .xbm and compiled
@@ -62,7 +64,7 @@ INSTALL:
 15. Normal Netrunner XP is allowed. Check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.6.9 removes global NPCPuppet AND VehicleObject attach/detach wrappers
+- v0.6.10 removes global NPCPuppet AND VehicleObject attach/detach wrappers
   to isolate repeated map-loading crashes after installing NetDeck.
   This is NOT compiler-verified and not a confirmed crash fix.
 - CET logging is optional: it observes our upload/HUD methods (if available)
@@ -153,6 +155,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.9-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.10-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
