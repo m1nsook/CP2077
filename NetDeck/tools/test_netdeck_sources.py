@@ -118,6 +118,18 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertNotIn("notification.m_text = loc.GetText(\"NetDeckWaveProgress\")", R)
         self.assertIn("r.robbedTargets, r.npcs + r.vehicles", R)
 
+    def test_no_unverified_global_hud_ownership(self):
+        # Crash report: redDispatcher6 / inkVirtualWindow / DynamicTexture.
+        # NETWORM must NOT manipulate the shared mission HUD blackboard until
+        # UI ownership/cleanup is validated against real quests in-game.
+        self.assertNotIn("UI_HUDProgressBar", R)
+        self.assertNotIn("NetDeckHudStart", R)
+        self.assertNotIn("NetDeckHudUpdate", R)
+        self.assertNotIn("NetDeckHudFinish", R)
+        self.assertNotIn("SetVariant(GetAllBlackboardDefs().UI_Notifications", R)
+        # Never restore the looping network VFX/audio path.
+        self.assertNotIn("PingNetworkGrid_Event(", R)
+
     def test_scoped_trace_hook(self):
         self.assertIn("NetDeck.ZeroAwareness:", Y)
         self.assertEqual(Y.count("awarenessCost: NetDeck.ZeroAwareness"), 3)
