@@ -169,6 +169,7 @@ public final static func GetPlayerQuickHackListWithQuality(
 public class NetDeckSpreadResult extends IScriptable {
   public let devices: Int32;
   public let npcs: Int32;
+  public let netrunners: Int32;
   public let vehicles: Int32;
   public let eddies: Int32;
   public let robbedTargets: Int32;
@@ -218,7 +219,7 @@ public func NetDeckSiphon(
 }
 
 public func NetDeckSpread(
-  game: GameInstance, root: ref<GameObject>
+  game: GameInstance, root: ref<GameObject>, fromDevice: Bool
 ) -> ref<NetDeckSpreadResult> {
   let result: ref<NetDeckSpreadResult> = new NetDeckSpreadResult();
   if !IsDefined(root) || !IsEquipped(game) { return result; }
@@ -280,6 +281,7 @@ public func NetDeckSpread(
       let ps: ref<ScriptableDeviceComponentPS> =
         device.GetDevicePS() as ScriptableDeviceComponentPS;
       if IsDefined(ps) && !ps.IsMarkedAsQuest() {
+        if fromDevice { result.netrunners += NetDeckBurnoutNearbyNetrunners(ps); }
         if ps.IsON() && ps.NetDeckApplyToMember(ps) {
           result.devices += 1;
         }
@@ -651,10 +653,9 @@ public func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Bo
 protected cb func OnNetDeckInfiltration(evt: ref<NetDeckInfiltration>) -> EntityNotificationType {
   NetDeckPulseNetwork(this);
   let source: ref<GameObject> = this.GetOwnerEntityWeak() as GameObject;
-  let result: ref<NetDeckSpreadResult> = NetDeckSpread(this.GetGameInstance(), source);
-  // Synapse Burnout remains device-origin only.
-  let burned: Int32 = NetDeckBurnoutNearbyNetrunners(this);
-  let affected: Int32 = result.devices + result.npcs + result.vehicles + burned;
+  let result: ref<NetDeckSpreadResult> = NetDeckSpread(this.GetGameInstance(), source, true);
+  // Only device-origin chains can inflict Synapse Burnout on netrunners.
+  let affected: Int32 = result.devices + result.npcs + result.vehicles + result.netrunners;
   if affected > 0 { NetDeckGiveDataComponents(this.GetGameInstance()); }
   NetDeckNotify(
     this.GetGameInstance(), affected + result.robbedTargets,
@@ -764,7 +765,7 @@ protected cb func OnNetDeckPuppetInfiltration(
     let puppet: ref<ScriptedPuppet> = this.GetOwnerEntityWeak() as ScriptedPuppet;
     if IsDefined(puppet) && !puppet.IsQuest() {
       let result: ref<NetDeckSpreadResult> =
-        NetDeckSpread(this.GetGameInstance(), puppet);
+        NetDeckSpread(this.GetGameInstance(), puppet, false);
       let affected: Int32 = result.devices + result.npcs + result.vehicles;
       if affected > 0 { NetDeckGiveDataComponents(this.GetGameInstance()); }
       NetDeckNotify(
