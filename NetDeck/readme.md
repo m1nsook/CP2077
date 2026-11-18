@@ -1,9 +1,40 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.3 CANTO ENEMY-PATH / AUDIO-SAFETY TEST · NOT game-compiler verified.**
+**Cyberpunk 2077 2.5 · v0.6.4 MAP-LOAD CRASH ISOLATION TEST · NOT game-compiler verified.**
 
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
+
+## v0.6.4 — map-load crash isolation (UNVERIFIED; PR #36 only)
+
+**Player-confirmed isolation:** Cyberpunk 2077 continued crashing during map/world
+loading with both Anywhere to Anywhere 2 and UndiscoverMe Teleporter removed.
+After removing NetDeck, the game loaded successfully. This strongly
+implicates NetDeck or an interaction with another installed mod, but it
+does **not** identify the specific corrupting function.
+
+The second crash report described heap corruption near an Animals NPC's
+`senseComponent.OnSenseInitialize -> CreateSenseMappin`. NetDeck previously
+wrapped **all** NPC `OnGameAttached`/`OnDetach` events to maintain a loaded
+NPC registry. That is an especially risky place to touch player state and
+arrays during streaming; it runs before a NETWORM upload.
+
+**Targeted source change:** removed only the global
+`@wrapMethod(NPCPuppet)` attach/detach wrappers. A target can still be
+registered when the player scans it, or directly when NETWORM uploads to
+that NPC. The targeting-system query, Sonic Shock Tier 5, device network
+infiltration, and experimental native mission upload bar are preserved.
+
+**Tradeoff:** passive discovery of unscanned NPCs no longer uses the
+attach-time registry. Chain-spreading to nearby enemies **must be
+reverified**; it may be less reliable than the previous version. This is
+a crash-isolation patch, **not** a proven crash fix. Vehicle streaming hooks
+remain and should be checked next if loading still crashes.
+
+**Don't merge or release this build.** Back up a save. First establish
+that map/world loading is stable in the same area, then test attacking
+multiple enemies and connected devices. Static tests do not compile
+REDscript or verify memory safety.
 
 ## v0.6.3 — optional native upload-bar experiment (UNVERIFIED)
 
