@@ -19,7 +19,7 @@ jobs:
       - name: Check out sources
         uses: actions/checkout@v4
       - name: Validate source invariants
-        run: python3 NetDeck/tools/test_nest_sources.py
+        run: python3 NetDeck/tools/test_netdeck_sources.py
       - name: Build game-root test ZIP
         run: python3 NetDeck/tools/pack_test.py --output dist/NetDeck-v0.2.0-TEST.zip
       - name: Upload test ZIP and checksum
