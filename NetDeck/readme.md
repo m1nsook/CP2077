@@ -1,9 +1,35 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.8 LIVE CET TUNING / SMOOTH HUD / CLUB-WIDE PRE-SCAN TEST · NOT game-compiler verified.**
+**Cyberpunk 2077 2.5 · v0.6.9 HUD WRAPPER COMPILATION FIX TEST · NOT game-compiler verified.**
 
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
+
+## v0.6.9 — REDscript HUD wrapper signature fix (UNVERIFIED)
+
+**Player-reported compile failure:** 18 Nov 2026, 19:35:53 Europe/Warsaw,
+`[UNRESOLVED_METHOD]` at `NetDeckHudSkin.reds:92`,
+`@wrapMethod(HUDProgressBarController)` from trying to wrap
+`UpdateTimerHeader(const label: ref<String>)`.
+
+The native decompiled script signatures differ: one resource uses a plain
+`String`, and another uses `const script_ref<String>`. Neither matches
+the previously committed `ref<String>` wrapper. Rather than ship another
+unverified guess at the string signature, **removed that entire wrapper**.
+
+The scoped icon-and-color skin now wraps
+`HUDProgressBarController.UpdateProgressBarActive(active: Bool) -> Void`
+with `public final func`, matching a known working REDscript wrapper
+of the vanilla HUD controller used by Dark Future. The implementation
+calls `wrappedMethod(active)` first, applies the NETWORM blue/icon skin
+only if the active bar's header is prefixed `NETWORM`, and restores
+vanilla art when the bar becomes inactive. The user's private quickhack
+icon archive is still required.
+
+No other v0.6.8 spread, CET menu, scan-radius or timing behavior changed
+for this focused compile fix. The native game compile remains unverified
+until tested in Cyberpunk 2077. If it fails again, **send the full new
+REDscript log**; do not assume success from source-level tests.
 
 ## v0.6.8 — fix HUD syntax, add live config, scan the club (UNVERIFIED)
 
