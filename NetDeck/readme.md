@@ -1,9 +1,37 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.2 VEHICLE PATH TEST · NOT game-compiler verified.**
+**Cyberpunk 2077 2.5 · v0.6.3 CANTO ENEMY-PATH / AUDIO-SAFETY TEST · NOT game-compiler verified.**
 
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
+
+## v0.6.3 — enemy targeting and sound-safety changes (UNVERIFIED)
+
+**Observed in the player's game (v0.6.2):** NETWORM counted 11 targets
+around only a few gang members/cars, did **not** spread Weapon Glitch to
+nearby enemies, and caused a persistent sound requiring mod removal.
+
+Changes committed to PR #36:
+- NPC quickhack now derives from Canto Mk.6's native
+  `QuickHack.BaseBlackWallHack` enemy-targeting record instead of
+  `QuickHack.FreePingHack`. NETWORM's own action/label/icon are retained.
+  Blackwall start/completion effects are cleared. **Requires Phantom Liberty
+  and in-game validation that no native Blackwall effects leak through.**
+- Removed the old **must have Ping action** NPC scanner gate. Quest, dead,
+  companion, crowd and child NPCs remain excluded.
+- Added a bounded loaded-NPC fallback for enemies missed by the targeting
+  system; existing device and vehicle paths are unchanged.
+- Spread attempts happen every **2 seconds**, with a hard maximum of
+  **16 scheduled jumps** per upload.
+- Removed the repeated `PingNetworkGrid_Event` effect and per-hop reward
+  notifications to address the persistent-audio regression. The precise
+  audio source has not yet been proven.
+- Final TARGETS feedback now counts dispatched effects, not all visited
+  relays. The count is not evidence of successful spread in-game.
+
+**Source-only: NOT REDscript-compiler verified. Do not reinstall v0.6.2 or
+publish this test. Leave PR #36 draft until compilation, real enemy
+propagation and normal audio teardown are verified on a backed-up save.**
 
 ## Why this rewrite exists
 
@@ -23,7 +51,7 @@ The user-supplied `HeatSpread Files(1).zip` contained:
   host positions and a hop/fanout limit. This is the model for the new
   NETWORM tick scheduling; NETWORM retains its own nonlethal effects.
 
-## v0.6.2: native vehicle path and propagation (unverified)
+## v0.6.2: previous vehicle-path experiment (failed in-game)
 
 The game does not define `TSFMV.Obj_Vehicle`, and `Obj_Other`
 is not a reliable way to discover traffic. Vehicles use a separate
@@ -52,10 +80,10 @@ The NetDeck source now:
 These additions do not affect the separate vanilla vehicle quickhacks,
 NetWatch retaliation, normal Ping, or the user's private icon files.
 
-## v0.6.1: timed-wave source implementation, not yet verified in-game
+## v0.6.1: previous timed-wave experiment (failed in-game)
 
 - One upload initializes a wave attached to the player and schedules a new
-  step **every 0.45 seconds** (no simultaneous instant-burst loop).
+  step **every 2.0 seconds** in v0.6.3 (no simultaneous instant-burst loop).
 - Each step checks a full-area targeting query **from V**, then selects one
   candidate within **25 m of a previously infected host**, up to **4 hops**,
   **4 outgoing links per host**, and **40 affected entities per upload**.
@@ -88,13 +116,13 @@ NetWatch retaliation, normal Ping, or the user's private icon files.
 - Random crafting component rewards retained. **Normal Netrunner XP is allowed** when using NETWORM; no XP suppression is required.
 
 This version does not yet render an actual traveling beam between **NPCs**;
-the visible changes are staggered native Weapon Glitch effects, device
-network-link pulses and periodic localized notifications. A custom NPC-to-NPC
+the intended visible changes are staggered native Weapon Glitch effects.
+Network pulses and repeated notifications were removed in v0.6.3. A custom NPC-to-NPC
 beam requires a separate verified VFX implementation.
 
 ## Source-only install
 
-Requires Cyberpunk 2077 2.5, RED4ext, REDscript, TweakXL and Codeware.
+Requires Cyberpunk 2077 2.5 **with Phantom Liberty**, RED4ext, REDscript, TweakXL and Codeware.
 Back up the save and close the game before installing.
 
 Replace these three source files from the **GitHub source test**:
@@ -113,8 +141,8 @@ Keep the user's privately packed `.archive` with the working icon art.
    have NOT been compiler-verified on the user's installation.
 2. **One gang upload**: watch 3–5 nearby enemies receive Weapon Glitch
    in order, spaced approximately 0.45 s apart, without retargeting.
-3. **Progress feedback**: check `NETWORM: SPREADING 4` and later
-   `TARGETS: <number>` in the finished notification.
+3. **Sound and count**: no repeating network pulses/notifications; check
+   the one final `TARGETS: <number>`, and ensure all audio stops normally.
 4. **Carhacker perk:** confirm vanilla vehicle quickhacks and NETWORM are
    both offered on an eligible traffic vehicle. With a different deck,
    the new vehicle NETWORM must disappear.
