@@ -42,7 +42,7 @@ INSTALL:
     Check that only the logged network devices appear in the feedback device count.
 12. Confirm ordinary NETWORM is not traced; NetWatch still triggers five stars.
 13. Check €$ siphon totals and number of sources in the feedback.
-14. Watch for native XP on netrunner burnout or hacking and check components.
+14. Normal Netrunner XP is allowed. Check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
 - v0.6.1 corrects REDscript signature errors but is NOT game-compiler verified.
@@ -56,7 +56,7 @@ IMPORTANT LIMITATIONS:
   affected loaded entities. Native network descendants also join the queue.
 - This is an unverified experimental build, not a confirmed gameplay fix.
 - Eurodollar siphon is a capped gameplay reward; it does not drain actual
-  NPC inventories. Native XP suppression still needs implementation.
+  NPC inventories. Normal Netrunner XP gain is allowed.
 - Robotic NPC shutdown, drones and mechs are NOT yet covered.
 - NETWORM does not need Camera Killer; test with or without it.
 - Do not publish this ZIP as a Nexus Mods release.
