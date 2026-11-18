@@ -181,14 +181,18 @@ public func NetDeckPulseNetwork(source: ref<ScriptableDeviceComponentPS>) -> Voi
 }
 
 // Report upload outcome once, using Codeware's interface language.
-public func NetDeckNotify(game: GameInstance, affected: Int32) -> Void {
+public func NetDeckNotify(game: GameInstance, affected: Int32, deviceCount: Int32) -> Void {
   let loc: ref<LocalizationSystem> = LocalizationSystem.GetInstance(game);
   if !IsDefined(loc) {
     return;
   }
   let notification: ref<HackingRewardNotificationEvent> = new HackingRewardNotificationEvent();
   if affected > 0 {
-    notification.m_text = loc.GetText("NetDeckSpreadComplete");
+    // Count only device actions dispatched via the actual linked network.
+    // NPC Weapon Glitch, Synapse Burnout and vehicle braking are excluded.
+    notification.m_text =
+      loc.GetText("NetDeckSpreadComplete") + " | " +
+      loc.GetText("NetDeckDevicesAffected") + ": " + IntToString(deviceCount);
   } else {
     notification.m_text = loc.GetText("NetDeckSpreadEmpty");
   }
@@ -462,10 +466,10 @@ public func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Bo
 @addMethod(ScriptableDeviceComponentPS)
 protected cb func OnNetDeckInfiltration(evt: ref<NetDeckInfiltration>) -> EntityNotificationType {
   NetDeckPulseNetwork(this);
-  let affected: Int32 = this.NetDeckInfiltrateNetwork();
-  affected += NetDeckBurnoutNearbyNetrunners(this);
+  let deviceCount: Int32 = this.NetDeckInfiltrateNetwork();
+  let affected: Int32 = deviceCount + NetDeckBurnoutNearbyNetrunners(this);
   if affected > 0 { NetDeckGiveDataComponents(this.GetGameInstance()); }
-  NetDeckNotify(this.GetGameInstance(), affected);
+  NetDeckNotify(this.GetGameInstance(), affected, deviceCount);
   return EntityNotificationType.DoNotNotifyEntity;
 }
 
@@ -575,16 +579,16 @@ protected cb func OnNetDeckPuppetInfiltration(
         if ArraySize(aps) > 0 {
           NetDeckPulseNetwork(aps[0]);
         }
-        let affected: Int32 = link.NetDeckInfiltrateLinkedDevices();
+        let deviceCount: Int32 = link.NetDeckInfiltrateLinkedDevices();
         NetDeckTriggerNetWatchPursuit(puppet);
-        affected += NetDeckDisruptNpcVicinity(puppet);
+        let affected: Int32 = deviceCount + NetDeckDisruptNpcVicinity(puppet);
         if affected > 0 { NetDeckGiveDataComponents(this.GetGameInstance()); }
-        NetDeckNotify(this.GetGameInstance(), affected);
+        NetDeckNotify(this.GetGameInstance(), affected, deviceCount);
       } else {
         NetDeckTriggerNetWatchPursuit(puppet);
         let affected: Int32 = NetDeckDisruptNpcVicinity(puppet);
         if affected > 0 { NetDeckGiveDataComponents(this.GetGameInstance()); }
-        NetDeckNotify(this.GetGameInstance(), affected);
+        NetDeckNotify(this.GetGameInstance(), affected, 0);
       }
     }
   }
