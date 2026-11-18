@@ -206,7 +206,7 @@ public func NetDeckBurnoutNearbyNetrunners(source: ref<ScriptableDeviceComponent
   if !IsDefined(origin) || !IsDefined(player) { return 0; }
   let query: TargetSearchQuery;
   query.testedSet = TargetingSet.Complete;
-  query.searchFilter = TSF_EnemyNPC();
+  query.searchFilter = TSF_NPC();
   query.includeSecondaryTargets = false;
   query.maxDistance = 25.0;
   query.filterObjectByDistance = true;
@@ -295,8 +295,8 @@ public func NetDeckDisruptNpcVicinity(puppet: ref<ScriptedPuppet>) -> Int32 {
       let vehicle: ref<VehicleObject> = component.GetEntity() as VehicleObject;
       if IsDefined(vehicle) && !ArrayContains(seen, vehicle) {
         ArrayPush(seen, vehicle);
-        if vehicle.IsHackable() && !vehicle.IsQuest() &&
-           !vehicle.IsPlayerVehicle() && !vehicle.IsInQuestOrScenePhysicsState() {
+        if !vehicle.IsQuest() && !vehicle.IsPlayerVehicle() &&
+           !vehicle.IsVehicleParked() && !vehicle.IsInQuestOrScenePhysicsState() {
           vehicle.ForceBrakesFor(4.0);
           affected += 1;
         }
