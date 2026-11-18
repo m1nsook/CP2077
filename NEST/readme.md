@@ -44,6 +44,25 @@ The gameplay source goes under:
 
 **Not ready for players:** the custom name/description are defined under `source/` in a WolvenKit JSON export and ArchiveXL source manifest. They must first be built into a proper `.archive` and packaged with the installable files. Until then the game may show missing localization keys. Similarly, the custom cyberdeck icon still needs an InkAtlas asset created with WolvenKit; the cloned Netdriver icon is a temporary placeholder.
 
+## Development test package
+
+PR #36 has a scoped **NΣT experimental test package** workflow. It runs only for
+changes to `NEST/**` and can also be manually started. The artifact contains
+one installable game-root ZIP with the REDscript and TweakXL files, plus
+`NEST-TEST-SHA256SUMS.txt`. It intentionally excludes uncompiled localization
+and icon sources: those are not ready for game installation yet.
+
+To build the exact same ZIP without GitHub Actions, run:
+
+```sh
+python NEST/tools/test_nest_sources.py
+python NEST/tools/pack_test.py --output dist/NEST-v0.2.0-TEST.zip
+```
+
+Extract the inner ZIP to the game root. **This is not a release**. Before
+testing, make a backup save and remove any old `r6/scripts/NEST` and
+`r6/tweaks/NEST` folders from earlier experiments.
+
 ## First in-game validation order
 
 1. Verify REDscript compiles and TweakXL accepts the YAML.

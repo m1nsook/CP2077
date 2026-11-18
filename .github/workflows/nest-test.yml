@@ -1,0 +1,33 @@
+name: NΣT experimental test package
+
+# Builds a game-root ZIP for the draft PR. DOES NOT publish a GitHub release.
+on:
+  pull_request:
+    paths:
+      - 'NEST/**'
+      - '.github/workflows/nest-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+      - name: Validate source invariants
+        run: python3 NEST/tools/test_nest_sources.py
+      - name: Build game-root test ZIP
+        run: python3 NEST/tools/pack_test.py --output dist/NEST-v0.2.0-TEST.zip
+      - name: Upload test ZIP and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEST-v0.2.0-TEST
+          path: |
+            dist/NEST-v0.2.0-TEST.zip
+            dist/NEST-TEST-SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
