@@ -118,16 +118,20 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertNotIn("notification.m_text = loc.GetText(\"NetDeckWaveProgress\")", R)
         self.assertIn("r.robbedTargets, r.npcs + r.vehicles", R)
 
-    def test_no_unverified_global_hud_ownership(self):
-        # Crash report: redDispatcher6 / inkVirtualWindow / DynamicTexture.
-        # NETWORM must NOT manipulate the shared mission HUD blackboard until
-        # UI ownership/cleanup is validated against real quests in-game.
-        self.assertNotIn("UI_HUDProgressBar", R)
-        self.assertNotIn("NetDeckHudStart", R)
-        self.assertNotIn("NetDeckHudUpdate", R)
-        self.assertNotIn("NetDeckHudFinish", R)
-        self.assertNotIn("SetVariant(GetAllBlackboardDefs().UI_Notifications", R)
-        # Never restore the looping network VFX/audio path.
+    def test_experimental_upload_bar_has_quest_ownership_guards(self):
+        # The 16:29:37 PL crash predates the 16:30:42 PL HUD commit.
+        # This is a SOURCE test only, not a REDscript/gameplay validation.
+        self.assertIn("UI_HUDProgressBar", R)
+        self.assertIn("private func NetDeckHudStart()", R)
+        self.assertIn("private func NetDeckHudUpdate()", R)
+        self.assertIn("private func NetDeckHudFinish()", R)
+        self.assertIn("if bb.GetBool(d.Active) { return; }", R)
+        self.assertIn("!Equals(bb.GetString(d.Header), this.netDeckHudHeader)", R)
+        self.assertIn("Equals(bb.GetString(d.Header), this.netDeckHudHeader)", R)
+        self.assertIn("this.NetDeckHudFinish();", R)
+        self.assertIn("this.NetDeckHudUpdate();", R)
+        self.assertIn('loc.GetText("NetDeckUploadProgress")', R)
+        # Never restore the repeating network VFX/audio path.
         self.assertNotIn("PingNetworkGrid_Event(", R)
 
     def test_scoped_trace_hook(self):
