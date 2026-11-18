@@ -631,14 +631,14 @@ private func NetDeckHudFinish() -> Void {
   }
 }
 
-// Short independent 4-second animation: 20 steps * 0.2 seconds.
+// Short independent 3-second animation: 20 steps * 0.15 seconds.
 // Does not change the 2.0-second gameplay propagation tick below.
 @addMethod(PlayerPuppet)
 private func NetDeckHudSchedule(step: Int32) -> Void {
   let evt: ref<NetDeckHudTickEvent> = new NetDeckHudTickEvent();
   evt.generation = this.netDeckWaveGeneration;
   evt.step = step;
-  GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, 0.2);
+  GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, 0.15);
 }
 
 @addMethod(PlayerPuppet)
@@ -650,7 +650,7 @@ protected cb func OnNetDeckHudTickEvent(evt: ref<NetDeckHudTickEvent>) -> Bool {
     this.NetDeckHudFinish();
     return true;
   }
-  // A 4-second initial upload, independent of the longer self-spreading wave.
+  // A ~3-second initial upload, independent of the longer self-spreading wave.
   this.netDeckHudProgress = Cast<Float>(evt.step) / 20.0;
   this.NetDeckHudUpdate();
   if evt.step >= 20 {
