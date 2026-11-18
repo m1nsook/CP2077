@@ -1,9 +1,67 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.7 SCOPED BLUE NETWORM HUD ICON TEST · NOT game-compiler verified.**
+**Cyberpunk 2077 2.5 · v0.6.8 LIVE CET TUNING / SMOOTH HUD / CLUB-WIDE PRE-SCAN TEST · NOT game-compiler verified.**
 
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
+
+## v0.6.8 — fix HUD syntax, add live config, scan the club (UNVERIFIED)
+
+The user's installed `NetDeckHudSkin.reds` reported a **real REDscript
+lexer error** at the `networm_icons.inkatlas` path on 18 Nov 2026:
+the resource literal used unescaped backslashes (`\n` was read as an
+invalid sequence). This has been corrected: the source now stores doubled
+backslashes in **all three** atlas resource literals. A source regression
+test explicitly rejects single unescaped backslashes.
+
+**HUD behavior:** Instead of incrementing by 5% every 0.15 seconds (which
+looked like an artificial stop/start animation), the native blackboard
+progress now follows **elapsed simulation time**, at ~30 refreshes/sec,
+clamped from 0 to 1. Default upload display is 2 seconds, adjustable from
+0.7 to 4.5 in the new CET menu. It ends independently of the longer
+infection wave even if only one enemy was available to infect. A quest
+that already owns the progress bar still takes priority.
+
+**Target preview:** Before opening the HUD, NETWORM now uses a bounded
+native TargetingSystem query and the player's weak-ref scanned NPC/vehicle
+registries to pre-discover eligible loaded targets. Newly found NPCs/cars
+join the infection queue (no need to hack each one separately). The HUD
+shows **the preflight discovered target estimate**, not the old current
+infected count starting at 0. Linked devices and the root are counted once
+where eligible. The resulting count is an **estimate**, not a claim that
+every person in an interior is exposed to native targeting or will
+successfully receive the effect.
+
+**Live in-game settings** (included CET overlay module):
+`bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings/init.lua`
+
+Persistent `settings.json`, automatically saved as sliders change.
+Menu: **NETWORM - Test Settings** in the CET overlay. Sliders include:
+
+- HUD upload duration: 0.7–4.5 seconds (default 2.0)
+- Native pre-scan radius: 30–180 m (default 105)
+- Relay hop range: 15–130 m (default 75)
+- Delay between infection steps: 0.10–2.50 s (default 0.25)
+- Maximum infection steps: 4–150 (default 100)
+- Max affected targets: 8–160 (default 120)
+- Max relay fanout per host: 1–16 (default 10)
+
+Presets: **Club takeover** (145 m scan, 115 m hops, 0.14 s per
+infection), **Balanced**, and **Performance safe** (lower load).
+The CET module calls REDscript `PlayerPuppet.NetDeckConfigure(...)` via
+RTTI, wrapped in Lua `pcall`, and retries after the game loads. If the
+method is unavailable, it logs a single error and REDscript uses its
+default settings. **These settings control NETWORM's custom upload
+display and spread; they do not alter vanilla quickhack activationTime
+in the game's TweakDB.**
+
+**Important safeguards:** No global NPC/vehicle spawn hooks added back.
+Quest, companion, crowd and child NPCs remain excluded. The larger scan
+can increase load or produce less predictable counts; use Performance
+safe as a rollback preset. Neither the CET bridge, new scan behavior,
+HUD icon nor redscript compiler result has been verified in the user's
+game yet. Leave PR #36 draft; send the full next redscript compile log
+if it reports a new error. Keep a backed-up save.
 
 ## v0.6.7 — scoped blue HUD and actual NETWORM icon (UNVERIFIED)
 
