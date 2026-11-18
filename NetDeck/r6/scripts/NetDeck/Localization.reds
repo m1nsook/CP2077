@@ -11,7 +11,7 @@ public class NetDeckEnglish extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Iconic cyberdeck with a built-in NETWORM quickhack that propagates through connected systems.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Upload to any Ping-capable target. Disable connected cameras, turrets and mines, or distract compatible electronics. Unlinked targets affect only their own supported functions.");
+    this.Text("NetDeckInfiltrationDescription", "Spreads through nearby enemies, vehicles and connected devices in chained hops. Glitches weapons, brakes vehicles, opens eligible doors and barriers, and siphons €$. Device uploads can burn hostile netrunners.");
     this.Text("NetDeckSpreadComplete", "NETWORM: NETWORK INFILTRATED");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NO COMPATIBLE DEVICES");
     this.Text("NetDeckDevicesAffected", "DEVICES");
@@ -25,7 +25,7 @@ public class NetDeckArabic extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. سطح إلكتروني أيقوني مزود باختراق NETWORM المدمج الذي ينتشر عبر الأنظمة المتصلة.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "ارفع الاختراق إلى أي هدف يدعم Ping. عطّل الكاميرات والأبراج والألغام المتصلة أو شتّت الأجهزة الإلكترونية المتوافقة. الأهداف غير المتصلة تؤثر في وظائفها المدعومة فقط.");
+    this.Text("NetDeckInfiltrationDescription", "ينتشر عبر الأعداء والمركبات والأجهزة المتصلة القريبة على مراحل. يعطّل أسلحة الأعداء ويوقف المركبات ويفتح الأبواب والحواجز المتاحة ويسحب المال. اختراق الأجهزة قد يحرق الشبكات العصبية للعدائين المعادين.");
     this.Text("NetDeckSpreadComplete", "NETWORM: تم اختراق الشبكة");
     this.Text("NetDeckSpreadEmpty", "NETWORM: لا توجد أجهزة متوافقة");
     this.Text("NetDeckDevicesAffected", "الأجهزة");
@@ -39,7 +39,7 @@ public class NetDeckChineseSimplified extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1。标志性网络接入仓，内置 NETWORM 快速破解，可沿连接的系统传播。");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "可上传至任何支持 Ping 的目标。关闭联网的摄像头、炮塔和地雷，或干扰兼容的电子设备。未联网的目标只会受到其自身支持的效果。");
+    this.Text("NetDeckInfiltrationDescription", "在附近敌人、载具和联网设备之间连续传播。干扰武器、紧急制动车辆、开启可控制的门和路障，并窃取欧元。通过设备传播可烧毁敌方网络黑客的突触。");
     this.Text("NetDeckSpreadComplete", "NETWORM：网络入侵成功");
     this.Text("NetDeckSpreadEmpty", "NETWORM：没有兼容设备");
     this.Text("NetDeckDevicesAffected", "设备");
@@ -53,7 +53,7 @@ public class NetDeckChineseTraditional extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1。經典網路接入倉，內建 NETWORM 快速破解，可沿著相連系統擴散。");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "可上傳至任何支援 Ping 的目標。關閉相連的攝影機、砲塔和地雷，或干擾相容的電子裝置。未連線的目標僅會觸發自身支援的效果。");
+    this.Text("NetDeckInfiltrationDescription", "在附近敵人、載具和連網裝置間連鎖擴散。干擾武器、緊急煞停載具、開啟可控制的門與路障並竊取歐元。從裝置入侵可燒毀敵方竄網使的突觸。");
     this.Text("NetDeckSpreadComplete", "NETWORM：網路入侵成功");
     this.Text("NetDeckSpreadEmpty", "NETWORM：沒有相容裝置");
     this.Text("NetDeckDevicesAffected", "裝置");
@@ -67,7 +67,7 @@ public class NetDeckCzech extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Ikonický kyberdeck s integrovaným rychlým hackem NETWORM, který se šíří propojenými systémy.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Nahraj do libovolného cíle podporujícího Ping. Vyřaď propojené kamery, věže a miny nebo rozptyl kompatibilní elektroniku. Nepropojené cíle ovlivní jen své podporované funkce.");
+    this.Text("NetDeckInfiltrationDescription", "Řetězově se šíří mezi blízkými nepřáteli, vozidly a připojenými zařízeními. Ruší zbraně, brzdí auta, otevírá dostupné dveře a závory a vysává eurodolary. Přes zařízení může zasáhnout nepřátelské netrunnery.");
     this.Text("NetDeckSpreadComplete", "NETWORM: SÍŤ INFILTROVÁNA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: ŽÁDNÁ KOMPATIBILNÍ ZAŘÍZENÍ");
     this.Text("NetDeckDevicesAffected", "ZAŘÍZENÍ");
@@ -81,7 +81,7 @@ public class NetDeckFrench extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Cyberdeck iconique intégrant NETWORM, un piratage rapide qui se propage dans les systèmes connectés.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Téléchargez-le sur toute cible compatible avec Ping. Neutralisez caméras, tourelles et mines connectées, ou distrayez les appareils compatibles. Les cibles isolées ne subissent que leurs effets pris en charge.");
+    this.Text("NetDeckInfiltrationDescription", "Se propage de proche en proche entre ennemis, véhicules et appareils connectés. Enraye les armes, freine les véhicules, ouvre les portes et barrières accessibles et siphonne des eurodollars. Les appareils peuvent brûler les synapses des netrunners ennemis.");
     this.Text("NetDeckSpreadComplete", "NETWORM : RÉSEAU INFILTRÉ");
     this.Text("NetDeckSpreadEmpty", "NETWORM : AUCUN APPAREIL COMPATIBLE");
     this.Text("NetDeckDevicesAffected", "APPAREILS");
@@ -95,7 +95,7 @@ public class NetDeckGerman extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Ikonisches Cyberdeck mit integriertem NETWORM-Quickhack, der sich über verbundene Systeme ausbreitet.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Auf jedes Ping-fähige Ziel hochladen. Verbundene Kameras, Geschütze und Minen abschalten oder kompatible Elektronik ablenken. Isolierte Ziele sind nur von ihren unterstützten Funktionen betroffen.");
+    this.Text("NetDeckInfiltrationDescription", "Springt zwischen nahen Feinden, Fahrzeugen und vernetzten Geräten weiter. Stört Waffen, bremst Fahrzeuge, öffnet geeignete Türen und Schranken und zweigt Eurodollars ab. Über Geräte können feindliche Netrunner Synapsenbrand erleiden.");
     this.Text("NetDeckSpreadComplete", "NETWORM: NETZWERK INFILTRIERT");
     this.Text("NetDeckSpreadEmpty", "NETWORM: KEINE KOMPATIBLEN GERÄTE");
     this.Text("NetDeckDevicesAffected", "GERÄTE");
@@ -109,7 +109,7 @@ public class NetDeckHungarian extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Ikonikus kiberdeck, beépített NETWORM gyorshackkel, amely a csatlakoztatott rendszereken terjed.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Feltölthető bármely Ping-kompatibilis célpontra. Kikapcsolja a csatlakoztatott kamerákat, tornyokat és aknákat, vagy megzavarja a kompatibilis elektronikát. Az elszigetelt célpontokra csak a támogatott hatások érvényesek.");
+    this.Text("NetDeckInfiltrationDescription", "Láncszerűen terjed a közeli ellenségek, járművek és hálózati eszközök között. Akadályozza a fegyvereket, fékezi a járműveket, nyitja az elérhető ajtókat és sorompókat, valamint eurodollárt lop. Az eszközökről az ellenséges netrunnereket is támadja.");
     this.Text("NetDeckSpreadComplete", "NETWORM: HÁLÓZAT FELTÖRVE");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NINCS KOMPATIBILIS ESZKÖZ");
     this.Text("NetDeckDevicesAffected", "ESZKÖZÖK");
@@ -123,7 +123,7 @@ public class NetDeckItalian extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Cyberdeck iconico con NETWORM integrato, un hack rapido che si propaga nei sistemi collegati.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Caricalo su qualsiasi bersaglio compatibile con Ping. Disattiva telecamere, torrette e mine collegate o distrae i dispositivi compatibili. I bersagli isolati subiscono solo gli effetti supportati.");
+    this.Text("NetDeckInfiltrationDescription", "Si diffonde a catena fra nemici vicini, veicoli e dispositivi collegati. Blocca le armi, frena i veicoli, apre porte e barriere compatibili e sottrae eurodollari. Dagli apparecchi può infliggere Bruciatura sinaptica ai netrunner ostili.");
     this.Text("NetDeckSpreadComplete", "NETWORM: RETE INFILTRATA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NESSUN DISPOSITIVO COMPATIBILE");
     this.Text("NetDeckDevicesAffected", "DISPOSITIVI");
@@ -137,7 +137,7 @@ public class NetDeckJapanese extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1。接続されたシステムに拡散するクイックハック「NETWORM」を内蔵したアイコニック・サイバーデッキ。");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Ping可能な対象にアップロード。接続されたカメラ、タレット、地雷を停止し、対応する電子機器をかく乱する。孤立した対象には、その機器が対応する効果のみが適用される。");
+    this.Text("NetDeckInfiltrationDescription", "周囲の敵、車両、接続機器へ連鎖的に拡散。武器を妨害し、車両を急停止させ、対応するドアや遮断機を開き、ユーロドルを奪取する。機器からの感染は敵ネットランナーにシナプス焼却を引き起こす。");
     this.Text("NetDeckSpreadComplete", "NETWORM：ネットワークへの侵入成功");
     this.Text("NetDeckSpreadEmpty", "NETWORM：対応する機器なし");
     this.Text("NetDeckDevicesAffected", "デバイス");
@@ -151,7 +151,7 @@ public class NetDeckKorean extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. 연결된 시스템을 따라 확산되는 내장 퀵핵 NETWORM을 탑재한 신화 사이버덱입니다.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Ping이 가능한 대상에 업로드합니다. 연결된 카메라, 포탑, 지뢰를 비활성화하거나 호환되는 전자 장치를 교란합니다. 연결되지 않은 대상에는 해당 장치가 지원하는 효과만 적용됩니다.");
+    this.Text("NetDeckInfiltrationDescription", "주변 적, 차량, 연결된 장치 사이로 연쇄 확산됩니다. 무기를 교란하고 차량을 급정지시키며 작동 가능한 문과 차단기를 열고 유로달러를 탈취합니다. 장치에서 확산될 때 적 넷러너에게 시냅스 과열을 가할 수 있습니다.");
     this.Text("NetDeckSpreadComplete", "NETWORM: 네트워크 침투 성공");
     this.Text("NetDeckSpreadEmpty", "NETWORM: 호환 장치 없음");
     this.Text("NetDeckDevicesAffected", "장치");
@@ -165,7 +165,7 @@ public class NetDeckPolish extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Kultowy cyberdeck z wbudowanym quickhackiem NETWORM, który rozprzestrzenia się po połączonych systemach.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Wgraj na dowolny cel obsługujący Ping. Wyłącz połączone kamery, wieżyczki i miny albo odwróć uwagę zgodnych urządzeń. Odizolowane cele podlegają tylko obsługiwanym przez nie efektom.");
+    this.Text("NetDeckInfiltrationDescription", "Rozprzestrzenia się łańcuchowo między pobliskimi wrogami, pojazdami i urządzeniami. Zakłóca broń, zatrzymuje auta, otwiera dostępne drzwi i szlabany oraz kradnie eurodolary. Z urządzeń może wywołać Wypalenie synaps u wrogich netrunnerów.");
     this.Text("NetDeckSpreadComplete", "NETWORM: SIEĆ ZINFILTROWANA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: BRAK ZGODNYCH URZĄDZEŃ");
     this.Text("NetDeckDevicesAffected", "URZĄDZENIA");
@@ -179,7 +179,7 @@ public class NetDeckPortugueseBrazil extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Cyberdeck icônico com NETWORM integrado, um hack rápido que se espalha pelos sistemas conectados.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Envie para qualquer alvo compatível com Ping. Desative câmeras, torretas e minas conectadas ou distraia dispositivos compatíveis. Alvos isolados recebem apenas os efeitos que suportam.");
+    this.Text("NetDeckInfiltrationDescription", "Espalha-se em cadeia entre inimigos próximos, veículos e dispositivos conectados. Sabota armas, freia veículos, abre portas e barreiras compatíveis e rouba eurodólares. A partir de dispositivos pode causar Queima Sináptica em netrunners inimigos.");
     this.Text("NetDeckSpreadComplete", "NETWORM: REDE INFILTRADA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NENHUM DISPOSITIVO COMPATÍVEL");
     this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
@@ -193,7 +193,7 @@ public class NetDeckRussian extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Культовая кибердека со встроенным скриптом NETWORM, распространяющимся по связанным системам.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Загрузите на любую цель, поддерживающую Ping. Отключайте связанные камеры, турели и мины или отвлекайте совместимую электронику. На изолированные цели действуют только поддерживаемые ими эффекты.");
+    this.Text("NetDeckInfiltrationDescription", "Цепная атака по ближайшим врагам, машинам и сетевым устройствам. Вызывает сбои оружия, останавливает транспорт, открывает доступные двери и шлагбаумы и похищает евродоллары. Через устройства может выжигать синапсы вражеских нетраннеров.");
     this.Text("NetDeckSpreadComplete", "NETWORM: СЕТЬ ВЗЛОМАНА");
     this.Text("NetDeckSpreadEmpty", "NETWORM: НЕТ СОВМЕСТИМЫХ УСТРОЙСТВ");
     this.Text("NetDeckDevicesAffected", "УСТРОЙСТВА");
@@ -207,7 +207,7 @@ public class NetDeckSpanishSpain extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Ciberterminal icónico con NETWORM integrado, un hackeo rápido que se propaga por sistemas conectados.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Cárgalo en cualquier objetivo compatible con Ping. Desactiva cámaras, torretas y minas conectadas o distrae dispositivos compatibles. Los objetivos aislados solo reciben los efectos que admiten.");
+    this.Text("NetDeckInfiltrationDescription", "Se propaga en cadena entre enemigos cercanos, vehículos y dispositivos conectados. Bloquea armas, frena vehículos, abre puertas y barreras compatibles y roba eurodólares. Desde dispositivos puede quemar las sinapsis de netrunners hostiles.");
     this.Text("NetDeckSpreadComplete", "NETWORM: RED INFILTRADA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NO HAY DISPOSITIVOS COMPATIBLES");
     this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
@@ -221,7 +221,7 @@ public class NetDeckSpanishLatinAmerica extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Cyberdeck icónico con NETWORM integrado, un hackeo rápido que se propaga por los sistemas conectados.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Súbelo a cualquier objetivo compatible con Ping. Desactiva cámaras, torretas y minas conectadas o distrae dispositivos compatibles. Los objetivos aislados solo reciben los efectos que admiten.");
+    this.Text("NetDeckInfiltrationDescription", "Se propaga en cadena entre enemigos cercanos, vehículos y dispositivos conectados. Interfiere armas, frena vehículos, abre puertas y barreras compatibles y roba eurodólares. Desde dispositivos puede quemar las sinapsis de netrunners enemigos.");
     this.Text("NetDeckSpreadComplete", "NETWORM: RED INFILTRADA");
     this.Text("NetDeckSpreadEmpty", "NETWORM: NO HAY DISPOSITIVOS COMPATIBLES");
     this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
@@ -235,7 +235,7 @@ public class NetDeckThai extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1 ไซเบอร์เด็คระดับไอคอนิกที่มี NETWORM ในตัว ควิกแฮ็กที่แพร่กระจายผ่านระบบที่เชื่อมต่อกัน");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "อัปโหลดไปยังเป้าหมายที่ใช้ Ping ได้ ปิดกล้อง ป้อมปืน และทุ่นระเบิดที่เชื่อมต่อกัน หรือรบกวนอุปกรณ์อิเล็กทรอนิกส์ที่รองรับ เป้าหมายที่ไม่เชื่อมต่อจะได้รับผลเฉพาะที่อุปกรณ์รองรับ");
+    this.Text("NetDeckInfiltrationDescription", "แพร่กระจายต่อเนื่องระหว่างศัตรู ยานพาหนะ และอุปกรณ์ที่เชื่อมต่ออยู่ใกล้กัน รบกวนอาวุธ เบรกยานพาหนะ เปิดประตูและไม้กั้นที่รองรับ และขโมยเงินยูโรดอลลาร์ การแฮ็กจากอุปกรณ์อาจเผาไซแนปส์ของเน็ตรันเนอร์ศัตรู");
     this.Text("NetDeckSpreadComplete", "NETWORM: แทรกซึมเครือข่ายสำเร็จ");
     this.Text("NetDeckSpreadEmpty", "NETWORM: ไม่พบอุปกรณ์ที่รองรับ");
     this.Text("NetDeckDevicesAffected", "อุปกรณ์");
@@ -249,7 +249,7 @@ public class NetDeckTurkish extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Bağlı sistemlere yayılan NETWORM hızlı hackini içeren ikonik siber deste.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Ping destekleyen herhangi bir hedefe yükle. Bağlı kameraları, taretleri ve mayınları devre dışı bırak veya uyumlu elektronik cihazları şaşırt. Bağlantısız hedeflerde yalnızca desteklenen etkiler uygulanır.");
+    this.Text("NetDeckInfiltrationDescription", "Yakındaki düşmanlar, araçlar ve bağlı cihazlar arasında zincirleme yayılır. Silahları bozar, araçları frenler, uygun kapı ve bariyerleri açar, eurodolar çalar. Cihazlardan yayıldığında düşman netrunner'lara Sinaps Yanığı uygulayabilir.");
     this.Text("NetDeckSpreadComplete", "NETWORM: AĞA SIZILDI");
     this.Text("NetDeckSpreadEmpty", "NETWORM: UYUMLU CİHAZ BULUNAMADI");
     this.Text("NetDeckDevicesAffected", "CİHAZLAR");
@@ -263,7 +263,7 @@ public class NetDeckUkrainian extends ModLocalizationPackage {
     this.Text("NetDeckDeckName", "NetWatch Σ MK.1");
     this.Text("NetDeckDeckDescription", "NetWatch Σ MK.1. Культова кібердека з вбудованим скриптом NETWORM, що поширюється через з’єднані системи.");
     this.Text("NetDeckInfiltrationName", "NETWORM");
-    this.Text("NetDeckInfiltrationDescription", "Завантажуйте на будь-яку ціль, що підтримує Ping. Вимикайте підключені камери, турелі та міни або відволікайте сумісну електроніку. На ізольовані цілі діють лише підтримувані ними ефекти.");
+    this.Text("NetDeckInfiltrationDescription", "Ланцюгово поширюється між найближчими ворогами, транспортом і підключеними пристроями. Псує зброю, гальмує авто, відчиняє доступні двері й шлагбауми та викрадає євродолари. Через пристрої може випалювати синапси ворожих нетранерів.");
     this.Text("NetDeckSpreadComplete", "NETWORM: МЕРЕЖУ ЗЛАМАНО");
     this.Text("NetDeckSpreadEmpty", "NETWORM: НЕМАЄ СУМІСНИХ ПРИСТРОЇВ");
     this.Text("NetDeckDevicesAffected", "ПРИСТРОЇ");
