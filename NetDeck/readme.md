@@ -1,9 +1,46 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.5 CRASH DIAGNOSTIC TEST · NOT game-compiler verified.**
+**Cyberpunk 2077 2.5 · v0.6.6 FAST NATIVE UPLOAD HUD TEST · NOT game-compiler verified.**
 
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
+
+## v0.6.6 — faster, neutral-tone NETWORM upload bar (UNVERIFIED)
+
+The player confirmed **v0.6.5 loads and runs without crashes so far**.
+Keep its world-stream safety changes: global NPC/vehicle attach/detach
+wrappers stay removed, and the optional CET crash diagnostics remain.
+
+**HUD feedback from in-game test:** The red triangle and red upload
+display didn't suit the blue cyberdeck; the bar lasted about 70 seconds
+and `DEVICES: 16%` accidentally ran into the native progress percent.
+
+**This source change:**
+- Added a **separate 20-step, 0.15-second HUD timer**, aiming for a
+  smooth ~3-second initial upload (under 5 seconds in normal real-time
+  play). The independent **2-second enemy/device propagation loop is
+  NOT sped up** and may continue after the HUD disappears.
+- Native `UI_HUDProgressBar.MessageType` is set to
+  `SimpleMessageType.Neutral` when NETWORM owns the bar. The game's
+  own controller uses its **Neutral** widget state instead of the red
+  Default alert style; actual shade depends on the user's UI theme.
+  This swaps the warning triangle for **the native neutral icon**,
+  **not** the privately compiled NETWORM quickhack icon.
+- Removed redundant `DEVICES: N` bottom text from the progress widget;
+  the game already displays a percentage in that position. The
+  final result notification still carries device count and earnings.
+- All changes use the existing quest-owned-bar guard, never set global
+  UI colors or hook `HUDProgressBarController`. Stale HUD timer
+  callbacks use the existing wave generation guard.
+- This is an experimental UI style/timing change, not a tested blue
+  custom-icon implementation. **Actual in-game color, fast pacing,
+  quest sharing and sound cleanup still need to be verified.**
+
+**No merge/release yet.** Back up a save. First ensure the same map still
+loads reliably; then upload on a device and gang and confirm (1) blue
+or neutral color, (2) short bar, (3) no triangle, (4) spreading keeps
+working after the bar closes, and (5) other quests' progress bars
+are untouched.
 
 ## v0.6.5 — diagnose NetDeck-induced streaming crashes (UNVERIFIED)
 
