@@ -36,7 +36,7 @@ INSTALL:
 9. Test connected security effects without any camera in the network.
 10. Check an unrelated network remains unaffected.
 11. Test ONE upload against a gang: multiple nearby hostiles should receive
-    staggered Weapon Glitch effects approximately every 0.45 seconds.
+    staggered Weapon Glitch attempts approximately every 2 seconds.
     Check a moving car, a road barrier, and a non-quest door too.
     Check that progress notifications and final target counts match.
     Check that only the logged network devices appear in the feedback device count.
@@ -47,7 +47,11 @@ INSTALL:
 15. Normal Netrunner XP is allowed. Check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.6.2 corrects REDscript signature errors but is NOT game-compiler verified.
+- v0.6.3 is a sound-safety/propagation test, NOT game-compiler verified.
+- Repeating Ping network grid audio/VFX and per-hop reward notifications are removed.
+- Jumps run every 2.0 seconds and stop after at most 16 scheduled jumps.
+- The reported target count reflects dispatched effects, not all discovered relays.
+- Loaded hostile-NPC registry fallback is experimental and not compiler verified.
 - Previous build's network shutdown, vendor and stats were user-confirmed.
 - Codeware interface-language packages cover 19 UI languages, with English fallback.
 - No NETWORM access-point scanner actions. NPC/vehicle/door/network effects are experimental.
@@ -99,6 +103,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.2-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.3-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
