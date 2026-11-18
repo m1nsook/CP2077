@@ -8,9 +8,30 @@ ROOT = Path(__file__).resolve().parents[1]
 R = (ROOT / "r6/scripts/NetDeck/NetDeck.reds").read_text("utf-8")
 Y = (ROOT / "r6/tweaks/NetDeck/NetDeck.yaml").read_text("utf-8")
 L = (ROOT / "r6/scripts/NetDeck/Localization.reds").read_text("utf-8")
+D = (ROOT / "bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua").read_text("utf-8")
+P = (ROOT / "tools/pack_test.py").read_text("utf-8")
 VENDORS = 26
 
 class InfiltrationSourceTests(unittest.TestCase):
+    def test_crash_diagnostic_is_observer_only(self):
+        self.assertIn('PREFIX = "[NetDeck/DIAG v0.6.5]"', D)
+        self.assertIn('registerForEvent("onInit"', D)
+        self.assertIn('registerForEvent("onUpdate"', D)
+        self.assertIn('registerForEvent("onShutdown"', D)
+        self.assertIn('ObserveAfter(className, methodName', D)
+        self.assertIn('observe("PlayerPuppet", "NetDeckWaveStart"', D)
+        self.assertIn('observe("PlayerPuppet", "NetDeckWaveInfect"', D)
+        self.assertIn('observe("PlayerPuppet", "NetDeckWaveFinish"', D)
+        self.assertIn('observe("PlayerPuppet", "NetDeckHudStart"', D)
+        self.assertIn('observe("PlayerPuppet", "NetDeckHudFinish"', D)
+        # Don't observe globally executed game streaming callbacks.
+        self.assertNotIn('ObserveAfter("VehicleObject"', D)
+        self.assertNotIn('ObserveAfter("NPCPuppet"', D)
+        self.assertNotIn('Game.GetTargetingSystem', D)
+        self.assertNotIn('GetWorldPosition', D)
+        # ACR captures CET scripting.log without a crash-reporter plugin API.
+        self.assertIn('bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua', P)
+
     def test_save_compatible_item_and_stats(self):
         for s in ["Items.NESTCyberdeck:", "$base: Items.AdvancedNetwatchNetdriverMKLegendaryPlusPlus",
                   "Items.CyberdeckBlueprint4Slots", "Variants.Humanity5Cost",
