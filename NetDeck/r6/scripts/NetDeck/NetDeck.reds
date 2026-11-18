@@ -270,9 +270,9 @@ public func NetDeckDisruptNpcVicinity(puppet: ref<ScriptedPuppet>) -> Int32 {
   if IsDefined(npc) &&
      (GameObject.GetAttitudeTowards(npc, player) == EAIAttitude.AIA_Hostile ||
       npc.IsCharacterPolice() || NetDeckIsNetWatch(puppet)) &&
-     !StatusEffectSystem.ObjectHasStatusEffect(npc, t"BaseStatusEffect.WeaponMalfunctionLvl4") {
+     !StatusEffectSystem.ObjectHasStatusEffect(npc, t"BaseStatusEffect.WeaponMalfunctionLvl2") {
     StatusEffectHelper.ApplyStatusEffect(
-      npc, t"BaseStatusEffect.WeaponMalfunctionLvl4", player.GetEntityID()
+      npc, t"BaseStatusEffect.WeaponMalfunctionLvl2", player.GetEntityID()
     );
     affected += 1;
   }
@@ -316,11 +316,16 @@ public func NetDeckGiveDataComponents(game: GameInstance) -> Void {
   let ts: ref<TransactionSystem> = GameInstance.GetTransactionSystem(game);
   if !IsDefined(ts) { return; }
   let id: TweakDBID = t"Items.QuickHackCommonMaterial1";
-  let roll: Int32 = RandRange(0, 5);
+  let roll: Int32 = RandRange(0, 9);
   if roll == 1 { id = t"Items.QuickHackUncommonMaterial1"; }
   if roll == 2 { id = t"Items.QuickHackRareMaterial1"; }
   if roll == 3 { id = t"Items.QuickHackEpicMaterial1"; }
   if roll == 4 { id = t"Items.QuickHackLegendaryMaterial1"; }
+  if roll == 5 { id = t"Items.CommonMaterial1"; }
+  if roll == 6 { id = t"Items.UncommonMaterial1"; }
+  if roll == 7 { id = t"Items.RareMaterial1"; }
+  if roll == 8 { id = t"Items.EpicMaterial1"; }
+  if roll == 9 { id = t"Items.LegendaryMaterial1"; }
   ts.GiveItemByTDBID(player, id, RandRange(1, 4));
 }
 
