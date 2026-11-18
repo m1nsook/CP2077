@@ -1,6 +1,7 @@
 name: Infiltration — NetWatch Σ MK.1 test package
 
-# Source-only game-root ZIP. NO .inkatlas, .xbm, PNG, or private WolvenKit files.
+# Source-only diagnostic game-root ZIP: REDscript, TweakXL and optional CET Lua.
+# NO .inkatlas, .xbm, PNG, or private WolvenKit files.
 # Does not compile REDscript or publish a GitHub release.
 on:
   pull_request:
@@ -22,13 +23,13 @@ jobs:
       - name: Validate source invariants
         run: python3 NetDeck/tools/test_netdeck_sources.py
       - name: Build game-root test ZIP
-        run: python3 NetDeck/tools/pack_test.py --output dist/NetDeck-v0.6.4-TEST.zip
+        run: python3 NetDeck/tools/pack_test.py --output dist/NetDeck-v0.6.5-TEST.zip
       - name: Upload test ZIP and checksum
         uses: actions/upload-artifact@v4
         with:
-          name: NetDeck-v0.6.4-TEST
+          name: NetDeck-v0.6.5-TEST
           path: |
-            dist/NetDeck-v0.6.4-TEST.zip
+            dist/NetDeck-v0.6.5-TEST.zip
             dist/NetDeck-TEST-SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
