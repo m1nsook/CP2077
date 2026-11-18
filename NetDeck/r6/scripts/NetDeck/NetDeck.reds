@@ -84,34 +84,35 @@ public func NetDeckActionInfiltration() -> ref<NetDeckInfiltration> {
   return action;
 }
 
-// GetQuickHackActions is where the native scanner builds device commands.
-// GetRemoteActions contains ordinary remote interactions and is not enough
-// for an independent built-in quickhack to appear in the player's wheel.
+// Use the known ScriptableDeviceComponentPS finalizer signature.
+// GetQuickHackActions on this base class cannot be wrapped with the old signature.
+// Insert before vanilla finalization so it processes the injected action.
 @wrapMethod(ScriptableDeviceComponentPS)
-protected func GetQuickHackActions(
-  out actions: array<ref<DeviceAction>>,
-  context: GetActionsContext
+protected final func FinalizeGetQuickHackActions(
+  outActions: script_ref<array<ref<DeviceAction>>>,
+  const context: script_ref<GetActionsContext>
 ) -> Void {
-  wrappedMethod(actions, context);
-  if !IsEquipped(this.GetGameInstance()) ||
-    !this.IsON() || this.IsMarkedAsQuest() ||
-    !IsDefined(this.NetDeckNetworkMaster()) {
-    return;
-  }
-
-  let i: Int32 = 0;
-  while i < ArraySize(actions) {
-    let existing: ref<ScriptableDeviceAction> = actions[i] as ScriptableDeviceAction;
-    if IsDefined(existing) {
-      let record: wref<ObjectAction_Record> = existing.GetObjectActionRecord();
-      if IsDefined(record) && Equals(record.ActionName(), n"NetDeckInfiltration") {
-        return;
+  if IsEquipped(this.GetGameInstance()) &&
+    this.IsON() && !this.IsMarkedAsQuest() &&
+    IsDefined(this.NetDeckNetworkMaster()) {
+    let exists: Bool = false;
+    let i: Int32 = 0;
+    while i < ArraySize(Deref(outActions)) {
+      let existing: ref<ScriptableDeviceAction> =
+        Deref(outActions)[i] as ScriptableDeviceAction;
+      if IsDefined(existing) {
+        let record: wref<ObjectAction_Record> = existing.GetObjectActionRecord();
+        if IsDefined(record) && Equals(record.ActionName(), n"NetDeckInfiltration") {
+          exists = true;
+        }
       }
+      i += 1;
     }
-    i += 1;
+    if !exists {
+      ArrayPush(Deref(outActions), this.NetDeckActionInfiltration());
+    }
   }
-
-  ArrayPush(actions, this.NetDeckActionInfiltration());
+  wrappedMethod(outActions, context);
 }
 
 // The scanner intersects device actions with the player's quickhack list.
@@ -219,8 +220,9 @@ private func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> V
   // Don't send a synthetic distraction to every device: the base controller
   // constructs a QuickHackDistraction even for devices with no such feature.
   // Only dispatch an actual offered, active game-created quickhack action.
-  if IsDefined(member as MasterControllerPS) ||
-    IsDefined(member as PuppetDeviceLinkPS) {
+  // Master controllers are not eligible distraction targets.
+  // PuppetDeviceLinkPS is not a ScriptableDeviceComponentPS subtype.
+  if IsDefined(member as MasterControllerPS) {
     return;
   }
   let actions: array<ref<DeviceAction>>;

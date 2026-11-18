@@ -24,12 +24,17 @@ class InfiltrationSourceTests(unittest.TestCase):
 
     def test_native_action_gate(self):
         for s in ["module NetDeck", "class NetDeckInfiltration extends ActionBool",
-                  "GetQuickHackActions(", "GetPlayerQuickHackListWithQuality(",
+                  "FinalizeGetQuickHackActions(", "GetPlayerQuickHackListWithQuality(",
                   "PlayerQuickhackData(ItemID.None(), record, 5)",
                   "DeviceAction.NetDeckInfiltration",
                   "protected cb func OnNetDeckInfiltration"]:
             self.assertIn(s, R)
         self.assertNotIn("public func GetRemoteActions(", R)
+        self.assertNotIn("member as PuppetDeviceLinkPS", R)
+        self.assertIn("outActions: script_ref<array<ref<DeviceAction>>>", R)
+        self.assertIn("const context: script_ref<GetActionsContext>", R)
+        self.assertIn("protected final func FinalizeGetQuickHackActions(", R)
+        self.assertIn("wrappedMethod(outActions, context);", R)
         self.assertIn("Items.NESTCyberdeck", R)
 
     def test_network_safety(self):

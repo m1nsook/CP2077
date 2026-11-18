@@ -56,3 +56,7 @@ If the game fails to load, check `r6/logs/redscript_rCURRENT.log` (or the instal
 6. Robots are **not** marked supported until a non-destructive native puppet/network integration is established.
 
 This build has **not** passed a 2.5 game or REDscript compiler check. Static tests alone cannot establish that the action uploads, that RAM is spent or that network devices turn off. Do not publish as a finished mod.
+
+### 2026-11-18 REDscript compiler correction
+
+The previous NetDeck test failed to compile because the base-class `GetQuickHackActions` wrapper signature does not match the 2.5 method. The corrected hook uses the 2.5 `FinalizeGetQuickHackActions` signature with script references. An impossible `PuppetDeviceLinkPS` cast was also removed. Source correction only; this is not an in-game success claim.
