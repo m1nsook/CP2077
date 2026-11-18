@@ -180,6 +180,13 @@ public func NetDeckInfiltrateNetwork() -> Void {
   }
 
   let seen: array<ref<ScriptableDeviceComponentPS>>;
+  // A pingable access point or network controller IS a valid cast target.
+  // Traverse its own descendants instead of expecting a camera-like parent.
+  let directMaster: ref<MasterControllerPS> = this as MasterControllerPS;
+  if IsDefined(directMaster) {
+    this.NetDeckInfiltrateMaster(directMaster, seen);
+    return;
+  }
   let accessPoints: array<ref<AccessPointControllerPS>> = this.GetAccessPoints();
   let i: Int32 = 0;
   let foundAP: Bool = false;

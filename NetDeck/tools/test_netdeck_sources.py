@@ -51,6 +51,7 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertNotIn("SystemCollapse", R)
         self.assertIn("member.NetDeckApplyToMember(member)", R)
         self.assertIn("this.NetDeckApplyToMember(this)", R)
+        self.assertIn("this.NetDeckInfiltrateMaster(directMaster, seen)", R)
         self.assertIn("class NetDeckPuppetInfiltration extends PuppetAction", R)
         self.assertIn("public final const func GetAllChoices(", R)
         self.assertIn("PuppetDeviceLinkPS", R)
