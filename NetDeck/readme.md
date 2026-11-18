@@ -1,6 +1,6 @@
 # Infiltration — NetWatch Σ MK.1 iconic cyberdeck
 
-Cyberpunk 2077 2.5 development test. **v0.5.2 is not REDscript-compiler verified yet.**
+Cyberpunk 2077 2.5 development test. **v0.5.3 is not REDscript-compiler verified yet.**
 NetWatch Σ MK.1 is an iconic Tier 5++ cyberdeck with the built-in NETWORM quickhack.
 The saved item ID remains `Items.NESTCyberdeck`; the directory and new
 internal prefixes are `NetDeck`.
@@ -12,7 +12,7 @@ internal prefixes are `NetDeck`.
 * Night City and Dogtown ripperdoc stock.
 * Camera Killer not required, and not modified.
 
-## v0.5.2 target eligibility and feedback
+## v0.5.3 target eligibility, takeover and feedback
 
 **NETWORM should be offered on anything vanilla Ping can target.** A
 camera, access point or surveillance system is no longer required.
@@ -39,7 +39,22 @@ Codeware's provider (19 UI languages with English fallback). Cyberdeck and NETWO
 
 The 26 ripperdoc records and NetWatch Σ MK.1 gameplay stat packages are **unchanged**.
 
-NETWORM's first-pass feedback uses a short native network pulse and a localized upload result. Access-point-only NETWORM scanning remains **experimental**. The v0.5.2 source fixes invalid `Device` casts and uses the correct `GetRemoteActions(out outActions: array<ref<DeviceAction>>, const context: script_ref<GetActionsContext>)` wrapper signature, but a successful game build has not been reported yet.
+NETWORM's network feedback remains a short native pulse plus a localized upload result.
+
+### v0.5.3 takeover rules (experimental)
+- **Access-point scanner quickhacking removed.** Vanilla access-point breach interactions remain unchanged; regular device NETWORM can still traverse connected controllers.
+- **Device-origin NETWORM:** cameras/turrets/mines and other compatible network electronics remain targets. Enemy **netrunners within 25 m of the infected device** receive a Tier 5 Synapse Burnout status effect. Ordinary NPCs are never damaged by this device-origin path.
+- **NPC-origin NETWORM:** non-damaging Weapon Glitch (lower-tier Weapon Malfunction status) on hostile/NCPD/NetWatch targets; attempts Emergency Brake on eligible nearby vehicles within 25 m. No direct lethal action on the NPC, and the linked electronic network can still be affected.
+- **NetWatch NPC upload:** issues the native five-star pursuit request and starts the game's position-reveal/trace path immediately. This relies on vanilla police/story constraints and may not equal an already completed trace in every state.
+- **Doors/windows:** opens connected non-quest/non-sealed/non-disabled/non-elevator door/window controllers using native toggle-lock and open actions. Scripted quest barriers remain untouched.
+- **Data extraction:** a successful upload gives 1–4 randomly selected item-crafting or quickhack-crafting components; the game's reward notification remains visible.
+- **XP:** this mod explicitly awards **no XP**. However, engine-originated combat/skill XP (especially after Synapse Burnout kills) has **not** yet been suppressed and must be checked in-game. Do not claim XP-free until confirmed.
+
+### What has and has not been tested
+- **Confirmed in-game:** NetWatch Σ MK.1 cyberdeck icon and NETWORM icon display correctly when the user packs their private original-resolution artwork.
+- **Compiler:** v0.5.1 failed due to invalid casts and a wrong method signature; v0.5.2 source corrected the reported signatures, but a subsequent successful game build has not been reported.
+- **New in v0.5.3, not verified:** remote door opening, vehicle braking, nonlethal Weapon Glitch, netrunner burnout, NetWatch full pursuit and trace, loot, and XP suppression.
+- **Safety:** no quest-marked devices, sealed doors, quest/scene vehicles, or quest NPCs should be forcibly modified. Test with a backed-up save.
 
 ## Install
 Requires RED4ext, redscript, TweakXL, Codeware and Cyberpunk 2077 2.5.
@@ -55,15 +70,17 @@ CET item command:
 Game.AddToInventory("Items.NESTCyberdeck", 1)
 ```
 
-## Focused live test for this build
-1. Confirm no REDscript compiler/TweakXL error (previous issue: incorrect `GetRemoteActions` signature).
-2. Scan a standalone pingable device **without a camera**. NETWORM must appear.
-3. Scan a pingable hostile NPC; NETWORM must appear alongside normal Ping.
-4. With a real access point link (camera or no camera), upload NETWORM and
-   confirm devices on that network shut down, and unrelated networks do not.
-5. Confirm **normal Ping still works** with NetWatch Σ MK.1 and a vanilla cyberdeck.
-6. Scan an access point with this deck and another deck. It must offer only NETWORM on NetWatch Σ MK.1; no extra hacks on other decks.
-7. Check whether the network pulse and localized success message appear after upload.
+## Focused v0.5.3 game test
+1. Confirm REDscript compiles. Send `r6/logs/redscript_rCURRENT.log` if not.
+2. Confirm NETWORM remains separate from normal Ping on standalone devices and regular NPCs.
+3. Scan a vanilla access point: the failed experimental NETWORM entry **must not appear**.
+4. Upload to a device near an enemy netrunner: verify Synapse Burnout hits **only netrunners**, not other NPCs; test >25 m too.
+5. Upload to a hostile NPC/NCPD/NetWatch: weapon glitches without damage; a nearby non-quest vehicle brakes, an unrelated vehicle does not.
+6. Upload to a NetWatch NPC: check five-star pursuit and whether reveal/trace truly finishes instantly.
+7. Test a regular network-connected closed door/window vs a quest/sealed door.
+8. Verify occasional crafting/quickhack component rewards on successful upload and check both Netrunner XP and kill XP changes.
+9. Confirm no unrelated-network shutdown, vanilla Ping regression, or private atlas changes.
+
 
 Previous gameplay results do not establish that this new NPC scanner hook,
 standalone targeting, access-point actions, feedback or localization work.
