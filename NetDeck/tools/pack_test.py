@@ -40,12 +40,14 @@ INSTALL:
     Check a moving car, a road barrier, and a non-quest door too.
     Check that progress notifications and final target counts match.
     Check that only the logged network devices appear in the feedback device count.
-12. Confirm ordinary NETWORM is not traced; NetWatch still triggers five stars.
-13. Check €$ siphon totals and number of sources in the feedback.
-14. Normal Netrunner XP is allowed. Check crafting components awarded.
+12. With Carhacker, verify NETWORM appears in the native vehicle scanner and
+    one moving car upload brakes and spreads to a second loaded car.
+13. Confirm ordinary NETWORM is not traced; NetWatch still triggers five stars.
+14. Check €$ siphon totals and number of sources in the feedback.
+15. Normal Netrunner XP is allowed. Check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.6.1 corrects REDscript signature errors but is NOT game-compiler verified.
+- v0.6.2 corrects REDscript signature errors but is NOT game-compiler verified.
 - Previous build's network shutdown, vendor and stats were user-confirmed.
 - Codeware interface-language packages cover 19 UI languages, with English fallback.
 - No NETWORM access-point scanner actions. NPC/vehicle/door/network effects are experimental.
@@ -54,6 +56,8 @@ IMPORTANT LIMITATIONS:
   an independent, functioning quickhack when NetWatch Σ MK.1 is installed.
 - Timed PlayerPuppet wave, 0.45s per target, 4 hops of up to 25m, max 40
   affected loaded entities. Native network descendants also join the queue.
+- Loaded cars are registered via native VehicleObject attach/detach, not TSFMV.
+- Dedicated VehicleQuickHack requires Carhacker and equipped NetWatch Σ MK.1.
 - This is an unverified experimental build, not a confirmed gameplay fix.
 - Eurodollar siphon is a capped gameplay reward; it does not drain actual
   NPC inventories. Normal Netrunner XP gain is allowed.
@@ -95,6 +99,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.1-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.2-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
