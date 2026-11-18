@@ -5,6 +5,29 @@
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
 
+## STOP — unresolved runtime crash (18 Nov 2026, 16:29:37)
+
+The player reported `20261118-162937-crash-tid25824-01.txt`:
+`redDispatcher6` fault in `Cyberpunk2077.exe` with references to
+`DynamicTexture`, `CMaterialTemplate` and `inkVirtualWindow Base Window`.
+The crash reporter identifies **no culprit**. This does not prove whether
+NETWORM, an icon atlas, another mod, or the game itself triggered the crash.
+
+**DO NOT install/retest the development build or merge/release PR #36 yet.**
+Back up the save and isolate the build that was actually installed. Github
+source changes do not affect a running game unless manually installed.
+
+An experimental implementation writing to the global `UI_HUDProgressBar`
+blackboard was committed then explicitly REVERTED before validation.
+The native quest-bar overlay and red completion banner are **not currently
+implemented**; do not describe them as working. Sonic Shock Tier 5 source
+changes are retained, but also await a clean game-compiler + runtime test.
+
+When ready to investigate, compare crash reproductions with NetDeck's
+`r6/scripts/NetDeck` and `r6/tweaks/NetDeck` **both** removed and with
+its separately installed private icon `.archive` disabled. The crash
+summary alone is not enough to attribute causality.
+
 ## v0.6.3 — enemy targeting and sound-safety changes (UNVERIFIED)
 
 **Observed in the player's game (v0.6.2):** NETWORM counted 11 targets
