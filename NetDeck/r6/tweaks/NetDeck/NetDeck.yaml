@@ -65,6 +65,20 @@ DeviceAction.NetDeckInfiltration:
   targetPrereqs: []
   targetActivePrereqs: []
 
+# Dedicated native vehicle quickhack; VehicleComponentPS scanner and the
+# Carhacker perk determine whether vehicle actions are available. No PNG data.
+DeviceAction.NetDeckVehicleInfiltration:
+  $base: DeviceAction.VehicleForceBrakesClassHack
+  awarenessCost: NetDeck.ZeroAwareness
+  actionName: NetDeckInfiltration
+  objectActionUI: Interactions.NetDeckInfiltration
+  isQuickHack: true
+  objectActionType: ObjectActionType.VehicleQuickHack
+  startEffects: []
+  completionEffects: []
+  targetPrereqs: []
+  targetActivePrereqs: []
+
 # Public source-only icon RECORDS: users must install their own cooked atlas.
 UIIcon.NetDeckNetworm:
   $type: gamedataUIIcon_Record
