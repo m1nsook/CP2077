@@ -275,6 +275,13 @@ public class NetDeckWaveTickEvent extends Event {
   public let generation: Int32;
 }
 
+// This drives only the native upload HUD. Malware fanout remains a separate,
+// slow and bounded event chain; its timers must never hold the HUD open.
+public class NetDeckHudTickEvent extends Event {
+  public let generation: Int32;
+  public let step: Int32;
+}
+
 // TSFMV does not expose Obj_Vehicle. Track loaded VehicleObjects through
 // their native attach/detach events, and inspect them separately from the
 // generic targeting query. Weak refs avoid keeping streamed-out cars alive.
@@ -566,6 +573,12 @@ private func NetDeckHudStart() -> Void {
   bb.SetFloat(d.Progress, 0.0, true);
   bb.SetBool(d.Active, true, true);
   this.NetDeckHudUpdate();
+  // The native controller chooses its own icon/tint from MessageType.
+  // Neutral replaces the alert triangle with the built-in neutral symbol,
+  // and switches the widget to its native neutral color theme.
+  // This affects only the bar that NETWORM has claimed.
+  bb.SetVariant(d.MessageType, SimpleMessageType.Neutral, true);
+  this.NetDeckHudSchedule(1);
 }
 
 @addMethod(PlayerPuppet)
@@ -588,11 +601,16 @@ private func NetDeckHudUpdate() -> Void {
   if !IsDefined(loc) { return; }
   let r: ref<NetDeckSpreadResult> = this.netDeckWaveResult;
   let count: Int32 = r.npcs + r.vehicles + r.netrunners + r.devices;
-  this.netDeckHudHeader = loc.GetText("NetDeckUploadProgress") + " " +
+  let nextHeader: String = loc.GetText("NetDeckUploadProgress") + " " +
     IntToString(count) + " " + loc.GetText("NetDeckTargetsAffected");
-  bb.SetString(d.Header, this.netDeckHudHeader, true);
-  bb.SetString(d.BottomText, loc.GetText("NetDeckDevicesAffected") +
-    ": " + IntToString(r.devices), true);
+  if !Equals(nextHeader, this.netDeckHudHeader) {
+    this.netDeckHudHeader = nextHeader;
+    bb.SetString(d.Header, this.netDeckHudHeader, true);
+    // Header changes normally reset the native controller to red warning.
+    bb.SetVariant(d.MessageType, SimpleMessageType.Neutral, true);
+  }
+  // The native widget already has its own percent text. Adding our device
+  // counter alongside it produced the user's misleading "DEVICES: 16%".
   bb.SetFloat(d.Progress, this.netDeckHudProgress, true);
 }
 
@@ -611,6 +629,36 @@ private func NetDeckHudFinish() -> Void {
     bb.SetFloat(d.Progress, 1.0, true);
     bb.SetBool(d.Active, false, true);
   }
+}
+
+// Short independent 4-second animation: 20 steps * 0.2 seconds.
+// Does not change the 2.0-second gameplay propagation tick below.
+@addMethod(PlayerPuppet)
+private func NetDeckHudSchedule(step: Int32) -> Void {
+  let evt: ref<NetDeckHudTickEvent> = new NetDeckHudTickEvent();
+  evt.generation = this.netDeckWaveGeneration;
+  evt.step = step;
+  GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, 0.2);
+}
+
+@addMethod(PlayerPuppet)
+protected cb func OnNetDeckHudTickEvent(evt: ref<NetDeckHudTickEvent>) -> Bool {
+  if evt.generation != this.netDeckWaveGeneration || !this.netDeckHudOwned {
+    return true;
+  }
+  if !IsEquipped(this.GetGame()) {
+    this.NetDeckHudFinish();
+    return true;
+  }
+  // A 4-second initial upload, independent of the longer self-spreading wave.
+  this.netDeckHudProgress = Cast<Float>(evt.step) / 20.0;
+  this.NetDeckHudUpdate();
+  if evt.step >= 20 {
+    this.NetDeckHudFinish();
+  } else {
+    this.NetDeckHudSchedule(evt.step + 1);
+  }
+  return true;
 }
 
 @addMethod(PlayerPuppet)
@@ -672,9 +720,6 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
   // Hard safety stop: max 16 scheduled jumps (32 seconds) in this test
   // build, even if native targeting starts returning phantom candidates.
   this.netDeckWaveTicks += 1;
-  if this.netDeckHudProgress < 1.0 {
-    this.netDeckHudProgress += 0.0625;
-  }
   if this.netDeckWaveTicks > 16 || ArraySize(this.netDeckWaveSeen) >= 40 {
     this.NetDeckWaveFinish();
     return true;
