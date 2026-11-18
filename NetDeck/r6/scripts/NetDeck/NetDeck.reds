@@ -215,7 +215,6 @@ public class NetDeckSpreadResult extends IScriptable {
   public let vehicles: Int32;
   public let eddies: Int32;
   public let robbedTargets: Int32;
-  public let pulses: Int32;
   public let seen: array<ref<GameObject>>;
 }
 
@@ -405,6 +404,8 @@ private let netDeckWavePendingDepths: array<Int32>;
 @addField(PlayerPuppet)
 private let netDeckWavePendingCursor: Int32;
 @addField(PlayerPuppet)
+private let netDeckWaveTicks: Int32;
+@addField(PlayerPuppet)
 private let netDeckWaveResult: ref<NetDeckSpreadResult>;
 
 @addMethod(PlayerPuppet)
@@ -523,10 +524,9 @@ private func NetDeckWaveInfect(obj: ref<GameObject>, depth: Int32) -> Void {
     let ps: ref<ScriptableDeviceComponentPS> =
       device.GetDevicePS() as ScriptableDeviceComponentPS;
     if IsDefined(ps) {
-      if this.netDeckWaveResult.pulses < 8 {
-        NetDeckPulseNetwork(ps);
-        this.netDeckWaveResult.pulses += 1;
-      }
+      // Do not run PingNetworkGrid_Event here. That effect can outlive
+      // its upload and was reported to leave continuous audio in-game.
+      // Reintroduce a VISUAL only after isolated, explicit cleanup tests.
       if this.netDeckWaveFromDevice {
         this.netDeckWaveResult.netrunners += NetDeckBurnoutNearbyNetrunners(ps);
       }
@@ -547,26 +547,15 @@ private func NetDeckWaveInfect(obj: ref<GameObject>, depth: Int32) -> Void {
     }
   }
 
-  // One progress message every 4 infected targets: visibly confirms each
-  // successive set of jumps without 40 notification popups.
-  if ArraySize(this.netDeckWaveSeen) % 4 == 0 {
-    let loc: ref<LocalizationSystem> =
-      LocalizationSystem.GetInstance(this.GetGame());
-    if IsDefined(loc) {
-      let notification: ref<HackingRewardNotificationEvent> =
-        new HackingRewardNotificationEvent();
-      notification.m_text = loc.GetText("NetDeckWaveProgress") +
-        " " + IntToString(ArraySize(this.netDeckWaveSeen));
-      GameInstance.GetUISystem(this.GetGame()).QueueEvent(notification);
-    }
-  }
+  // No per-hop notifications: the native reward event may play UI audio.
+  // Emit a single outcome at the end, not a repeating reward chime.
 }
 
 @addMethod(PlayerPuppet)
 private func NetDeckWaveSchedule() -> Void {
   let evt: ref<NetDeckWaveTickEvent> = new NetDeckWaveTickEvent();
   evt.generation = this.netDeckWaveGeneration;
-  GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, 0.45);
+  GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, 2.0);
 }
 
 @addMethod(PlayerPuppet)
@@ -577,7 +566,7 @@ private func NetDeckWaveFinish() -> Void {
   if affected > 0 { NetDeckGiveDataComponents(this.GetGame()); }
   NetDeckNotify(
     this.GetGame(), affected + r.robbedTargets, r.devices, r.eddies,
-    r.robbedTargets, ArraySize(this.netDeckWaveSeen)
+    r.robbedTargets, affected
   );
 }
 
@@ -594,6 +583,7 @@ public func NetDeckWaveStart(root: ref<GameObject>, fromDevice: Bool) -> Void {
   this.netDeckWaveFromDevice = fromDevice;
   this.netDeckWaveOrigin = root.GetWorldPosition();
   this.netDeckWavePendingCursor = 0;
+  this.netDeckWaveTicks = 0;
   this.netDeckWaveResult = new NetDeckSpreadResult();
   ArrayClear(this.netDeckWaveSeen);
   ArrayClear(this.netDeckWaveHosts);
@@ -611,7 +601,13 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
   if !IsEquipped(this.GetGame()) {
     return true;
   }
-  if ArraySize(this.netDeckWaveSeen) >= 40 { this.NetDeckWaveFinish(); return true; }
+  // Hard safety stop: max 16 scheduled jumps (32 seconds) in this test
+  // build, even if native targeting starts returning phantom candidates.
+  this.netDeckWaveTicks += 1;
+  if this.netDeckWaveTicks > 16 || ArraySize(this.netDeckWaveSeen) >= 40 {
+    this.NetDeckWaveFinish();
+    return true;
+  }
 
   // First process genuine connected network descendants, one at a time.
   let selected: ref<GameObject>;
@@ -756,21 +752,8 @@ public final static func WillHackRevealPlayer(
   return wrappedMethod(playerRef, targetRecordId, action, programItemID);
 }
 
-// Use the game's existing network visual for a short propagation pulse.
-public func NetDeckPulseNetwork(source: ref<ScriptableDeviceComponentPS>) -> Void {
-  if !IsDefined(source) {
-    return;
-  }
-  let device: ref<Device> = source.GetOwnerEntityWeak() as Device;
-  if !IsDefined(device) {
-    return;
-  }
-  device.PingNetworkGrid_Event(
-    device.GetNetworkBeamEndpoint(),
-    device.GetFxResourceByKey(n"pingNetworkLink"),
-    2.5, EPingType.DIRECT, true, true, false
-  );
-}
+// Deliberately no PingNetworkGrid_Event call: stale network audio must not
+// survive a NETWORM upload or make the user uninstall the mod to silence it.
 
 // Report upload outcome once, using Codeware's interface language.
 public func NetDeckNotify(
