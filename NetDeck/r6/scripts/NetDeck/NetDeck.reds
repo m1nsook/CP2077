@@ -326,6 +326,64 @@ protected cb func OnDetach() -> Bool {
   return wrappedMethod();
 }
 
+// The targeting query can miss nearby NPCs even when the initial upload
+// succeeded. Keep a bounded weak-ref fallback for loaded puppets, as for cars.
+// No NPCs are acted on at registration time.
+@addField(PlayerPuppet)
+private let netDeckLoadedPuppets: array<wref<NPCPuppet>>;
+
+@addMethod(PlayerPuppet)
+public func NetDeckRegisterPuppet(puppet: wref<NPCPuppet>) -> Void {
+  if !IsDefined(puppet) { return; }
+  let i: Int32 = 0;
+  while i < ArraySize(this.netDeckLoadedPuppets) {
+    if !IsDefined(this.netDeckLoadedPuppets[i]) {
+      ArrayErase(this.netDeckLoadedPuppets, i);
+    } else {
+      if Equals(this.netDeckLoadedPuppets[i].GetEntityID(), puppet.GetEntityID()) {
+        return;
+      }
+      i += 1;
+    }
+  }
+  if ArraySize(this.netDeckLoadedPuppets) >= 512 {
+    ArrayErase(this.netDeckLoadedPuppets, 0);
+  }
+  ArrayPush(this.netDeckLoadedPuppets, puppet);
+}
+
+@addMethod(PlayerPuppet)
+public func NetDeckUnregisterPuppet(id: EntityID) -> Void {
+  let i: Int32 = 0;
+  while i < ArraySize(this.netDeckLoadedPuppets) {
+    if !IsDefined(this.netDeckLoadedPuppets[i]) ||
+       Equals(this.netDeckLoadedPuppets[i].GetEntityID(), id) {
+      ArrayErase(this.netDeckLoadedPuppets, i);
+    } else {
+      i += 1;
+    }
+  }
+}
+
+@wrapMethod(NPCPuppet)
+protected cb func OnGameAttached() -> Bool {
+  let result: Bool = wrappedMethod();
+  let player: ref<PlayerPuppet> = GetPlayer(this.GetGame());
+  if IsDefined(player) {
+    player.NetDeckRegisterPuppet(this);
+  }
+  return result;
+}
+
+@wrapMethod(NPCPuppet)
+protected cb func OnDetach() -> Bool {
+  let player: ref<PlayerPuppet> = GetPlayer(this.GetGame());
+  if IsDefined(player) {
+    player.NetDeckUnregisterPuppet(this.GetEntityID());
+  }
+  return wrappedMethod();
+}
+
 @addField(PlayerPuppet)
 private let netDeckWaveGeneration: Int32;
 @addField(PlayerPuppet)
@@ -373,7 +431,11 @@ private func NetDeckWaveValid(obj: ref<GameObject>) -> Bool {
     if !IsDefined(npc.GetRecord()) || npc.GetRecord().IsChild() {
       return false;
     }
-    return true;
+    // A nearby civilian or friendly/companion NPC must NEVER become a relay,
+    // receive a malfunction, or contribute to network-theft rewards.
+    return EnumInt(GameObject.GetAttitudeTowards(npc, this)) ==
+      EnumInt(EAIAttitude.AIA_Hostile) ||
+      npc.IsCharacterPolice() || NetDeckIsNetWatch(npc);
   }
   let vehicle: ref<VehicleObject> = obj as VehicleObject;
   if IsDefined(vehicle) {
@@ -527,6 +589,8 @@ public func NetDeckWaveStart(root: ref<GameObject>, fromDevice: Bool) -> Void {
   this.netDeckWaveGeneration += 1;
   let initialVehicle: wref<VehicleObject> = root as VehicleObject;
   if IsDefined(initialVehicle) { this.NetDeckRegisterVehicle(initialVehicle); }
+  let initialPuppet: wref<NPCPuppet> = root as NPCPuppet;
+  if IsDefined(initialPuppet) { this.NetDeckRegisterPuppet(initialPuppet); }
   this.netDeckWaveFromDevice = fromDevice;
   this.netDeckWaveOrigin = root.GetWorldPosition();
   this.netDeckWavePendingCursor = 0;
@@ -609,6 +673,31 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
         }
       }
       i += 1;
+    }
+    // Fallback for hostile loaded NPCs omitted by TargetingSystem. Every
+    // candidate still passes the same eligibility, range, hop, visited and
+    // fanout checks as the targeting query. Civilians cannot relay the worm.
+    let p: Int32 = 0;
+    while p < ArraySize(this.netDeckLoadedPuppets) {
+      let loadedNpc: ref<NPCPuppet> = this.netDeckLoadedPuppets[p];
+      if IsDefined(loadedNpc) && this.NetDeckWaveValid(loadedNpc) &&
+         Vector4.Distance(this.netDeckWaveOrigin, loadedNpc.GetWorldPosition()) <= 55.0 {
+        let hostNpc: Int32 = 0;
+        while hostNpc < ArraySize(this.netDeckWaveHosts) {
+          if this.netDeckWaveLinks[hostNpc] < 4 &&
+             this.netDeckWaveDepths[hostNpc] < 4 {
+            let npcDistance: Float =
+              Vector4.Distance(this.netDeckWaveHosts[hostNpc], loadedNpc.GetWorldPosition());
+            if npcDistance <= nearest {
+              nearest = npcDistance;
+              selected = loadedNpc;
+              selectedHost = hostNpc;
+            }
+          }
+          hostNpc += 1;
+        }
+      }
+      p += 1;
     }
     // Cars are not reliably returned by TSFMV's generic object mask.
     // Match loaded VehicleObjects explicitly using their world positions.
