@@ -42,9 +42,8 @@ class InfiltrationSourceTests(unittest.TestCase):
                   "OnNetDeckPuppetInfiltration",
                   "protected cb func OnNetDeckInfiltration"]:
             self.assertIn(s, R)
-        self.assertIn("@wrapMethod(ScriptableDeviceComponentPS)\npublic func GetRemoteActions(", R)
-        self.assertIn("out outActions: array<ref<DeviceAction>>", R)
-        self.assertIn("const context: script_ref<GetActionsContext>", R)
+        self.assertNotIn("public func GetRemoteActions(", R)
+        self.assertNotIn("@wrapMethod(AccessPointControllerPS)", R)
         self.assertNotIn("this as AccessPointController;", R)
         self.assertNotIn("@wrapMethod(Device)", R)
         self.assertNotIn("member as PuppetDeviceLinkPS", R)
@@ -77,13 +76,34 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertNotIn("$base: Interactions.PingHack", Y)
         self.assertNotIn('IsDefined(this.NetDeckNetworkMaster()) {', R)
 
-    def test_access_points_and_feedback_are_experimental(self):
-        self.assertIn("@wrapMethod(AccessPointControllerPS)", R)
-        self.assertIn("CanCreateAnyQuickHackActions()", R)
-        self.assertIn("ArrayClear(outActions);", R)
+    def test_access_point_experiment_removed_and_feedback_preserved(self):
+        self.assertNotIn("@wrapMethod(AccessPointControllerPS)", R)
+        self.assertNotIn("public func GetRemoteActions(", R)
+        self.assertIn("!IsDefined(this as AccessPointControllerPS)", R)
         self.assertIn("NetDeckPulseNetwork(", R)
         self.assertIn("NetDeckNotify(", R)
         self.assertIn("HackingRewardNotificationEvent", R)
+
+    def test_networm_takeover_rules(self):
+        self.assertIn("NetDeckBurnoutNearbyNetrunners(", R)
+        self.assertIn("BaseStatusEffect.BrainMeltLevel4", R)
+        self.assertIn("target.IsNetrunnerPuppet()", R)
+        self.assertIn("NetDeckDisruptNpcVicinity(", R)
+        self.assertIn("BaseStatusEffect.WeaponMalfunctionLvl2", R)
+        self.assertNotIn("BaseStatusEffect.WeaponMalfunctionLvl4", R)
+        self.assertIn("vehicle.ForceBrakesFor(4.0)", R)
+        self.assertIn("door.ActionSetOpened()", R)
+        self.assertIn("door.ActionToggleLock()", R)
+        self.assertIn("door.IsMarkedAsQuest()", R)
+        self.assertIn("NetDeckIsNetWatch(", R)
+        self.assertIn("gamedataAffiliation.NetWatch", R)
+        self.assertIn("wanted.m_wantedLevel = EPreventionHeatStage.Heat_5", R)
+        self.assertIn("NPCPuppet.RevealPlayerPositionIfNeeded(", R)
+        self.assertIn("NetDeckGiveDataComponents(", R)
+        self.assertIn("Items.LegendaryMaterial1", R)
+        self.assertIn("Items.QuickHackLegendaryMaterial1", R)
+        self.assertNotIn("RPGManager.AwardXP(", R)
+        self.assertNotIn("AddExperience(", R)
 
     def test_19_ui_languages_and_fallback(self):
         import re
