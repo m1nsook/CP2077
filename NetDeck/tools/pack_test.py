@@ -36,10 +36,11 @@ INSTALL:
 9. Test connected security effects without any camera in the network.
 10. Check an unrelated network remains unaffected.
 11. Test nonlethal Weapon Glitch, vehicle brake, NetWatch pursuit and linked door unlocking.
+    Check that only the logged network devices appear in the feedback device count.
 12. Watch for XP on netrunner burnout or hacking, and check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.5.3 corrects REDscript signature errors but is NOT game-compiler verified.
+- v0.5.4 corrects REDscript signature errors but is NOT game-compiler verified.
 - Previous build's network shutdown, vendor and stats were user-confirmed.
 - Codeware interface-language packages cover 19 UI languages, with English fallback.
 - No NETWORM access-point scanner actions. NPC/vehicle/door/network effects are experimental.
@@ -87,6 +88,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.5.3-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.5.4-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
