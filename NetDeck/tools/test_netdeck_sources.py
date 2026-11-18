@@ -87,7 +87,7 @@ class InfiltrationSourceTests(unittest.TestCase):
 
     def test_19_ui_languages_and_fallback(self):
         import re
-        locale_ids = set(re.findall(r'if Equals\\(language, n"([a-z]{2}-[a-z]{2})"\\)', L))
+        locale_ids = set(re.findall(r'if Equals\(language, n"([a-z]{2}-[a-z]{2})"\)', L))
         self.assertEqual(locale_ids, {
             "en-us", "ar-ar", "zh-cn", "zh-tw", "cz-cz",
             "fr-fr", "de-de", "hu-hu", "it-it", "jp-jp",
@@ -104,8 +104,8 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertNotIn("$base: Interactions.PingHack", Y)
         self.assertIn("$base: DeviceAction.ToggleStateClassHack", Y)
         self.assertIn("$base: Interactions.TakeControlCameraHack", Y)
-        self.assertIn("m1nsook\\\\netdeck\\\\ui\\\\netdeck_icons.inkatlas", Y)
-        self.assertIn("m1nsook\\\\netdeck\\\\ui\\\\networm_icons.inkatlas", Y)
+        self.assertIn("m1nsook\\netdeck\\ui\\netdeck_icons.inkatlas", Y)
+        self.assertIn("m1nsook\\netdeck\\ui\\networm_icons.inkatlas", Y)
         self.assertIn("captionIcon: ChoiceCaptionParts.NetDeckNetwormIcon", Y)
 
     def test_independent_native_labels(self):
