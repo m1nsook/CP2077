@@ -29,15 +29,16 @@ vehicle propagation may regress** until we develop a safer discovery path.
 This tiny CET mod uses observer-only hooks on *NetDeck methods*, not global
 entity lifecycle methods. It emits `[NetDeck/DIAG v0.6.5]` lines:
 session_start, observer_ready/unavailable, heartbeat every ~15 seconds,
-wave_start, wave_infect (max 16 logged per upload), wave_finish,
-hud_start, and hud_finish. Failing to observe a method is logged and
+wave_request (BEFORE upload starts), wave_start (AFTER upload returns),
+wave_infect (max 16 logged per upload), wave_finish,
+hud_request (BEFORE HUD creation), hud_start, and hud_finish. Failing to observe a method is logged and
 must not block gameplay. This does not read world objects during
 the heartbeat. **Advanced Crash Reporter 1.6 already includes
 CET `scripting.log`, so no patch to the crash reporter is needed.**
 
 Read `bin/x64/plugins/cyber_engine_tweaks/scripting.log`, or send the
 next Advanced Crash Reporter `.txt` (it includes the log tail). If it crashes
-**before any `wave_start`**, we know the crashing session did not have a
+**before any `wave_request`**, we know the crashing session did not have a
 logged successful NETWORM upload, though the item/quickhack source can still
 affect the game. If it crashes after wave_start, the last method logs can
 help correlate the crash with an upload or HUD transition. **Logging alone
