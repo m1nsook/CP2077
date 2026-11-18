@@ -76,21 +76,40 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertNotIn("$base: Interactions.PingHack", Y)
         self.assertNotIn('IsDefined(this.NetDeckNetworkMaster()) {', R)
 
-    def test_access_point_experiment_removed_and_feedback_preserved(self):
+    def test_spreading_and_feedback(self):
         self.assertNotIn("@wrapMethod(AccessPointControllerPS)", R)
         self.assertNotIn("public func GetRemoteActions(", R)
         self.assertIn("!IsDefined(this as AccessPointControllerPS)", R)
         self.assertIn("NetDeckPulseNetwork(", R)
-        self.assertIn("NetDeckNotify(", R)
         self.assertIn("HackingRewardNotificationEvent", R)
-        self.assertIn("public func NetDeckNotify(game: GameInstance, affected: Int32, deviceCount: Int32)", R)
+        self.assertIn("public class NetDeckSpreadResult extends IScriptable", R)
+        self.assertIn("public func NetDeckSpread(", R)
+        self.assertIn("GetTargetParts(obj, query, parts)", R)
+        self.assertIn("query.maxDistance = 18.0", R)
+        self.assertIn("depth < 4", R)
+        self.assertIn("ArraySize(queue) < 64", R)
+        self.assertIn("ArrayContains(result.seen, obj)", R)
+        self.assertIn("NetDeckEnqueueMaster(", R)
+        self.assertIn("NetDeckSpread(this.GetGameInstance(), source)", R)
+        self.assertIn("NetDeckSpread(this.GetGameInstance(), puppet)", R)
         self.assertIn('loc.GetText("NetDeckDevicesAffected")', R)
+        self.assertIn('loc.GetText("NetDeckEddiesStolen")', R)
+        self.assertIn('loc.GetText("NetDeckStolenTargets")', R)
         self.assertIn("IntToString(deviceCount)", R)
-        self.assertIn("let deviceCount: Int32 = this.NetDeckInfiltrateNetwork();", R)
-        self.assertIn("let deviceCount: Int32 = link.NetDeckInfiltrateLinkedDevices();", R)
-        self.assertIn("NetDeckNotify(this.GetGameInstance(), affected, 0);", R)
-        self.assertIn("deviceCount + NetDeckBurnoutNearbyNetrunners(this)", R)
-        self.assertIn("deviceCount + NetDeckDisruptNpcVicinity(puppet)", R)
+        self.assertIn("result.devices, result.eddies, result.robbedTargets", R)
+        self.assertIn("let barrier: ref<RoadBlockControllerPS>", R)
+        self.assertIn("this.QueuePSEvent(barrier, toggle)", R)
+        self.assertIn("NetDeckSiphon(", R)
+        self.assertIn("Items.money", R)
+        self.assertIn("if result.eddies >= 1500", R)
+
+    def test_untraceable_networm_not_global_trace_disabled(self):
+        self.assertIn("NetDeck.ZeroAwareness:", Y)
+        self.assertIn("$type: gamedataStatModifierGroup_Record", Y)
+        self.assertEqual(Y.count("awarenessCost: NetDeck.ZeroAwareness"), 2)
+        self.assertIn("wanted.m_wantedLevel = EPreventionHeatStage.Heat_5", R)
+        self.assertIn("NetDeckTriggerNetWatchPursuit(npc)", R)
+        self.assertNotIn("@wrapMethod(QuickHackableHelper)", R)
 
     def test_networm_takeover_rules(self):
         self.assertIn("NetDeckBurnoutNearbyNetrunners(", R)
@@ -128,6 +147,8 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertEqual(L.count('this.Text("NetDeckSpreadComplete"'), 19)
         self.assertEqual(L.count('this.Text("NetDeckSpreadEmpty"'), 19)
         self.assertEqual(L.count('this.Text("NetDeckDevicesAffected"'), 19)
+        self.assertEqual(L.count('this.Text("NetDeckEddiesStolen"'), 19)
+        self.assertEqual(L.count('this.Text("NetDeckStolenTargets"'), 19)
 
     def test_no_uncooked_placeholders(self):
         self.assertFalse((ROOT / "source").exists())
