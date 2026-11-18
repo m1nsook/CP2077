@@ -40,5 +40,9 @@
   "Camera_Killer": {
     "name": "Camera Killer",
     "summary": "Shuts down cameras connected to the same access point or surveillance system when V turns off one camera."
+  },
+  "NetDeck": {
+    "name": "Infiltration",
+    "summary": "NetWatch Σ MK.1 iconic cyberdeck with the built-in NETWORM network quickhack (gameplay test; unverified)."
   }
 }
