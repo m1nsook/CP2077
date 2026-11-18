@@ -2,8 +2,14 @@
 # Keep Items.NESTCyberdeck stable for existing saves.
 
 
+# Original icon resources are built privately in WolvenKit and NOT uploaded to GitHub.
+# These TweakXL references contain no texture data.
 Items.NESTCyberdeck:
   $base: Items.AdvancedNetwatchNetdriverMKLegendaryPlusPlus
+  icon:
+    atlasResourcePath: m1nsook\netdeck\ui\netdeck_icons.inkatlas
+    atlasPartName: cw_m1_netdeck
+
   friendlyName: "NetWatch Σ MK.1"
   displayName: l"NetDeckDeckName"
   localizedDescription: l"NetDeckDeckDescription"
@@ -51,10 +57,21 @@ DeviceAction.NetDeckInfiltration:
   targetPrereqs: []
   targetActivePrereqs: []
 
+# Public source-only icon RECORDS: users must install their own cooked atlas.
+UIIcon.NetDeckNetworm:
+  $type: gamedataUIIcon_Record
+  atlasResourcePath: m1nsook\netdeck\ui\networm_icons.inkatlas
+  atlasPartName: networmhack
+
+ChoiceCaptionParts.NetDeckNetwormIcon:
+  $base: ChoiceCaptionParts.OverheatIcon
+  texturePartID: UIIcon.NetDeckNetworm
+
 Interactions.NetDeckInfiltration:
   $base: Interactions.TakeControlCameraHack
   caption: l"NetDeckInfiltrationName"
   description: l"NetDeckInfiltrationDescription"
+  captionIcon: ChoiceCaptionParts.NetDeckNetwormIcon
 
 # The NPC scanner uses PuppetQuickHack actions, unlike devices.
 # FreePingHack is a known puppet action base (not PingDevice).
