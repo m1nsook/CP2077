@@ -566,7 +566,9 @@ private func NetDeckWaveFinish() -> Void {
   if affected > 0 { NetDeckGiveDataComponents(this.GetGame()); }
   NetDeckNotify(
     this.GetGame(), affected + r.robbedTargets, r.devices, r.eddies,
-    r.robbedTargets, affected
+    // TARGETS counts NPCs and cars actually dispatched an attack effect.
+    // Device actions have their own DEVICE field and must not inflate it.
+    r.robbedTargets, r.npcs + r.vehicles
   );
 }
 
