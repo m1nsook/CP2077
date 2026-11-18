@@ -746,8 +746,11 @@ private func NetDeckHudUpdate() -> Void {
   let r: ref<NetDeckSpreadResult> = this.netDeckWaveResult;
   // Target estimate is collected before uploading. No fake 0/1 during spread.
   let count: Int32 = this.netDeckWavePreviewCount;
-  let nextHeader: String = loc.GetText("NetDeckUploadProgress") + " " +
-    IntToString(count) + " " + loc.GetText("NetDeckTargetsAffected");
+  let nextHeader: String = loc.GetText("NetDeckUploadSingle");
+  if count > 1 {
+    nextHeader = loc.GetText("NetDeckUploadProgress") + " " +
+      IntToString(count) + " " + loc.GetText("NetDeckTargetsAffected");
+  }
   if !Equals(nextHeader, this.netDeckHudHeader) {
     this.netDeckHudHeader = nextHeader;
     bb.SetString(d.Header, this.netDeckHudHeader, true);
