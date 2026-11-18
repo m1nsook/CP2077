@@ -5,28 +5,33 @@
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
 
-## STOP — unresolved runtime crash (18 Nov 2026, 16:29:37)
+## v0.6.3 — optional native upload-bar experiment (UNVERIFIED)
 
-The player reported `20261118-162937-crash-tid25824-01.txt`:
-`redDispatcher6` fault in `Cyberpunk2077.exe` with references to
-`DynamicTexture`, `CMaterialTemplate` and `inkVirtualWindow Base Window`.
-The crash reporter identifies **no culprit**. This does not prove whether
-NETWORM, an icon atlas, another mod, or the game itself triggered the crash.
+The user requested the game's mission-style transfer bar in place of spammy
+NETWORM HUD feedback. An experimental `UI_HUDProgressBar` implementation
+was committed on **18 Nov 2026 at 16:30:42 Europe/Warsaw**, then reverted
+at 16:31:42 before the user could install and test it. This was premature.
 
-**DO NOT install/retest the development build or merge/release PR #36 yet.**
-Back up the save and isolate the build that was actually installed. Github
-source changes do not affect a running game unless manually installed.
+**The reported crash occurred at 16:29:37**, **65 seconds BEFORE** the HUD
+feature was committed. The installed NetDeck version was last modified
+at 16:13. Therefore the crash is **not evidence that this new HUD caused it**.
+The crash report still has no identified culprit.
 
-An experimental implementation writing to the global `UI_HUDProgressBar`
-blackboard was committed then explicitly REVERTED before validation.
-The native quest-bar overlay and red completion banner are **not currently
-implemented**; do not describe them as working. Sonic Shock Tier 5 source
-changes are retained, but also await a clean game-compiler + runtime test.
+The HUD code has been restored for testing. It opens a native progress bar,
+shows localized `NETWORM: UPLOADING TO ... TARGETS` and devices affected,
+updates the progress over the bounded wave, and closes at completion or
+unequip. It checks whether another quest's progress bar is active before
+claiming it and verifies ownership by header before updating/closing.
+**Those protections are source-level only and need real in-game testing.**
 
-When ready to investigate, compare crash reproductions with NetDeck's
-`r6/scripts/NetDeck` and `r6/tweaks/NetDeck` **both** removed and with
-its separately installed private icon `.archive` disabled. The crash
-summary alone is not enough to attribute causality.
+**Important:** This does not yet replace the separate `EXTRACTED DATA`
+notification in `NetDeckNotify`. A native red completion summary remains
+a planned, unverified follow-up. It also does not prove that the in-game
+progress widget exactly matches the user's red malware-upload screenshot.
+
+Keep PR #36 in DRAFT until game REDscript compilation and a safe in-game
+test of both NETWORM spread and the upload UI. Preserve a save backup.
+The crash investigation remains independent of this feature.
 
 ## v0.6.3 — enemy targeting and sound-safety changes (UNVERIFIED)
 
