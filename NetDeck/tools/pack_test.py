@@ -15,7 +15,7 @@ ROOT_FILES = (
 )
 TESTING = """Infiltration — NetWatch Σ MK.1 / NETWORM SOURCE-ONLY TEST — NOT A RELEASE
 
-Requires Cyberpunk 2077 2.5, RED4ext, redscript, TweakXL and Codeware.
+Requires Cyberpunk 2077 2.5 + Phantom Liberty, RED4ext, redscript, TweakXL and Codeware.
 
 INSTALL:
 1. Back up the save you will use for testing and CLOSE THE GAME.
@@ -47,7 +47,9 @@ INSTALL:
 15. Normal Netrunner XP is allowed. Check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.6.3 is a sound-safety/propagation test, NOT game-compiler verified.
+- v0.6.3 is a Canto enemy-targeting/sound-safety test, NOT compiler verified.
+- Uses Phantom Liberty's QuickHack.BaseBlackWallHack record for the NPC action.
+- Native Blackwall start/completion effects are cleared; confirm no lethal effect.
 - Repeating Ping network grid audio/VFX and per-hop reward notifications are removed.
 - Jumps run every 2.0 seconds and stop after at most 16 scheduled jumps.
 - The reported target count reflects dispatched effects, not all discovered relays.
