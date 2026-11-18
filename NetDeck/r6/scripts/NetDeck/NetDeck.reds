@@ -432,11 +432,11 @@ private func NetDeckWaveValid(obj: ref<GameObject>) -> Bool {
     if !IsDefined(npc.GetRecord()) || npc.GetRecord().IsChild() {
       return false;
     }
-    // A nearby civilian or friendly/companion NPC must NEVER become a relay,
-    // receive a malfunction, or contribute to network-theft rewards.
-    return EnumInt(GameObject.GetAttitudeTowards(npc, this)) ==
-      EnumInt(EAIAttitude.AIA_Hostile) ||
-      npc.IsCharacterPolice() || NetDeckIsNetWatch(npc);
+    // Pre-combat gangs may be neutral until V attacks. Treat combat-capable
+    // non-crowd NPCs as candidates unless they are explicitly friendly.
+    // Quest NPCs, children and companions are already filtered above.
+    return EnumInt(GameObject.GetAttitudeTowards(npc, this)) !=
+      EnumInt(EAIAttitude.AIA_Friendly);
   }
   let vehicle: ref<VehicleObject> = obj as VehicleObject;
   if IsDefined(vehicle) {
@@ -490,10 +490,10 @@ private func NetDeckWaveInfect(obj: ref<GameObject>, depth: Int32) -> Void {
   let device: ref<Device> = obj as Device;
 
   if IsDefined(npc) {
-    let hostile: Bool =
-      EnumInt(GameObject.GetAttitudeTowards(npc, this)) ==
-      EnumInt(EAIAttitude.AIA_Hostile);
-    if hostile || npc.IsCharacterPolice() || NetDeckIsNetWatch(npc) {
+    // The validator rejects friends/civilians; neutral street gangs are
+    // attackable even before aggro, just like native combat quickhacks.
+    if EnumInt(GameObject.GetAttitudeTowards(npc, this)) !=
+       EnumInt(EAIAttitude.AIA_Friendly) {
       if !StatusEffectSystem.ObjectHasStatusEffect(
           npc, t"BaseStatusEffect.WeaponMalfunctionLvl2") {
         StatusEffectHelper.ApplyStatusEffect(
@@ -609,18 +609,37 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
     return true;
   }
 
-  // First process genuine connected network descendants, one at a time.
+  // Attack-hack priority: consume nearby eligible NPCs before devices
+  // or cars. The old connected-device-first loop starved the attack chain,
+  // showing many visited devices while only one gang member was glitched.
   let selected: ref<GameObject>;
   let depth: Int32 = 0;
-  while this.netDeckWavePendingCursor < ArraySize(this.netDeckWavePending) &&
-        !IsDefined(selected) {
-    let index: Int32 = this.netDeckWavePendingCursor;
-    this.netDeckWavePendingCursor += 1;
-    let candidate: ref<GameObject> = this.netDeckWavePending[index];
-    if this.NetDeckWaveValid(candidate) {
-      selected = candidate;
-      depth = this.netDeckWavePendingDepths[index];
+  let nearestNpc: Float = 25.0;
+  let selectedNpcHost: Int32 = -1;
+  let p: Int32 = 0;
+  while p < ArraySize(this.netDeckLoadedPuppets) {
+    let npcCandidate: ref<NPCPuppet> = this.netDeckLoadedPuppets[p];
+    if IsDefined(npcCandidate) && this.NetDeckWaveValid(npcCandidate) &&
+       Vector4.Distance(this.netDeckWaveOrigin, npcCandidate.GetWorldPosition()) <= 55.0 {
+      let h: Int32 = 0;
+      while h < ArraySize(this.netDeckWaveHosts) {
+        if this.netDeckWaveLinks[h] < 4 && this.netDeckWaveDepths[h] < 4 {
+          let d: Float =
+            Vector4.Distance(this.netDeckWaveHosts[h], npcCandidate.GetWorldPosition());
+          if d <= nearestNpc {
+            nearestNpc = d;
+            selected = npcCandidate;
+            selectedNpcHost = h;
+          }
+        }
+        h += 1;
+      }
     }
+    p += 1;
+  }
+  if IsDefined(selected) && selectedNpcHost >= 0 {
+    this.netDeckWaveLinks[selectedNpcHost] += 1;
+    depth = this.netDeckWaveDepths[selectedNpcHost] + 1;
   }
 
   if !IsDefined(selected) {
@@ -722,6 +741,19 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
     if IsDefined(selected) && selectedHost >= 0 {
       this.netDeckWaveLinks[selectedHost] += 1;
       depth = this.netDeckWaveDepths[selectedHost] + 1;
+    }
+  }
+
+  // Genuine connected devices are still supported, but never consume all
+  // available ticks ahead of loaded hostile/neutral gang members.
+  while this.netDeckWavePendingCursor < ArraySize(this.netDeckWavePending) &&
+        !IsDefined(selected) {
+    let index: Int32 = this.netDeckWavePendingCursor;
+    this.netDeckWavePendingCursor += 1;
+    let pendingCandidate: ref<GameObject> = this.netDeckWavePending[index];
+    if this.NetDeckWaveValid(pendingCandidate) {
+      selected = pendingCandidate;
+      depth = this.netDeckWavePendingDepths[index];
     }
   }
 
