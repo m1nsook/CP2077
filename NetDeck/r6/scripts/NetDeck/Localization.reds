@@ -17,6 +17,8 @@ public class NetDeckEnglish extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "DEVICES");
     this.Text("NetDeckEddiesStolen", "STOLE");
     this.Text("NetDeckStolenTargets", "TARGETS");
+    this.Text("NetDeckWaveProgress", "NETWORM: SPREADING");
+    this.Text("NetDeckTargetsAffected", "TARGETS");
   }
 }
 
@@ -31,6 +33,8 @@ public class NetDeckArabic extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "الأجهزة");
     this.Text("NetDeckEddiesStolen", "سُرِقَ");
     this.Text("NetDeckStolenTargets", "أهداف");
+    this.Text("NetDeckWaveProgress", "NETWORM: جارٍ الانتشار");
+    this.Text("NetDeckTargetsAffected", "الأهداف");
   }
 }
 
@@ -45,6 +49,8 @@ public class NetDeckChineseSimplified extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "设备");
     this.Text("NetDeckEddiesStolen", "窃取");
     this.Text("NetDeckStolenTargets", "目标");
+    this.Text("NetDeckWaveProgress", "NETWORM：正在传播");
+    this.Text("NetDeckTargetsAffected", "目标");
   }
 }
 
@@ -59,6 +65,8 @@ public class NetDeckChineseTraditional extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "裝置");
     this.Text("NetDeckEddiesStolen", "竊取");
     this.Text("NetDeckStolenTargets", "目標");
+    this.Text("NetDeckWaveProgress", "NETWORM：正在擴散");
+    this.Text("NetDeckTargetsAffected", "目標");
   }
 }
 
@@ -73,6 +81,8 @@ public class NetDeckCzech extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "ZAŘÍZENÍ");
     this.Text("NetDeckEddiesStolen", "UKRADENO");
     this.Text("NetDeckStolenTargets", "CÍLŮ");
+    this.Text("NetDeckWaveProgress", "NETWORM: ŠÍŘENÍ");
+    this.Text("NetDeckTargetsAffected", "CÍLE");
   }
 }
 
@@ -87,6 +97,8 @@ public class NetDeckFrench extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "APPAREILS");
     this.Text("NetDeckEddiesStolen", "VOLÉS");
     this.Text("NetDeckStolenTargets", "CIBLES");
+    this.Text("NetDeckWaveProgress", "NETWORM : PROPAGATION");
+    this.Text("NetDeckTargetsAffected", "CIBLES");
   }
 }
 
@@ -101,6 +113,8 @@ public class NetDeckGerman extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "GERÄTE");
     this.Text("NetDeckEddiesStolen", "GESTOHLEN");
     this.Text("NetDeckStolenTargets", "ZIELE");
+    this.Text("NetDeckWaveProgress", "NETWORM: VERBREITUNG");
+    this.Text("NetDeckTargetsAffected", "ZIELE");
   }
 }
 
@@ -115,6 +129,8 @@ public class NetDeckHungarian extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "ESZKÖZÖK");
     this.Text("NetDeckEddiesStolen", "ELLOPVA");
     this.Text("NetDeckStolenTargets", "CÉLPONT");
+    this.Text("NetDeckWaveProgress", "NETWORM: TERJEDÉS");
+    this.Text("NetDeckTargetsAffected", "CÉLPONTOK");
   }
 }
 
@@ -129,6 +145,8 @@ public class NetDeckItalian extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "DISPOSITIVI");
     this.Text("NetDeckEddiesStolen", "RUBATI");
     this.Text("NetDeckStolenTargets", "BERSAGLI");
+    this.Text("NetDeckWaveProgress", "NETWORM: PROPAGAZIONE");
+    this.Text("NetDeckTargetsAffected", "BERSAGLI");
   }
 }
 
@@ -143,6 +161,8 @@ public class NetDeckJapanese extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "デバイス");
     this.Text("NetDeckEddiesStolen", "奪取");
     this.Text("NetDeckStolenTargets", "対象");
+    this.Text("NetDeckWaveProgress", "NETWORM：拡散中");
+    this.Text("NetDeckTargetsAffected", "対象");
   }
 }
 
@@ -157,6 +177,8 @@ public class NetDeckKorean extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "장치");
     this.Text("NetDeckEddiesStolen", "탈취");
     this.Text("NetDeckStolenTargets", "대상");
+    this.Text("NetDeckWaveProgress", "NETWORM: 확산 중");
+    this.Text("NetDeckTargetsAffected", "대상");
   }
 }
 
@@ -171,6 +193,8 @@ public class NetDeckPolish extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "URZĄDZENIA");
     this.Text("NetDeckEddiesStolen", "SKRADZIONO");
     this.Text("NetDeckStolenTargets", "CELÓW");
+    this.Text("NetDeckWaveProgress", "NETWORM: ROZPRZESTRZENIANIE");
+    this.Text("NetDeckTargetsAffected", "CELE");
   }
 }
 
@@ -185,6 +209,8 @@ public class NetDeckPortugueseBrazil extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
     this.Text("NetDeckEddiesStolen", "ROUBADOS");
     this.Text("NetDeckStolenTargets", "ALVOS");
+    this.Text("NetDeckWaveProgress", "NETWORM: PROPAGANDO");
+    this.Text("NetDeckTargetsAffected", "ALVOS");
   }
 }
 
@@ -199,6 +225,8 @@ public class NetDeckRussian extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "УСТРОЙСТВА");
     this.Text("NetDeckEddiesStolen", "ПОХИЩЕНО");
     this.Text("NetDeckStolenTargets", "ЦЕЛЕЙ");
+    this.Text("NetDeckWaveProgress", "NETWORM: РАСПРОСТРАНЕНИЕ");
+    this.Text("NetDeckTargetsAffected", "ЦЕЛИ");
   }
 }
 
@@ -213,6 +241,8 @@ public class NetDeckSpanishSpain extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
     this.Text("NetDeckEddiesStolen", "ROBADOS");
     this.Text("NetDeckStolenTargets", "OBJETIVOS");
+    this.Text("NetDeckWaveProgress", "NETWORM: PROPAGACIÓN");
+    this.Text("NetDeckTargetsAffected", "OBJETIVOS");
   }
 }
 
@@ -227,6 +257,8 @@ public class NetDeckSpanishLatinAmerica extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "DISPOSITIVOS");
     this.Text("NetDeckEddiesStolen", "ROBADOS");
     this.Text("NetDeckStolenTargets", "OBJETIVOS");
+    this.Text("NetDeckWaveProgress", "NETWORM: PROPAGACIÓN");
+    this.Text("NetDeckTargetsAffected", "OBJETIVOS");
   }
 }
 
@@ -241,6 +273,8 @@ public class NetDeckThai extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "อุปกรณ์");
     this.Text("NetDeckEddiesStolen", "ขโมย");
     this.Text("NetDeckStolenTargets", "เป้าหมาย");
+    this.Text("NetDeckWaveProgress", "NETWORM: กำลังแพร่กระจาย");
+    this.Text("NetDeckTargetsAffected", "เป้าหมาย");
   }
 }
 
@@ -255,6 +289,8 @@ public class NetDeckTurkish extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "CİHAZLAR");
     this.Text("NetDeckEddiesStolen", "ÇALINDI");
     this.Text("NetDeckStolenTargets", "HEDEF");
+    this.Text("NetDeckWaveProgress", "NETWORM: YAYILIYOR");
+    this.Text("NetDeckTargetsAffected", "HEDEFLER");
   }
 }
 
@@ -269,6 +305,8 @@ public class NetDeckUkrainian extends ModLocalizationPackage {
     this.Text("NetDeckDevicesAffected", "ПРИСТРОЇ");
     this.Text("NetDeckEddiesStolen", "ВИКРАДЕНО");
     this.Text("NetDeckStolenTargets", "ЦІЛЕЙ");
+    this.Text("NetDeckWaveProgress", "NETWORM: ПОШИРЕННЯ");
+    this.Text("NetDeckTargetsAffected", "ЦІЛІ");
   }
 }
 
