@@ -10,6 +10,7 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 MOD = Path(__file__).resolve().parents[1]
 ROOT_FILES = (
     "r6/scripts/NetDeck/NetDeck.reds",
+    "r6/scripts/NetDeck/NetDeckHudSkin.reds",
     "r6/scripts/NetDeck/Localization.reds",
     "r6/tweaks/NetDeck/NetDeck.yaml",
     "bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua",
@@ -22,6 +23,7 @@ INSTALL:
 1. Back up the save you will use for testing and CLOSE THE GAME.
 2. Extract this ZIP into the Cyberpunk 2077 game root.
 3. Make sure r6/scripts/NetDeck/NetDeck.reds,
+   r6/scripts/NetDeck/NetDeckHudSkin.reds,
    r6/scripts/NetDeck/Localization.reds and r6/tweaks/NetDeck/NetDeck.yaml exist.
 4. This diagnostic artifact contains only REDscript, TweakXL and a small
    CET diagnostic Lua script (no binary assets). The optional diagnostic
@@ -57,7 +59,7 @@ INSTALL:
 15. Normal Netrunner XP is allowed. Check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.6.6 removes global NPCPuppet AND VehicleObject attach/detach wrappers
+- v0.6.7 removes global NPCPuppet AND VehicleObject attach/detach wrappers
   to isolate repeated map-loading crashes after installing NetDeck.
   This is NOT compiler-verified and not a confirmed crash fix.
 - CET logging is optional: it observes our upload/HUD methods (if available)
@@ -65,10 +67,15 @@ IMPORTANT LIMITATIONS:
   Advanced Crash Reporter 1.6 collects CET scripting.log automatically.
   If CET cannot observe a method, observer_unavailable is logged instead.
 - Confirm map stability BEFORE trying hacks. If still crashing, remove NetDeck.
-- Native HUD progress bar is now a separate ~3-second animation, using the
-  game's Neutral icon/tint style (blue/neutral appearance varies with UI theme).
-  It does not replace the triangle with our private NETWORM icon artwork.
+- Native HUD is a separate ~3-second upload animation (20 steps at 0.15s).
   The infection wave still runs separately every 2 seconds for up to 16 jumps.
+- NetDeckHudSkin.reds applies a NETWORM-only blue skin to the native Neutral
+  widget and swaps its layered triangle for the real "networmhack" atlas part.
+  The icon appears only if you keep your privately packed NetDeck.archive.
+  When another quest uses the bar, vanilla visuals are restored.
+  This scoped HUD-controller wrap is UNVERIFIED and is a new crash-test risk.
+  If a crash begins after upgrading, remove only NetDeckHudSkin.reds to
+  compare against the previously stable v0.6.6 HUD with neutral triangle.
   The old EXTRACTED DATA completion notification is still present.
 - Uses Phantom Liberty's QuickHack.BaseBlackWallHack record for the NPC action.
 - Native Blackwall start/completion effects are cleared; confirm no lethal effect.
@@ -131,6 +138,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.6-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.7-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
