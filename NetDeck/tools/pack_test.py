@@ -12,6 +12,7 @@ ROOT_FILES = (
     "r6/scripts/NetDeck/NetDeck.reds",
     "r6/scripts/NetDeck/Localization.reds",
     "r6/tweaks/NetDeck/NetDeck.yaml",
+    "bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua",
 )
 TESTING = """Infiltration — NetWatch Σ MK.1 / NETWORM SOURCE-ONLY TEST — NOT A RELEASE
 
@@ -22,12 +23,17 @@ INSTALL:
 2. Extract this ZIP into the Cyberpunk 2077 game root.
 3. Make sure r6/scripts/NetDeck/NetDeck.reds,
    r6/scripts/NetDeck/Localization.reds and r6/tweaks/NetDeck/NetDeck.yaml exist.
-4. IMPORTANT: This GitHub artifact contains ONLY REDscript and TweakXL sources.
+4. This diagnostic artifact contains only REDscript, TweakXL and a small
+   CET diagnostic Lua script (no binary assets). The optional diagnostic
+   script is bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua.
+   Advanced Crash Reporter reads its [NetDeck/DIAG] output from CET scripting.log.
    Original icon PNGs, WolvenKit raw project, .inkatlas, .xbm and compiled
    .archive are PRIVATE and NOT included. A separate locally packed archive
    containing both icon atlases is required for custom icons to display.
 5. FIRST: Launch/load the SAME map or save that crashed previously. Do not
    use NETWORM or open its HUD yet. Test whether world loading is now stable.
+   If a crash occurs, share the Advanced Crash Reporter .txt; it captures
+   CET scripting.log, including [NetDeck/DIAG] session and heartbeat entries.
    If REDscript compilation or TweakXL loading fails, send the redscript
    and TweakXL errors; do not proceed to combat testing.
 6. To add the experimental deck through CET console:
@@ -39,8 +45,8 @@ INSTALL:
 10. Check an unrelated network remains unaffected.
 11. AFTER confirming stable loading: test ONE NETWORM upload against a gang.
     Several nearby enemies should get Tier 5 Sonic Shock at 2s intervals.
-    Passive NPC attach-based discovery was disabled to investigate crashes,
-    so propagation to enemies you have not scanned may temporarily regress.
+    Passive NPC and vehicle attach-based discovery was disabled for crash
+    isolation, so spreading to targets not scanned may temporarily regress.
     Check a moving car, a road barrier and a non-quest door separately.
     Confirm the experimental native upload bar closes after a finished hack.
     The old "EXTRACTED DATA" reward notification is still present.
@@ -51,9 +57,13 @@ INSTALL:
 15. Normal Netrunner XP is allowed. Check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.6.4 removes NPCPuppet OnGameAttached/OnDetach wrappers to isolate a
-  reported map-loading crash; user reported game loads when NetDeck removed.
+- v0.6.5 removes global NPCPuppet AND VehicleObject attach/detach wrappers
+  to isolate repeated map-loading crashes after installing NetDeck.
   This is NOT compiler-verified and not a confirmed crash fix.
+- CET logging is optional: it observes our upload/HUD methods (if available)
+  and emits a 15s heartbeat without scanning entities or world streams.
+  Advanced Crash Reporter 1.6 collects CET scripting.log automatically.
+  If CET cannot observe a method, observer_unavailable is logged instead.
 - Confirm map stability BEFORE trying hacks. If still crashing, remove NetDeck.
 - Native HUD progress bar is experimental; no replacement red completion yet.
 - Uses Phantom Liberty's QuickHack.BaseBlackWallHack record for the NPC action.
@@ -71,7 +81,8 @@ IMPORTANT LIMITATIONS:
   an independent, functioning quickhack when NetWatch Σ MK.1 is installed.
 - Timed PlayerPuppet wave, 2.0s per target, 4 hops of up to 25m, max 40
   affected loaded entities. Native network descendants also join the queue.
-- Loaded cars are registered via native VehicleObject attach/detach, not TSFMV.
+- Loaded cars are registered on native vehicle scanner actions and direct
+  uploads, NOT global attach/detach. Unscanned car spread may regress.
 - Dedicated VehicleQuickHack requires Carhacker and equipped NetWatch Σ MK.1.
 - This is an unverified experimental build, not a confirmed gameplay fix.
 - Eurodollar siphon is a capped gameplay reward; it does not drain actual
@@ -81,7 +92,9 @@ IMPORTANT LIMITATIONS:
 - Do not publish this ZIP as a Nexus Mods release.
 
 REMOVE:
-Delete r6/scripts/NetDeck and r6/tweaks/NetDeck.
+Delete r6/scripts/NetDeck and r6/tweaks/NetDeck, and optionally
+bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics.
+If you installed a separate local NetDeck.archive, disable it too.
 """.replace("\n", "\n")
 
 def build(output: Path) -> None:
@@ -114,6 +127,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.4-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.5-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
