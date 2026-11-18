@@ -10,11 +10,35 @@ Y = (ROOT / "r6/tweaks/NetDeck/NetDeck.yaml").read_text("utf-8")
 L = (ROOT / "r6/scripts/NetDeck/Localization.reds").read_text("utf-8")
 D = (ROOT / "bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua").read_text("utf-8")
 P = (ROOT / "tools/pack_test.py").read_text("utf-8")
+SKIN = (ROOT / "r6/scripts/NetDeck/NetDeckHudSkin.reds").read_text("utf-8")
 VENDORS = 26
 
 class InfiltrationSourceTests(unittest.TestCase):
+    def test_networm_only_icon_skin_restores_vanilla(self):
+        # The exported 2.5 HUD has separate neutral triangle/ghost layers;
+        # do not ship a base .inkwidget replacement or modify all quest bars.
+        self.assertIn("@wrapMethod(HUDProgressBarController)", SKIN)
+        self.assertIn("public func UpdateTimerHeader(const label: ref<String>)", SKIN)
+        self.assertIn("wrappedMethod(label);", SKIN)
+        self.assertIn('StrBeginsWith(header, "NETWORM")', SKIN)
+        self.assertIn("this.NetDeckHudSkinApply(isNetworm);", SKIN)
+        self.assertIn('r"m1nsook\\netdeck\\ui\\networm_icons.inkatlas"', SKIN)
+        self.assertIn('n"networmhack"', SKIN)
+        self.assertIn('r"base\\gameplay\\gui\\quests\\assets\\personal_link.inkatlas"', SKIN)
+        self.assertIn('n"neutral_!"', SKIN)
+        self.assertIn('n"MainColors.ActiveBlue"', SKIN)
+        self.assertIn('n"Bar.ProgressLine"', SKIN)
+        self.assertIn('n"Neutral_Triangle_Icon"', SKIN)
+        self.assertIn('n"Neutral_Triangle_Icon_GHOST"', SKIN)
+        self.assertIn('n"Neurtral_Small_Icon"', SKIN)
+        self.assertIn('n"Neutral_Background_Icon"', SKIN)
+        self.assertIn('r6/scripts/NetDeck/NetDeckHudSkin.reds', P)
+        self.assertNotIn("OnGameAttached", SKIN)
+        self.assertNotIn("OnDetach", SKIN)
+        self.assertNotIn("@wrapMethod(HUDProgressBarController)", R)
+
     def test_crash_diagnostic_is_observer_only(self):
-        self.assertIn('PREFIX = "[NetDeck/DIAG v0.6.6]"', D)
+        self.assertIn('PREFIX = "[NetDeck/DIAG v0.6.7]"', D)
         self.assertIn('registerForEvent("onInit"', D)
         self.assertIn('registerForEvent("onUpdate"', D)
         self.assertIn('registerForEvent("onShutdown"', D)
