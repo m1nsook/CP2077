@@ -161,15 +161,7 @@ public final static func GetPlayerQuickHackListWithQuality(
   return hacks;
 }
 
-@wrapMethod(ScriptableDeviceComponentPS)
-public const func IsPotentiallyQuickHackable() -> Bool {
-  if wrappedMethod() {
-    return true;
-  }
-  // Native pingable devices remain eligible even without a network master.
-  // Do not make arbitrary non-quickhackable world objects scannable.
-  return false;
-}
+// Preserve vanilla IsPotentiallyQuickHackable unchanged. Ping remains native.
 
 // Only act on actual links. Cameras on a neighboring network are untouched.
 // Multiple APs sharing one target are deduplicated, not processed twice.
