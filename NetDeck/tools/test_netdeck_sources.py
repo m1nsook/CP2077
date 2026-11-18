@@ -65,7 +65,7 @@ class InfiltrationSourceTests(unittest.TestCase):
     def test_skin_resource_escapes_are_valid(self):
         # A literal backslash-n sequence without escaping caused the actual
         # November 18 REDscript compilation failure in NetDeckHudSkin.reds.
-        paths = re.findall(r'r"([^"]+\\.inkatlas)"', SKIN)
+        paths = re.findall(r'r"([^"]+\.inkatlas)"', SKIN)
         self.assertEqual(len(paths), 3)
         for path in paths:
             self.assertNotRegex(path, r'(?<!\\)\\(?!\\)')
