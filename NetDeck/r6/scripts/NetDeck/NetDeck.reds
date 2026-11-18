@@ -211,7 +211,7 @@ public func NetDeckSiphon(
   if !IsDefined(player) { return; }
   let amount: Int32 = RandRange(12, 65);
   if computer { amount = RandRange(35, 125); }
-  amount = Min(amount, 1500 - result.eddies);
+  if amount > 1500 - result.eddies { amount = 1500 - result.eddies; }
   GameInstance.GetTransactionSystem(game).GiveItemByTDBID(player, t"Items.money", amount);
   result.eddies += amount;
   result.robbedTargets += 1;
