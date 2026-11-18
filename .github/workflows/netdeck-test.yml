@@ -1,11 +1,11 @@
-name: Infiltration Infiltration test package
+name: Infiltration — NΣT test package
 
 # Builds a game-root ZIP for the draft PR. DOES NOT publish a GitHub release.
 on:
   pull_request:
     paths:
       - 'NetDeck/**'
-      - '.github/workflows/nest-test.yml'
+      - '.github/workflows/netdeck-test.yml'
   workflow_dispatch:
 
 permissions:
