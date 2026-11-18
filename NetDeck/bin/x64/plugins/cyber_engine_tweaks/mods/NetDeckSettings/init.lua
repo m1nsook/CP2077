@@ -23,6 +23,10 @@ local settings = {}
 local loaded = false
 local syncSeconds = 0
 local lastError = ""
+-- The settings are not an in-game HUD. Only draw while CET's own overlay
+-- is explicitly open, and start every session with the window hidden.
+local overlayOpen = false
+local windowOpen = false
 local script = (debug and debug.getinfo and debug.getinfo(1, "S").source) or ""
 local dir = script:gsub("^@", ""):match("^(.*[/\\])") or ""
 local filePath = dir .. "settings.json"
@@ -100,14 +104,15 @@ end
 
 local function sliderFloat(key, label, fmt)
   local range = LIMITS[key]
-  local yes, value = ImGui.SliderFloat(label, settings[key], range[1], range[2], fmt or "%.2f")
-  if yes then changed(key, value) end
+  -- CET's ImGui binding returns NEW VALUE first and changed BOOL second.
+  local value, wasChanged = ImGui.SliderFloat(label, settings[key], range[1], range[2], fmt or "%.2f")
+  if wasChanged then changed(key, value) end
 end
 
 local function sliderInt(key, label)
   local range = LIMITS[key]
-  local yes, value = ImGui.SliderInt(label, settings[key], range[1], range[2])
-  if yes then changed(key, value) end
+  local value, wasChanged = ImGui.SliderInt(label, settings[key], range[1], range[2])
+  if wasChanged then changed(key, value) end
 end
 
 local function preset(values)
@@ -131,9 +136,26 @@ registerForEvent("onUpdate", function(dt)
   end
 end)
 
+-- CET's overlay events are the only authority for showing the UI.
+-- The window cannot draw or capture input in normal gameplay, even if a
+-- version of CET invokes onDraw outside the overlay.
+registerForEvent("onOverlayOpen", function()
+  overlayOpen = true
+  windowOpen = true
+end)
+
+registerForEvent("onOverlayClose", function()
+  overlayOpen = false
+  windowOpen = false
+end)
+
 registerForEvent("onDraw", function()
-  if not loaded then return end
-  if ImGui.Begin("NETWORM - Test Settings") then
+  if not loaded or not overlayOpen or not windowOpen then return end
+  -- Supplying the open-state pointer gives the player a working X close button.
+  -- CET returns (windowOpen, shouldDraw), not (shouldDraw, windowOpen).
+  local shouldDraw
+  windowOpen, shouldDraw = ImGui.Begin("NETWORM - Test Settings", windowOpen)
+  if shouldDraw then
     ImGui.Text("Changes apply live and are saved automatically.")
     ImGui.Separator()
     sliderFloat("uploadSeconds", "HUD upload seconds", "%.2f s")
