@@ -1070,10 +1070,10 @@ protected cb func OnNetDeckInfiltration(evt: ref<NetDeckInfiltration>) -> Entity
   return EntityNotificationType.DoNotNotifyEntity;
 }
 
-// NPCs are a different quickhack pipeline from devices. The native scanner
-// uses ScriptedPuppetPS.GetAllChoices and accepts PuppetQuickHack records.
-// Only add an independent action to targets that offer native Ping; this
-// deliberately does not modify PingSquad or the default puppet hack list.
+// Canto-style hostile quickhack targeting. The old code required a native
+// Ping action to be present; many ordinary enemy puppets lack that action,
+// so NETWORM was never offered to them. Unlike a network discovery hack,
+// an ATTACK hack must use the NPC scanner path and target hostiles directly.
 public class NetDeckPuppetInfiltration extends PuppetAction {}
 
 @wrapMethod(ScriptedPuppetPS)
@@ -1087,31 +1087,29 @@ public final const func GetAllChoices(
     return;
   }
   let owner: ref<ScriptedPuppet> = this.GetOwnerEntityWeak() as ScriptedPuppet;
-  if !IsDefined(owner) || !owner.IsQuickHackAble() || owner.IsQuest() {
+  let npc: ref<NPCPuppet> = owner as NPCPuppet;
+  if !IsDefined(npc) || !npc.IsQuickHackAble() || !npc.IsActive() ||
+     npc.IsQuest() || npc.IsDead() || npc.IsCrowd() ||
+     ScriptedPuppet.IsPlayerCompanion(npc) {
+    return;
+  }
+  if !IsDefined(npc.GetRecord()) || npc.GetRecord().IsChild() {
     return;
   }
 
-  let pingable: Bool = false;
+  // The available base action is Canto's Blackwall Gateway, not FreePing.
+  // Keep vanilla Ping untouched and avoid inserting duplicate custom actions.
   let i: Int32 = 0;
   while i < ArraySize(Deref(puppetActions)) {
     let existing: ref<PuppetAction> = Deref(puppetActions)[i];
     if IsDefined(existing) {
       let existingRecord: wref<ObjectAction_Record> = existing.GetObjectActionRecord();
-      if IsDefined(existingRecord) {
-        if Equals(existingRecord.ActionName(), n"NetDeckInfiltration") {
-          return;
-        }
-        if IsDefined(existing as PingSquad) ||
-          Equals(existingRecord.ActionName(), n"Ping") ||
-          Equals(existingRecord.ActionName(), n"PingSquad") {
-          pingable = true;
-        }
+      if IsDefined(existingRecord) &&
+         Equals(existingRecord.ActionName(), n"NetDeckInfiltration") {
+        return;
       }
     }
     i += 1;
-  }
-  if !pingable {
-    return;
   }
 
   let record: wref<ObjectAction_Record> =
