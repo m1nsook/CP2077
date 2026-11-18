@@ -57,7 +57,7 @@ INSTALL:
 15. Normal Netrunner XP is allowed. Check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.6.5 removes global NPCPuppet AND VehicleObject attach/detach wrappers
+- v0.6.6 removes global NPCPuppet AND VehicleObject attach/detach wrappers
   to isolate repeated map-loading crashes after installing NetDeck.
   This is NOT compiler-verified and not a confirmed crash fix.
 - CET logging is optional: it observes our upload/HUD methods (if available)
@@ -65,7 +65,11 @@ IMPORTANT LIMITATIONS:
   Advanced Crash Reporter 1.6 collects CET scripting.log automatically.
   If CET cannot observe a method, observer_unavailable is logged instead.
 - Confirm map stability BEFORE trying hacks. If still crashing, remove NetDeck.
-- Native HUD progress bar is experimental; no replacement red completion yet.
+- Native HUD progress bar is now a separate ~3-second animation, using the
+  game's Neutral icon/tint style (blue/neutral appearance varies with UI theme).
+  It does not replace the triangle with our private NETWORM icon artwork.
+  The infection wave still runs separately every 2 seconds for up to 16 jumps.
+  The old EXTRACTED DATA completion notification is still present.
 - Uses Phantom Liberty's QuickHack.BaseBlackWallHack record for the NPC action.
 - Native Blackwall start/completion effects are cleared; confirm no lethal effect.
 - Repeating Ping network grid audio/VFX and per-hop reward notifications are removed.
@@ -127,6 +131,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.5-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.6-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
