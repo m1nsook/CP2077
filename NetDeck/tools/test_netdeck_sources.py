@@ -190,7 +190,10 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("netDeckLoadedPuppets: array<wref<NPCPuppet>>", R)
         self.assertIn("public func NetDeckRegisterPuppet(", R)
         self.assertIn("public func NetDeckUnregisterPuppet(", R)
-        self.assertIn("@wrapMethod(NPCPuppet)", R)
+        # Do not hook world-stream NPC lifecycle / SenseInitialize.
+        self.assertNotIn("@wrapMethod(NPCPuppet)", R)
+        self.assertIn("netDeckPlayer.NetDeckRegisterPuppet(npc);", R)
+        self.assertIn("this.NetDeckRegisterPuppet(initialPuppet)", R)
         self.assertIn("let initialPuppet: wref<NPCPuppet> = root as NPCPuppet;", R)
         self.assertIn("this.netDeckLoadedPuppets[p]", R)
         self.assertIn("this.NetDeckWaveValid(loadedNpc)", R)
@@ -203,8 +206,18 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("this.netDeckLoadedPuppets[p]", R)
         self.assertIn("let pendingCandidate: ref<GameObject>", R)
         self.assertLess(R.index("let selectedNpcHost: Int32"), R.index("let pendingCandidate: ref<GameObject>"))
-        self.assertEqual(R.count("protected cb func OnGameAttached() -> Bool"), 2)
-        self.assertEqual(R.count("protected cb func OnDetach() -> Bool"), 2)
+        self.assertEqual(R.count("protected cb func OnGameAttached() -> Bool"), 1)
+        self.assertEqual(R.count("protected cb func OnDetach() -> Bool"), 1)
+
+    def test_no_npc_attach_code_runs_at_map_load(self):
+        self.assertNotIn("@wrapMethod(NPCPuppet)", R)
+        self.assertNotIn("player.NetDeckRegisterPuppet(this);", R)
+        self.assertNotIn("player.NetDeckUnregisterPuppet(this.GetEntityID());", R)
+        self.assertIn("netDeckPlayer.NetDeckRegisterPuppet(npc);", R)
+        self.assertIn("protected cb func OnNetDeckPuppetInfiltration(", R)
+        self.assertIn("GetTargetParts(\n      this, query, parts", R)
+        self.assertIn("BaseStatusEffect.CommsNoiseLevel4", R)
+        self.assertIn("UI_HUDProgressBar", R)
 
     def test_reward_and_feedback(self):
         self.assertIn("HackingRewardNotificationEvent", R)
