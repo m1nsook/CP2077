@@ -95,7 +95,7 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("NetDeckWaveStart(root: ref<GameObject>, fromDevice: Bool)", R)
         self.assertIn("protected cb func OnNetDeckWaveTickEvent", R)
         self.assertIn("NetDeckWaveInfect(selected, depth)", R)
-        self.assertIn("DelayEvent(this, evt, 0.45)", R)
+        self.assertIn("DelayEvent(this, evt, 2.0)", R)
         self.assertIn("GetTargetParts(\n      this, query, parts", R)
         self.assertIn("TargetingSet.Complete", R)
         self.assertIn("Vector4.Distance(this.netDeckWaveHosts[j], candidate.GetWorldPosition())", R)
@@ -104,11 +104,19 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("this.netDeckWaveSeen) >= 40", R)
         self.assertIn("this.netDeckWavePendingCursor", R)
         self.assertIn("NetDeckWaveAddMaster", R)
-        self.assertIn("NetDeckWaveProgress", R)
+        self.assertNotIn("NetDeckWaveProgress", R)
         self.assertIn("NetDeckTargetsAffected", R)
         self.assertNotIn("public func NetDeckSpread(", R)
         self.assertNotIn("GetTargetParts(obj, query, parts)", R)
         self.assertNotRegex(R, r"\bcontinue\s*;")
+
+    def test_silent_two_second_bounded_wave(self):
+        self.assertIn("this.netDeckWaveTicks += 1;", R)
+        self.assertIn("this.netDeckWaveTicks > 16", R)
+        self.assertNotIn("PingNetworkGrid_Event(", R)
+        self.assertNotIn("NetDeckPulseNetwork(ps)", R)
+        self.assertNotIn("notification.m_text = loc.GetText(\"NetDeckWaveProgress\")", R)
+        self.assertIn("r.robbedTargets, affected", R)
 
     def test_scoped_trace_hook(self):
         self.assertIn("NetDeck.ZeroAwareness:", Y)
