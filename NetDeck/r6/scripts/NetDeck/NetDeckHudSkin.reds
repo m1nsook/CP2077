@@ -100,12 +100,10 @@ public final func UpdateProgressBarActive(active: Bool) -> Void {
     return;
   }
 
-  let bb: ref<IBlackboard> =
-    GameInstance.GetBlackboardSystem(this.GetGameInstance()).Get(
-      GetAllBlackboardDefs().UI_HUDProgressBar
-    );
-  if !IsDefined(bb) { return; }
-  let d: ref<UI_HUDProgressBarDef> = GetAllBlackboardDefs().UI_HUDProgressBar;
-  let header: String = bb.GetString(d.Header);
+  // This HUD controller already owns its progress blackboard and def.
+  // inkHUDGameController does NOT provide GetGameInstance().
+  if !IsDefined(this.m_progressBarBB) { return; }
+  let header: String =
+    this.m_progressBarBB.GetString(this.m_progressBarDef.Header);
   this.NetDeckHudSkinApply(StrBeginsWith(header, "NETWORM"));
 }
