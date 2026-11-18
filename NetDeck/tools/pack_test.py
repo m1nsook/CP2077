@@ -62,7 +62,7 @@ INSTALL:
 15. Normal Netrunner XP is allowed. Check crafting components awarded.
 
 IMPORTANT LIMITATIONS:
-- v0.6.8 removes global NPCPuppet AND VehicleObject attach/detach wrappers
+- v0.6.9 removes global NPCPuppet AND VehicleObject attach/detach wrappers
   to isolate repeated map-loading crashes after installing NetDeck.
   This is NOT compiler-verified and not a confirmed crash fix.
 - CET logging is optional: it observes our upload/HUD methods (if available)
@@ -153,6 +153,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.8-SOURCE-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.9-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
