@@ -235,8 +235,8 @@ public func NetDeckSpread(
     let obj: ref<GameObject> = queue[i];
     let depth: Int32 = levels[i];
     i += 1;
-    if !IsDefined(obj) || ArrayContains(result.seen, obj) { continue; }
-    ArrayPush(result.seen, obj);
+    if IsDefined(obj) && !ArrayContains(result.seen, obj) {
+      ArrayPush(result.seen, obj);
 
     let npc: ref<ScriptedPuppet> = obj as ScriptedPuppet;
     let vehicle: ref<VehicleObject> = obj as VehicleObject;
@@ -328,6 +328,7 @@ public func NetDeckSpread(
         }
         k += 1;
       }
+    }
     }
   }
   return result;
