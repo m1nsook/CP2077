@@ -13,7 +13,7 @@ ROOT_FILES = (
     "r6/scripts/NetDeck/Localization.reds",
     "r6/tweaks/NetDeck/NetDeck.yaml",
 )
-TESTING = """Infiltration — NetWatch Σ MK.1 / NETWORM GAMEPLAY TEST — NOT A RELEASE
+TESTING = """Infiltration — NetWatch Σ MK.1 / NETWORM SOURCE-ONLY TEST — NOT A RELEASE
 
 Requires Cyberpunk 2077 2.5, RED4ext, redscript, TweakXL and Codeware.
 
@@ -22,21 +22,26 @@ INSTALL:
 2. Extract this ZIP into the Cyberpunk 2077 game root.
 3. Make sure r6/scripts/NetDeck/NetDeck.reds,
    r6/scripts/NetDeck/Localization.reds and r6/tweaks/NetDeck/NetDeck.yaml exist.
-4. Launch the game. If REDscript compilation or TweakXL loading fails,
+4. IMPORTANT: This GitHub artifact contains ONLY REDscript and TweakXL sources.
+   Original icon PNGs, WolvenKit raw project, .inkatlas, .xbm and compiled
+   .archive are PRIVATE and NOT included. A separate locally packed archive
+   containing both icon atlases is required for custom icons to display.
+5. Launch the game. If REDscript compilation or TweakXL loading fails,
    send the r6/logs/redscript* and red4ext/plugins/TweakXL/TweakXL.log errors.
-5. To add the experimental deck through CET console:
+6. To add the experimental deck through CET console:
    Game.AddToInventory("Items.NESTCyberdeck", 1)
-6. Equip NetWatch Σ MK.1; test NETWORM on a camera, terminal, isolated device,
+7. Equip NetWatch Σ MK.1; test NETWORM on a camera, terminal, isolated device,
    and pingable hostile NPC. A camera is NOT required as an entry point.
-7. Confirm the original Ping is offered and works separately.
-8. Test connected security effects without any camera in the network.
-9. Check an unrelated network remains unaffected.
+8. Confirm the original Ping is offered and works separately.
+9. Test connected security effects without any camera in the network.
+10. Check an unrelated network remains unaffected.
 
 IMPORTANT LIMITATIONS:
-- This regression fix is source/package tested but NOT reverified in game 2.5.
+- v0.5.2 corrects REDscript signature errors but is NOT game-compiler verified.
 - Previous build's network shutdown, vendor and stats were user-confirmed.
-- The custom NetWatch Σ MK.1 and NETWORM names/descriptions use Codeware's native
-  localization provider. The icon still uses an existing vanilla asset.
+- Codeware interface-language packages cover 19 UI languages, with English fallback.
+- Access-point NETWORM scanner support and spread FX are experimental.
+- No copyrighted or private icon/ArchiveXL/WolvenKit binary assets are distributed.
 - NETWORM no longer inherits PingDevice, so vanilla Ping must remain
   an independent, functioning quickhack when NetWatch Σ MK.1 is installed.
 - NPCs are new entry points via PuppetQuickHack. Their connected devices
@@ -80,6 +85,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.4.1-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.5.2-SOURCE-TEST.zip")
     args = parser.parse_args()
     build(args.output)
