@@ -364,24 +364,10 @@ public func NetDeckUnregisterPuppet(id: EntityID) -> Void {
   }
 }
 
-@wrapMethod(NPCPuppet)
-protected cb func OnGameAttached() -> Bool {
-  let result: Bool = wrappedMethod();
-  let player: ref<PlayerPuppet> = GetPlayer(this.GetGame());
-  if IsDefined(player) {
-    player.NetDeckRegisterPuppet(this);
-  }
-  return result;
-}
-
-@wrapMethod(NPCPuppet)
-protected cb func OnDetach() -> Bool {
-  let player: ref<PlayerPuppet> = GetPlayer(this.GetGame());
-  if IsDefined(player) {
-    player.NetDeckUnregisterPuppet(this.GetEntityID());
-  }
-  return wrappedMethod();
-}
+// Do not wrap NPCPuppet.OnGameAttached or NPCPuppet.OnDetach here.
+// They run during world streaming and SenseInitialize/CreateSenseMappin,
+// including without an active NETWORM upload. Track only scanned or
+// explicitly hacked NPCs, leaving native NPC initialization untouched.
 
 @addField(PlayerPuppet)
 private let netDeckWaveGeneration: Int32;
@@ -1218,6 +1204,13 @@ public final const func GetAllChoices(
   }
   if !IsDefined(npc.GetRecord()) || npc.GetRecord().IsChild() {
     return;
+  }
+
+  // Lazy, scan-driven candidate registration. Never hook the entity attach
+  // path: loading a save must not mutate a registry for every spawned NPC.
+  let netDeckPlayer: ref<PlayerPuppet> = GetPlayer(this.GetGameInstance());
+  if IsDefined(netDeckPlayer) {
+    netDeckPlayer.NetDeckRegisterPuppet(npc);
   }
 
   // The available base action is Canto's Blackwall Gateway, not FreePing.
