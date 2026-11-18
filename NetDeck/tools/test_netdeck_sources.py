@@ -156,7 +156,10 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("netDeckLoadedVehicles: array<wref<VehicleObject>>", R)
         self.assertIn("public func NetDeckRegisterVehicle(", R)
         self.assertIn("public func NetDeckUnregisterVehicle(", R)
-        self.assertIn("@wrapMethod(VehicleObject)", R)
+        # Global vehicle lifecycle hooks run during world streaming; not safe.
+        self.assertNotIn("@wrapMethod(VehicleObject)", R)
+        self.assertIn("netDeckPlayer.NetDeckRegisterVehicle(vehicle);", R)
+        self.assertIn("this.NetDeckRegisterVehicle(initialVehicle);", R)
         self.assertIn("protected cb func OnGameAttached() -> Bool", R)
         self.assertIn("protected cb func OnDetach() -> Bool", R)
         self.assertIn("VehicleNetrunnerQuickhackType.ForceBrakes", R)
@@ -206,8 +209,15 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("this.netDeckLoadedPuppets[p]", R)
         self.assertIn("let pendingCandidate: ref<GameObject>", R)
         self.assertLess(R.index("let selectedNpcHost: Int32"), R.index("let pendingCandidate: ref<GameObject>"))
-        self.assertEqual(R.count("protected cb func OnGameAttached() -> Bool"), 1)
-        self.assertEqual(R.count("protected cb func OnDetach() -> Bool"), 1)
+        self.assertEqual(R.count("protected cb func OnGameAttached() -> Bool"), 0)
+        self.assertEqual(R.count("protected cb func OnDetach() -> Bool"), 0)
+
+    def test_no_vehicle_attach_code_runs_at_map_load(self):
+        self.assertNotIn("@wrapMethod(VehicleObject)", R)
+        self.assertNotIn("player.NetDeckRegisterVehicle(this);", R)
+        self.assertNotIn("player.NetDeckUnregisterVehicle(this.GetEntityID());", R)
+        self.assertIn("netDeckPlayer.NetDeckRegisterVehicle(vehicle);", R)
+        self.assertIn("this.NetDeckRegisterVehicle(initialVehicle);", R)
 
     def test_no_npc_attach_code_runs_at_map_load(self):
         self.assertNotIn("@wrapMethod(NPCPuppet)", R)
