@@ -3,6 +3,8 @@
 // or alter its hooks; NETWORM runs only while NetWatch Σ MK.1 is installed.
 module NetDeck
 
+import Codeware.Localization.*
+
 public class NetDeckInfiltration extends ActionBool {
   public final func SetProperties() -> Void {
     this.actionName = n"NetDeckInfiltration";
@@ -161,23 +163,88 @@ public final static func GetPlayerQuickHackListWithQuality(
   return hacks;
 }
 
+// Access points opt out of remote quickhacks by default. Only our deck
+// may expose a NETWORM action on a non-quest access point.
+@wrapMethod(AccessPointControllerPS)
+protected const func CanCreateAnyQuickHackActions() -> Bool {
+  return wrappedMethod() ||
+    (IsEquipped(this.GetGameInstance()) &&
+     this.HasNetworkBackdoor() &&
+     !this.IsMarkedAsQuest() &&
+     !this.IsDisabled());
+}
+
+// AccessPointController extends MasterController (not Device). Do not
+// attach access-point logic to Device via impossible downcasts.
+// Match the base GetRemoteActions out-parameter exactly.
+@wrapMethod(ScriptableDeviceComponentPS)
+public func GetRemoteActions(
+  out outActions: array<ref<DeviceAction>>,
+  const context: script_ref<GetActionsContext>
+) -> Void {
+  wrappedMethod(outActions, context);
+  let ap: ref<AccessPointControllerPS> = this as AccessPointControllerPS;
+  if !IsDefined(ap) ||
+     !IsEquipped(this.GetGameInstance()) ||
+     ap.IsMarkedAsQuest() ||
+     ap.IsDisabled() ||
+     !ap.HasNetworkBackdoor() {
+    return;
+  }
+  ArrayClear(outActions);
+  let action: ref<NetDeckInfiltration> = ap.NetDeckActionInfiltration();
+  action.SetAsQuickHack(false);
+  ArrayPush(outActions, action);
+}
+
+// Use the game's existing network visual for a short propagation pulse.
+public func NetDeckPulseNetwork(source: ref<ScriptableDeviceComponentPS>) -> Void {
+  if !IsDefined(source) {
+    return;
+  }
+  let device: ref<Device> = source.GetOwnerEntityWeak() as Device;
+  if !IsDefined(device) {
+    return;
+  }
+  device.PingNetworkGrid_Event(
+    device.GetNetworkBeamEndpoint(),
+    device.GetFxResourceByKey(n"pingNetworkLink"),
+    2.5, EPingType.DIRECT, true, true, false
+  );
+}
+
+// Report upload outcome once, using Codeware's interface language.
+public func NetDeckNotify(game: GameInstance, affected: Int32) -> Void {
+  let loc: ref<LocalizationSystem> = LocalizationSystem.GetInstance(game);
+  if !IsDefined(loc) {
+    return;
+  }
+  let notification: ref<HackingRewardNotificationEvent> = new HackingRewardNotificationEvent();
+  if affected > 0 {
+    notification.m_text = loc.GetText("NetDeckSpreadComplete");
+  } else {
+    notification.m_text = loc.GetText("NetDeckSpreadEmpty");
+  }
+  GameInstance.GetUISystem(game).QueueEvent(notification);
+}
+
 // Preserve vanilla IsPotentiallyQuickHackable unchanged. Ping remains native.
 
 // Only act on actual links. Cameras on a neighboring network are untouched.
 // Multiple APs sharing one target are deduplicated, not processed twice.
 @addMethod(ScriptableDeviceComponentPS)
-public func NetDeckInfiltrateNetwork() -> Void {
+public func NetDeckInfiltrateNetwork() -> Int32 {
   if !IsEquipped(this.GetGameInstance()) || this.IsMarkedAsQuest() {
-    return;
+    return 0;
   }
 
+  let affected: Int32 = 0;
   let seen: array<ref<ScriptableDeviceComponentPS>>;
   // A pingable access point or network controller IS a valid cast target.
   // Traverse its own descendants instead of expecting a camera-like parent.
   let directMaster: ref<MasterControllerPS> = this as MasterControllerPS;
   if IsDefined(directMaster) {
-    this.NetDeckInfiltrateMaster(directMaster, seen);
-    return;
+    return this.NetDeckInfiltrateMaster(directMaster, seen);
   }
   let accessPoints: array<ref<AccessPointControllerPS>> = this.GetAccessPoints();
   let i: Int32 = 0;
@@ -185,30 +252,34 @@ public func NetDeckInfiltrateNetwork() -> Void {
   while i < ArraySize(accessPoints) {
     if IsDefined(accessPoints[i]) {
       foundAP = true;
-      this.NetDeckInfiltrateMaster(accessPoints[i], seen);
+      affected += this.NetDeckInfiltrateMaster(accessPoints[i], seen);
     }
     i += 1;
   }
 
   // Devices on a virtual surveillance system may not have an explicit AP.
   if !foundAP {
-    this.NetDeckInfiltrateMaster(this.NetDeckNetworkMaster(), seen);
+    affected += this.NetDeckInfiltrateMaster(this.NetDeckNetworkMaster(), seen);
   }
   // A Ping-capable standalone terminal, turret, mine, camera, or other
   // electronic device must still respond when it has no shared controller.
   if !foundAP && !IsDefined(this.NetDeckNetworkMaster()) && this.IsON() {
-    this.NetDeckApplyToMember(this);
+    if this.NetDeckApplyToMember(this) {
+      affected += 1;
+    }
   }
+  return affected;
 }
 
 @addMethod(ScriptableDeviceComponentPS)
 private func NetDeckInfiltrateMaster(
   master: ref<MasterControllerPS>,
   out seen: array<ref<ScriptableDeviceComponentPS>>
-) -> Void {
+) -> Int32 {
   if !IsDefined(master) {
-    return;
+    return 0;
   }
+  let affected: Int32 = 0;
   let members: array<ref<DeviceComponentPS>>;
   master.GetAllDescendants(members);
   let i: Int32 = 0;
@@ -218,22 +289,25 @@ private func NetDeckInfiltrateMaster(
     if IsDefined(member) && !ArrayContains(seen, member) {
       ArrayPush(seen, member);
       if member.IsON() && !member.IsMarkedAsQuest() {
-        this.NetDeckApplyToMember(member);
+        if this.NetDeckApplyToMember(member) {
+          affected += 1;
+        }
       }
     }
     i += 1;
   }
+  return affected;
 }
 
 @addMethod(ScriptableDeviceComponentPS)
-public func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Void {
+public func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Bool {
   if IsDefined(member as SurveillanceCameraControllerPS) ||
     IsDefined(member as SecurityTurretControllerPS) ||
     IsDefined(member as ExplosiveTriggerDeviceControllerPS) {
     // Uses the same game's OFF event as Camera Killer, but only when the
     // player intentionally uploads Infiltration. No automatic global hooks.
     this.QueuePSEvent(member, member.ActionSetDeviceOFF());
-    return;
+    return true;
   }
 
   // Don't send a synthetic distraction to every device: the base controller
@@ -242,7 +316,7 @@ public func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Vo
   // Master controllers are not eligible distraction targets.
   // PuppetDeviceLinkPS is not a ScriptableDeviceComponentPS subtype.
   if IsDefined(member as MasterControllerPS) {
-    return;
+    return false;
   }
   let actions: array<ref<DeviceAction>>;
   let context: GetActionsContext = member.GenerateContext(
@@ -260,17 +334,20 @@ public func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Vo
     if IsDefined(distraction) && !distraction.IsInactive() {
       distraction.SetExecutor(GetPlayer(this.GetGameInstance()));
       this.QueuePSEvent(member, distraction);
-      return;
+      return true;
     }
     i += 1;
   }
+  return false;
 }
 
 // The game's action dispatcher is responsible for invoking this after the
 // quickhack action is accepted. Do not set scanner or breach blackboards.
 @addMethod(ScriptableDeviceComponentPS)
 protected cb func OnNetDeckInfiltration(evt: ref<NetDeckInfiltration>) -> EntityNotificationType {
-  this.NetDeckInfiltrateNetwork();
+  NetDeckPulseNetwork(this);
+  let affected: Int32 = this.NetDeckInfiltrateNetwork();
+  NetDeckNotify(this.GetGameInstance(), affected);
   return EntityNotificationType.DoNotNotifyEntity;
 }
 
@@ -335,10 +412,11 @@ public final const func GetAllChoices(
 // Puppet network links are not ScriptableDeviceComponentPS. Use the link's
 // own real access points and their descendants. No radius-based search.
 @addMethod(PuppetDeviceLinkPS)
-public func NetDeckInfiltrateLinkedDevices() -> Void {
+public func NetDeckInfiltrateLinkedDevices() -> Int32 {
   if !this.IsConnected() {
-    return;
+    return 0;
   }
+  let affected: Int32 = 0;
   let aps: array<ref<AccessPointControllerPS>> = this.GetAccessPoints();
   let seen: array<ref<ScriptableDeviceComponentPS>>;
   let i: Int32 = 0;
@@ -353,7 +431,9 @@ public func NetDeckInfiltrateLinkedDevices() -> Void {
         if IsDefined(member) && !ArrayContains(seen, member) {
           ArrayPush(seen, member);
           if member.IsON() && !member.IsMarkedAsQuest() {
-            member.NetDeckApplyToMember(member);
+            if member.NetDeckApplyToMember(member) {
+              affected += 1;
+            }
           }
         }
         j += 1;
@@ -361,6 +441,7 @@ public func NetDeckInfiltrateLinkedDevices() -> Void {
     }
     i += 1;
   }
+  return affected;
 }
 
 @addMethod(ScriptedPuppetPS)
@@ -372,7 +453,12 @@ protected cb func OnNetDeckPuppetInfiltration(
     if IsDefined(puppet) && !puppet.IsQuest() {
       let link: ref<PuppetDeviceLinkPS> = this.GetDeviceLink();
       if IsDefined(link) {
-        link.NetDeckInfiltrateLinkedDevices();
+        let aps: array<ref<AccessPointControllerPS>> = link.GetAccessPoints();
+        if ArraySize(aps) > 0 {
+          NetDeckPulseNetwork(aps[0]);
+        }
+        let affected: Int32 = link.NetDeckInfiltrateLinkedDevices();
+        NetDeckNotify(this.GetGameInstance(), affected);
       }
     }
   }
