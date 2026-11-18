@@ -39,13 +39,13 @@ private func NetDeckHudSkinApply(enable: Bool) -> Void {
     // Use the existing player's 32x32/64x64 multi-resolution quickhack icon.
     inkImageRef.SetAtlasResource(
       this.m_neutralInIcon,
-      r"m1nsook\netdeck\ui\networm_icons.inkatlas"
+      r"m1nsook\\netdeck\\ui\\networm_icons.inkatlas"
     );
     if !inkImageRef.SetTexturePart(this.m_neutralInIcon, n"networmhack") {
       // Gracefully fall back if the private icon .archive is not installed.
       inkImageRef.SetAtlasResource(
         this.m_neutralInIcon,
-        r"base\gameplay\gui\quests\assets\personal_link.inkatlas"
+        r"base\\gameplay\\gui\\quests\\assets\\personal_link.inkatlas"
       );
       inkImageRef.SetTexturePart(this.m_neutralInIcon, n"neutral_!");
       return;
@@ -70,7 +70,7 @@ private func NetDeckHudSkinApply(enable: Bool) -> Void {
     // Restore all native neutral parts for other game/quest progress bars.
     inkImageRef.SetAtlasResource(
       this.m_neutralInIcon,
-      r"base\gameplay\gui\quests\assets\personal_link.inkatlas"
+      r"base\\gameplay\\gui\\quests\\assets\\personal_link.inkatlas"
     );
     inkImageRef.SetTexturePart(this.m_neutralInIcon, n"neutral_!");
     this.NetDeckHudSkinShowNeutralPart(n"Neutral_Triangle_Icon", true);
