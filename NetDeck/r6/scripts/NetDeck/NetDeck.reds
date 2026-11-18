@@ -98,6 +98,7 @@ protected final func FinalizeGetQuickHackActions(
   // A camera, surveillance master or access point is NOT required.
   if IsEquipped(this.GetGameInstance()) &&
     !this.IsMarkedAsQuest() &&
+    !IsDefined(this as AccessPointControllerPS) &&
     this.IsPotentiallyQuickHackable() {
     let exists: Bool = false;
     let i: Int32 = 0;
@@ -163,40 +164,6 @@ public final static func GetPlayerQuickHackListWithQuality(
   return hacks;
 }
 
-// Access points opt out of remote quickhacks by default. Only our deck
-// may expose a NETWORM action on a non-quest access point.
-@wrapMethod(AccessPointControllerPS)
-protected const func CanCreateAnyQuickHackActions() -> Bool {
-  return wrappedMethod() ||
-    (IsEquipped(this.GetGameInstance()) &&
-     this.HasNetworkBackdoor() &&
-     !this.IsMarkedAsQuest() &&
-     !this.IsDisabled());
-}
-
-// AccessPointController extends MasterController (not Device). Do not
-// attach access-point logic to Device via impossible downcasts.
-// Match the base GetRemoteActions out-parameter exactly.
-@wrapMethod(ScriptableDeviceComponentPS)
-public func GetRemoteActions(
-  out outActions: array<ref<DeviceAction>>,
-  const context: script_ref<GetActionsContext>
-) -> Void {
-  wrappedMethod(outActions, context);
-  let ap: ref<AccessPointControllerPS> = this as AccessPointControllerPS;
-  if !IsDefined(ap) ||
-     !IsEquipped(this.GetGameInstance()) ||
-     ap.IsMarkedAsQuest() ||
-     ap.IsDisabled() ||
-     !ap.HasNetworkBackdoor() {
-    return;
-  }
-  ArrayClear(outActions);
-  let action: ref<NetDeckInfiltration> = ap.NetDeckActionInfiltration();
-  action.SetAsQuickHack(false);
-  ArrayPush(outActions, action);
-}
-
 // Use the game's existing network visual for a short propagation pulse.
 public func NetDeckPulseNetwork(source: ref<ScriptableDeviceComponentPS>) -> Void {
   if !IsDefined(source) {
@@ -226,6 +193,135 @@ public func NetDeckNotify(game: GameInstance, affected: Int32) -> Void {
     notification.m_text = loc.GetText("NetDeckSpreadEmpty");
   }
   GameInstance.GetUISystem(game).QueueEvent(notification);
+}
+
+// No access-point scanner hacks: access points use their own breach flow.
+// NETWORM may still cross their existing network as a device's controller.
+
+// Synapse Burnout is deliberately the *only* damaging NPC effect and only
+// fires for enemy netrunners near a DEVICE upload. No civilians or quest NPCs.
+public func NetDeckBurnoutNearbyNetrunners(source: ref<ScriptableDeviceComponentPS>) -> Int32 {
+  let origin: ref<GameObject> = source.GetOwnerEntityWeak() as GameObject;
+  let player: ref<PlayerPuppet> = GetPlayer(source.GetGameInstance());
+  if !IsDefined(origin) || !IsDefined(player) { return 0; }
+  let query: TargetSearchQuery;
+  query.testedSet = TargetingSet.Complete;
+  query.searchFilter = TSF_EnemyNPC();
+  query.includeSecondaryTargets = false;
+  query.maxDistance = 25.0;
+  query.filterObjectByDistance = true;
+  let parts: array<TS_TargetPartInfo>;
+  GameInstance.GetTargetingSystem(source.GetGameInstance()).GetTargetParts(origin, query, parts);
+  let seen: array<ref<ScriptedPuppet>>;
+  let hits: Int32 = 0;
+  let i: Int32 = 0;
+  while i < ArraySize(parts) {
+    let component: wref<TargetingComponent> = TS_TargetPartInfo.GetComponent(parts[i]);
+    if IsDefined(component) {
+      let target: ref<ScriptedPuppet> = component.GetEntity() as ScriptedPuppet;
+      if IsDefined(target) && !ArrayContains(seen, target) {
+        ArrayPush(seen, target);
+        if target.IsNetrunnerPuppet() && !target.IsQuest() &&
+          GameObject.GetAttitudeTowards(target, player) == EAIAttitude.AIA_Hostile &&
+          !StatusEffectSystem.ObjectHasStatusEffect(target, t"BaseStatusEffect.BrainMeltLevel4") {
+          StatusEffectHelper.ApplyStatusEffect(
+            target, t"BaseStatusEffect.BrainMeltLevel4", player.GetEntityID()
+          );
+          hits += 1;
+        }
+      }
+    }
+    i += 1;
+  }
+  return hits;
+}
+
+public func NetDeckIsNetWatch(puppet: ref<ScriptedPuppet>) -> Bool {
+  let npc: ref<NPCPuppet> = puppet as NPCPuppet;
+  if !IsDefined(npc) { return false; }
+  let record: wref<Character_Record> = TweakDBInterface.GetCharacterRecord(npc.GetRecordID());
+  if !IsDefined(record) { return false; }
+  let affiliation: wref<Affiliation_Record> = record.Affiliation();
+  return IsDefined(affiliation) && Equals(affiliation.Type(), gamedataAffiliation.NetWatch);
+}
+
+// Detected by NetWatch: immediate five-star response and the game's own
+// reveal-position attempt. This doesn't modify trace timers for other NPCs.
+public func NetDeckTriggerNetWatchPursuit(puppet: ref<ScriptedPuppet>) -> Void {
+  if !NetDeckIsNetWatch(puppet) { return; }
+  let player: ref<PlayerPuppet> = GetPlayer(puppet.GetGame());
+  if !IsDefined(player) { return; }
+  let wanted: ref<SetWantedLevel> = new SetWantedLevel();
+  wanted.m_wantedLevel = EPreventionHeatStage.Heat_5;
+  wanted.m_forcePlayerPositionAsLastCrimePoint = true;
+  PreventionSystem.QueueRequest(puppet.GetGame(), wanted);
+  NPCPuppet.RevealPlayerPositionIfNeeded(puppet, player.GetEntityID(), false);
+}
+
+// NPC-origin NETWORM is non-lethal: interfere with hostile weapons and brake
+// nearby non-quest vehicles. No damage, incapacitation or radius-based
+// network shutdown is applied to any civilian or hostile puppet.
+public func NetDeckDisruptNpcVicinity(puppet: ref<ScriptedPuppet>) -> Int32 {
+  if !IsDefined(puppet) || puppet.IsQuest() { return 0; }
+  let player: ref<PlayerPuppet> = GetPlayer(puppet.GetGame());
+  if !IsDefined(player) { return 0; }
+  let affected: Int32 = 0;
+  let npc: ref<NPCPuppet> = puppet as NPCPuppet;
+  if IsDefined(npc) &&
+     (GameObject.GetAttitudeTowards(npc, player) == EAIAttitude.AIA_Hostile ||
+      npc.IsCharacterPolice() || NetDeckIsNetWatch(puppet)) &&
+     !StatusEffectSystem.ObjectHasStatusEffect(npc, t"BaseStatusEffect.WeaponMalfunctionLvl4") {
+    StatusEffectHelper.ApplyStatusEffect(
+      npc, t"BaseStatusEffect.WeaponMalfunctionLvl4", player.GetEntityID()
+    );
+    affected += 1;
+  }
+
+  // TargetingSystem only returns loaded, targetable vehicles in this radius.
+  // No driving quest/scene vehicles, no player's own vehicle.
+  let query: TargetSearchQuery;
+  query.testedSet = TargetingSet.Complete;
+  query.searchFilter = TSF_Any(TSFMV.Obj_Other | TSFMV.Obj_Device);
+  query.includeSecondaryTargets = false;
+  query.maxDistance = 25.0;
+  query.filterObjectByDistance = true;
+  let parts: array<TS_TargetPartInfo>;
+  GameInstance.GetTargetingSystem(puppet.GetGame()).GetTargetParts(puppet, query, parts);
+  let seen: array<ref<VehicleObject>>;
+  let i: Int32 = 0;
+  while i < ArraySize(parts) {
+    let component: wref<TargetingComponent> = TS_TargetPartInfo.GetComponent(parts[i]);
+    if IsDefined(component) {
+      let vehicle: ref<VehicleObject> = component.GetEntity() as VehicleObject;
+      if IsDefined(vehicle) && !ArrayContains(seen, vehicle) {
+        ArrayPush(seen, vehicle);
+        if vehicle.IsHackable() && !vehicle.IsQuest() &&
+           !vehicle.IsPlayerVehicle() && !vehicle.IsInQuestOrScenePhysicsState() {
+          vehicle.ForceBrakesFor(4.0);
+          affected += 1;
+        }
+      }
+    }
+    i += 1;
+  }
+  return affected;
+}
+
+// "DATA EXTRACTED" is the game's native hacking reward notification.
+// Give a small random pool of real crafting/quickhack components on success.
+// No explicit XP or skill-progression awards are issued by NETWORM.
+public func NetDeckGiveDataComponents(game: GameInstance) -> Void {
+  let player: ref<PlayerPuppet> = GetPlayer(game);
+  if !IsDefined(player) { return; }
+  let ts: ref<TransactionSystem> = GameInstance.GetTransactionSystem(game);
+  if !IsDefined(ts) { return; }
+  let id: TweakDBID = t"Items.QuickHackCommonMaterial1";
+  let roll: Int32 = RandRange(0, 5);
+  if roll == 1 { id = t"Items.QuickHackUncommonMaterial1"; }
+  if roll == 2 { id = t"Items.QuickHackRareMaterial1"; }
+  if roll == 3 { id = t"Items.QuickHackEpicMaterial1"; }
+  if roll == 4 { id = t"Items.QuickHackLegendaryMaterial1"; }
+  ts.GiveItemByTDBID(player, id, RandRange(1, 4));
 }
 
 // Preserve vanilla IsPotentiallyQuickHackable unchanged. Ping remains native.
@@ -301,6 +397,21 @@ private func NetDeckInfiltrateMaster(
 
 @addMethod(ScriptableDeviceComponentPS)
 public func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Bool {
+  // Remotely take over ordinary doors and windows using their real controller
+  // actions, never quest / sealed / disabled / unpowered doors or elevators.
+  let door: ref<DoorControllerPS> = member as DoorControllerPS;
+  if IsDefined(door) {
+    if door.IsMarkedAsQuest() || door.IsSealed() || door.IsDisabled() ||
+       door.IsUnpowered() || door.IsLiftDoor() || door.IsOpen() {
+      return false;
+    }
+    if door.IsLocked() {
+      this.QueuePSEvent(door, door.ActionToggleLock());
+    }
+    this.QueuePSEvent(door, door.ActionSetOpened());
+    return true;
+  }
+
   if IsDefined(member as SurveillanceCameraControllerPS) ||
     IsDefined(member as SecurityTurretControllerPS) ||
     IsDefined(member as ExplosiveTriggerDeviceControllerPS) {
@@ -347,6 +458,8 @@ public func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Bo
 protected cb func OnNetDeckInfiltration(evt: ref<NetDeckInfiltration>) -> EntityNotificationType {
   NetDeckPulseNetwork(this);
   let affected: Int32 = this.NetDeckInfiltrateNetwork();
+  affected += NetDeckBurnoutNearbyNetrunners(this);
+  if affected > 0 { NetDeckGiveDataComponents(this.GetGameInstance()); }
   NetDeckNotify(this.GetGameInstance(), affected);
   return EntityNotificationType.DoNotNotifyEntity;
 }
@@ -458,6 +571,14 @@ protected cb func OnNetDeckPuppetInfiltration(
           NetDeckPulseNetwork(aps[0]);
         }
         let affected: Int32 = link.NetDeckInfiltrateLinkedDevices();
+        NetDeckTriggerNetWatchPursuit(puppet);
+        affected += NetDeckDisruptNpcVicinity(puppet);
+        if affected > 0 { NetDeckGiveDataComponents(this.GetGameInstance()); }
+        NetDeckNotify(this.GetGameInstance(), affected);
+      } else {
+        NetDeckTriggerNetWatchPursuit(puppet);
+        let affected: Int32 = NetDeckDisruptNpcVicinity(puppet);
+        if affected > 0 { NetDeckGiveDataComponents(this.GetGameInstance()); }
         NetDeckNotify(this.GetGameInstance(), affected);
       }
     }
