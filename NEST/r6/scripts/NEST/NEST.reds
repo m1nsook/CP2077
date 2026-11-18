@@ -125,24 +125,51 @@ public const func IsPotentiallyQuickHackable() -> Bool {
     IsDefined(this.NESTNetworkMaster());
 }
 
-// Only act on the actual network members: no radius-based entity scan.
+// Only act on actual links. Cameras on a neighboring network are untouched.
+// Multiple APs sharing one target are deduplicated, not processed twice.
 @addMethod(ScriptableDeviceComponentPS)
 public func NESTInfiltrateNetwork() -> Void {
   if !IsEquipped(this.GetGameInstance()) || this.IsMarkedAsQuest() {
     return;
   }
-  let master: ref<MasterControllerPS> = this.NESTNetworkMaster();
+
+  let seen: array<ref<ScriptableDeviceComponentPS>>;
+  let accessPoints: array<ref<AccessPointControllerPS>> = this.GetAccessPoints();
+  let i: Int32 = 0;
+  let foundAP: Bool = false;
+  while i < ArraySize(accessPoints) {
+    if IsDefined(accessPoints[i]) {
+      foundAP = true;
+      this.NESTInfiltrateMaster(accessPoints[i], seen);
+    }
+    i += 1;
+  }
+
+  // Devices on a virtual surveillance system may not have an explicit AP.
+  if !foundAP {
+    this.NESTInfiltrateMaster(this.NESTNetworkMaster(), seen);
+  }
+}
+
+@addMethod(ScriptableDeviceComponentPS)
+private func NESTInfiltrateMaster(
+  master: ref<MasterControllerPS>,
+  out seen: array<ref<ScriptableDeviceComponentPS>>
+) -> Void {
   if !IsDefined(master) {
     return;
   }
-
   let members: array<ref<DeviceComponentPS>>;
   master.GetAllDescendants(members);
   let i: Int32 = 0;
   while i < ArraySize(members) {
-    let member: ref<ScriptableDeviceComponentPS> = members[i] as ScriptableDeviceComponentPS;
-    if IsDefined(member) && member.IsON() && !member.IsMarkedAsQuest() {
-      this.NESTApplyToMember(member);
+    let member: ref<ScriptableDeviceComponentPS> =
+      members[i] as ScriptableDeviceComponentPS;
+    if IsDefined(member) && !ArrayContains(seen, member) {
+      ArrayPush(seen, member);
+      if member.IsON() && !member.IsMarkedAsQuest() {
+        this.NESTApplyToMember(member);
+      }
     }
     i += 1;
   }
@@ -153,23 +180,38 @@ private func NESTApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Void
   if IsDefined(member as SurveillanceCameraControllerPS) ||
     IsDefined(member as SecurityTurretControllerPS) ||
     IsDefined(member as ExplosiveTriggerDeviceControllerPS) {
-    // Uses the existing game OFF event, including Camera Killer's camera
-    // shutdown mechanism. No explosion or forced quest progression.
+    // Uses the same game's OFF event as Camera Killer, but only when the
+    // player intentionally uploads Infiltration. No automatic global hooks.
     this.QueuePSEvent(member, member.ActionSetDeviceOFF());
     return;
   }
 
-  // Other regular devices cannot safely be guaranteed to power off.
-  // Use the game's own Distract Enemies/Distraction event as fallback.
-  // Masters, puppet links and quest-marked devices must never receive it.
+  // Don't send a synthetic distraction to every device: the base controller
+  // constructs a QuickHackDistraction even for devices with no such feature.
+  // Only dispatch an actual offered, active game-created quickhack action.
   if IsDefined(member as MasterControllerPS) ||
     IsDefined(member as PuppetDeviceLinkPS) {
     return;
   }
-  let distraction: ref<QuickHackDistraction> = member.ActionQuickHackDistraction();
-  if IsDefined(distraction) {
-    distraction.SetDurationValue(6.0);
-    this.QueuePSEvent(member, distraction);
+  let actions: array<ref<DeviceAction>>;
+  let context: GetActionsContext = member.GenerateContext(
+    gamedeviceRequestType.Remote,
+    member.GetClearance(),
+    member.GetPlayerMainObject(),
+    PersistentID.ExtractEntityID(member.GetID())
+  );
+  context.ignoresRPG = true;
+  member.GetQuickHackActions(actions, context);
+
+  let i: Int32 = 0;
+  while i < ArraySize(actions) {
+    let distraction: ref<QuickHackDistraction> = actions[i] as QuickHackDistraction;
+    if IsDefined(distraction) && !distraction.IsInactive() {
+      distraction.SetExecutor(GetPlayer(this.GetGameInstance()));
+      this.QueuePSEvent(member, distraction);
+      return;
+    }
+    i += 1;
   }
 }
 

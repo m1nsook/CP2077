@@ -21,15 +21,15 @@ The RAM and buffer stats are defined in the deck's equip package. The original N
 
 ## Planned gameplay
 
-V scans **one device with a real network link** and selects **Infiltration** in the usual scanner quickhack list. The game performs its normal quickhack action. The mod traverses that device's access point or surveillance-system descendants, never searches an arbitrary radius.
+V scans **one device with a real network link** and selects **Infiltration** in the usual scanner quickhack list. The game performs its normal quickhack action. The mod traverses that device's access point or surveillance-system descendants, never searches an arbitrary radius. If the target has multiple explicit access points, each linked network is processed with per-device deduplication.
 
 - **Cameras, turrets, laser mines:** game-owned `SetDeviceOFF` event.
-- **Other non-quest, powered devices:** game-owned `QuickHackDistraction` event (6 seconds) as the fallback.
+- **Other non-quest, powered devices:** use an active, device-supported native **Distract Enemies** quickhack, if one is exposed; otherwise skip.
 - **Quest-marked devices, disconnected devices and system masters:** skipped.
 - **Robots, drones and mechs:** planned next; do not claim supported until their puppet-device links can be safely resolved and a non-lethal shutdown is verified.
 - **No effects outside the selected network.**
 
-The initial REDscript uses a native custom `ActionBool` action. Runtime dispatch and RAM/upload behavior **must be tested in Cyberpunk 2077 2.5**. It is not verified that every target can produce a distraction.
+The initial REDscript uses a native custom `ActionBool` action. Runtime dispatch and RAM/upload behavior **must be tested in Cyberpunk 2077 2.5**. Only devices whose game-created quickhack list offers a usable distraction are eligible for the fallback.
 
 ## All ripperdocs
 

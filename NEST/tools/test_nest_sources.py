@@ -51,6 +51,8 @@ class NESTSourceTests(unittest.TestCase):
         self.assertIn("Items.NESTCyberdeck", self.reds)
         self.assertIn("this.GetAccessPoints()", self.reds)
         self.assertIn("master.GetAllDescendants(members)", self.reds)
+        self.assertIn("this.NESTInfiltrateMaster(accessPoints[i], seen)", self.reds)
+        self.assertIn("ArrayContains(seen, member)", self.reds)
         self.assertNotIn("GetTargetParts(", self.reds)
         self.assertNotIn("LogChannel(", self.reds)
 
@@ -66,7 +68,10 @@ class NESTSourceTests(unittest.TestCase):
         self.assertIn("ExplosiveTriggerDeviceControllerPS", self.reds)
         self.assertIn("SecurityTurretControllerPS", self.reds)
         self.assertIn("SurveillanceCameraControllerPS", self.reds)
-        self.assertIn("ActionQuickHackDistraction()", self.reds)
+        self.assertIn("member.GetQuickHackActions(actions, context)", self.reds)
+        self.assertIn("actions[i] as QuickHackDistraction", self.reds)
+        self.assertIn("!distraction.IsInactive()", self.reds)
+        self.assertNotIn("member.ActionQuickHackDistraction()", self.reds)
         self.assertNotIn("SystemCollapse", self.reds)
 
     def test_localization_keys(self):
