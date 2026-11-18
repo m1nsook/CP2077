@@ -1,6 +1,6 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.1 TIMED WAVE TEST · NOT game-compiler verified.**
+**Cyberpunk 2077 2.5 · v0.6.2 VEHICLE PATH TEST · NOT game-compiler verified.**
 
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
@@ -23,7 +23,36 @@ The user-supplied `HeatSpread Files(1).zip` contained:
   host positions and a hop/fanout limit. This is the model for the new
   NETWORM tick scheduling; NETWORM retains its own nonlethal effects.
 
-## v0.6.1: source implementation, not yet verified in-game
+## v0.6.2: native vehicle path and propagation (unverified)
+
+The game does not define `TSFMV.Obj_Vehicle`, and `Obj_Other`
+is not a reliable way to discover traffic. Vehicles use a separate
+`VehicleComponentPS.GetQuickHackActions` pipeline, which calls the
+shared quickhack finalizer; normal vehicle hacks are unlocked by the
+**Carhacker** Intelligence perk.
+
+The NetDeck source now:
+- Adds a distinct built-in `VehicleQuickHack` action,
+  `DeviceAction.NetDeckVehicleInfiltration`, which shares the
+  existing NETWORM actionName, icon and effects.
+- Offers it only for an equipped NetWatch Σ MK.1 on eligible,
+  hackable, non-player, non-quest vehicles with the Carhacker perk.
+- Uses native `VehicleObject.OnGameAttached` / `OnDetach` events to
+  maintain a bounded weak-reference registry of loaded vehicles.
+  It checks vehicle world positions during each timed wave tick
+  **separately from the TSFMV target search**.
+- Uses native `VehicleObject.ActivateNetrunnerQuickhack(
+  VehicleNetrunnerQuickhackType.ForceBrakes)` on moving vehicles,
+  matching the in-game braking quickhack entry point.
+- Allows parked eligible cars to relay the worm without forcing brakes.
+- Keeps the existing four-hop, four-fanout, 40-target timed wave for
+  NPCs and devices. A registry records loaded cars, but propagation
+  has **not been demonstrated in-game yet**.
+
+These additions do not affect the separate vanilla vehicle quickhacks,
+NetWatch retaliation, normal Ping, or the user's private icon files.
+
+## v0.6.1: timed-wave source implementation, not yet verified in-game
 
 - One upload initializes a wave attached to the player and schedules a new
   step **every 0.45 seconds** (no simultaneous instant-burst loop).
@@ -86,18 +115,22 @@ Keep the user's privately packed `.archive` with the working icon art.
    in order, spaced approximately 0.45 s apart, without retargeting.
 3. **Progress feedback**: check `NETWORM: SPREADING 4` and later
    `TARGETS: <number>` in the finished notification.
-4. **One vehicle upload**: confirm eligible moving vehicles brake across
-   multiple hops and stationary ones act as relay targets.
-5. **One device upload**: confirm new device pulses, linked descendants
+4. **Carhacker perk:** confirm vanilla vehicle quickhacks and NETWORM are
+   both offered on an eligible traffic vehicle. With a different deck,
+   the new vehicle NETWORM must disappear.
+5. **One vehicle upload:** confirm it triggers native Emergency Brake,
+   then infects at least one other nearby car or NPC automatically.
+   A parked car may relay but must not brake.
+6. **One device upload**: confirm new device pulses, linked descendants
    and enemy-netrunner-only Synapse Burnout.
-6. **Road barrier**: test ordinary blockades alongside a sealed/quest
+7. **Road barrier**: test ordinary blockades alongside a sealed/quest
    barrier, which must remain protected.
-7. **Tracing**: ordinary gang/NCPD uploads should not trace. NETWORM
+8. **Tracing**: ordinary gang/NCPD uploads should not trace. NETWORM
    against a true NetWatch NPC should produce a five-star response.
-8. **€$ siphon**: check displayed credits against V's money before/after.
-9. **Vanilla**: normal Ping, weapon hacking, existing icons, cyberdeck stats
+9. **€$ siphon**: check displayed credits against V's money before/after.
+10. **Vanilla**: normal Ping, weapon hacking, existing icons, cyberdeck stats
    and other cyberdecks must continue working.
-10. **XP**: normal Netrunner XP gain is expected and allowed; do not treat it as a bug.
+11. **XP**: normal Netrunner XP gain is expected and allowed; do not treat it as a bug.
 
 **Keep PR #36 draft. REDscript compilation and gameplay results are
 required before describing this feature as working.**
@@ -107,3 +140,4 @@ required before describing this feature as working.**
 - `NetDeckInfiltration`
 - `DeviceAction.NetDeckInfiltration`
 - `QuickHack.NetDeckPuppetInfiltration`
+- `DeviceAction.NetDeckVehicleInfiltration` (new native vehicle record)
