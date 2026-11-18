@@ -467,7 +467,7 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
     let query: TargetSearchQuery;
     query.testedSet = TargetingSet.Complete;
     query.searchFilter =
-      TSF_Any(TSFMV.Obj_Puppet | TSFMV.Obj_Device | TSFMV.Obj_Vehicle);
+      TSF_Any(TSFMV.Obj_Puppet | TSFMV.Obj_Device | TSFMV.Obj_Other);
     query.includeSecondaryTargets = false;
     query.ignoreInstigator = true;
     query.maxDistance = 55.0;
