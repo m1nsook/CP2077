@@ -1,9 +1,57 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.4 MAP-LOAD CRASH ISOLATION TEST · NOT game-compiler verified.**
+**Cyberpunk 2077 2.5 · v0.6.5 CRASH DIAGNOSTIC TEST · NOT game-compiler verified.**
 
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
+
+## v0.6.5 — diagnose NetDeck-induced streaming crashes (UNVERIFIED)
+
+The player's repeatable A/B test is now the main evidence: **with NetDeck the
+game crashes during map/world loading, without NetDeck it loads normally**.
+The 17:04:28 crash again reported heap corruption near
+`vehiclePersistentDataPS` and a streamed NPC. Other native reports mention
+NPC stealth mappins and resource streaming. The faulting engine allocator and
+the crash reporter's "unknown culprit" message cannot establish exactly
+which NetDeck operation corrupted memory.
+
+**Source isolation change:** both global `NPCPuppet` and `VehicleObject`
+`OnGameAttached`/`OnDetach` wrappers are now removed. Those hooks previously
+ran while the map streamed and maintained large weak-ref arrays on V.
+Candidates are registered only when their native scanner action is generated
+or a NETWORM upload explicitly starts on them. **Nearby unscanned enemy and
+vehicle propagation may regress** until we develop a safer discovery path.
+
+**Crash diagnostic addon** (included in the test ZIP):
+
+`bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua`
+
+This tiny CET mod uses observer-only hooks on *NetDeck methods*, not global
+entity lifecycle methods. It emits `[NetDeck/DIAG v0.6.5]` lines:
+session_start, observer_ready/unavailable, heartbeat every ~15 seconds,
+wave_start, wave_infect (max 16 logged per upload), wave_finish,
+hud_start, and hud_finish. Failing to observe a method is logged and
+must not block gameplay. This does not read world objects during
+the heartbeat. **Advanced Crash Reporter 1.6 already includes
+CET `scripting.log`, so no patch to the crash reporter is needed.**
+
+Read `bin/x64/plugins/cyber_engine_tweaks/scripting.log`, or send the
+next Advanced Crash Reporter `.txt` (it includes the log tail). If it crashes
+**before any `wave_start`**, we know the crashing session did not have a
+logged successful NETWORM upload, though the item/quickhack source can still
+affect the game. If it crashes after wave_start, the last method logs can
+help correlate the crash with an upload or HUD transition. **Logging alone
+is not proof of memory ownership or a definitive crash culprit.**
+
+The previous 16:59:06 report also confirms REDscript compilation succeeded.
+It included a RedHotTools hook and repeated unloaded-resource warnings, but
+those **do not override the user's A/B evidence against NetDeck**.
+
+First test loading the *same save/sector* with the new sources and logger
+installed, **without using NETWORM**. If crashes remain, test script/tweak
+components separately from the local `NetDeck.archive` icon archive. Do
+not remove dependencies or mix source versions during comparisons. Preserve
+a backup save, leave PR #36 in DRAFT, and **do not release** this build.
 
 ## v0.6.4 — map-load crash isolation (UNVERIFIED; PR #36 only)
 
