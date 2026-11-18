@@ -173,6 +173,7 @@ public class NetDeckSpreadResult extends IScriptable {
   public let vehicles: Int32;
   public let eddies: Int32;
   public let robbedTargets: Int32;
+  public let pulses: Int32;
   public let seen: array<ref<GameObject>>;
 }
 
@@ -281,6 +282,10 @@ public func NetDeckSpread(
       let ps: ref<ScriptableDeviceComponentPS> =
         device.GetDevicePS() as ScriptableDeviceComponentPS;
       if IsDefined(ps) && !ps.IsMarkedAsQuest() {
+        if result.pulses < 8 {
+          NetDeckPulseNetwork(ps);
+          result.pulses += 1;
+        }
         if fromDevice { result.netrunners += NetDeckBurnoutNearbyNetrunners(ps); }
         if ps.IsON() && ps.NetDeckApplyToMember(ps) {
           result.devices += 1;
