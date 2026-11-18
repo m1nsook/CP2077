@@ -1,70 +1,64 @@
-# Infiltration
+# Infiltration — NΣT iconic cyberdeck
 
-**Status:** Developer test — REDscript and TweakXL runtime not verified in Cyberpunk 2077 2.5.
+Cyberpunk 2077 2.5 development test. **Not verified in game for v0.4.**
+NΣT is an iconic Tier 5++ NetWatch Netdriver Mk.2 cyberdeck.
+The saved item ID remains `Items.NESTCyberdeck`; the directory and new
+internal prefixes are `NetDeck`.
 
-**Cyberware:** NΣT (NetWatch Netdriver Mk.2), an iconic Tier 5++ cyberdeck. This mod is independent of Camera Killer.
+## User-confirmed baseline (v0.2.1)
+* Capacity **5**, RAM **15**, **4** quickhack slots, **4** buffer.
+* Existing Netdriver perks.
+* Same-network cameras/turrets/mines shut down; unrelated network and quest devices unaffected.
+* Night City and Dogtown ripperdoc stock.
+* Camera Killer not required, and not modified.
 
-| Specification | Value |
-| --- | --- |
-| Capacity | 5 |
-| RAM | 15 |
-| Quickhack slots | 4 |
-| Buffer | 4 |
-| Legacy item ID (keep for saves) | `Items.NESTCyberdeck` |
-| Source item | `Items.AdvancedNetwatchNetdriverMKLegendaryPlusPlus` |
+## v0.4 target eligibility
 
-## How it is intended to work
+**Infiltration should be offered on anything vanilla Ping can target.** A
+camera, access point or surveillance system is no longer required.
 
-With NΣT installed, the scanner should offer the **built-in** Infiltration device quickhack on an on-line device linked to an actual access point or surveillance master. Its synthetic player quickhack entry does **not** occupy any of the four physical slots. The game should handle upload and RAM spending through the copied native quickhack record; the REDscript completion event then traverses **only the target's linked network**.
+* Native quickhackable **devices**, even without a network master, offer
+  Infiltration. A standalone device receives only a native supported shutdown
+  or distraction, never cross-network effects.
+* **NPCs** with a Ping action in the native puppet scanner list now get an
+  independent PuppetQuickHack form of Infiltration. On upload, the linked
+  PuppetDeviceLinkPS is traversed through its real access point(s), then
+  connected security devices are disabled/distracted.
+* NPCs without a real device network link can receive the upload, but no
+  surrounding devices are affected; the mod never guesses nearby connections.
+* Quest-critical entities are skipped, and only actual linked network
+  descendants are affected.
+* Robots, drones and mechs are **not shut down yet** as NPCs, even though a
+  pingable robotic puppet could be an entry point. That needs a separate
+  safe puppet shutdown implementation.
 
-* Cameras, security turrets, and explosive trigger mines: request the game's device OFF action.
-* Other ordinary, non-quest electronic devices: use an existing, active, device-provided **Distract Enemies** action where available.
-* Masters, quest-marked devices, devices not on the selected network and powered-off targets: skipped.
-* **Robots, drones, and mechs: still unsupported.** Their link representation and safe shutdown need verification using game assets. The current code deliberately does not attack arbitrary puppets.
+Normal **Ping must remain separate and functional**. Infiltration uses a
+unique action name and a dedicated device and puppet action record, not
+`DeviceAction.PingDevice`. The actual quickhack UI is localized using
+Codeware's provider (English fallback). The icon is still vanilla.
 
-### What changed from PR #36
+The 26 ripperdoc records and NΣT gameplay stat packages are **unchanged**.
 
-* Folder, REDscript module, action names and TweakXL records renamed to `NetDeck`; the working item TDBID is preserved.
-* Infiltration is now offered via `GetQuickHackActions` instead of ordinary `GetRemoteActions`.
-* The player list is extended with a virtual built-in Infiltration action only while NΣT is installed, so the native scanner can match the command to the target action.
-* Action completion uses a REDscript event callback.
-* In v0.3, the custom action uses a separate Toggle State quickhack record, not Ping's record.
-* Removed the unusable ArchiveXL manifest and uncooked localization JSON. **As a result, native UI name and icon are not finished**: inherited game text/icon may be displayed. Real NΣT/Infiltration UI texts require a cooked WolvenKit localization archive. Do not mistake a test ZIP for a finished release.
+## Install
+Requires RED4ext, redscript, TweakXL, Codeware and Cyberpunk 2077 2.5.
+Back up a save, close the game and remove old `r6/scripts/NEST` and
+`r6/tweaks/NEST` directories (if present). Extract the test ZIP to the
+game root. Replace existing `r6/scripts/NetDeck` and `r6/tweaks/NetDeck`
+files, leaving Camera Killer and other mods untouched.
 
-### Vendor stock
-
-The same 26 TweakXL ripperdoc vendor records are patched, including Dogtown. This has not been checked at every vendor.
-
-## Install this test ZIP
-
-Close the game. **Remove older `r6/scripts/NEST` and `r6/tweaks/NEST` folders** so previous wrappers are not loaded twice. Extract the test ZIP to the Cyberpunk 2077 game root. Requires RED4ext, redscript, TweakXL and Codeware. Cyberware-EX is supported by the 0–3 system-replacement equip-slot check (not independently validated).
-
-Add the deck with CET:
+CET item command:
 ```lua
 Game.AddToInventory("Items.NESTCyberdeck", 1)
 ```
 
-If the game fails to load, check `r6/logs/redscript_rCURRENT.log` (or the installed redscript log) and `red4ext/plugins/TweakXL/TweakXL.log`.
+## Focused live test for this build
+1. Confirm no REDscript compiler/TweakXL error.
+2. Scan a standalone pingable device **without a camera**. Infiltration must appear.
+3. Scan a pingable hostile NPC; Infiltration must appear alongside normal Ping.
+4. With a real access point link (camera or no camera), upload Infiltration and
+   confirm devices on that network shut down, and unrelated networks do not.
+5. Confirm **normal Ping still works** with NΣT and a vanilla cyberdeck.
 
-## Testing and limitations
-
-1. Confirm the deck still shows 5 / 15 / 4 / 4 and existing Netdriver perks.
-2. Equip NΣT; scan a linked camera. Verify an Infiltration command is actually offered and uploads normally. In the test build, untranslated native UI text may appear instead.
-3. Verify same-network cameras/turrets/mines go off and a second, unrelated network does not.
-4. Verify quest-marked and unlinked devices are ignored; test with and without Camera Killer.
-5. Verify stock at a Night City ripperdoc and in Dogtown.
-6. Robots are **not** marked supported until a non-destructive native puppet/network integration is established.
-
-This build has **not** passed a 2.5 game or REDscript compiler check. Static tests alone cannot establish that the action uploads, that RAM is spent or that network devices turn off. Do not publish as a finished mod.
-
-### 2026-11-18 REDscript compiler correction
-
-The previous NetDeck test failed to compile because the base-class `GetQuickHackActions` wrapper signature does not match the 2.5 method. The corrected hook uses the 2.5 `FinalizeGetQuickHackActions` signature with script references. An impossible `PuppetDeviceLinkPS` cast was also removed. Source correction only; this is not an in-game success claim.
-
-### 2026-11-18 Ping regression fix (v0.3 test)
-
-**User-tested baseline:** 5/15/4/4, existing Netdriver perks, network shutdown, safety isolation, Night City and Dogtown vendors **pass**. The custom action was displayed as **PING**, and the actual vanilla Ping stopped working. Those are **confirmed regressions**, not harmless placeholder text.
-
-This candidate stops inheriting `DeviceAction.PingDevice` and `Interactions.PingHack`; it uses a separate device quickhack action and interaction while retaining `NetDeckInfiltration` and the working network dispatcher. It supplies the custom name and description through a **Codeware script localization provider** (English fallback), not an unfinished ArchiveXL manifest. It does not patch `DeviceAction.PingDevice`, nor any vanilla scanner record. The real original Ping must remain functional. The inherited vanilla quickhack icon is still temporary. This changed action needs a new 2.5 in-game verification; the successful earlier gameplay test does not validate this regression fix.
-
-Test both **separate** scanner entries on a camera: Infiltration should shut down only linked security devices; original Ping should still ping/reveal nearby network targets without causing shutdown. With a normal deck, Infiltration must disappear and Ping should still work.
+Previous gameplay results do not establish that this new NPC scanner hook,
+standalone targeting, localization or the v0.3 Ping regression fix work.
+Keep PR #36 in draft until verified.

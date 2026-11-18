@@ -92,9 +92,11 @@ protected final func FinalizeGetQuickHackActions(
   outActions: script_ref<array<ref<DeviceAction>>>,
   const context: script_ref<GetActionsContext>
 ) -> Void {
+  // Any device that vanilla considers quickhackable is a valid entry point.
+  // A camera, surveillance master or access point is NOT required.
   if IsEquipped(this.GetGameInstance()) &&
-    this.IsON() && !this.IsMarkedAsQuest() &&
-    IsDefined(this.NetDeckNetworkMaster()) {
+    !this.IsMarkedAsQuest() &&
+    this.IsPotentiallyQuickHackable() {
     let exists: Bool = false;
     let i: Int32 = 0;
     while i < ArraySize(Deref(outActions)) {
@@ -128,21 +130,34 @@ public final static func GetPlayerQuickHackListWithQuality(
     return hacks;
   }
 
+  // Both device and puppet actions are registered, each with its own native
+  // objectActionType. The game's scanner filters by target type. Never use
+  // Ping's actionName, and never evict the original Ping.
   let record: wref<ObjectAction_Record> =
     TweakDBInterface.GetObjectActionRecord(t"DeviceAction.NetDeckInfiltration");
-  if !IsDefined(record) {
-    return hacks;
-  }
-
+  let puppetRecord: wref<ObjectAction_Record> =
+    TweakDBInterface.GetObjectActionRecord(t"QuickHack.NetDeckPuppetInfiltration");
   let i: Int32 = 0;
+  let hasDevice: Bool = false;
+  let hasPuppet: Bool = false;
   while i < ArraySize(hacks) {
-    if IsDefined(hacks[i].actionRecord) &&
-      Equals(hacks[i].actionRecord.ActionName(), n"NetDeckInfiltration") {
-      return hacks;
+    if IsDefined(hacks[i].actionRecord) {
+      let actionID: TweakDBID = hacks[i].actionRecord.GetID();
+      if Equals(actionID, t"DeviceAction.NetDeckInfiltration") {
+        hasDevice = true;
+      }
+      if Equals(actionID, t"QuickHack.NetDeckPuppetInfiltration") {
+        hasPuppet = true;
+      }
     }
     i += 1;
   }
-  ArrayPush(hacks, PlayerQuickhackData(ItemID.None(), record, 5));
+  if IsDefined(record) && !hasDevice {
+    ArrayPush(hacks, PlayerQuickhackData(ItemID.None(), record, 5));
+  }
+  if IsDefined(puppetRecord) && !hasPuppet {
+    ArrayPush(hacks, PlayerQuickhackData(ItemID.None(), puppetRecord, 5));
+  }
   return hacks;
 }
 
@@ -151,9 +166,9 @@ public const func IsPotentiallyQuickHackable() -> Bool {
   if wrappedMethod() {
     return true;
   }
-  return IsEquipped(this.GetGameInstance()) &&
-    this.IsON() && !this.IsMarkedAsQuest() &&
-    IsDefined(this.NetDeckNetworkMaster());
+  // Native pingable devices remain eligible even without a network master.
+  // Do not make arbitrary non-quickhackable world objects scannable.
+  return false;
 }
 
 // Only act on actual links. Cameras on a neighboring network are untouched.
@@ -179,6 +194,11 @@ public func NetDeckInfiltrateNetwork() -> Void {
   // Devices on a virtual surveillance system may not have an explicit AP.
   if !foundAP {
     this.NetDeckInfiltrateMaster(this.NetDeckNetworkMaster(), seen);
+  }
+  // A Ping-capable standalone terminal, turret, mine, camera, or other
+  // electronic device must still respond when it has no shared controller.
+  if !foundAP && !IsDefined(this.NetDeckNetworkMaster()) && this.IsON() {
+    this.NetDeckApplyToMember(this);
   }
 }
 
@@ -207,7 +227,7 @@ private func NetDeckInfiltrateMaster(
 }
 
 @addMethod(ScriptableDeviceComponentPS)
-private func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Void {
+public func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> Void {
   if IsDefined(member as SurveillanceCameraControllerPS) ||
     IsDefined(member as SecurityTurretControllerPS) ||
     IsDefined(member as ExplosiveTriggerDeviceControllerPS) {
@@ -252,5 +272,110 @@ private func NetDeckApplyToMember(member: ref<ScriptableDeviceComponentPS>) -> V
 @addMethod(ScriptableDeviceComponentPS)
 protected cb func OnNetDeckInfiltration(evt: ref<NetDeckInfiltration>) -> EntityNotificationType {
   this.NetDeckInfiltrateNetwork();
+  return EntityNotificationType.DoNotNotifyEntity;
+}
+
+// NPCs are a different quickhack pipeline from devices. The native scanner
+// uses ScriptedPuppetPS.GetAllChoices and accepts PuppetQuickHack records.
+// Only add an independent action to targets that offer native Ping; this
+// deliberately does not modify PingSquad or the default puppet hack list.
+public class NetDeckPuppetInfiltration extends PuppetAction {}
+
+@wrapMethod(ScriptedPuppetPS)
+public final const func GetAllChoices(
+  const actions: script_ref<array<wref<ObjectAction_Record>>>,
+  const context: script_ref<GetActionsContext>,
+  puppetActions: script_ref<array<ref<PuppetAction>>>
+) -> Void {
+  wrappedMethod(actions, context, puppetActions);
+  if !IsEquipped(this.GetGameInstance()) || this.IsMarkedAsQuest() {
+    return;
+  }
+  let owner: ref<ScriptedPuppet> = this.GetOwnerEntityWeak() as ScriptedPuppet;
+  if !IsDefined(owner) || !owner.IsQuickHackAble() || owner.IsQuest() {
+    return;
+  }
+
+  let pingable: Bool = false;
+  let i: Int32 = 0;
+  while i < ArraySize(Deref(puppetActions)) {
+    let existing: ref<PuppetAction> = Deref(puppetActions)[i];
+    if IsDefined(existing) {
+      let existingRecord: wref<ObjectAction_Record> = existing.GetObjectActionRecord();
+      if IsDefined(existingRecord) {
+        if Equals(existingRecord.ActionName(), n"NetDeckInfiltration") {
+          return;
+        }
+        if IsDefined(existing as PingSquad) ||
+          Equals(existingRecord.ActionName(), n"Ping") ||
+          Equals(existingRecord.ActionName(), n"PingSquad") {
+          pingable = true;
+        }
+      }
+    }
+    i += 1;
+  }
+  if !pingable {
+    return;
+  }
+
+  let record: wref<ObjectAction_Record> =
+    TweakDBInterface.GetObjectActionRecord(t"QuickHack.NetDeckPuppetInfiltration");
+  if !IsDefined(record) {
+    return;
+  }
+  let action: ref<NetDeckPuppetInfiltration> = new NetDeckPuppetInfiltration();
+  action.SetUp(this);
+  action.RegisterAsRequester(PersistentID.ExtractEntityID(this.GetID()));
+  action.SetExecutor(GetPlayer(this.GetGameInstance()));
+  action.SetObjectActionID(record.GetID());
+  action.CreateInteraction();
+  ArrayPush(Deref(puppetActions), action);
+}
+
+// Puppet network links are not ScriptableDeviceComponentPS. Use the link's
+// own real access points and their descendants. No radius-based search.
+@addMethod(PuppetDeviceLinkPS)
+public func NetDeckInfiltrateLinkedDevices() -> Void {
+  if !this.IsConnected() {
+    return;
+  }
+  let aps: array<ref<AccessPointControllerPS>> = this.GetAccessPoints();
+  let seen: array<ref<ScriptableDeviceComponentPS>>;
+  let i: Int32 = 0;
+  while i < ArraySize(aps) {
+    if IsDefined(aps[i]) {
+      let children: array<ref<DeviceComponentPS>>;
+      aps[i].GetAllDescendants(children);
+      let j: Int32 = 0;
+      while j < ArraySize(children) {
+        let member: ref<ScriptableDeviceComponentPS> =
+          children[j] as ScriptableDeviceComponentPS;
+        if IsDefined(member) && !ArrayContains(seen, member) {
+          ArrayPush(seen, member);
+          if member.IsON() && !member.IsMarkedAsQuest() {
+            member.NetDeckApplyToMember(member);
+          }
+        }
+        j += 1;
+      }
+    }
+    i += 1;
+  }
+}
+
+@addMethod(ScriptedPuppetPS)
+protected cb func OnNetDeckPuppetInfiltration(
+  evt: ref<NetDeckPuppetInfiltration>
+) -> EntityNotificationType {
+  if IsEquipped(this.GetGameInstance()) {
+    let puppet: ref<ScriptedPuppet> = this.GetOwnerEntityWeak() as ScriptedPuppet;
+    if IsDefined(puppet) && !puppet.IsQuest() {
+      let link: ref<PuppetDeviceLinkPS> = this.GetDeviceLink();
+      if IsDefined(link) {
+        link.NetDeckInfiltrateLinkedDevices();
+      }
+    }
+  }
   return EntityNotificationType.DoNotNotifyEntity;
 }

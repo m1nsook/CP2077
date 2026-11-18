@@ -26,9 +26,11 @@ INSTALL:
    send the r6/logs/redscript* and red4ext/plugins/TweakXL/TweakXL.log errors.
 5. To add the experimental deck through CET console:
    Game.AddToInventory("Items.NESTCyberdeck", 1)
-6. Check NΣT at ripperdocs, equip it, and scan a linked camera to see
-   whether Infiltration is offered. Test its upload and network effect.
-7. Check another network to confirm it was not affected.
+6. Equip NΣT; test Infiltration on a camera, terminal, isolated device,
+   and pingable hostile NPC. A camera is NOT required as an entry point.
+7. Confirm the original Ping is offered and works separately.
+8. Test connected security effects without any camera in the network.
+9. Check an unrelated network remains unaffected.
 
 IMPORTANT LIMITATIONS:
 - This regression fix is source/package tested but NOT reverified in game 2.5.
@@ -37,7 +39,10 @@ IMPORTANT LIMITATIONS:
   localization provider. The icon still uses an existing vanilla asset.
 - Infiltration no longer inherits PingDevice, so vanilla Ping must remain
   an independent, functioning quickhack when NΣT is installed.
-- Robotic NPCs, drones and mechs are not yet covered.
+- NPCs are new entry points via PuppetQuickHack. Their connected devices
+  are affected if they have a real network link. No link means no devices
+  to shut down; we never invent nearby connections.
+- Robotic NPC shutdown, drones and mechs are NOT yet covered.
 - Infiltration does not need Camera Killer; test with or without it.
 - Do not publish this ZIP as a Nexus Mods release.
 
@@ -75,6 +80,6 @@ def build(output: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.3.0-TEST.zip")
+    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.4.0-TEST.zip")
     args = parser.parse_args()
     build(args.output)

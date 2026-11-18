@@ -13,7 +13,7 @@ public class NetDeckEnglish extends ModLocalizationPackage {
       "NetWatch Netdriver Mk.2. Iconic network-infiltration cyberdeck with a built-in Infiltration quickhack.");
     this.Text("NetDeckInfiltrationName", "Infiltration");
     this.Text("NetDeckInfiltrationDescription",
-      "Shuts down cameras, turrets and mines on this device's connected network. Distracts compatible electronics.");
+      "Upload to any Ping-capable target. Disable connected cameras, turrets and mines, or distract compatible electronics. Unlinked targets affect only their own supported functions.");
   }
 }
 

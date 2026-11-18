@@ -28,6 +28,9 @@ class InfiltrationSourceTests(unittest.TestCase):
                   "FinalizeGetQuickHackActions(", "GetPlayerQuickHackListWithQuality(",
                   "PlayerQuickhackData(ItemID.None(), record, 5)",
                   "DeviceAction.NetDeckInfiltration",
+                  "QuickHack.NetDeckPuppetInfiltration",
+                  "GetAllChoices(",
+                  "OnNetDeckPuppetInfiltration",
                   "protected cb func OnNetDeckInfiltration"]:
             self.assertIn(s, R)
         self.assertNotIn("public func GetRemoteActions(", R)
@@ -46,6 +49,18 @@ class InfiltrationSourceTests(unittest.TestCase):
                   "member.GetQuickHackActions(actions, context)"]:
             self.assertIn(s, R)
         self.assertNotIn("SystemCollapse", R)
+        self.assertIn("member.NetDeckApplyToMember(member)", R)
+        self.assertIn("this.NetDeckApplyToMember(this)", R)
+        self.assertIn("class NetDeckPuppetInfiltration extends PuppetAction", R)
+        self.assertIn("public final const func GetAllChoices(", R)
+        self.assertIn("PuppetDeviceLinkPS", R)
+        self.assertNotIn("member as PuppetDeviceLinkPS", R)
+        self.assertIn("QuickHack.NetDeckPuppetInfiltration:", Y)
+        self.assertIn("ObjectActionType.PuppetQuickHack", Y)
+        self.assertIn("DeviceAction.NetDeckInfiltration:", Y)
+        self.assertNotIn("$base: DeviceAction.PingDevice", Y)
+        self.assertNotIn("$base: Interactions.PingHack", Y)
+        self.assertNotIn('IsDefined(this.NetDeckNetworkMaster()) {', R)
 
     def test_no_uncooked_placeholders(self):
         self.assertFalse((ROOT / "source").exists())

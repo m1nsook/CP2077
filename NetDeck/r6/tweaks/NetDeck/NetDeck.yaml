@@ -56,6 +56,20 @@ Interactions.NetDeckInfiltration:
   caption: l"NetDeckInfiltrationName"
   description: l"NetDeckInfiltrationDescription"
 
+# The NPC scanner uses PuppetQuickHack actions, unlike devices.
+# FreePingHack is a known puppet action base (not PingDevice).
+# Its unique actionName keeps vanilla Ping selectable independently.
+QuickHack.NetDeckPuppetInfiltration:
+  $base: QuickHack.FreePingHack
+  actionName: NetDeckInfiltration
+  objectActionUI: Interactions.NetDeckInfiltration
+  objectActionType: ObjectActionType.PuppetQuickHack
+  isQuickHack: true
+  startEffects: []
+  completionEffects: []
+  targetPrereqs: []
+  targetActivePrereqs: []
+
 # One guaranteed stock record, appended to all known Night City / Dogtown
 # ripperdoc lists. This does not replace any existing stock.
 NetDeck.RipperdocStock:
