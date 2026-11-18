@@ -44,10 +44,18 @@ NetDeck.RAM15Buffer4:
       modifierType: Additive
       value: 4
 
+# Virtual built-in quickhacks (ItemID.None) are treated as untraceable
+# by QuickHackableHelper when their awareness cost is zero.
+# NetWatch's separate retaliation is triggered explicitly in NETWORM code.
+NetDeck.ZeroAwareness:
+  $type: gamedataStatModifierGroup_Record
+  statModifiers: []
+
 # NETWORM native device quickhack. Never derive from PingDevice:
 # doing so duplicated Ping UI semantics and broke normal Ping selection.
 DeviceAction.NetDeckInfiltration:
   $base: DeviceAction.ToggleStateClassHack
+  awarenessCost: NetDeck.ZeroAwareness
   actionName: NetDeckInfiltration
   objectActionUI: Interactions.NetDeckInfiltration
   isQuickHack: true
@@ -78,6 +86,7 @@ Interactions.NetDeckInfiltration:
 # Its unique actionName keeps vanilla Ping selectable independently.
 QuickHack.NetDeckPuppetInfiltration:
   $base: QuickHack.FreePingHack
+  awarenessCost: NetDeck.ZeroAwareness
   actionName: NetDeckInfiltration
   objectActionUI: Interactions.NetDeckInfiltration
   objectActionType: ObjectActionType.PuppetQuickHack
