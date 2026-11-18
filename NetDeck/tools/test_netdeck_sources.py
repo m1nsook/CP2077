@@ -155,6 +155,25 @@ class InfiltrationSourceTests(unittest.TestCase):
         # Never restore the repeating network VFX/audio path.
         self.assertNotIn("PingNetworkGrid_Event(", R)
 
+    def test_fast_native_neutral_upload_hud(self):
+        # ~3s native HUD upload, not the independent 32s propagation loop.
+        # Built-in Neutral type replaces the alert icon/visual state without
+        # recoloring the global theme or patching HUDProgressBarController.
+        self.assertIn("public class NetDeckHudTickEvent extends Event", R)
+        self.assertIn("protected cb func OnNetDeckHudTickEvent(", R)
+        self.assertIn("private func NetDeckHudSchedule(step: Int32)", R)
+        self.assertIn("DelayEvent(this, evt, 0.15)", R)
+        self.assertIn("evt.step >= 20", R)
+        self.assertIn("Cast<Float>(evt.step) / 20.0", R)
+        self.assertIn("this.NetDeckHudSchedule(1);", R)
+        self.assertIn("bb.SetVariant(d.MessageType, SimpleMessageType.Neutral, true);", R)
+        self.assertNotIn("this.netDeckHudProgress += 0.0625", R)
+        self.assertNotIn("bb.SetString(d.BottomText, loc.GetText(\"NetDeckDevicesAffected\")", R)
+        self.assertIn("DelayEvent(this, evt, 2.0)", R)
+        self.assertNotIn("@wrapMethod(HUDProgressBarController)", R)
+        self.assertNotIn("@wrapMethod(NPCPuppet)", R)
+        self.assertNotIn("@wrapMethod(VehicleObject)", R)
+
     def test_scoped_trace_hook(self):
         self.assertIn("NetDeck.ZeroAwareness:", Y)
         self.assertEqual(Y.count("awarenessCost: NetDeck.ZeroAwareness"), 3)
