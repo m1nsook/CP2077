@@ -24,6 +24,7 @@ struct Setting
     Value minimum;
     Value maximum;
     std::vector<std::string> choices;
+    Id group = 0; // UI metadata only; zero means ungrouped.
 };
 
 // Immutable copy of registry state for UI rendering and diagnostics.
@@ -35,6 +36,7 @@ struct SettingSnapshot {
     Value minimum;
     Value maximum;
     std::vector<std::string> choices;
+    Id group = 0; // UI metadata only; zero means ungrouped.
 };
 struct ModSnapshot {
     Id id;
@@ -80,6 +82,7 @@ public:
     bool SetKeybind(Id mod, Id id, std::int32_t virtualKey);
 
     bool Reset(Id mod, Id id);
+    bool SetGroup(Id mod, Id id, Id group);
     std::vector<ModSnapshot> Snapshot() const;
 
 private:

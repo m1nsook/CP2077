@@ -25,6 +25,10 @@ int main()
         m1core::Registry registry(file);
         CHECK(registry.Load());
         CHECK(registry.RegisterBool(1, 1, true));
+        CHECK(registry.SetGroup(1, 1, 101));
+        CHECK(!registry.SetGroup(1, 999, 101));
+        CHECK(registry.RegisterBool(1, 1, true));
+
         CHECK(registry.RegisterBool(2, 1, false));
         CHECK(registry.RegisterInt(1, 2, 5, 0, 10));
         CHECK(registry.RegisterFloat(1, 3, 1.0F, 0.5F, 3.0F));
@@ -58,6 +62,7 @@ int main()
         CHECK(snapshot[0].id == 1);
         CHECK(snapshot[0].settings.size() == 5);
         CHECK(snapshot[0].settings[0].id == 1);
+        CHECK(snapshot[0].settings[0].group == 101);
         CHECK(snapshot[0].settings[2].kind == m1core::Kind::Float);
         CHECK(std::get<float>(snapshot[0].settings[2].value) == 0.5F);
         CHECK(snapshot[0].settings[3].kind == m1core::Kind::Enum);

@@ -390,6 +390,7 @@ bool Registry::Register(Id mod, Id id, Setting setting)
         if (it->second.kind != setting.kind)
             return false;
         setting.value = Clamp(setting, it->second.value);
+        setting.group = it->second.group; // Preserve display metadata on re-registration.
     }
     else if (const auto loadedMod = persisted_.find(mod); loadedMod != persisted_.end())
     {
@@ -542,6 +543,19 @@ bool Registry::Reset(Id mod, Id id)
     setting->second.value = setting->second.defaultValue;
     return true;
 }
+bool Registry::SetGroup(Id mod, Id id, Id group)
+{
+    std::lock_guard lock(mutex_);
+    const auto module = registered_.find(mod);
+    if (module == registered_.end())
+        return false;
+    const auto setting = module->second.find(id);
+    if (setting == module->second.end())
+        return false;
+    setting->second.group = group;
+    return true;
+}
+
 std::vector<ModSnapshot> Registry::Snapshot() const
 {
     std::lock_guard lock(mutex_);
@@ -553,7 +567,7 @@ std::vector<ModSnapshot> Registry::Snapshot() const
         mod.settings.reserve(settings.size());
         for (const auto& [id, setting] : settings)
             mod.settings.push_back({id, setting.kind, setting.value, setting.defaultValue,
-                                    setting.minimum, setting.maximum, setting.choices});
+                                    setting.minimum, setting.maximum, setting.choices, setting.group});
         modules.push_back(std::move(mod));
     }
     return modules;
