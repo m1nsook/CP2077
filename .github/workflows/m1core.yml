@@ -37,6 +37,18 @@ jobs:
           Copy-Item "m1core/build/Release/m1core.dll" "m1core/package/red4ext/plugins/m1core/m1core.dll"
           Copy-Item "m1core/r6/scripts/m1core/m1core.reds" "m1core/package/r6/scripts/m1core/m1core.reds"
           Compress-Archive -Path "m1core/package/*" -DestinationPath "m1core/m1core-dev.zip"
+      - name: Package optional native API smoke test
+        shell: pwsh
+        run: |
+          Copy-Item "m1core/tests/ingame/m1core_smoke.reds" "m1core/package/r6/scripts/m1core/m1core_smoke.reds"
+          Compress-Archive -Path "m1core/package/*" -DestinationPath "m1core/m1core-smoke-dev.zip"
+      - name: Upload optional native API smoke test
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1core-smoke-test-x64-dev
+          path: m1core/m1core-smoke-dev.zip
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload test build
         uses: actions/upload-artifact@v4
         with:

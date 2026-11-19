@@ -22,7 +22,20 @@ FetchContent_Declare(
     GIT_TAG v3.11.3
     GIT_SHALLOW TRUE
 )
-FetchContent_MakeAvailable(red4ext_sdk nlohmann_json)
+FetchContent_Declare(
+    dear_imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG 9a5d5c45f54b1301ea471622eddede70384243af
+)
+FetchContent_MakeAvailable(red4ext_sdk nlohmann_json dear_imgui)
+
+add_library(m1core_imgui STATIC
+    ${dear_imgui_SOURCE_DIR}/imgui.cpp
+    ${dear_imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${dear_imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${dear_imgui_SOURCE_DIR}/imgui_widgets.cpp
+)
+target_include_directories(m1core_imgui PUBLIC "${dear_imgui_SOURCE_DIR}")
 
 add_library(m1core_settings STATIC src/settings.cpp)
 target_include_directories(m1core_settings PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -32,8 +45,8 @@ if(WIN32)
 endif()
 
 if(WIN32)
-    add_library(m1core SHARED src/plugin.cpp)
-    target_link_libraries(m1core PRIVATE m1core_settings RED4ext::SDK)
+    add_library(m1core SHARED src/plugin.cpp src/ui.cpp)
+    target_link_libraries(m1core PRIVATE m1core_settings m1core_imgui RED4ext::SDK)
     target_compile_definitions(m1core PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE RED4EXT_HEADER_ONLY)
     set_target_properties(m1core PROPERTIES OUTPUT_NAME "m1core" PREFIX "")
 endif()
