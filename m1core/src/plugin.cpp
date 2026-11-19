@@ -6,6 +6,8 @@
 #include <Windows.h>
 #include <filesystem>
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace
 {
@@ -68,6 +70,52 @@ void RegisterFloat(Scriptable*, Frame* frame, bool* out, int64_t)
     Output(out, g_settings && g_settings->RegisterFloat(mod.hash, id.hash, def, min, max));
 }
 
+void RegisterEnumSetting(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod, id;
+    std::int32_t def = 0;
+    RED4ext::CString labels;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    RED4ext::GetParameter(frame, &def);
+    RED4ext::GetParameter(frame, &labels);
+    frame->code++;
+
+    std::vector<std::string> choices;
+    const std::string options(labels.c_str(), labels.Length());
+    if (!options.empty() && options.size() <= 8192)
+    {
+        std::size_t start = 0;
+        while (start <= options.size() && choices.size() <= 64)
+        {
+            const auto end = options.find('|', start);
+            auto label = options.substr(start, end == std::string::npos ? std::string::npos : end - start);
+            if (!label.empty())
+                choices.push_back(std::move(label));
+            else
+            {
+                choices.clear();
+                break;
+            }
+            if (end == std::string::npos)
+                break;
+            start = end + 1;
+        }
+    }
+    Output(out, g_settings && g_settings->RegisterEnum(mod.hash, id.hash, def, std::move(choices)));
+}
+
+void RegisterKeybindSetting(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod, id;
+    std::int32_t def = 0;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    RED4ext::GetParameter(frame, &def);
+    frame->code++;
+    Output(out, g_settings && g_settings->RegisterKeybind(mod.hash, id.hash, def));
+}
+
 void GetBool(Scriptable*, Frame* frame, bool* out, int64_t)
 {
     Name mod, id;
@@ -93,6 +141,24 @@ void GetFloat(Scriptable*, Frame* frame, float* out, int64_t)
     RED4ext::GetParameter(frame, &id);
     frame->code++;
     Output(out, g_settings ? g_settings->GetFloat(mod.hash, id.hash).value_or(0.0F) : 0.0F);
+}
+
+void GetEnum(Scriptable*, Frame* frame, std::int32_t* out, int64_t)
+{
+    Name mod, id;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    frame->code++;
+    Output(out, g_settings ? g_settings->GetEnum(mod.hash, id.hash).value_or(0) : 0);
+}
+
+void GetKeybind(Scriptable*, Frame* frame, std::int32_t* out, int64_t)
+{
+    Name mod, id;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    frame->code++;
+    Output(out, g_settings ? g_settings->GetKeybind(mod.hash, id.hash).value_or(0) : 0);
 }
 
 void SetBool(Scriptable*, Frame* frame, bool* out, int64_t)
@@ -126,6 +192,28 @@ void SetFloat(Scriptable*, Frame* frame, bool* out, int64_t)
     RED4ext::GetParameter(frame, &value);
     frame->code++;
     Output(out, g_settings && g_settings->SetFloat(mod.hash, id.hash, value));
+}
+
+void SetEnum(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod, id;
+    std::int32_t value = 0;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    RED4ext::GetParameter(frame, &value);
+    frame->code++;
+    Output(out, g_settings && g_settings->SetEnum(mod.hash, id.hash, value));
+}
+
+void SetKeybind(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod, id;
+    std::int32_t value = 0;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    RED4ext::GetParameter(frame, &value);
+    frame->code++;
+    Output(out, g_settings && g_settings->SetKeybind(mod.hash, id.hash, value));
 }
 
 void Reset(Scriptable*, Frame* frame, bool* out, int64_t)
@@ -169,6 +257,19 @@ void RegisterNatives()
     RegisterNative("M1Core_RegisterFloatSetting", &RegisterFloat,
                    {{"CName", "modName"}, {"CName", "settingId"}, {"Float", "defaultValue"},
                     {"Float", "minValue"}, {"Float", "maxValue"}}, "Bool");
+    RegisterNative("M1Core_RegisterEnumSetting", &RegisterEnumSetting,
+                   {{"CName", "modName"}, {"CName", "settingId"}, {"Int32", "defaultIndex"},
+                    {"String", "choices"}}, "Bool");
+    RegisterNative("M1Core_RegisterKeybindSetting", &RegisterKeybindSetting,
+                   {{"CName", "modName"}, {"CName", "settingId"}, {"Int32", "defaultVirtualKey"}}, "Bool");
+    RegisterNative("M1Core_GetEnumSetting", &GetEnum,
+                   {{"CName", "modName"}, {"CName", "settingId"}}, "Int32");
+    RegisterNative("M1Core_GetKeybindSetting", &GetKeybind,
+                   {{"CName", "modName"}, {"CName", "settingId"}}, "Int32");
+    RegisterNative("M1Core_SetEnumSetting", &SetEnum,
+                   {{"CName", "modName"}, {"CName", "settingId"}, {"Int32", "index"}}, "Bool");
+    RegisterNative("M1Core_SetKeybindSetting", &SetKeybind,
+                   {{"CName", "modName"}, {"CName", "settingId"}, {"Int32", "virtualKey"}}, "Bool");
     RegisterNative("M1Core_GetBoolSetting", &GetBool,
                    {{"CName", "modName"}, {"CName", "settingId"}}, "Bool");
     RegisterNative("M1Core_GetIntSetting", &GetInt,
@@ -206,7 +307,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"m1core";
     info->author = L"m1nsook";
-    info->version = RED4EXT_V1_SEMVER(0, 2, 0);
+    info->version = RED4EXT_V1_SEMVER(0, 3, 0);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_2_50;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }
@@ -239,7 +340,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
         RED4ext::CRTTISystem::Get()->AddPostRegisterCallback(RegisterNatives);
         m1core::StartOverlay(*g_settings, config.parent_path(), handle, sdk);
         if (g_logger)
-            g_logger->Info(g_handle, "m1core 0.2.0-dev: settings API active; renderer opt-in");
+            g_logger->Info(g_handle, "m1core 0.3.0-dev: settings API active; renderer opt-in");
         return true;
     }
     case RED4ext::v1::EMainReason::Unload:

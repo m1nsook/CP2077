@@ -17,6 +17,12 @@ public func M1Core_SmokeTest(stage: Int32) -> Int32 {
     if !M1Core_RegisterFloatSetting(n"m1core.smoke", n"Multiplier", 1.0, 0.5, 4.0) {
         failed = failed + 8;
     }
+    if !M1Core_RegisterEnumSetting(n"m1core.smoke", n"Mode", 1, "Off|Normal|Strong") {
+        failed = failed + 1048576;
+    }
+    if !M1Core_RegisterKeybindSetting(n"m1core.smoke", n"ActionKey", 0x75) {
+        failed = failed + 2097152;
+    }
     if failed != 0 {
         return failed;
     }
@@ -58,11 +64,29 @@ public func M1Core_SmokeTest(stage: Int32) -> Int32 {
         if M1Core_GetFloatSetting(n"m1core.smoke", n"Multiplier") != 2.25 {
             failed = failed + 32768;
         }
+        if !M1Core_SetEnumSetting(n"m1core.smoke", n"Mode", 2) {
+            failed = failed + 4194304;
+        }
+        if !M1Core_SetKeybindSetting(n"m1core.smoke", n"ActionKey", 0x76) {
+            failed = failed + 8388608;
+        }
+        if M1Core_GetEnumSetting(n"m1core.smoke", n"Mode") != 2 {
+            failed = failed + 16777216;
+        }
+        if M1Core_GetKeybindSetting(n"m1core.smoke", n"ActionKey") != 0x76 {
+            failed = failed + 33554432;
+        }
         if !M1Core_SaveSettings() {
             failed = failed + 65536;
         }
     } else {
         if stage == 2 {
+            if M1Core_GetEnumSetting(n"m1core.smoke", n"Mode") != 2 {
+                failed = failed + 4194304;
+            }
+            if M1Core_GetKeybindSetting(n"m1core.smoke", n"ActionKey") != 0x76 {
+                failed = failed + 8388608;
+            }
             if M1Core_GetBoolSetting(n"m1core.smoke", n"Enabled") {
                 failed = failed + 131072;
             }

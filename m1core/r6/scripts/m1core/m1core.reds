@@ -1,4 +1,4 @@
-// m1core v0.1 native API. These names must match plugin.cpp exactly.
+// m1core v0.3 native API. These names must match plugin.cpp exactly.
 // Do not copy this file into the game without its matching m1core.dll.
 public static native func M1Core_IsAvailable() -> Bool;
 public static native func M1Core_RegisterBoolSetting(modName: CName, settingId: CName, defaultValue: Bool) -> Bool;
@@ -12,3 +12,13 @@ public static native func M1Core_SetIntSetting(modName: CName, settingId: CName,
 public static native func M1Core_SetFloatSetting(modName: CName, settingId: CName, value: Float) -> Bool;
 public static native func M1Core_ResetSetting(modName: CName, settingId: CName) -> Bool;
 public static native func M1Core_SaveSettings() -> Bool;
+
+// Enum is zero-based; choices are UTF-8 labels separated by |, e.g. "Off|Low|High".
+public static native func M1Core_RegisterEnumSetting(modName: CName, settingId: CName, defaultIndex: Int32, choices: String) -> Bool;
+public static native func M1Core_GetEnumSetting(modName: CName, settingId: CName) -> Int32;
+public static native func M1Core_SetEnumSetting(modName: CName, settingId: CName, index: Int32) -> Bool;
+// Keybinds store Win32 virtual-key codes (0 = unbound). m1core does not
+// execute mod actions; the mod consumes this setting through its own input code.
+public static native func M1Core_RegisterKeybindSetting(modName: CName, settingId: CName, defaultVirtualKey: Int32) -> Bool;
+public static native func M1Core_GetKeybindSetting(modName: CName, settingId: CName) -> Int32;
+public static native func M1Core_SetKeybindSetting(modName: CName, settingId: CName, virtualKey: Int32) -> Bool;
