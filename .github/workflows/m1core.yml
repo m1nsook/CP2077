@@ -29,54 +29,44 @@ jobs:
         run: cmake --build m1core/build --config Release --parallel 4
       - name: Run registry tests
         run: ctest --test-dir m1core/build -C Release --output-on-failure
-      - name: Package test build (not a release)
+      # GitHub Actions artifacts are ZIPs already. Upload the two game-root
+      # directories directly, NOT an archive-inside-an-archive.
+      - name: Stage game-ready development build
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path "m1core/package/red4ext/plugins/m1core" | Out-Null
-          New-Item -ItemType Directory -Force -Path "m1core/package/r6/scripts/m1core" | Out-Null
-          Copy-Item "m1core/build/Release/m1core.dll" "m1core/package/red4ext/plugins/m1core/m1core.dll"
-          Copy-Item "m1core/r6/scripts/m1core/m1core.reds" "m1core/package/r6/scripts/m1core/m1core.reds"
-          Compress-Archive -Path "m1core/package/*" -DestinationPath "m1core/m1core-dev.zip"
-      - name: Package optional native API smoke test
-        shell: pwsh
-        run: |
-          Copy-Item "m1core/tests/ingame/m1core_smoke.reds" "m1core/package/r6/scripts/m1core/m1core_smoke.reds"
-          Compress-Archive -Path "m1core/package/*" -DestinationPath "m1core/m1core-smoke-dev.zip"
-      - name: Upload optional native API smoke test
-        uses: actions/upload-artifact@v4
-        with:
-          name: m1core-smoke-test-x64-dev
-          path: m1core/m1core-smoke-dev.zip
-          if-no-files-found: error
-          retention-days: 7
-      - name: Package opt-in D3D12 overlay preview
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path "m1core/overlay-package/red4ext/plugins/m1core" | Out-Null
-          New-Item -ItemType Directory -Force -Path "m1core/overlay-package/r6/scripts/m1core" | Out-Null
-          Copy-Item "m1core/build/Release/m1core.dll" "m1core/overlay-package/red4ext/plugins/m1core/m1core.dll"
-          Copy-Item "m1core/r6/scripts/m1core/m1core.reds" "m1core/overlay-package/r6/scripts/m1core/m1core.reds"
-          Set-Content -Path "m1core/overlay-package/red4ext/plugins/m1core/overlay.enable" -Value "experimental overlay opt-in"
-          Set-Content -Path "m1core/overlay-package/README-overlay-preview.txt" -Value @(
-            "m1core experimental DX12 overlay (Cyberpunk 2077 2.50)"
-            "F11: open and close settings window. Escape is not used."
-            "Ctrl+Shift+F11: disable overlay for this game session."
-            "If it causes problems, remove red4ext/plugins/m1core/overlay.enable and restart."
-            "The normal m1core ZIP never installs overlay.enable."
-            "This is an unverified development preview; back up settings.json."
+          $root = "m1core/game-package"
+          New-Item -ItemType Directory -Force -Path "$root/red4ext/plugins/m1core" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$root/r6/scripts/m1core" | Out-Null
+          Copy-Item "m1core/build/Release/m1core.dll" "$root/red4ext/plugins/m1core/m1core.dll"
+          Copy-Item "m1core/r6/scripts/m1core/m1core.reds" "$root/r6/scripts/m1core/m1core.reds"
+
+          # This is a development artifact: the optional test helper only runs
+          # when explicitly called from a console and changes no game state.
+          Copy-Item "m1core/tests/ingame/m1core_smoke.reds" "$root/r6/scripts/m1core/m1core_smoke.reds"
+
+          # Enable the known-working F11 overlay in this dev/test artifact.
+          # For a headless installation, simply delete overlay.enable.
+          Set-Content -Path "$root/red4ext/plugins/m1core/overlay.enable" -Value "development overlay enabled"
+
+          $required = @(
+            "$root/red4ext/plugins/m1core/m1core.dll",
+            "$root/red4ext/plugins/m1core/overlay.enable",
+            "$root/r6/scripts/m1core/m1core.reds",
+            "$root/r6/scripts/m1core/m1core_smoke.reds"
           )
-          Compress-Archive -Path "m1core/overlay-package/*" -DestinationPath "m1core/m1core-overlay-preview-dev.zip"
-      - name: Upload opt-in overlay preview
+          foreach ($file in $required) {
+            if (!(Test-Path -LiteralPath $file -PathType Leaf)) {
+              throw "Missing required package file: $file"
+            }
+          }
+          if (Get-ChildItem -Path $root -Filter "*.zip" -Recurse) {
+            throw "Nested ZIP found in game package"
+          }
+
+      - name: Upload ONE game-ready ZIP (no nested archives)
         uses: actions/upload-artifact@v4
         with:
-          name: m1core-overlay-preview-x64-dev
-          path: m1core/m1core-overlay-preview-dev.zip
-          if-no-files-found: error
-          retention-days: 7
-      - name: Upload test build
-        uses: actions/upload-artifact@v4
-        with:
-          name: m1core-windows-x64-dev
-          path: m1core/m1core-dev.zip
+          name: m1core-game-ready-x64-dev
+          path: m1core/game-package/
           if-no-files-found: error
           retention-days: 7
