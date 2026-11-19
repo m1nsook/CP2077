@@ -1,15 +1,15 @@
 # m1core — native settings foundation (development)
 
-**Status: experimental v0.2.0-dev, not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The first D3D12 ImGui renderer is now included, but is **not yet in-game verified**. The supplied HTML demo is a *layout reference*, not the final visual design.
+**Status: experimental v0.3.0-dev, not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The first D3D12 ImGui renderer is now included, but is **not yet in-game verified**. The supplied HTML demo is a *layout reference*, not the final visual design.
 
 ## Architecture
 
 - `red4ext/plugins/m1core/m1core.dll` — one native plugin; no separate DLL per feature mod.
 - `r6/scripts/m1core/m1core.reds` — matching REDscript native declarations.
 - `red4ext/plugins/m1core/settings.json` — generated on save, shared across mods. Keys are persistent CName hashes and isolated per mod.
-- `src/settings.*` — pure C++ registry with bool / Int32 / Float, clamping, resets, and schema-v1 JSON.
+- `src/settings.*` — pure C++ registry with bool / Int32 / Float / enum / keybind (Win32 VK), clamping, resets, and schema-v1 JSON.
 - `src/plugin.cpp` — RED4ext lifecycle and registered native globals.
-- `src/ui.cpp` — Dear ImGui view layer with a searchable mod sidebar, bool/int/float controls and save/reset. The opt-in D3D12 overlay can render this view; visual/UI behavior requires in-game verification.
+- `src/ui.cpp` — Dear ImGui view layer with a searchable mod sidebar, bool/int/float controls, enum dropdowns, keybind capture, functional All Mods / Keybinds / About tabs, and save/reset. The opt-in D3D12 overlay can render this view; visual/UI behavior requires in-game verification.
 -  `src/overlay.cpp` — experimental DXGI Present/Resize hooks, game-window subclass, native Win32/D3D12 ImGui renderer, emergency-disable shortcut; opt-in only.
 - `src/cursor.cpp` — opt-in guarded user32 cursor release / recenter suppression while the overlay is open, restores the game's clip on close or focus loss; detour install failure leaves the virtual mouse fallback available.
 - `src/raw_input.cpp` — copies RAWINPUT on the window thread and injects relative mouse movement, button presses, wheel, raw-key input and text into ImGui on the render thread. It does not depend on the game exposing legacy WM_MOUSEMOVE / WM_LBUTTONDOWN events.
@@ -31,11 +31,11 @@ CMake downloads pinned RED4ext.SDK (revision `a34f0ad`, which defines game v2.50
 
 **Development prerequisite:** RED4ext, redscript compiler / redscript mod support, and Cyberpunk 2077 2.50. No CET or Mod Settings is required for the m1core library itself. Other mods may retain their own dependencies until migration.
 
-## Opt-in ImGui overlay preview — v0.2.0-dev
+## Opt-in ImGui overlay preview — v0.3.0-dev
 
 **New cursor/input build not yet verified in-game. Do not install during important gameplay.** The usual `m1core-windows-x64-dev` package is still **headless**: it does not install `overlay.enable`, so it never creates graphics/window hooks.
 
-For a first UI test, GitHub Actions publishes **`m1core-overlay-preview-x64-dev`** as a separate artifact. It includes an `overlay.enable` file which explicitly enables the experimental DXGI Present/Resize renderer. The overlay adds temporary sample settings under `m1core.preview` to demonstrate the sidebar, toggle, integer slider and float slider before other mods migrate.
+For a first UI test, GitHub Actions publishes **`m1core-overlay-preview-x64-dev`** as a separate artifact. It includes an `overlay.enable` file which explicitly enables the experimental DXGI Present/Resize renderer. The overlay adds temporary sample settings under `m1core.preview` to demonstrate the sidebar, toggle, integer/float sliders, enum dropdown and keybind capture before other mods migrate.
 
 - **F11** — open or close the settings window with the same key.
 - **Ctrl+Shift+F11** — emergency disable until game restart.
@@ -49,6 +49,36 @@ The overlay has fail-closed focus rules and releases back-buffer references befo
 **In-game test:** the user confirmed the overlay and cursor controls work on 2026-11-19. F11 is the only normal keyboard open/close shortcut; Escape is not handled by m1core.
 
 **Known limitations:** this cursor rewrite has not been verified in-game. The user32 hooks are process-wide while the preview is enabled, though they act only during m1core capture; they may interact with other overlay mods. Virtual cursor movement works from relative RAWINPUT even if OS cursor recenter suppression fails. Non-US keyboard layouts, IME composition, controller navigation, and third-party overlay coexistence still need testing. If the UI is visible but input behaves unexpectedly, press the emergency shortcut, exit the game, delete `overlay.enable` and send logs. Do not treat a successful CI build as proof that real input behavior is correct.
+
+## Enum & keybind API (v0.3.0 development)
+
+Existing Bool, Int32 and Float APIs remain unchanged. The new optional types use their own
+registration/read/write functions and remain isolated by mod ID.
+
+```redscript
+// Values are zero-based indexes: Off=0, Stealth=1, Aggressive=2
+M1Core_RegisterEnumSetting(n"ExampleMod", n"Mode", 1, "Off|Stealth|Aggressive");
+let mode = M1Core_GetEnumSetting(n"ExampleMod", n"Mode");
+M1Core_SetEnumSetting(n"ExampleMod", n"Mode", 2);
+
+// Key codes are Windows VK values; 0 means "Unbound"; e.g. 117 is F6.
+M1Core_RegisterKeybindSetting(n"ExampleMod", n"Action", 117);
+let key = M1Core_GetKeybindSetting(n"ExampleMod", n"Action");
+M1Core_SetKeybindSetting(n"ExampleMod", n"Action", 118);
+```
+
+- Enum option labels use a pipe-separated `String`, up to 64 unique nonempty choices.
+- The selected enum **index** is persisted as a typed `enum`, not just a generic integer.
+  Adding/removing options clamps an old saved index to the new range.
+- Keybinds use Win32 virtual-key numbers from 0 to 255 and persist as typed `keybind`.
+  **m1core stores the code; it does not execute the mod's action.** The consuming mod
+  remains responsible for checking keyboard events when appropriate.
+- The UI reserves **F11** for opening and closing m1core. Escape cancels an active
+  *key-capture operation* only, and does not close the m1core overlay.
+- The preview registers `Camera Mode` and `Quick Action` fields to validate
+  the dropdown, key capture and two-phase settings persistence.
+- The v0.3.0 C++ build and CTest cover these types; **new REDscript native calls still
+  require in-game verification** after installing the matching DLL and `.reds`.
 
 ## Optional in-game native API test
 
@@ -76,8 +106,8 @@ The bindings are installed only with their matching DLL. Never ship the `.reds` 
 ## Roadmap
 
 1. **Milestone 1 (compiled and launched):** native RED4ext plugin, versioned REDscript API, registry, persistence, CTest and Windows CI build; optional API/persistence runtime test awaiting results.
-2. **Milestone 2 (experimental):** opt-in D3D12/ImGui render path, guarded Win32 input, three exit mechanisms, game focus and resize handling. Still requires in-game verification. F11 toggle, Close button, and emergency recovery must work; never leave game input blocked.
-3. **Milestone 3:** searchable sidebar/grouped mod settings, keybinds, profiles, visual customization independent of the HTML demo.
+2. **Milestone 2 (in-game validated):** opt-in D3D12/ImGui render path, guarded Win32 input, three exit mechanisms, game focus and resize handling. F11 toggle and mouse cursor were user-tested in game on 2026-11-19. The newer enum/keybind UI still requires runtime testing. F11 toggle, Close button, and emergency recovery must work; never leave game input blocked.
+3. **Milestone 3 (partially implemented):** searchable sidebar, separate Keybinds/About tabs, enum dropdowns and keybind capture. Profiles, richer grouping and final visual customization remain future work.
 4. **Milestone 4:** live in-game validation, compatibility audit, test mod, release ZIP and API freeze.
 5. **After m1core is stable:** migrate existing CP2077 mods individually, maintaining their working behavior.
 
