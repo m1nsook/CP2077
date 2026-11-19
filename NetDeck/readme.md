@@ -1,9 +1,50 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.10 CET INPUT/OVERLAY FIX TEST · NOT game-compiler verified.**
+**Cyberpunk 2077 2.5 · v0.6.11 NATIVE VEHICLE CRASH ISOLATION TEST · NOT game-compiler verified.**
 
 **Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
 **Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
+
+## v0.6.11 — disable native vehicle quickhack crashing during NETWORM propagation (UNVERIFIED)
+
+On 19 November 2026 the user posted Advanced Crash Reporter analysis
+[on PR #36](https://github.com/m1nsook/CP2077/pull/36#issuecomment-7003958626).
+ACR reported two similar recent crashes and identified this **likely**
+call chain: `PlayerPuppet.OnNetDeckWaveTickEvent` →
+`PlayerPuppet.NetDeckWaveInfect` →
+**native `VehicleObject.ActivateNetrunnerQuickhack`**, with the fault
+occurring in `Cyberpunk2077.exe`.
+
+The source confirmed exactly that native call in the `VehicleObject`
+branch of `NetDeckWaveInfect`, invoked when the worm reached a
+non-parked vehicle. To isolate this fault without compromising
+the rest of NETWORM, the automatic
+`vehicle.ActivateNetrunnerQuickhack(VehicleNetrunnerQuickhackType.ForceBrakes)`
+call is **removed**. The wide-area preview queue now includes only
+eligible NPC puppets rather than NPCs and cars; tick selection ignores
+vehicles from the targeting system, registered vehicle fallbacks and
+pending network candidates. This also prevents the displayed preview
+count from including automatically discovered cars that are not hacked.
+
+**Temporary limitation:** NETWORM does not force-brake vehicles and
+does not automatically propagate to cars. A vehicle can still be a
+manually targeted *entry point* for spreading the worm to nearby
+eligible NPCs and devices. This is a crash-isolation experiment, not
+a permanent removal decision. Vanilla vehicle quickhacks are
+unmodified. No global NPC/vehicle world-loading hooks were added back.
+
+**Test order:** Compile REDscript first. Load the same save and run
+NETWORM on a device or hostile NPC where cars are present. Verify
+that NPC/device propagation still works and map loading remains
+stable. Optionally, separately try starting NETWORM from a vehicle,
+expecting NO force brakes. If it crashes again, supply the complete
+Advanced Crash Reporter `.txt` (the PR comment only includes the
+diagnosis excerpt), particularly its native stack and NetDeck frames.
+
+All existing adjustable CET speeds, scan radii, the smooth native
+upload bar and user-provided icon references are unchanged. Tests
+assert that the unsafe native vehicle quickhack call cannot reappear.
+**No game compile or gameplay confirmation yet; PR remains draft.**
 
 ## v0.6.10 — CET settings window must not block gameplay (UNVERIFIED)
 
