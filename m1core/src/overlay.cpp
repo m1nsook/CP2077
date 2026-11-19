@@ -397,7 +397,7 @@ bool InitializeGraphics(IDXGISwapChain* swapchain)
         std::lock_guard lock(g_stateMutex);
         g_gate.SetRendererReady(true);
     }
-    Log("m1core overlay: renderer ready; F11 toggle, ESC close, Ctrl+Shift+F11 emergency disable");
+    Log("m1core overlay: renderer ready; F11 opens and closes, Ctrl+Shift+F11 emergency disable");
     return true;
 }
 

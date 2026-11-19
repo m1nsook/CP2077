@@ -16,6 +16,12 @@ on:
 permissions:
   contents: read
 
+# PR and branch pushes otherwise build the identical commit twice.
+# Use the same key for both events and keep only the newest validation run.
+concurrency:
+  group: m1core-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   windows-build:
     name: Build Windows x64 plugin and settings tests
