@@ -283,10 +283,18 @@ class InfiltrationSourceTests(unittest.TestCase):
         self.assertIn("this.NetDeckRegisterVehicle(initialVehicle);", R)
         self.assertIn("protected cb func OnGameAttached() -> Bool", R)
         self.assertIn("protected cb func OnDetach() -> Bool", R)
-        self.assertIn("VehicleNetrunnerQuickhackType.ForceBrakes", R)
-        self.assertIn("vehicle.ActivateNetrunnerQuickhack(", R)
-        self.assertIn("this.netDeckLoadedVehicles[k]", R)
-        self.assertIn("Vector4.Distance(this.netDeckWaveHosts[host], car.GetWorldPosition())", R)
+        # ACR Nov 19: native vehicle quickhack crashed while NETWORM spread.
+        # Keep manually targeted vehicles as initial relay entry points,
+        # but never auto-select or run the native force-braking operation.
+        self.assertNotIn("VehicleNetrunnerQuickhackType.ForceBrakes", R)
+        self.assertNotIn("vehicle.ActivateNetrunnerQuickhack(", R)
+        self.assertNotIn("this.netDeckLoadedVehicles[k]", R)
+        self.assertNotIn("this.NetDeckQueuePreviewCandidate(vehicle)", R)
+        self.assertNotIn("let candidateVehicle: ref<VehicleObject> = candidate as VehicleObject", R)
+        self.assertIn("!IsDefined(candidate as VehicleObject)", R)
+        self.assertIn("!IsDefined(pendingCandidate as VehicleObject)", R)
+        self.assertIn("this.NetDeckWaveInfect(root, 0);", R)
+        self.assertIn("this.NetDeckPreviewNetwork();", R)
         self.assertNotIn("TSFMV.Obj_Vehicle", R)
 
     def test_canto_enemy_action_not_ping_derived(self):
