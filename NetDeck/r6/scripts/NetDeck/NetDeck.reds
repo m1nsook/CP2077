@@ -1136,9 +1136,9 @@ public func NetDeckTriggerNetWatchPursuit(puppet: ref<ScriptedPuppet>) -> Void {
   NPCPuppet.RevealPlayerPositionIfNeeded(puppet, player.GetEntityID(), false);
 }
 
-// NPC-origin NETWORM is non-lethal: disrupt hostile communications and brake
-// nearby non-quest vehicles. No damage, incapacitation or radius-based
-// network shutdown is applied to any civilian or hostile puppet.
+// NPC-origin NETWORM is non-lethal: disrupt hostile communications.
+// Automatic vehicle braking is disabled while isolating native game crashes.
+// No damage, incapacitation or radius-based network shutdown is applied.
 public func NetDeckDisruptNpcVicinity(puppet: ref<ScriptedPuppet>) -> Int32 {
   if !IsDefined(puppet) || puppet.IsQuest() { return 0; }
   let player: ref<PlayerPuppet> = GetPlayer(puppet.GetGame());
@@ -1155,33 +1155,8 @@ public func NetDeckDisruptNpcVicinity(puppet: ref<ScriptedPuppet>) -> Int32 {
     affected += 1;
   }
 
-  // TargetingSystem only returns loaded, targetable vehicles in this radius.
-  // No driving quest/scene vehicles, no player's own vehicle.
-  let query: TargetSearchQuery;
-  query.testedSet = TargetingSet.Complete;
-  query.searchFilter = TSF_Any(TSFMV.Obj_Other | TSFMV.Obj_Device);
-  query.includeSecondaryTargets = false;
-  query.maxDistance = 25.0;
-  query.filterObjectByDistance = true;
-  let parts: array<TS_TargetPartInfo>;
-  GameInstance.GetTargetingSystem(puppet.GetGame()).GetTargetParts(puppet, query, parts);
-  let seen: array<ref<VehicleObject>>;
-  let i: Int32 = 0;
-  while i < ArraySize(parts) {
-    let component: wref<TargetingComponent> = TS_TargetPartInfo.GetComponent(parts[i]);
-    if IsDefined(component) {
-      let vehicle: ref<VehicleObject> = component.GetEntity() as VehicleObject;
-      if IsDefined(vehicle) && !ArrayContains(seen, vehicle) {
-        ArrayPush(seen, vehicle);
-        if !vehicle.IsQuest() && !vehicle.IsPlayerVehicle() &&
-           !vehicle.IsVehicleParked() && !vehicle.IsInQuestOrScenePhysicsState() {
-          vehicle.ForceBrakesFor(4.0);
-          affected += 1;
-        }
-      }
-    }
-    i += 1;
-  }
+  // No native vehicle actions here; even a compatibility helper must not
+  // reintroduce automatic car braking during this ACR crash-isolation build.
   return affected;
 }
 
