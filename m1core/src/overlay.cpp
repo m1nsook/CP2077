@@ -510,7 +510,10 @@ void Draw(IDXGISwapChain* swapchain)
     const ImGuiIO& io = ImGui::GetIO();
     ImGui::GetBackgroundDrawList()->AddRectFilled(
         ImVec2(0.0F, 0.0F), io.DisplaySize, IM_COL32(0, 0, 0, 140));
-    if (g_registry) RenderSettings(*g_registry);
+    bool windowOpen = true;
+    if (g_registry) RenderSettings(*g_registry, windowOpen);
+    if (!windowOpen)
+        CloseOverlay();
     ImGui::Render();
 
     if (FAILED(frame.allocator->Reset())) {

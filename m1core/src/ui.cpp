@@ -82,7 +82,7 @@ void DrawSetting(Registry& registry, Id modId, const SettingSnapshot& setting)
 }
 } // namespace
 
-void RenderSettings(Registry& registry)
+void RenderSettings(Registry& registry, bool& open)
 {
     // Layout prototype only. Final colors/fonts/visual appearance are undecided.
     // The D3D12 presentation and safe focus/input layer will call this later.
@@ -98,7 +98,7 @@ void RenderSettings(Registry& registry)
         selected = mods.front().id;
 
     ImGui::SetNextWindowSize(ImVec2(900.0F, 580.0F), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("m1core - Mod Settings", nullptr, ImGuiWindowFlags_NoCollapse))
+    if (!ImGui::Begin("m1core - Mod Settings", &open, ImGuiWindowFlags_NoCollapse))
     {
         ImGui::End();
         return;
@@ -157,6 +157,9 @@ void RenderSettings(Registry& registry)
     ImGui::Separator();
     if (ImGui::Button("Save settings"))
         saveFailed = !registry.Save();
+    ImGui::SameLine();
+    if (ImGui::Button("Close"))
+        open = false;
     ImGui::SameLine();
     if (saveFailed)
         ImGui::TextUnformatted("Save failed. Check plugin directory permissions.");
