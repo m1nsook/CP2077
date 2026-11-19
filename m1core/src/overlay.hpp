@@ -1,8 +1,8 @@
 #pragma once
 #include <filesystem>
+#include <RED4ext/Api/v1/PluginHandle.hpp>
 
 namespace RED4ext::v1 { struct Sdk; struct Logger; }
-namespace RED4ext { namespace v1 { struct PluginHandle; } }
 namespace m1core {
 class Registry;
 
