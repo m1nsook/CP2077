@@ -323,4 +323,21 @@ bool Registry::Reset(Id mod, Id id)
     setting->second.value = setting->second.defaultValue;
     return true;
 }
+std::vector<ModSnapshot> Registry::Snapshot() const
+{
+    std::lock_guard lock(mutex_);
+    std::vector<ModSnapshot> modules;
+    modules.reserve(registered_.size());
+    for (const auto& [modId, settings] : registered_)
+    {
+        ModSnapshot mod{modId, {}};
+        mod.settings.reserve(settings.size());
+        for (const auto& [id, setting] : settings)
+            mod.settings.push_back({id, setting.kind, setting.value, setting.defaultValue,
+                                    setting.minimum, setting.maximum});
+        modules.push_back(std::move(mod));
+    }
+    return modules;
+}
+
 } // namespace m1core

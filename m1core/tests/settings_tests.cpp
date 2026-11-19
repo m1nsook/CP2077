@@ -37,6 +37,13 @@ int main()
         CHECK(registry.GetBool(2, 1) == false);
         CHECK(registry.GetInt(1, 2) == 10);
         CHECK(registry.GetFloat(1, 3) == 0.5F);
+        const auto snapshot = registry.Snapshot();
+        CHECK(snapshot.size() == 2);
+        CHECK(snapshot[0].id == 1);
+        CHECK(snapshot[0].settings.size() == 3);
+        CHECK(snapshot[0].settings[0].id == 1);
+        CHECK(snapshot[0].settings[2].kind == m1core::Kind::Float);
+        CHECK(std::get<float>(snapshot[0].settings[2].value) == 0.5F);
         CHECK(registry.Save());
     }
     {

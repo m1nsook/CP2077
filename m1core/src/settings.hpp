@@ -5,6 +5,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <vector>
 #include <variant>
 
 namespace m1core
@@ -21,6 +22,20 @@ struct Setting
     Value defaultValue;
     Value minimum;
     Value maximum;
+};
+
+// Immutable copy of registry state for UI rendering and diagnostics.
+struct SettingSnapshot {
+    Id id;
+    Kind kind;
+    Value value;
+    Value defaultValue;
+    Value minimum;
+    Value maximum;
+};
+struct ModSnapshot {
+    Id id;
+    std::vector<SettingSnapshot> settings;
 };
 
 // No RED4ext dependencies here: persistence and settings logic are testable
@@ -46,6 +61,7 @@ public:
     bool SetFloat(Id mod, Id id, float value);
 
     bool Reset(Id mod, Id id);
+    std::vector<ModSnapshot> Snapshot() const;
 
 private:
     using Settings = std::map<Id, Setting>;
