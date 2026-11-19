@@ -3,7 +3,7 @@
 -- Advanced Crash Reporter 1.6 already captures CET scripting.log.
 -- Output: [NetDeck/DIAG] ... in bin/x64/plugins/cyber_engine_tweaks/scripting.log
 -- Remove this folder after diagnosing crashes.
-local PREFIX = "[NetDeck/DIAG v0.6.10]"
+local PREFIX = "[NetDeck/DIAG v0.6.11]"
 local seconds = 0
 local waves = 0
 local infections = 0
