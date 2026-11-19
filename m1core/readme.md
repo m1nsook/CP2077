@@ -10,7 +10,7 @@
 - `red4ext/plugins/m1core/profiles.json` — separately managed named configuration snapshots; never included in an install ZIP, so updates do not overwrite user-created profiles.
 - `src/settings.*` — pure C++ registry with bool / Int32 / Float / enum / keybind (Win32 VK), clamping, resets, and schema-v1 JSON.
 - `src/plugin.cpp` — RED4ext lifecycle and registered native globals.
-- `src/ui.cpp` — Dear ImGui view layer with a searchable mod sidebar, bool/int/float controls, enum dropdowns, keybind capture, functional All Mods / Keybinds / About tabs, and save/reset. The opt-in D3D12 overlay can render this view; the previous dropdowns and keybinds were tested in-game; profiles are the new untested feature.
+- `src/ui.cpp` — Dear ImGui view layer with a searchable mod sidebar, bool/int/float controls, enum dropdowns, keybind capture, functional All Mods / Keybinds / Profiles / About tabs, and save/reset. The opt-in D3D12 overlay can render this view; the previous dropdowns and keybinds were tested in-game; profiles and per-mod grouping are the new untested features.
 -  `src/overlay.cpp` — experimental DXGI Present/Resize hooks, game-window subclass, native Win32/D3D12 ImGui renderer, emergency-disable shortcut; opt-in only.
 - `src/cursor.cpp` — opt-in guarded user32 cursor release / recenter suppression while the overlay is open, restores the game's clip on close or focus loss; detour install failure leaves the virtual mouse fallback available.
 - `src/raw_input.cpp` — copies RAWINPUT on the window thread and injects relative mouse movement, button presses, wheel, raw-key input and text into ImGui on the render thread. It does not depend on the game exposing legacy WM_MOUSEMOVE / WM_LBUTTONDOWN events.
@@ -66,6 +66,21 @@ The **Profiles** tab provides named configurations, such as `Stealth`, `Combat`,
 Profiles are stored in a separate `profiles.json` beside `settings.json`, using a versioned schema and temporary-file replacement. Up to 24 profiles are supported; names may use UTF-8 (up to 64 bytes) but cannot contain control characters or path separators. A damaged or unexpectedly large profiles file does not prevent loading the plugin or the original settings.
 
 **Status:** this feature compiles and has automated unit tests, but still needs a short in-game UI test. The install package never includes `settings.json` or `profiles.json`, preserving both during updates.
+
+## Mod-defined settings groups (v0.4.0 development)
+
+A compatible mod can optionally label its settings with categories without changing their type, persisted value or CName ID. The native API must be called **after** registration:
+
+```redscript
+M1Core_RegisterBoolSetting(n"ExampleMod", n"Enabled", true);
+M1Core_RegisterFloatSetting(n"ExampleMod", n"Intensity", 1.0, 0.5, 3.0);
+M1Core_SetSettingGroup(n"ExampleMod", n"Enabled", n"General");
+M1Core_SetSettingGroup(n"ExampleMod", n"Intensity", n"Gameplay");
+```
+
+The All Mods and Keybinds pages render categories in named sections. If a mod does not set a category, settings stay in the default General section. Group metadata is **not** written to `settings.json`: the mod declares categories again when it registers settings on the next startup. A later registration preserves categories already supplied during that process.
+
+The development preview now demonstrates General, Gameplay and Controls groups. These new grouping controls, along with the Profiles tab, still need an in-game UI test.
 
 ## Enum & keybind API (v0.3.0 development)
 
