@@ -43,6 +43,9 @@ if(WIN32)
     target_compile_definitions(m1core_imgui PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
 endif()
 
+add_library(m1core_diagnostics STATIC src/diagnostics.cpp)
+target_include_directories(m1core_diagnostics PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
 add_library(m1core_settings STATIC src/settings.cpp)
 target_include_directories(m1core_settings PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(m1core_settings PUBLIC nlohmann_json::nlohmann_json)
@@ -58,7 +61,7 @@ if(WIN32)
         src/cursor.cpp
         src/raw_input.cpp
     )
-    target_link_libraries(m1core PRIVATE m1core_settings m1core_imgui RED4ext::SDK comctl32)
+    target_link_libraries(m1core PRIVATE m1core_settings m1core_diagnostics m1core_imgui RED4ext::SDK comctl32)
     target_compile_definitions(m1core PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE RED4EXT_HEADER_ONLY)
     set_target_properties(m1core PROPERTIES OUTPUT_NAME "m1core" PREFIX "")
 endif()
@@ -68,6 +71,10 @@ if(BUILD_TESTING)
     add_executable(m1core_settings_tests tests/settings_tests.cpp)
     target_link_libraries(m1core_settings_tests PRIVATE m1core_settings)
     add_test(NAME m1core_settings_tests COMMAND m1core_settings_tests)
+
+    add_executable(m1core_diagnostics_tests tests/diagnostics_tests.cpp)
+    target_link_libraries(m1core_diagnostics_tests PRIVATE m1core_diagnostics)
+    add_test(NAME m1core_diagnostics_tests COMMAND m1core_diagnostics_tests)
 
     add_executable(m1core_input_gate_tests tests/input_gate_tests.cpp)
     target_include_directories(m1core_input_gate_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
