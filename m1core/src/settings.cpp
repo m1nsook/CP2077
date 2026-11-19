@@ -54,6 +54,8 @@ const char* Name(Kind kind)
     case Kind::Boolean: return "bool";
     case Kind::Integer: return "int";
     case Kind::Float: return "float";
+    case Kind::Enum: return "enum";
+    case Kind::Keybind: return "keybind";
     }
     return "unknown";
 }
@@ -68,12 +70,13 @@ std::optional<std::pair<Kind, Value>> Decode(const json& setting)
     const auto& value = setting["value"];
     if (type == "bool" && value.is_boolean())
         return std::pair{Kind::Boolean, Value(value.get<bool>())};
-    if (type == "int" && value.is_number_integer())
+    if ((type == "int" || type == "enum" || type == "keybind") && value.is_number_integer())
     {
         const auto number = value.get<std::int64_t>();
         if (number >= std::numeric_limits<std::int32_t>::min() &&
             number <= std::numeric_limits<std::int32_t>::max())
-            return std::pair{Kind::Integer, Value(static_cast<std::int32_t>(number))};
+            return std::pair{type == "enum" ? Kind::Enum : type == "keybind" ? Kind::Keybind : Kind::Integer,
+                             Value(static_cast<std::int32_t>(number))};
     }
     if (type == "float" && value.is_number())
     {
@@ -196,7 +199,7 @@ bool Registry::Save() const
 
 Value Registry::Clamp(const Setting& setting, Value value)
 {
-    if (setting.kind == Kind::Integer)
+    if (setting.kind == Kind::Integer || setting.kind == Kind::Enum || setting.kind == Kind::Keybind)
         return std::clamp(std::get<std::int32_t>(value),
                           std::get<std::int32_t>(setting.minimum),
                           std::get<std::int32_t>(setting.maximum));
@@ -251,6 +254,30 @@ bool Registry::RegisterFloat(Id mod, Id id, float def, float min, float max)
     return Register(mod, id, {Kind::Float, def, def, min, max});
 }
 
+bool Registry::RegisterEnum(Id mod, Id id, std::int32_t def,
+                            std::vector<std::string> choices)
+{
+    if (choices.empty() || choices.size() > 64)
+        return false;
+    for (const auto& choice : choices)
+        if (choice.empty() || choice.size() > 128)
+            return false;
+    // Avoid ambiguous labels when rendering selection changes.
+    for (std::size_t i = 0; i < choices.size(); ++i)
+        for (std::size_t j = i + 1; j < choices.size(); ++j)
+            if (choices[i] == choices[j]) return false;
+    const auto maximum = static_cast<std::int32_t>(choices.size() - 1);
+    def = std::clamp(def, 0, maximum);
+    return Register(mod, id, {Kind::Enum, def, def, 0, maximum, std::move(choices)});
+}
+
+bool Registry::RegisterKeybind(Id mod, Id id, std::int32_t def)
+{
+    if (def < 0 || def > 255)
+        return false;
+    return Register(mod, id, {Kind::Keybind, def, def, 0, 255});
+}
+
 std::optional<Value> Registry::Get(Id mod, Id id, Kind kind) const
 {
     std::lock_guard lock(mutex_);
@@ -279,6 +306,18 @@ std::optional<float> Registry::GetFloat(Id mod, Id id) const
 {
     const auto value = Get(mod, id, Kind::Float);
     return value ? std::optional(std::get<float>(*value)) : std::nullopt;
+}
+
+std::optional<std::int32_t> Registry::GetEnum(Id mod, Id id) const
+{
+    const auto value = Get(mod, id, Kind::Enum);
+    return value ? std::optional(std::get<std::int32_t>(*value)) : std::nullopt;
+}
+
+std::optional<std::int32_t> Registry::GetKeybind(Id mod, Id id) const
+{
+    const auto value = Get(mod, id, Kind::Keybind);
+    return value ? std::optional(std::get<std::int32_t>(*value)) : std::nullopt;
 }
 
 bool Registry::Set(Id mod, Id id, Kind kind, Value value)
@@ -311,6 +350,18 @@ bool Registry::SetFloat(Id mod, Id id, float value)
     return Set(mod, id, Kind::Float, value);
 }
 
+bool Registry::SetEnum(Id mod, Id id, std::int32_t index)
+{
+    return Set(mod, id, Kind::Enum, index);
+}
+
+bool Registry::SetKeybind(Id mod, Id id, std::int32_t virtualKey)
+{
+    if (virtualKey < 0 || virtualKey > 255)
+        return false;
+    return Set(mod, id, Kind::Keybind, virtualKey);
+}
+
 bool Registry::Reset(Id mod, Id id)
 {
     std::lock_guard lock(mutex_);
@@ -334,7 +385,7 @@ std::vector<ModSnapshot> Registry::Snapshot() const
         mod.settings.reserve(settings.size());
         for (const auto& [id, setting] : settings)
             mod.settings.push_back({id, setting.kind, setting.value, setting.defaultValue,
-                                    setting.minimum, setting.maximum});
+                                    setting.minimum, setting.maximum, setting.choices});
         modules.push_back(std::move(mod));
     }
     return modules;
