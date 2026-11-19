@@ -462,13 +462,11 @@ void Draw(IDXGISwapChain* swapchain)
     ProcessHotkeys();
     if (!g_enabled.load()) return;
 
-    std::vector<MSG> messages;
-    std::vector<RawSample> rawSamples;
+    // Do not discard mouse/key packets if this back buffer is still busy.
+    // They remain queued until a frame can actually render.
     {
         std::lock_guard lock(g_stateMutex);
         if (!g_gate.MayCaptureInput()) return;
-        messages.swap(g_messages);
-        rawSamples.swap(g_rawSamples);
     }
 
     auto& gfx = g_graphics;
@@ -490,6 +488,15 @@ void Draw(IDXGISwapChain* swapchain)
         return;
     }
     g_pendingFrames = 0;
+
+    std::vector<MSG> messages;
+    std::vector<RawSample> rawSamples;
+    {
+        std::lock_guard lock(g_stateMutex);
+        if (!g_gate.MayCaptureInput()) return;
+        messages.swap(g_messages);
+        rawSamples.swap(g_rawSamples);
+    }
 
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
