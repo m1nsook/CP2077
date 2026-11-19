@@ -23,6 +23,12 @@ public func M1Core_SmokeTest(stage: Int32) -> Int32 {
     if !M1Core_RegisterKeybindSetting(n"m1core.smoke", n"ActionKey", 117) {
         failed = failed + 2097152;
     }
+    if !M1Core_SetSettingGroup(n"m1core.smoke", n"Enabled", n"General") {
+        failed = failed + 67108864;
+    }
+    if !M1Core_SetSettingGroup(n"m1core.smoke", n"Mode", n"Gameplay") {
+        failed = failed + 134217728;
+    }
     if failed != 0 {
         return failed;
     }
