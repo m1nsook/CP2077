@@ -51,7 +51,13 @@ if(WIN32)
 endif()
 
 if(WIN32)
-    add_library(m1core SHARED src/plugin.cpp src/ui.cpp src/overlay.cpp)
+    add_library(m1core SHARED
+        src/plugin.cpp
+        src/ui.cpp
+        src/overlay.cpp
+        src/cursor.cpp
+        src/raw_input.cpp
+    )
     target_link_libraries(m1core PRIVATE m1core_settings m1core_imgui RED4ext::SDK comctl32)
     target_compile_definitions(m1core PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE RED4EXT_HEADER_ONLY)
     set_target_properties(m1core PROPERTIES OUTPUT_NAME "m1core" PREFIX "")
