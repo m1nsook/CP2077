@@ -37,8 +37,7 @@ CMake downloads pinned RED4ext.SDK (revision `a34f0ad`, which defines game v2.50
 
 For a first UI test, GitHub Actions publishes **`m1core-overlay-preview-x64-dev`** as a separate artifact. It includes an `overlay.enable` file which explicitly enables the experimental DXGI Present/Resize renderer. The overlay adds temporary sample settings under `m1core.preview` to demonstrate the sidebar, toggle, integer slider and float slider before other mods migrate.
 
-- **F11** — toggle the settings window after it has initialized.
-- **Escape** — close immediately.
+- **F11** — open or close the settings window with the same key.
 - **Ctrl+Shift+F11** — emergency disable until game restart.
 - **Recovery before next launch:** delete `red4ext/plugins/m1core/overlay.enable`. This fully disables our graphics and window hooks, without removing m1core itself.
 - **Full uninstall:** remove the DLL and `m1core.reds` together.
@@ -46,6 +45,8 @@ For a first UI test, GitHub Actions publishes **`m1core-overlay-preview-x64-dev`
 The overlay draws a dimmed fullscreen backdrop via ImGui's background draw list and shows normal draggable ImGui settings windows on top. It tracks raw-relative mouse deltas to draw an ImGui cursor independently of the game cursor; it also attempts to guard user32 `ClipCursor` / `SetCursorPos` while capturing input, restoring the last requested clip when the overlay closes. Key/button releases continue to reach the game to avoid stuck controls.
 
 The overlay has fail-closed focus rules and releases back-buffer references before swap-chain resize. It only hooks when the RED4ext Running callback executes on the owner thread of the game window; if this thread check fails, it **does not** attach hooks. Normal builds contain the renderer code but leave it inactive.
+
+**In-game test:** the user confirmed the overlay and cursor controls work on 2026-11-19. F11 is the only normal keyboard open/close shortcut; Escape is not handled by m1core.
 
 **Known limitations:** this cursor rewrite has not been verified in-game. The user32 hooks are process-wide while the preview is enabled, though they act only during m1core capture; they may interact with other overlay mods. Virtual cursor movement works from relative RAWINPUT even if OS cursor recenter suppression fails. Non-US keyboard layouts, IME composition, controller navigation, and third-party overlay coexistence still need testing. If the UI is visible but input behaves unexpectedly, press the emergency shortcut, exit the game, delete `overlay.enable` and send logs. Do not treat a successful CI build as proof that real input behavior is correct.
 
@@ -75,7 +76,7 @@ The bindings are installed only with their matching DLL. Never ship the `.reds` 
 ## Roadmap
 
 1. **Milestone 1 (compiled and launched):** native RED4ext plugin, versioned REDscript API, registry, persistence, CTest and Windows CI build; optional API/persistence runtime test awaiting results.
-2. **Milestone 2 (experimental):** opt-in D3D12/ImGui render path, guarded Win32 input, three exit mechanisms, game focus and resize handling. Still requires in-game verification. Escape, close and emergency recovery must work; never leave game input blocked.
+2. **Milestone 2 (experimental):** opt-in D3D12/ImGui render path, guarded Win32 input, three exit mechanisms, game focus and resize handling. Still requires in-game verification. F11 toggle, Close button, and emergency recovery must work; never leave game input blocked.
 3. **Milestone 3:** searchable sidebar/grouped mod settings, keybinds, profiles, visual customization independent of the HTML demo.
 4. **Milestone 4:** live in-game validation, compatibility audit, test mod, release ZIP and API freeze.
 5. **After m1core is stable:** migrate existing CP2077 mods individually, maintaining their working behavior.

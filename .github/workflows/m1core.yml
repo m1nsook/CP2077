@@ -59,7 +59,7 @@ jobs:
           Set-Content -Path "m1core/overlay-package/red4ext/plugins/m1core/overlay.enable" -Value "experimental overlay opt-in"
           Set-Content -Path "m1core/overlay-package/README-overlay-preview.txt" -Value @(
             "m1core experimental DX12 overlay (Cyberpunk 2077 2.50)"
-            "F11: toggle settings window. Escape: close."
+            "F11: open and close settings window. Escape is not used."
             "Ctrl+Shift+F11: disable overlay for this game session."
             "If it causes problems, remove red4ext/plugins/m1core/overlay.enable and restart."
             "The normal m1core ZIP never installs overlay.enable."

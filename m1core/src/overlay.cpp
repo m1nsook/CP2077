@@ -88,7 +88,6 @@ bool g_hooked = false;
 bool g_subclassed = false;
 bool g_loggedThreadMismatch = false;
 bool g_f11WasDown = false;
-bool g_escapeWasDown = false;
 bool g_emergencyWasDown = false;
 PresentFn g_present = nullptr;
 ResizeFn g_resize = nullptr;
@@ -405,7 +404,6 @@ bool InitializeGraphics(IDXGISwapChain* swapchain)
 void ProcessHotkeys()
 {
     const bool f11 = (GetAsyncKeyState(VK_F11) & 0x8000) != 0;
-    const bool esc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
     const bool emergency = f11 && (GetAsyncKeyState(VK_CONTROL) & 0x8000) &&
                                     (GetAsyncKeyState(VK_SHIFT) & 0x8000);
     if (emergency && !g_emergencyWasDown)
@@ -419,8 +417,6 @@ void ProcessHotkeys()
         if (g_enabled.load()) {
             if (f11 && !g_f11WasDown && !emergency)
                 g_gate.Toggle();
-            if (esc && !g_escapeWasDown)
-                g_gate.Escape();
         }
         capture = g_gate.MayCaptureInput();
         if (!capture) {
@@ -429,7 +425,6 @@ void ProcessHotkeys()
         }
     }
     g_f11WasDown = f11;
-    g_escapeWasDown = esc;
 
     // Never call user32 trampolines while holding the state mutex. Both
     // open and close transitions must update the game's cursor clip.

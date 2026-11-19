@@ -15,7 +15,6 @@ int main()
     CHECK(!input.IsOpen());
     CHECK(!input.MayCaptureInput());
     CHECK(!input.Toggle()); // No renderer or focus: cannot steal input.
-    CHECK(!input.Escape());
 
     input.SetRendererReady(true);
     CHECK(!input.Toggle()); // A ready renderer is not enough.
@@ -23,10 +22,9 @@ int main()
     CHECK(input.Toggle());
     CHECK(input.IsOpen());
     CHECK(input.MayCaptureInput());
-    CHECK(input.Escape()); // ESC must close regardless of UI state.
+    CHECK(!input.Toggle()); // F11 closes using the same toggle as opening.
     CHECK(!input.IsOpen());
     CHECK(!input.MayCaptureInput());
-    CHECK(!input.Escape());
 
     CHECK(input.Toggle());
     CHECK(!input.Toggle()); // Hotkey toggles closed.

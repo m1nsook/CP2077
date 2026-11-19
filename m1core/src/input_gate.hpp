@@ -45,16 +45,6 @@ public:
         return true;
     }
 
-    // ESC is a guaranteed exit: dispatch it before forwarding the event
-    // to ImGui. Returns true only if the key was consumed by our overlay.
-    bool Escape() noexcept
-    {
-        if (!open_)
-            return false;
-        Close();
-        return true;
-    }
-
     void Close() noexcept
     {
         open_ = false;
