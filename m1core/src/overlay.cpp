@@ -1,5 +1,7 @@
 #include "overlay.hpp"
 #include "input_gate.hpp"
+#include "cursor.hpp"
+#include "raw_input.hpp"
 #include "settings.hpp"
 #include "ui.hpp"
 
@@ -76,6 +78,9 @@ const RED4ext::v1::Sdk* g_sdk = nullptr;
 HWND g_window = nullptr;
 IDXGISwapChain4* g_selectedChain = nullptr; // Owned by Cyberpunk.
 std::vector<MSG> g_messages;
+std::vector<RawSample> g_rawSamples;
+RawInputBridge g_rawBridge;
+bool g_wasCapturingLastFrame = false;
 std::atomic_bool g_enabled{false};
 std::atomic_bool g_renderError{false};
 bool g_hooked = false;
@@ -110,9 +115,13 @@ bool IsFocused()
 
 void CloseOverlay()
 {
-    std::lock_guard lock(g_stateMutex);
-    g_gate.Close();
-    g_messages.clear();
+    {
+        std::lock_guard lock(g_stateMutex);
+        g_gate.Close();
+        g_messages.clear();
+        g_rawSamples.clear();
+    }
+    SetCursorCaptured(false);
 }
 
 void EmergencyDisable()
@@ -146,36 +155,6 @@ bool IsMouseMessage(UINT msg)
     }
 }
 
-// An input release may occur after a game key was pressed but before the
-// overlay opened. Always deliver those releases so the game cannot get stuck
-// treating a key or mouse button as held down.
-bool RawReleaseOrUnrelated(LPARAM param)
-{
-    UINT bytes = 0;
-    auto input = reinterpret_cast<HRAWINPUT>(param);
-    if (GetRawInputData(input, RID_INPUT, nullptr, &bytes, sizeof(RAWINPUTHEADER)) != 0 ||
-        bytes < sizeof(RAWINPUTHEADER) || bytes > sizeof(RAWINPUT) + 32)
-        return true; // Unknown input: never steal it from the game.
-    alignas(RAWINPUT) std::array<BYTE, sizeof(RAWINPUT) + 32> storage{};
-    if (GetRawInputData(input, RID_INPUT, storage.data(), &bytes, sizeof(RAWINPUTHEADER)) ==
-        static_cast<UINT>(-1))
-        return true;
-    const auto& data = *reinterpret_cast<const RAWINPUT*>(storage.data());
-    if (data.header.dwType == RIM_TYPEKEYBOARD)
-        return (data.data.keyboard.Flags & RI_KEY_BREAK) != 0;
-    if (data.header.dwType == RIM_TYPEMOUSE) {
-        const auto flags = data.data.mouse.usButtonFlags;
-        constexpr USHORT pressed = RI_MOUSE_LEFT_BUTTON_DOWN | RI_MOUSE_RIGHT_BUTTON_DOWN |
-                                   RI_MOUSE_MIDDLE_BUTTON_DOWN | RI_MOUSE_BUTTON_4_DOWN |
-                                   RI_MOUSE_BUTTON_5_DOWN;
-        constexpr USHORT released = RI_MOUSE_LEFT_BUTTON_UP | RI_MOUSE_RIGHT_BUTTON_UP |
-                                    RI_MOUSE_MIDDLE_BUTTON_UP | RI_MOUSE_BUTTON_4_UP |
-                                    RI_MOUSE_BUTTON_5_UP;
-        return (flags & pressed) == 0 && (flags & released) != 0;
-    }
-    return true; // Other HID events are not ours.
-}
-
 LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM lparam,
                                  UINT_PTR, DWORD_PTR)
 {
@@ -191,7 +170,11 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         std::lock_guard lock(g_stateMutex);
         g_gate.SetGameFocused(false);
         g_messages.clear();
+        g_rawSamples.clear();
+        // The OS cursor must be freed/restored without holding g_stateMutex.
     }
+    if (message == WM_KILLFOCUS || (message == WM_ACTIVATEAPP && !wparam))
+        SetCursorCaptured(false);
 
     if (g_enabled.load() && (message == WM_KEYDOWN || message == WM_SYSKEYDOWN)
         && wparam == VK_F11
@@ -239,10 +222,22 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     }
 
     if (capture && message == WM_INPUT) {
-        if (RawReleaseOrUnrelated(lparam))
+        RawSample sample{};
+        if (!DecodeRawInput(lparam, sample))
             return DefSubclassProc(window, message, wparam, lparam);
-        // Let Windows perform required RIM_INPUT cleanup. Raw key/button
-        // presses and movement are not delivered to the game while active.
+
+        // Copy raw data NOW, on the window thread. A HRAWINPUT handle may
+        // become invalid before the DX12 Present thread processes it.
+        {
+            std::lock_guard lock(g_stateMutex);
+            if (g_gate.MayCaptureInput() && g_rawSamples.size() < 1024)
+                g_rawSamples.push_back(sample);
+        }
+
+        if (ForwardToGame(sample))
+            return DefSubclassProc(window, message, wparam, lparam);
+        // Normal RIM_INPUT housekeeping; do not forward camera movement and
+        // key/button presses to Cyberpunk while m1core owns input.
         return DefWindowProcW(window, message, wparam, lparam);
     }
 
@@ -297,7 +292,9 @@ void DestroyGraphics()
         std::lock_guard lock(g_stateMutex);
         g_gate.SetRendererReady(false);
         g_messages.clear();
+        g_rawSamples.clear();
     }
+    SetCursorCaptured(false);
     auto& gfx = g_graphics;
     WaitForGpu();
     if (gfx.dx12Ready) ImGui_ImplDX12_Shutdown();
@@ -400,7 +397,7 @@ bool InitializeGraphics(IDXGISwapChain* swapchain)
         std::lock_guard lock(g_stateMutex);
         g_gate.SetRendererReady(true);
     }
-    Log("m1core overlay: renderer ready; F11 opens settings, ESC closes, Ctrl+Shift+F11 disables");
+    Log("m1core overlay: renderer ready; F11 toggle, ESC close, Ctrl+Shift+F11 emergency disable");
     return true;
 }
 
@@ -410,19 +407,37 @@ void ProcessHotkeys()
     const bool esc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
     const bool emergency = f11 && (GetAsyncKeyState(VK_CONTROL) & 0x8000) &&
                                     (GetAsyncKeyState(VK_SHIFT) & 0x8000);
-    if (emergency && !g_emergencyWasDown) EmergencyDisable();
+    if (emergency && !g_emergencyWasDown)
+        EmergencyDisable();
     g_emergencyWasDown = emergency;
 
-    std::lock_guard lock(g_stateMutex);
-    g_gate.SetGameFocused(IsFocused());
-    if (g_enabled.load()) {
-        if (f11 && !g_f11WasDown && !emergency)
-            g_gate.Toggle();
-        if (esc && !g_escapeWasDown)
-            g_gate.Escape();
+    bool capture = false;
+    {
+        std::lock_guard lock(g_stateMutex);
+        g_gate.SetGameFocused(IsFocused());
+        if (g_enabled.load()) {
+            if (f11 && !g_f11WasDown && !emergency)
+                g_gate.Toggle();
+            if (esc && !g_escapeWasDown)
+                g_gate.Escape();
+        }
+        capture = g_gate.MayCaptureInput();
+        if (!capture) {
+            g_messages.clear();
+            g_rawSamples.clear();
+        }
     }
     g_f11WasDown = f11;
     g_escapeWasDown = esc;
+
+    // Never call user32 trampolines while holding the state mutex. Both
+    // open and close transitions must update the game's cursor clip.
+    SetCursorCaptured(capture);
+
+    if (capture != g_wasCapturingLastFrame) {
+        g_rawBridge.Reset();
+        g_wasCapturingLastFrame = capture;
+    }
 }
 
 void Draw(IDXGISwapChain* swapchain)
@@ -440,10 +455,12 @@ void Draw(IDXGISwapChain* swapchain)
     if (!g_enabled.load()) return;
 
     std::vector<MSG> messages;
+    std::vector<RawSample> rawSamples;
     {
         std::lock_guard lock(g_stateMutex);
         if (!g_gate.MayCaptureInput()) return;
         messages.swap(g_messages);
+        rawSamples.swap(g_rawSamples);
     }
 
     auto& gfx = g_graphics;
@@ -456,12 +473,12 @@ void Draw(IDXGISwapChain* swapchain)
     if (frame.pendingFence && gfx.fence->GetCompletedValue() < frame.pendingFence)
         return;
 
-    for (const auto& event : messages)
-        ImGui_ImplWin32_WndProcHandler(event.hwnd, event.message, event.wParam, event.lParam);
-
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::GetIO().MouseDrawCursor = true;
+    // The game may use RIDEV_NOLEGACY and recenter the physical pointer.
+    // ImGui must instead consume the raw deltas, buttons, wheel and keys.
+    g_rawBridge.Feed(g_window, messages, rawSamples);
     ImGui::NewFrame();
     // The background is a separate full-viewport ImGui layer; mod settings
     // remain freely movable windows above it, as in CET.
@@ -572,6 +589,10 @@ bool OnRunningUpdate(RED4ext::CGameApplication*)
             return false;
         }
         g_hooked = true;
+        if (InstallCursorDetours(g_handle, g_sdk))
+            Log("m1core overlay: cursor recenter/clip detours installed");
+        else
+            Warn("m1core overlay: cursor detours unavailable; using RAWINPUT virtual cursor fallback");
         Log("m1core overlay: DXGI hooks installed (development opt-in)");
         return false;
     }
@@ -624,6 +645,7 @@ void StopOverlay()
 {
     g_enabled.store(false);
     CloseOverlay();
+    RemoveCursorDetours();
     if (g_hooked && g_sdk && g_sdk->hooking) {
         g_sdk->hooking->Detach(g_handle, g_resize1Target);
         g_sdk->hooking->Detach(g_handle, g_resizeTarget);
