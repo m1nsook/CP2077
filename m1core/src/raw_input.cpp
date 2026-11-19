@@ -55,7 +55,8 @@ void FeedRawKey(HWND window, const RawSample& sample)
     // RAWINPUT with RIDEV_NOLEGACY does not generate WM_CHAR. Translate only
     // printable key-downs. Flag 4 makes ToUnicodeEx avoid mutating dead-key
     // state on Windows 10+.
-    if (released || sample.vkey < VK_SPACE || sample.vkey >= VK_F1 ||
+    if (released || sample.vkey < VK_SPACE ||
+        (sample.vkey >= VK_F1 && sample.vkey <= VK_F24) ||
         (GetAsyncKeyState(VK_CONTROL) & 0x8000) ||
         (GetAsyncKeyState(VK_MENU) & 0x8000))
         return;
