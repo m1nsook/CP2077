@@ -337,6 +337,8 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
         g_settings = std::make_unique<m1core::Registry>(config);
         if (!g_settings->Load() && g_logger)
             g_logger->Warn(g_handle, "m1core: settings.json could not be read; defaults will be used");
+        if (!g_settings->LoadProfiles() && g_logger)
+            g_logger->Warn(g_handle, "m1core: profiles.json could not be read; profiles unavailable");
         RED4ext::CRTTISystem::Get()->AddPostRegisterCallback(RegisterNatives);
         m1core::StartOverlay(*g_settings, config.parent_path(), handle, sdk);
         if (g_logger)
