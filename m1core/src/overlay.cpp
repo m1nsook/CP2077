@@ -624,7 +624,7 @@ bool OnRunningUpdate(RED4ext::CGameApplication*)
             return false;
         }
         g_hooked = true;
-        if (InstallCursorDetours(g_handle, g_sdk))
+        if (InstallCursorDetours(g_handle, g_sdk, g_window))
             Log("m1core overlay: cursor recenter/clip detours installed");
         else
             Warn("m1core overlay: cursor detours unavailable; using RAWINPUT virtual cursor fallback");

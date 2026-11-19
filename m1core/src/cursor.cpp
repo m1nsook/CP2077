@@ -22,6 +22,7 @@ void* g_clipTarget = nullptr;
 RED4ext::v1::PluginHandle g_handle{};
 const RED4ext::v1::Sdk* g_sdk = nullptr;
 bool g_hooksInstalled = false;
+HWND g_gameWindow = nullptr;
 
 BOOL WINAPI SetCursorPosHook(int x, int y)
 {
@@ -50,7 +51,7 @@ BOOL WINAPI ClipCursorHook(const RECT* requested)
 }
 } // namespace
 
-bool InstallCursorDetours(RED4ext::v1::PluginHandle plugin, const RED4ext::v1::Sdk* sdk)
+bool InstallCursorDetours(RED4ext::v1::PluginHandle plugin, const RED4ext::v1::Sdk* sdk, HWND gameWindow)
 {
     if (g_hooksInstalled)
         return true;
@@ -66,6 +67,7 @@ bool InstallCursorDetours(RED4ext::v1::PluginHandle plugin, const RED4ext::v1::S
 
     g_handle = plugin;
     g_sdk = sdk;
+    g_gameWindow = gameWindow;
     const bool setPosOk = sdk->hooking->Attach(plugin, g_setPosTarget,
         reinterpret_cast<void*>(&SetCursorPosHook),
         reinterpret_cast<void**>(&g_originalSetPos));
@@ -115,7 +117,12 @@ void SetCursorCaptured(bool active)
             restore = g_restoreClip;
             hasRestore = g_hasRestoreClip;
         }
-        g_originalClip(hasRestore ? &restore : nullptr);
+        // Never trap the OS pointer inside the game's window after Alt+Tab.
+        // On return to the game, its own clip policy can resume.
+        if (!g_gameWindow || GetForegroundWindow() != g_gameWindow)
+            g_originalClip(nullptr);
+        else
+            g_originalClip(hasRestore ? &restore : nullptr);
     }
 }
 
@@ -133,5 +140,6 @@ void RemoveCursorDetours()
     g_setPosTarget = nullptr;
     g_clipTarget = nullptr;
     g_sdk = nullptr;
+    g_gameWindow = nullptr;
 }
 } // namespace m1core
