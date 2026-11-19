@@ -585,12 +585,13 @@ private func NetDeckWaveInfect(obj: ref<GameObject>, depth: Int32) -> Void {
     }
     NetDeckSiphon(this.GetGame(), this.netDeckWaveResult, false);
   } else if IsDefined(vehicle) {
-    if !vehicle.IsVehicleParked() {
-      // Same native command as the game's VehicleComponentPS
-      // OnVehicleOverrideForceBrakes callback. No TSFMV vehicle mask.
-      vehicle.ActivateNetrunnerQuickhack(VehicleNetrunnerQuickhackType.ForceBrakes);
-      this.netDeckWaveResult.vehicles += 1;
-    }
+    // Crash isolation 2026-11-19: ACR traced two crashes through
+    // OnNetDeckWaveTickEvent -> NetDeckWaveInfect ->
+    // VehicleObject.ActivateNetrunnerQuickhack (native game fault).
+    // Never call that native operation from automatic NETWORM fanout.
+    // An explicitly hacked vehicle can still act as the initial relay
+    // host, but NETWORM does not force-brake it in this test.
+    return;
   } else if IsDefined(device) {
     let ps: ref<ScriptableDeviceComponentPS> =
       device.GetDevicePS() as ScriptableDeviceComponentPS;
@@ -637,9 +638,10 @@ private func NetDeckQueuePreviewCandidate(obj: ref<GameObject>) -> Void {
      this.NetDeckScanRadius() {
     return;
   }
+  // Until the native vehicle quickhack is proven safe, only add
+  // hostile NPCs to the automatic wide-radius pre-scan queue.
   let npc: ref<NPCPuppet> = obj as NPCPuppet;
-  let vehicle: ref<VehicleObject> = obj as VehicleObject;
-  if !IsDefined(npc) && !IsDefined(vehicle) { return; }
+  if !IsDefined(npc) { return; }
   ArrayPush(this.netDeckWavePending, obj);
   ArrayPush(this.netDeckWavePendingDepths, 1);
 }
@@ -676,13 +678,8 @@ private func NetDeckPreviewNetwork() -> Void {
     if IsDefined(npc) { this.NetDeckQueuePreviewCandidate(npc); }
     i += 1;
   }
-  i = 0;
-  while i < ArraySize(this.netDeckLoadedVehicles) &&
-        ArraySize(this.netDeckWavePending) < this.NetDeckTargetLimit() {
-    let vehicle: ref<VehicleObject> = this.netDeckLoadedVehicles[i];
-    if IsDefined(vehicle) { this.NetDeckQueuePreviewCandidate(vehicle); }
-    i += 1;
-  }
+  // Do not pre-queue scanned vehicles while their native braking path
+  // is isolated. Explicit vehicle upload remains a valid entry point.
   this.netDeckWavePreviewCount =
     ArraySize(this.netDeckWaveSeen) + ArraySize(this.netDeckWavePending);
   if this.netDeckWavePreviewCount < 1 { this.netDeckWavePreviewCount = 1; }
@@ -884,9 +881,7 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
   while pre < ArraySize(this.netDeckWavePending) && !IsDefined(selected) {
     let candidate: ref<GameObject> = this.netDeckWavePending[pre];
     let candidateNpc: ref<NPCPuppet> = candidate as NPCPuppet;
-    let candidateVehicle: ref<VehicleObject> = candidate as VehicleObject;
-    if (IsDefined(candidateNpc) || IsDefined(candidateVehicle)) &&
-       this.NetDeckWaveValid(candidate) {
+    if IsDefined(candidateNpc) && this.NetDeckWaveValid(candidate) {
       selected = candidate;
       depth = this.netDeckWavePendingDepths[pre];
     }
@@ -947,7 +942,11 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
       if IsDefined(component) {
         let candidate: ref<GameObject> =
           component.GetEntity() as GameObject;
-        if this.NetDeckWaveValid(candidate) &&
+        // The generic targeting mask can return vehicles as Obj_Other.
+        // Never propagate an automatic hack to them while the native
+        // ActivateNetrunnerQuickhack crash is under investigation.
+        if !IsDefined(candidate as VehicleObject) &&
+           this.NetDeckWaveValid(candidate) &&
            Vector4.Distance(this.netDeckWaveOrigin, candidate.GetWorldPosition()) <= this.NetDeckScanRadius() {
           let j: Int32 = 0;
           while j < ArraySize(this.netDeckWaveHosts) {
@@ -992,30 +991,8 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
       }
       p += 1;
     }
-    // Cars are not reliably returned by TSFMV's generic object mask.
-    // Match loaded VehicleObjects explicitly using their world positions.
-    let k: Int32 = 0;
-    while k < ArraySize(this.netDeckLoadedVehicles) {
-      let car: ref<VehicleObject> = this.netDeckLoadedVehicles[k];
-      if IsDefined(car) && this.NetDeckWaveValid(car) &&
-         Vector4.Distance(this.netDeckWaveOrigin, car.GetWorldPosition()) <= this.NetDeckScanRadius() {
-        let host: Int32 = 0;
-        while host < ArraySize(this.netDeckWaveHosts) {
-          if this.netDeckWaveLinks[host] < this.NetDeckFanoutLimit() &&
-             this.netDeckWaveDepths[host] < 4 {
-            let distance: Float =
-              Vector4.Distance(this.netDeckWaveHosts[host], car.GetWorldPosition());
-            if distance <= nearest {
-              nearest = distance;
-              selected = car;
-              selectedHost = host;
-            }
-          }
-          host += 1;
-        }
-      }
-      k += 1;
-    }
+    // Vehicle auto-selection deliberately disabled for crash isolation.
+    // Keep the NPC/device selection and their configurable radii intact.
     if IsDefined(selected) && selectedHost >= 0 {
       this.netDeckWaveLinks[selectedHost] += 1;
       depth = this.netDeckWaveDepths[selectedHost] + 1;
@@ -1029,7 +1006,8 @@ protected cb func OnNetDeckWaveTickEvent(evt: ref<NetDeckWaveTickEvent>) -> Bool
     let index: Int32 = this.netDeckWavePendingCursor;
     this.netDeckWavePendingCursor += 1;
     let pendingCandidate: ref<GameObject> = this.netDeckWavePending[index];
-    if this.NetDeckWaveValid(pendingCandidate) {
+    if !IsDefined(pendingCandidate as VehicleObject) &&
+       this.NetDeckWaveValid(pendingCandidate) {
       selected = pendingCandidate;
       depth = this.netDeckWavePendingDepths[index];
     }
