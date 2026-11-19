@@ -15,9 +15,11 @@
 
 int main()
 {
-    const auto file = std::filesystem::temp_directory_path() / "m1core-registry-test.json";
+    const auto directory = std::filesystem::temp_directory_path() / "m1core-registry-tests";
+    const auto file = directory / "settings.json";
+    const auto profilesFile = directory / "profiles.json";
     std::error_code ignored;
-    std::filesystem::remove(file, ignored);
+    std::filesystem::remove_all(directory, ignored);
 
     {
         m1core::Registry registry(file);
@@ -87,6 +89,77 @@ int main()
     }
 
     {
+        // Profile names are JSON keys, never filesystem paths. Reject names
+        // with separators, controls, empty/oversized values, and bad spacing.
+        m1core::Registry registry(file);
+        CHECK(registry.Load());
+        CHECK(registry.LoadProfiles());
+        CHECK(registry.RegisterBool(1, 1, true));
+        CHECK(registry.RegisterEnum(1, 4, 1, {"Off", "Standard", "Stealth"}));
+        CHECK(registry.RegisterKeybind(1, 5, 118));
+        CHECK(!registry.SaveProfile(""));
+        CHECK(!registry.SaveProfile("/invalid"));
+        CHECK(!registry.SaveProfile(" bad "));
+        CHECK(!registry.SaveProfile(std::string(65, 'x')));
+        CHECK(registry.SaveProfile("Stealth"));
+
+        CHECK(registry.SetBool(1, 1, false));
+        CHECK(registry.SetEnum(1, 4, 0));
+        CHECK(registry.SetKeybind(1, 5, 119));
+        CHECK(registry.SaveProfile("Combat"));
+        CHECK(registry.ActivateProfile("Stealth"));
+        CHECK(registry.GetBool(1, 1) == true);
+        CHECK(registry.GetEnum(1, 4) == 2); // Saved enum came from original file.
+        CHECK(registry.GetKeybind(1, 5) == 0x72); // Original saved F3.
+        CHECK(registry.Save());
+        CHECK(!registry.ActivateProfile("Unknown"));
+        const auto names = registry.ListProfiles();
+        CHECK(names.size() == 2);
+        CHECK(names[0] == "Combat");
+        CHECK(names[1] == "Stealth");
+    }
+    {
+        m1core::Registry registry(file);
+        CHECK(registry.Load());
+        CHECK(registry.LoadProfiles());
+        CHECK(registry.ListProfiles().size() == 2);
+        CHECK(registry.RegisterBool(1, 1, true));
+        CHECK(registry.RegisterEnum(1, 4, 1, {"Off", "Standard", "Stealth"}));
+        CHECK(registry.RegisterKeybind(1, 5, 118));
+        CHECK(registry.ActivateProfile("Combat"));
+        CHECK(registry.GetBool(1, 1) == false);
+        CHECK(registry.GetEnum(1, 4) == 0);
+        CHECK(registry.GetKeybind(1, 5) == 119);
+        CHECK(registry.DeleteProfile("Stealth"));
+        CHECK(!registry.DeleteProfile("Stealth"));
+        CHECK(registry.ListProfiles().size() == 1);
+        CHECK(registry.Save());
+    }
+    {
+        m1core::Registry registry(file);
+        CHECK(registry.Load());
+        CHECK(registry.LoadProfiles());
+        CHECK(registry.ListProfiles().size() == 1);
+        // Loading a profile with a shorter enum safely clamps its index.
+        CHECK(registry.RegisterEnum(1, 4, 1, {"Off", "Standard"}));
+        CHECK(registry.ActivateProfile("Combat"));
+        CHECK(registry.GetEnum(1, 4) == 0);
+        CHECK(registry.GetEnum(1, 4) != std::nullopt);
+    }
+    {
+        std::ofstream output(profilesFile, std::ios::trunc);
+        output << "{ damaged profiles";
+    }
+    {
+        // An invalid profiles.json cannot break the existing settings.json.
+        m1core::Registry registry(file);
+        CHECK(!registry.LoadProfiles());
+        CHECK(registry.Load());
+        CHECK(registry.RegisterBool(1, 1, true));
+        CHECK(registry.GetBool(1, 1) == false);
+    }
+
+    {
         std::ofstream output(file, std::ios::trunc);
         output << "{ corrupt json";
     }
@@ -96,5 +169,5 @@ int main()
         CHECK(registry.RegisterBool(1, 1, true));
         CHECK(registry.GetBool(1, 1) == true);
     }
-    std::filesystem::remove(file, ignored);
+    std::filesystem::remove_all(directory, ignored);
 }
