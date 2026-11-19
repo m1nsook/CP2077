@@ -73,9 +73,9 @@ void StartCapture(Id mod, Id id)
         g_capture.wasDown[key] = (GetAsyncKeyState(key) & 0x8000) != 0;
 }
 
-void PollCapture(Registry& registry)
+bool PollCapture(Registry& registry)
 {
-    if (!g_capture.active) return;
+    if (!g_capture.active) return false;
     for (int key = 7; key < 256; ++key) {
         const bool down = (GetAsyncKeyState(key) & 0x8000) != 0;
         const bool rising = down && !g_capture.wasDown[key];
@@ -85,15 +85,16 @@ void PollCapture(Registry& registry)
         // shortcut; Escape only cancels *keybind capture*, never m1core itself.
         if (key == VK_ESCAPE) {
             g_capture.active = false;
-            return;
+            return false;
         }
         if (key == VK_F11 || key == VK_LWIN || key == VK_RWIN ||
             key == VK_MENU || key == VK_LMENU || key == VK_RMENU)
             continue;
-        registry.SetKeybind(g_capture.mod, g_capture.setting, key);
+        const bool saved = registry.SetKeybind(g_capture.mod, g_capture.setting, key);
         g_capture.active = false;
-        return;
+        return saved;
     }
+    return false;
 }
 
 bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
@@ -229,7 +230,7 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::SetNextItemWidth((std::max)(150.0F, ImGui::GetContentRegionAvail().x * 0.42F));
     ImGui::InputTextWithHint("##search", "Search mods and settings", search, sizeof(search));
     ImGui::SameLine();
-    auto tab = [&page](const char* name, Page value) {
+    auto tab = [](const char* name, Page value) {
         if (ImGui::Button(name)) page = value;
         if (page == value) {
             const auto a = ImGui::GetItemRectMin();
@@ -314,7 +315,7 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::SameLine();
     if (ImGui::Button("Close")) open = false;
     if (saveFailed) ImGui::TextUnformatted("Failed saving settings.json");
-    PollCapture(registry);
+    dirty |= PollCapture(registry);
     ImGui::End();
 }
 } // namespace m1core
