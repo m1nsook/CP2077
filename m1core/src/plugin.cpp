@@ -1,9 +1,10 @@
 #include "settings.hpp"
 #include "overlay.hpp"
 #include "diagnostics.hpp"
-#include <RED4ext/CNamePool.hpp>
 
 #include <RED4ext/RED4ext.hpp>
+#include <RED4ext/CName.hpp>
+#include <RED4ext/CNamePool.hpp>
 
 #include <Windows.h>
 #include <filesystem>
