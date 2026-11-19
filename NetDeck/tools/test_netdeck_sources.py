@@ -288,6 +288,7 @@ class InfiltrationSourceTests(unittest.TestCase):
         # but never auto-select or run the native force-braking operation.
         self.assertNotIn("VehicleNetrunnerQuickhackType.ForceBrakes", R)
         self.assertNotIn("vehicle.ActivateNetrunnerQuickhack(", R)
+        self.assertNotIn("ForceBrakesFor(", R)
         self.assertNotIn("this.netDeckLoadedVehicles[k]", R)
         self.assertNotIn("this.NetDeckQueuePreviewCandidate(vehicle)", R)
         self.assertNotIn("let candidateVehicle: ref<VehicleObject> = candidate as VehicleObject", R)
