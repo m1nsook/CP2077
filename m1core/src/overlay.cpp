@@ -669,12 +669,11 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
         return;
     }
     // A tiny local preview for testing the UI before external mods migrate.
-    registry.RegisterBool(RED4ext::CName("m1core.preview").hash,
-                          RED4ext::CName("Enabled").hash, true);
-    registry.RegisterInt(RED4ext::CName("m1core.preview").hash,
-                         RED4ext::CName("Level").hash, 5, 0, 20);
-    registry.RegisterFloat(RED4ext::CName("m1core.preview").hash,
-                           RED4ext::CName("Multiplier").hash, 1.0F, 0.5F, 5.0F);
+    const auto mod = RED4ext::CNamePool::Add("m1core.preview");
+    registry.RegisterBool(mod.hash, RED4ext::CNamePool::Add("Enabled").hash, true);
+    registry.RegisterInt(mod.hash, RED4ext::CNamePool::Add("Level").hash, 5, 0, 20);
+    registry.RegisterFloat(mod.hash, RED4ext::CNamePool::Add("Multiplier").hash,
+                           1.0F, 0.5F, 5.0F);
     g_enabled.store(true);
     Log("m1core overlay: opted in; waiting for Cyberpunk swap chain");
 }
