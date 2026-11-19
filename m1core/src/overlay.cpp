@@ -80,6 +80,7 @@ std::atomic_bool g_enabled{false};
 std::atomic_bool g_renderError{false};
 bool g_hooked = false;
 bool g_subclassed = false;
+bool g_loggedThreadMismatch = false;
 bool g_f10WasDown = false;
 bool g_escapeWasDown = false;
 bool g_emergencyWasDown = false;
@@ -377,6 +378,7 @@ bool InitializeGraphics(IDXGISwapChain* swapchain)
     ImGui::CreateContext();
     gfx.contextCreated = true;
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    ImGui::GetIO().IniFilename = nullptr; // Never write imgui.ini into the game directory.
     ImGui::StyleColorsDark();
     gfx.win32Ready = ImGui_ImplWin32_Init(g_window);
     if (!gfx.win32Ready) return false;
@@ -526,8 +528,13 @@ bool OnRunningUpdate(RED4ext::CGameApplication*)
             !IsWindow(chainData.windowHandle)) continue;
         // Win32 subclassing must run on the window-owning thread. If the
         // RED4ext Running callback uses another thread, do not install.
-        if (GetCurrentThreadId() != GetWindowThreadProcessId(chainData.windowHandle, nullptr))
+        if (GetCurrentThreadId() != GetWindowThreadProcessId(chainData.windowHandle, nullptr)) {
+            if (!g_loggedThreadMismatch) {
+                Warn("m1core overlay: RED4ext game callback is not the window thread; waiting (no input hook)");
+                g_loggedThreadMismatch = true;
+            }
             continue;
+        }
         g_window = chainData.windowHandle;
         g_selectedChain = chainData.swapChain.Get();
         if (!SetWindowSubclass(g_window, WindowSubclass, kSubclassId, 0)) {
