@@ -307,7 +307,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"m1core";
     info->author = L"m1nsook";
-    info->version = RED4EXT_V1_SEMVER(0, 3, 0);
+    info->version = RED4EXT_V1_SEMVER(0, 4, 0);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_2_50;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }
@@ -342,7 +342,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
         RED4ext::CRTTISystem::Get()->AddPostRegisterCallback(RegisterNatives);
         m1core::StartOverlay(*g_settings, config.parent_path(), handle, sdk);
         if (g_logger)
-            g_logger->Info(g_handle, "m1core 0.3.0-dev: settings API active; renderer opt-in");
+            g_logger->Info(g_handle, "m1core 0.4.0-dev: settings API active; renderer opt-in");
         return true;
     }
     case RED4ext::v1::EMainReason::Unload:

@@ -1,15 +1,16 @@
 # m1core — native settings foundation (development)
 
-**Status: experimental v0.3.0-dev, not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The F11 D3D12 ImGui overlay and cursor movement were **confirmed in-game**; new enum/keybind features are pending user verification. The supplied HTML demo is a *layout reference*, not the final visual design.
+**Status: experimental v0.4.0-dev, not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The F11 D3D12 ImGui overlay and cursor movement were **confirmed in-game**; enum dropdowns, tabs, and keybind persistence have also been confirmed in-game. The supplied HTML demo is a *layout reference*, not the final visual design.
 
 ## Architecture
 
 - `red4ext/plugins/m1core/m1core.dll` — one native plugin; no separate DLL per feature mod.
 - `r6/scripts/m1core/m1core.reds` — matching REDscript native declarations.
 - `red4ext/plugins/m1core/settings.json` — generated on save, shared across mods. Keys are persistent CName hashes and isolated per mod.
+- `red4ext/plugins/m1core/profiles.json` — separately managed named configuration snapshots; never included in an install ZIP, so updates do not overwrite user-created profiles.
 - `src/settings.*` — pure C++ registry with bool / Int32 / Float / enum / keybind (Win32 VK), clamping, resets, and schema-v1 JSON.
 - `src/plugin.cpp` — RED4ext lifecycle and registered native globals.
-- `src/ui.cpp` — Dear ImGui view layer with a searchable mod sidebar, bool/int/float controls, enum dropdowns, keybind capture, functional All Mods / Keybinds / About tabs, and save/reset. The opt-in D3D12 overlay can render this view; visual/UI behavior requires in-game verification.
+- `src/ui.cpp` — Dear ImGui view layer with a searchable mod sidebar, bool/int/float controls, enum dropdowns, keybind capture, functional All Mods / Keybinds / About tabs, and save/reset. The opt-in D3D12 overlay can render this view; the previous dropdowns and keybinds were tested in-game; profiles are the new untested feature.
 -  `src/overlay.cpp` — experimental DXGI Present/Resize hooks, game-window subclass, native Win32/D3D12 ImGui renderer, emergency-disable shortcut; opt-in only.
 - `src/cursor.cpp` — opt-in guarded user32 cursor release / recenter suppression while the overlay is open, restores the game's clip on close or focus loss; detour install failure leaves the virtual mouse fallback available.
 - `src/raw_input.cpp` — copies RAWINPUT on the window thread and injects relative mouse movement, button presses, wheel, raw-key input and text into ImGui on the render thread. It does not depend on the game exposing legacy WM_MOUSEMOVE / WM_LBUTTONDOWN events.
@@ -31,7 +32,7 @@ CMake downloads pinned RED4ext.SDK (revision `a34f0ad`, which defines game v2.50
 
 **Development prerequisite:** RED4ext, redscript compiler / redscript mod support, and Cyberpunk 2077 2.50. No CET or Mod Settings is required for the m1core library itself. Other mods may retain their own dependencies until migration.
 
-## Opt-in ImGui overlay preview — v0.3.0-dev
+## Opt-in ImGui overlay preview — v0.4.0-dev
 
 **Experimental development build.** The F11 overlay and cursor have been confirmed working in-game; the newer enum and keybind controls still require testing. This single development package includes `overlay.enable` for convenient UI testing. Remove that marker to run the settings API without graphics/input hooks.
 
@@ -51,6 +52,20 @@ The overlay has fail-closed focus rules and releases back-buffer references befo
 **In-game test:** the user confirmed the overlay and cursor controls work on 2026-11-19. F11 is the only normal keyboard open/close shortcut; Escape is not handled by m1core.
 
 **Known limitations:** cursor movement and basic overlay behavior work in-game, but broader compatibility tests are pending. The user32 hooks are process-wide while the preview is enabled, though they act only during m1core capture; they may interact with other overlay mods. Virtual cursor movement works from relative RAWINPUT even if OS cursor recenter suppression fails. Non-US keyboard layouts, IME composition, controller navigation, and third-party overlay coexistence still need testing. If the UI is visible but input behaves unexpectedly, press the emergency shortcut, exit the game, delete `overlay.enable` and send logs. Do not treat a successful CI build as proof that real input behavior is correct.
+
+## Named settings profiles (v0.4.0 development)
+
+The **Profiles** tab provides named configurations, such as `Stealth`, `Combat`, and `Exploration`. Each profile snapshots the current values of all registered settings plus any previously persisted settings from temporarily absent mods. Values are matched by mod ID, setting ID and type, and are clamped to the currently declared bounds on restore.
+
+- **Create from current settings:** Save a new name. The UI refuses duplicate names instead of silently overwriting.
+- **Load selected:** Apply saved values immediately and write `settings.json` so they survive restart.
+- **Overwrite selected:** Replace the saved snapshot only after a second confirmation click.
+- **Delete selected:** Delete only that named snapshot after confirmation; it does not change currently active mod settings.
+- **F11 to close:** Continues to save active settings automatically.
+
+Profiles are stored in a separate `profiles.json` beside `settings.json`, using a versioned schema and temporary-file replacement. Up to 24 profiles are supported; names may use UTF-8 (up to 64 bytes) but cannot contain control characters or path separators. A damaged or unexpectedly large profiles file does not prevent loading the plugin or the original settings.
+
+**Status:** this feature compiles and has automated unit tests, but still needs a short in-game UI test. The install package never includes `settings.json` or `profiles.json`, preserving both during updates.
 
 ## Enum & keybind API (v0.3.0 development)
 
@@ -111,7 +126,7 @@ The bindings are installed only with their matching DLL. Never ship the `.reds` 
 
 1. **Milestone 1 (compiled and launched):** native RED4ext plugin, versioned REDscript API, registry, persistence, CTest and Windows CI build; optional API/persistence runtime test awaiting results.
 2. **Milestone 2 (in-game validated):** opt-in D3D12/ImGui render path, guarded Win32 input, three exit mechanisms, game focus and resize handling. F11 toggle and mouse cursor were user-tested in game on 2026-11-19. The newer enum/keybind UI still requires runtime testing. F11 toggle, Close button, and emergency recovery must work; never leave game input blocked.
-3. **Milestone 3 (partially implemented):** searchable sidebar, separate Keybinds/About tabs, enum dropdowns and keybind capture. Profiles, richer grouping and final visual customization remain future work.
+3. **Milestone 3 (partially implemented):** searchable sidebar, separate Keybinds/Profiles/About tabs, enum dropdowns, keybind capture, and named profiles. Named profiles now exist; finer per-mod grouping and final visual customization remain future work.
 4. **Milestone 4:** live in-game validation, compatibility audit, test mod, release ZIP and API freeze.
 5. **After m1core is stable:** migrate existing CP2077 mods individually, maintaining their working behavior.
 
