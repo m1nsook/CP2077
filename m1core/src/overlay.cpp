@@ -16,6 +16,9 @@
 #include <backends/imgui_impl_dx12.h>
 #include <backends/imgui_impl_win32.h>
 
+// The ImGui Win32 backend intentionally leaves this declaration to callers.
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
+
 #include <algorithm>
 #include <array>
 #include <atomic>
