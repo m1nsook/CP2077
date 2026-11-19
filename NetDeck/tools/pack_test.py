@@ -51,14 +51,15 @@ INSTALL:
 9. Test connected security effects without any camera in the network.
 10. Check an unrelated network remains unaffected.
 11. AFTER confirming stable loading: test ONE NETWORM upload against a gang.
-    Several nearby enemies should get Tier 5 Sonic Shock at 2s intervals.
+    Several nearby enemies should receive Tier 5 Sonic Shock at the
+    configured interval (default 0.25s).
     Passive NPC and vehicle attach-based discovery was disabled for crash
     isolation, so spreading to targets not scanned may temporarily regress.
-    Check a moving car, a road barrier and a non-quest door separately.
+    Check a road barrier and a non-quest door separately.
     Confirm the experimental native upload bar closes after a finished hack.
     The old "EXTRACTED DATA" reward notification is still present.
-12. With Carhacker, verify NETWORM appears in the native vehicle scanner and
-    one moving car upload brakes and spreads to a second loaded car.
+12. With Carhacker, verify NETWORM appears in the vehicle scanner.
+    Vehicle NETWORM is now a safe entry/relay only, NOT a force-brake action.
 13. Confirm ordinary NETWORM is not traced; NetWatch still triggers five stars.
 14. Check €$ siphon totals and number of sources in the feedback.
 15. Normal Netrunner XP is allowed. Check crafting components awarded.
@@ -78,7 +79,7 @@ IMPORTANT LIMITATIONS:
   infection interval, max infections, maximum targets, and max fanout.
   Default scan 105m, jump radius 75m, interval 0.25s; "Club takeover"
   preset scans 145m and infects every 0.14s. Settings are live and persistent.
-- A bounded native pre-scan queues eligible loaded hostile NPCs/vehicles
+- A bounded native pre-scan queues eligible loaded hostile NPCs
   before the upload bar shows its discovered-target estimate. This is not
   a guarantee every NPC in the building is loaded/visible to the game.
 - The native quickhack's internal uploadTime/activationTime TweakDB property
@@ -94,8 +95,9 @@ IMPORTANT LIMITATIONS:
 - Uses Phantom Liberty's QuickHack.BaseBlackWallHack record for the NPC action.
 - Native Blackwall start/completion effects are cleared; confirm no lethal effect.
 - Repeating Ping network grid audio/VFX and per-hop reward notifications are removed.
-- Jumps run every 2.0 seconds and stop after at most 16 scheduled jumps.
-- The TARGETS count is NPCs + moving cars with dispatched effects; device actions have their own count.
+- Jumps default to every 0.25 seconds, with a max 100 steps; adjust in CET.
+- The HUD pre-scan targets count is an estimate of loaded eligible targets.
+  Device effects are counted separately; vehicle effects are disabled.
 - Loaded hostile-NPC fallback registers scanned or explicitly uploaded NPCs.
   Large-area pre-scan uses the native targeting system without world hooks.
 - Previous build's network shutdown, vendor and stats were user-confirmed.
@@ -108,10 +110,13 @@ IMPORTANT LIMITATIONS:
   pre-scan, 75m native relay hops, 100 steps and 120 affected entities.
   Change these values live using the CET overlay. Native network descendants
   also join the queue.
-- Loaded cars are registered on native vehicle scanner actions and direct
-  uploads, NOT global attach/detach. Unscanned car spread may regress.
+- Vehicle braking and automatic car infection are DISABLED for crash
+  isolation. Nov 19 ACR points to native ActivateNetrunnerQuickhack during
+  NetDeckWaveInfect. Cars may still be hacked as the entry/relay point,
+  but NETWORM does not brake them in this build. Vanilla car hacks remain.
 - Dedicated VehicleQuickHack requires Carhacker and equipped NetWatch Σ MK.1.
 - This is an unverified experimental build, not a confirmed gameplay fix.
+  If a crash persists, send the FULL Advanced Crash Reporter text.
 - Eurodollar siphon is a capped gameplay reward; it does not drain actual
   NPC inventories. Normal Netrunner XP gain is allowed.
 - Robotic NPC shutdown, drones and mechs are NOT yet covered.
