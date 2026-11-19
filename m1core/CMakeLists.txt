@@ -34,8 +34,14 @@ add_library(m1core_imgui STATIC
     ${dear_imgui_SOURCE_DIR}/imgui_draw.cpp
     ${dear_imgui_SOURCE_DIR}/imgui_tables.cpp
     ${dear_imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${dear_imgui_SOURCE_DIR}/backends/imgui_impl_dx12.cpp
+    ${dear_imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
 )
 target_include_directories(m1core_imgui PUBLIC "${dear_imgui_SOURCE_DIR}")
+if(WIN32)
+    target_link_libraries(m1core_imgui PUBLIC d3d12 dxgi d3dcompiler imm32)
+    target_compile_definitions(m1core_imgui PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
+endif()
 
 add_library(m1core_settings STATIC src/settings.cpp)
 target_include_directories(m1core_settings PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -45,8 +51,8 @@ if(WIN32)
 endif()
 
 if(WIN32)
-    add_library(m1core SHARED src/plugin.cpp src/ui.cpp)
-    target_link_libraries(m1core PRIVATE m1core_settings m1core_imgui RED4ext::SDK)
+    add_library(m1core SHARED src/plugin.cpp src/ui.cpp src/overlay.cpp)
+    target_link_libraries(m1core PRIVATE m1core_settings m1core_imgui RED4ext::SDK comctl32)
     target_compile_definitions(m1core PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE RED4EXT_HEADER_ONLY)
     set_target_properties(m1core PROPERTIES OUTPUT_NAME "m1core" PREFIX "")
 endif()

@@ -1,6 +1,6 @@
 # m1core — native settings foundation (development)
 
-**Status: prototype, not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified in-game with v0.1.0 on 2026-11-19. The native API has not yet been called from REDscript in-game, and there is **no visible overlay yet**. The supplied HTML demo is a *layout reference*, not the final visual design.
+**Status: experimental v0.2.0-dev, not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The first D3D12 ImGui renderer is now included, but is **not yet in-game verified**. The supplied HTML demo is a *layout reference*, not the final visual design.
 
 ## Architecture
 
@@ -9,7 +9,8 @@
 - `red4ext/plugins/m1core/settings.json` — generated on save, shared across mods. Keys are persistent CName hashes and isolated per mod.
 - `src/settings.*` — pure C++ registry with bool / Int32 / Float, clamping, resets, and schema-v1 JSON.
 - `src/plugin.cpp` — RED4ext lifecycle and registered native globals.
-- `src/ui.cpp` — Dear ImGui view layer with a searchable mod sidebar, bool/int/float controls and save/reset. This is not rendered in-game until D3D12 presentation and focus handling are implemented.
+- `src/ui.cpp` — Dear ImGui view layer with a searchable mod sidebar, bool/int/float controls and save/reset. The opt-in D3D12 overlay can render this view; visual/UI behavior requires in-game verification.
+- `src/overlay.cpp` — experimental DXGI Present/Resize hooks, game-window subclass, native Win32/D3D12 ImGui renderer, emergency-disable shortcut; opt-in only.
 - `tests/ingame/m1core_smoke.reds` — opt-in native API and persistence smoke test. **Not** shipped in the normal ZIP.
 
 Settings registration must happen before reading or setting values. A getter for an unregistered setting returns `false`, `0`, or `0.0`; setter methods return `false` on failure. Call `M1Core_SaveSettings()` after changes when appropriate. The plugin also saves on unload. Persistent settings for temporarily absent mods are retained.
@@ -24,9 +25,25 @@ cmake --build m1core/build --config Release --parallel
 ctest --test-dir m1core/build -C Release --output-on-failure
 ```
 
-CMake downloads pinned RED4ext.SDK (revision `a34f0ad`, which defines game v2.50), nlohmann/json v3.11.3, and Dear ImGui v1.92.4. CI creates a development ZIP containing the DLL and the bindings at game-root-relative paths.
+CMake downloads pinned RED4ext.SDK (revision `a34f0ad`, which defines game v2.50), nlohmann/json v3.11.3, and Dear ImGui v1.92.4 including the Win32 and D3D12 backends. CI creates a development ZIP containing the DLL and the bindings at game-root-relative paths.
 
 **Development prerequisite:** RED4ext, redscript compiler / redscript mod support, and Cyberpunk 2077 2.50. No CET or Mod Settings is required for the m1core library itself. Other mods may retain their own dependencies until migration.
+
+## Opt-in ImGui overlay preview — v0.2.0-dev
+
+**Not verified in-game. Do not install during important gameplay.** The usual `m1core-windows-x64-dev` package is still **headless**: it does not install `overlay.enable`, so it never creates graphics/window hooks.
+
+For a first UI test, GitHub Actions publishes **`m1core-overlay-preview-x64-dev`** as a separate artifact. It includes an `overlay.enable` file which explicitly enables the experimental DXGI Present/Resize renderer. The overlay adds temporary sample settings under `m1core.preview` to demonstrate the sidebar, toggle, integer slider and float slider before other mods migrate.
+
+- **F10** — toggle the settings window after it has initialized.
+- **Escape** — close immediately.
+- **Ctrl+Shift+F10** — emergency disable until game restart.
+- **Recovery before next launch:** delete `red4ext/plugins/m1core/overlay.enable`. This fully disables our graphics and window hooks, without removing m1core itself.
+- **Full uninstall:** remove the DLL and `m1core.reds` together.
+
+The overlay has fail-closed focus rules and releases back-buffer references before swap-chain resize. It only hooks when the RED4ext Running callback executes on the owner thread of the game window; if this thread check fails, it **does not** attach hooks. Normal builds contain the renderer code but leave it inactive.
+
+**Known limitations of this first renderer:** first in-game validation pending; mouse cursor capture and simultaneous third-party overlays need testing; overlay detection for other programs is not implemented yet. If the UI is visible but input behaves unexpectedly, press the emergency shortcut, exit the game, delete `overlay.enable` and send logs. Do not treat a successful CI build as proof that real input behavior is correct.
 
 ## Optional in-game native API test
 
@@ -54,7 +71,7 @@ The bindings are installed only with their matching DLL. Never ship the `.reds` 
 ## Roadmap
 
 1. **Milestone 1 (compiled and launched):** native RED4ext plugin, versioned REDscript API, registry, persistence, CTest and Windows CI build; optional API/persistence runtime test awaiting results.
-2. **Milestone 2 (in development):** settings view ready; safe D3D12/ImGui renderer with reliable game/overlay input ownership. Escape, close and emergency recovery must work; never leave game input blocked.
+2. **Milestone 2 (experimental):** opt-in D3D12/ImGui render path, guarded Win32 input, three exit mechanisms, game focus and resize handling. Still requires in-game verification. Escape, close and emergency recovery must work; never leave game input blocked.
 3. **Milestone 3:** searchable sidebar/grouped mod settings, keybinds, profiles, visual customization independent of the HTML demo.
 4. **Milestone 4:** live in-game validation, compatibility audit, test mod, release ZIP and API freeze.
 5. **After m1core is stable:** migrate existing CP2077 mods individually, maintaining their working behavior.
