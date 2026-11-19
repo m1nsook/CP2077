@@ -82,6 +82,7 @@ bool g_hooked = false;
 bool g_subclassed = false;
 bool g_f10WasDown = false;
 bool g_escapeWasDown = false;
+bool g_emergencyWasDown = false;
 PresentFn g_present = nullptr;
 ResizeFn g_resize = nullptr;
 Resize1Fn g_resize1 = nullptr;
@@ -193,6 +194,12 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     }
 
     if (capture && (IsKeyboardMessage(message) || IsMouseMessage(message))) {
+        // Forward release events to the game: a key held before opening
+        // the menu must never remain stuck after the menu is closed.
+        if (message == WM_KEYUP || message == WM_SYSKEYUP ||
+            message == WM_LBUTTONUP || message == WM_RBUTTONUP ||
+            message == WM_MBUTTONUP || message == WM_XBUTTONUP)
+            return DefSubclassProc(window, message, wparam, lparam);
         if (message == WM_SETCURSOR) {
             SetCursor(nullptr); // ImGui draws its own cursor while active.
             return TRUE;
@@ -369,7 +376,8 @@ void ProcessHotkeys()
     const bool esc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
     const bool emergency = f10 && (GetAsyncKeyState(VK_CONTROL) & 0x8000) &&
                                     (GetAsyncKeyState(VK_SHIFT) & 0x8000);
-    if (emergency && !g_f10WasDown) EmergencyDisable();
+    if (emergency && !g_emergencyWasDown) EmergencyDisable();
+    g_emergencyWasDown = emergency;
 
     std::lock_guard lock(g_stateMutex);
     g_gate.SetGameFocused(IsFocused());
