@@ -81,7 +81,7 @@ std::atomic_bool g_renderError{false};
 bool g_hooked = false;
 bool g_subclassed = false;
 bool g_loggedThreadMismatch = false;
-bool g_f10WasDown = false;
+bool g_f11WasDown = false;
 bool g_escapeWasDown = false;
 bool g_emergencyWasDown = false;
 PresentFn g_present = nullptr;
@@ -194,16 +194,16 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     }
 
     if (g_enabled.load() && (message == WM_KEYDOWN || message == WM_SYSKEYDOWN)
-        && wparam == VK_F10
+        && wparam == VK_F11
         && (GetAsyncKeyState(VK_CONTROL) & 0x8000)
         && (GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
         EmergencyDisable();
         return 0;
     }
 
-    // F10 is polled in the Present callback, because the game may use RAWINPUT
+    // F11 is polled in the Present callback, because the game may use RAWINPUT
     // (RIDEV_NOLEGACY) and never produce WM_KEYDOWN for the hotkey.
-    if (g_enabled.load() && IsKeyboardMessage(message) && wparam == VK_F10)
+    if (g_enabled.load() && IsKeyboardMessage(message) && wparam == VK_F11)
         return 0;
 
     bool capture = false;
@@ -400,15 +400,15 @@ bool InitializeGraphics(IDXGISwapChain* swapchain)
         std::lock_guard lock(g_stateMutex);
         g_gate.SetRendererReady(true);
     }
-    Log("m1core overlay: renderer ready; F10 opens settings, ESC closes, Ctrl+Shift+F10 disables");
+    Log("m1core overlay: renderer ready; F11 opens settings, ESC closes, Ctrl+Shift+F11 disables");
     return true;
 }
 
 void ProcessHotkeys()
 {
-    const bool f10 = (GetAsyncKeyState(VK_F10) & 0x8000) != 0;
+    const bool f11 = (GetAsyncKeyState(VK_F11) & 0x8000) != 0;
     const bool esc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
-    const bool emergency = f10 && (GetAsyncKeyState(VK_CONTROL) & 0x8000) &&
+    const bool emergency = f11 && (GetAsyncKeyState(VK_CONTROL) & 0x8000) &&
                                     (GetAsyncKeyState(VK_SHIFT) & 0x8000);
     if (emergency && !g_emergencyWasDown) EmergencyDisable();
     g_emergencyWasDown = emergency;
@@ -416,12 +416,12 @@ void ProcessHotkeys()
     std::lock_guard lock(g_stateMutex);
     g_gate.SetGameFocused(IsFocused());
     if (g_enabled.load()) {
-        if (f10 && !g_f10WasDown && !emergency)
+        if (f11 && !g_f11WasDown && !emergency)
             g_gate.Toggle();
         if (esc && !g_escapeWasDown)
             g_gate.Escape();
     }
-    g_f10WasDown = f10;
+    g_f11WasDown = f11;
     g_escapeWasDown = esc;
 }
 
@@ -463,6 +463,11 @@ void Draw(IDXGISwapChain* swapchain)
     ImGui_ImplWin32_NewFrame();
     ImGui::GetIO().MouseDrawCursor = true;
     ImGui::NewFrame();
+    // The background is a separate full-viewport ImGui layer; mod settings
+    // remain freely movable windows above it, as in CET.
+    const ImGuiIO& io = ImGui::GetIO();
+    ImGui::GetBackgroundDrawList()->AddRectFilled(
+        ImVec2(0.0F, 0.0F), io.DisplaySize, IM_COL32(0, 0, 0, 140));
     if (g_registry) RenderSettings(*g_registry);
     ImGui::Render();
 
