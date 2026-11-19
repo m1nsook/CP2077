@@ -10,6 +10,8 @@
 #include <array>
 #include <cctype>
 #include <cstdio>
+#include <map>
+#include <vector>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -181,15 +183,41 @@ bool DrawSettingsTable(Registry& registry, Id mod, const std::vector<SettingSnap
                        std::string_view query, bool onlyKeybinds)
 {
     bool changed = false;
+    // Group settings by the owning mod's optional category metadata. The
+    // underlying values, stable IDs and schema remain unchanged.
+    std::map<Id, std::vector<const SettingSnapshot*>> grouped;
+    for (const auto& setting : settings) {
+        if (onlyKeybinds && setting.kind != Kind::Keybind) continue;
+        if (!Matches(Label(setting.id), query)) continue;
+        grouped[setting.group].push_back(&setting);
+    }
+    std::vector<Id> order;
+    order.reserve(grouped.size());
+    for (const auto& [group, _] : grouped) order.push_back(group);
+    std::sort(order.begin(), order.end(), [](Id lhs, Id rhs) {
+        if (lhs == 0) return true;       // Ungrouped first.
+        if (rhs == 0) return false;
+        return Label(lhs) < Label(rhs);  // Actual category names, not hashes.
+    });
+
     if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg |
                           ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerH)) {
         ImGui::TableSetupColumn("Setting", ImGuiTableColumnFlags_WidthStretch, 0.45F);
         ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.55F);
         ImGui::TableHeadersRow();
-        for (const auto& setting : settings) {
-            if (onlyKeybinds && setting.kind != Kind::Keybind) continue;
-            if (!Matches(Label(setting.id), query)) continue;
-            changed |= DrawSetting(registry, mod, setting);
+
+        for (Id group : order) {
+            const auto& members = grouped.at(group);
+            if (group != 0 || order.size() > 1) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                const auto groupName = group == 0 ? std::string("General") : Label(group);
+                ImGui::TextDisabled("%s", groupName.c_str());
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextDisabled("%zu settings", members.size());
+            }
+            for (const auto* setting : members)
+                changed |= DrawSetting(registry, mod, *setting);
         }
         ImGui::EndTable();
     }
