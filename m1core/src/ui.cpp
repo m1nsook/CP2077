@@ -1,5 +1,6 @@
 #include "ui.hpp"
 #include "settings.hpp"
+#include "diagnostics.hpp"
 
 #include <RED4ext/CName.hpp>
 #include <RED4ext/CNamePool.hpp>
@@ -18,7 +19,7 @@
 
 namespace m1core {
 namespace {
-enum class Page { Mods, Keybinds, Profiles, About };
+enum class Page { Mods, Keybinds, Profiles, Logs, About };
 
 struct BindCapture {
     bool active = false;
@@ -260,6 +261,61 @@ bool ModMatches(const ModSnapshot& mod, std::string_view query, bool keybindsOnl
     return hasMatchingType && Matches(Label(mod.id), query);
 }
 
+void DrawLogs()
+{
+    static int minimum = 0;
+    static char search[128]{};
+    constexpr const char* levels[] = {"All", "Debug", "Info", "Warning", "Error"};
+
+    ImGui::BeginChild("diagnostics_panel", ImVec2(0.0F, -66.0F), ImGuiChildFlags_Borders);
+    ImGui::TextUnformatted("M1CORE DEBUG LOG");
+    ImGui::SameLine();
+    ImGui::TextDisabled("In-game events and native mod diagnostics");
+    ImGui::Separator();
+    ImGui::SetNextItemWidth(155.0F);
+    ImGui::Combo("Minimum severity", &minimum, levels, IM_ARRAYSIZE(levels));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth((std::max)(140.0F, ImGui::GetContentRegionAvail().x - 170.0F));
+    ImGui::InputTextWithHint("##logsearch", "Search source or message", search, sizeof(search));
+
+    const auto entries = Diagnostics::Get().Snapshot();
+    std::vector<std::string> lines;
+    for (const auto& event : entries) {
+        if (minimum && static_cast<int>(event.level) < minimum - 1) continue;
+        if (!Matches(event.source, search) && !Matches(event.message, search)) continue;
+        lines.push_back(event.timestamp + " [" + LogLevelName(event.level) + "] [" +
+                        event.source + "] " + event.message);
+    }
+    ImGui::TextDisabled("Showing %zu / %zu recent events", lines.size(), entries.size());
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Copy visible")) {
+        std::string copied;
+        for (const auto& line : lines) {
+            copied += line;
+            copied += '\n';
+        }
+        ImGui::SetClipboardText(copied.c_str());
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Clear panel"))
+        Diagnostics::Get().ClearView();
+    ImGui::TextDisabled("Disk log: red4ext/plugins/m1core/m1core.log (retained when panel clears)");
+    ImGui::Separator();
+
+    ImGui::BeginChild("log_lines", ImVec2(0.0F, 0.0F), ImGuiChildFlags_Borders);
+    if (lines.empty()) {
+        ImGui::TextDisabled("No events match the filter.");
+    } else {
+        ImGuiListClipper clipper;
+        clipper.Begin(static_cast<int>(lines.size()));
+        while (clipper.Step())
+            for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
+                ImGui::TextUnformatted(lines[static_cast<std::size_t>(i)].c_str());
+    }
+    ImGui::EndChild();
+    ImGui::EndChild();
+}
+
 void DrawProfiles(Registry& registry)
 {
     const auto names = registry.ListProfiles();
@@ -424,12 +480,16 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::SameLine();
     tab("Profiles", Page::Profiles);
     ImGui::SameLine();
+    tab("Logs", Page::Logs);
+    ImGui::SameLine();
     tab("About", Page::About);
     ImGui::Separator();
 
     const bool keybindsOnly = page == Page::Keybinds;
     if (page == Page::Profiles) {
         DrawProfiles(registry);
+    } else if (page == Page::Logs) {
+        DrawLogs();
     } else if (page != Page::About) {
         ImGui::BeginChild("mods_sidebar", ImVec2(220.0F, -66.0F), ImGuiChildFlags_Borders);
         ImGui::TextDisabled("REGISTERED MODS");

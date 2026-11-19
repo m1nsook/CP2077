@@ -34,6 +34,9 @@ public func M1Core_SmokeTest(stage: Int32) -> Int32 {
     }
 
     if stage == 1 {
+        if !M1Core_LogEvent(n"m1core.smoke", 1, "Native diagnostic smoke test") {
+            failed = failed + 268435456;
+        }
         if !M1Core_ResetSetting(n"m1core.smoke", n"Enabled") {
             failed = failed + 16;
         }

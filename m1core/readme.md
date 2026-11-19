@@ -82,6 +82,28 @@ The All Mods and Keybinds pages render categories in named sections. If a mod do
 
 The development preview now demonstrates General, Gameplay and Controls groups. These new grouping controls, along with the Profiles tab, still need an in-game UI test.
 
+## Native diagnostic log and in-game Logs panel (post-v0.4.0 development)
+
+The new **Logs** tab shows the last 512 diagnostic events, with source/message
+search, a minimum severity filter, clipboard copy, and a clear-panel button.
+A separate on-disk log is kept at `red4ext/plugins/m1core/m1core.log`
+and rotates at roughly 2 MiB to `m1core.log.previous`.
+Clearing the panel does **not** erase either disk log. Native startup,
+settings/profile load errors, and unload errors are journaled.
+
+m1nsook mods may write their own events with the REDscript native API:
+
+```redscript
+M1Core_LogEvent(n"ExampleMod", 1, "Initialized"); // Info
+M1Core_LogEvent(n"ExampleMod", 2, "Optional data unavailable"); // Warning
+```
+
+Levels: 0 Debug, 1 Info, 2 Warning, 3 Error. Invalid levels, empty
+messages, and strings longer than 2048 bytes are rejected. Logging is
+best-effort and has no CET dependency. These logs are a starting point for
+future crash-report attachments, not yet a crash handler, Advanced Crash
+Reporter integration, or arbitrary console command execution.
+
 ## Bulk reset controls (post-v0.4.0 development)
 
 The All Mods page has a two-click **Reset mod to defaults** action. Each named

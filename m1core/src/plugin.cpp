@@ -1,5 +1,7 @@
 #include "settings.hpp"
 #include "overlay.hpp"
+#include "diagnostics.hpp"
+#include <RED4ext/CNamePool.hpp>
 
 #include <RED4ext/RED4ext.hpp>
 
@@ -252,6 +254,28 @@ void SetSettingGroup(Scriptable*, Frame* frame, bool* out, int64_t)
     Output(out, g_settings && g_settings->SetGroup(mod.hash, id.hash, group.hash));
 }
 
+void WriteLog(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod;
+    std::int32_t level = 0;
+    RED4ext::CString message;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &level);
+    RED4ext::GetParameter(frame, &message);
+    frame->code++;
+    if (!mod.hash || level < 0 || level > 3 || message.Length() == 0 ||
+        message.Length() > 2048)
+    {
+        Output(out, false);
+        return;
+    }
+    const char* source = RED4ext::CNamePool::Get(mod);
+    Output(out, m1core::Diagnostics::Get().Write(
+        static_cast<m1core::LogLevel>(level),
+        source && *source ? source : "unknown-mod",
+        std::string_view(message.c_str(), message.Length())));
+}
+
 void Save(Scriptable*, Frame* frame, bool* out, int64_t)
 {
     frame->code++;
@@ -318,6 +342,8 @@ void RegisterNatives()
     RegisterNative("M1Core_SetSettingGroup", &SetSettingGroup,
                    {{"CName", "modName"}, {"CName", "settingId"},
                     {"CName", "groupName"}}, "Bool");
+    RegisterNative("M1Core_LogEvent", &WriteLog,
+                   {{"CName", "modName"}, {"Int32", "level"}, {"String", "message"}}, "Bool");
     RegisterNative("M1Core_SaveSettings", &Save, {}, "Bool");
 }
 
@@ -368,11 +394,24 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
                 g_logger->Error(g_handle, "m1core: unable to resolve plugin directory");
             return false;
         }
+        m1core::Diagnostics::Get().Initialize(config.parent_path());
+        m1core::Diagnostics::Get().Write(m1core::LogLevel::Info, "m1core",
+                                         "v0.4.0-dev loading; Cyberpunk 2.50");
         g_settings = std::make_unique<m1core::Registry>(config);
-        if (!g_settings->Load() && g_logger)
-            g_logger->Warn(g_handle, "m1core: settings.json could not be read; defaults will be used");
-        if (!g_settings->LoadProfiles() && g_logger)
-            g_logger->Warn(g_handle, "m1core: profiles.json could not be read; profiles unavailable");
+        if (!g_settings->Load())
+        {
+            if (g_logger)
+                g_logger->Warn(g_handle, "m1core: settings.json could not be read; defaults will be used");
+            m1core::Diagnostics::Get().Write(m1core::LogLevel::Warning, "m1core",
+                                              "settings.json unreadable; using defaults");
+        }
+        if (!g_settings->LoadProfiles())
+        {
+            if (g_logger)
+                g_logger->Warn(g_handle, "m1core: profiles.json could not be read; profiles unavailable");
+            m1core::Diagnostics::Get().Write(m1core::LogLevel::Warning, "m1core",
+                                              "profiles.json unreadable; profiles unavailable");
+        }
         RED4ext::CRTTISystem::Get()->AddPostRegisterCallback(RegisterNatives);
         m1core::StartOverlay(*g_settings, config.parent_path(), handle, sdk);
         if (g_logger)
@@ -381,8 +420,14 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
     }
     case RED4ext::v1::EMainReason::Unload:
         m1core::StopOverlay();
-        if (g_settings && !g_settings->Save() && g_logger)
-            g_logger->Warn(g_handle, "m1core: settings save failed");
+        if (g_settings && !g_settings->Save())
+        {
+            if (g_logger)
+                g_logger->Warn(g_handle, "m1core: settings save failed");
+            m1core::Diagnostics::Get().Write(m1core::LogLevel::Error, "m1core",
+                                              "settings save failed during unload");
+        }
+        m1core::Diagnostics::Get().Write(m1core::LogLevel::Info, "m1core", "plugin unloaded");
         g_settings.reset();
         return true;
     }

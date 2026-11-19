@@ -12,6 +12,8 @@ public static native func M1Core_SetIntSetting(modName: CName, settingId: CName,
 public static native func M1Core_SetFloatSetting(modName: CName, settingId: CName, value: Float) -> Bool;
 public static native func M1Core_ResetSetting(modName: CName, settingId: CName) -> Bool;
 public static native func M1Core_SaveSettings() -> Bool;
+// Diagnostic severity: Debug=0, Info=1, Warning=2, Error=3.
+public static native func M1Core_LogEvent(modName: CName, level: Int32, message: String) -> Bool;
 
 // Enum is zero-based; choices are UTF-8 labels separated by |, e.g. "Off|Low|High".
 public static native func M1Core_RegisterEnumSetting(modName: CName, settingId: CName, defaultIndex: Int32, choices: String) -> Bool;
