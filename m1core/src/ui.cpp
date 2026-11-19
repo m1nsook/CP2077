@@ -16,7 +16,7 @@
 
 namespace m1core {
 namespace {
-enum class Page { Mods, Keybinds, About };
+enum class Page { Mods, Keybinds, Profiles, About };
 
 struct BindCapture {
     bool active = false;
@@ -27,6 +27,12 @@ struct BindCapture {
 
 BindCapture g_capture;
 bool g_dirty = false;
+char g_newProfileName[80]{};
+std::string g_selectedProfile;
+std::string g_profileMessage;
+bool g_profileError = false;
+bool g_confirmOverwrite = false;
+bool g_confirmDelete = false;
 
 std::string Label(Id id)
 {
@@ -201,6 +207,128 @@ bool ModMatches(const ModSnapshot& mod, std::string_view query, bool keybindsOnl
     }
     return hasMatchingType && Matches(Label(mod.id), query);
 }
+
+void DrawProfiles(Registry& registry)
+{
+    const auto names = registry.ListProfiles();
+    if (!g_selectedProfile.empty() &&
+        std::find(names.begin(), names.end(), g_selectedProfile) == names.end())
+        g_selectedProfile.clear();
+
+    ImGui::BeginChild("profiles_panel", ImVec2(0.0F, -66.0F), ImGuiChildFlags_Borders);
+    ImGui::TextUnformatted("SETTINGS PROFILES");
+    ImGui::Separator();
+    ImGui::TextWrapped("Save different combinations of mod settings and keybinds, then restore them with one click.");
+    ImGui::Spacing();
+
+    ImGui::Text("Saved profiles: %zu / 24", names.size());
+    ImGui::SetNextItemWidth((std::max)(220.0F, ImGui::GetContentRegionAvail().x * 0.60F));
+    const auto selectedLabel = g_selectedProfile.empty() ? "Select a profile..." : g_selectedProfile.c_str();
+    if (ImGui::BeginCombo("Saved profile", selectedLabel)) {
+        for (const auto& name : names) {
+            if (ImGui::Selectable(name.c_str(), g_selectedProfile == name)) {
+                g_selectedProfile = name;
+                g_confirmOverwrite = false;
+                g_confirmDelete = false;
+                g_profileMessage.clear();
+            }
+        }
+        ImGui::EndCombo();
+    }
+
+    ImGui::SetNextItemWidth((std::max)(220.0F, ImGui::GetContentRegionAvail().x * 0.60F));
+    ImGui::InputTextWithHint("New profile name", "e.g. Stealth, Combat, Exploration",
+                             g_newProfileName, sizeof(g_newProfileName));
+
+    if (ImGui::Button("Create from current settings")) {
+        const std::string name(g_newProfileName);
+        if (std::find(names.begin(), names.end(), name) != names.end()) {
+            g_profileError = true;
+            g_profileMessage = "A profile already has that name. Select it to overwrite.";
+        } else if (registry.SaveProfile(name)) {
+            g_selectedProfile = name;
+            g_newProfileName[0] = '\0';
+            g_profileError = false;
+            g_profileMessage = "Profile created. Your current settings were saved.";
+        } else {
+            g_profileError = true;
+            g_profileMessage = "Could not create profile. Check name, available slots and disk permissions.";
+        }
+        g_confirmOverwrite = false;
+        g_confirmDelete = false;
+    }
+
+    ImGui::Spacing();
+    if (g_selectedProfile.empty())
+        ImGui::BeginDisabled();
+
+    if (ImGui::Button("Load selected")) {
+        if (!registry.ActivateProfile(g_selectedProfile)) {
+            g_profileError = true;
+            g_profileMessage = "Could not load the selected profile.";
+        } else {
+            const bool saved = registry.Save();
+            g_dirty = !saved;
+            g_profileError = !saved;
+            g_profileMessage = saved ? "Profile applied and settings.json saved."
+                                      : "Profile applied in memory, but settings.json could not be saved.";
+        }
+        g_capture.active = false;
+        g_confirmOverwrite = false;
+        g_confirmDelete = false;
+    }
+    ImGui::SameLine();
+
+    if (ImGui::Button(g_confirmOverwrite ? "Confirm overwrite" : "Overwrite selected")) {
+        if (g_confirmOverwrite) {
+            const bool ok = registry.SaveProfile(g_selectedProfile);
+            g_profileError = !ok;
+            g_profileMessage = ok ? "Profile updated from current settings."
+                                  : "Unable to overwrite profile.";
+            g_confirmOverwrite = false;
+        } else {
+            g_confirmOverwrite = true;
+            g_confirmDelete = false;
+            g_profileMessage = "Click Confirm overwrite to replace this profile's saved values.";
+            g_profileError = false;
+        }
+    }
+    ImGui::SameLine();
+
+    if (ImGui::Button(g_confirmDelete ? "Confirm delete" : "Delete selected")) {
+        if (g_confirmDelete) {
+            const bool ok = registry.DeleteProfile(g_selectedProfile);
+            g_profileError = !ok;
+            g_profileMessage = ok ? "Profile deleted. Current game settings are unchanged."
+                                  : "Unable to delete profile.";
+            if (ok) g_selectedProfile.clear();
+            g_confirmDelete = false;
+        } else {
+            g_confirmDelete = true;
+            g_confirmOverwrite = false;
+            g_profileMessage = "Click Confirm delete to permanently remove this profile.";
+            g_profileError = false;
+        }
+    }
+
+    if (g_selectedProfile.empty())
+        ImGui::EndDisabled();
+
+    ImGui::Spacing();
+    if (!g_profileMessage.empty()) {
+        if (g_profileError)
+            ImGui::TextWrapped("Error: %s", g_profileMessage.c_str());
+        else
+            ImGui::TextWrapped("%s", g_profileMessage.c_str());
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("Profiles: red4ext/plugins/m1core/profiles.json");
+    ImGui::TextWrapped("Profiles include values for registered and previously saved mods. "
+                       "They do not replace or delete settings.json. A loaded profile is "
+                       "automatically written to settings.json for the next game start.");
+    ImGui::EndChild();
+}
+
 } // namespace
 
 void RenderSettings(Registry& registry, bool& open)
@@ -242,11 +370,15 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::SameLine();
     tab("Keybinds", Page::Keybinds);
     ImGui::SameLine();
+    tab("Profiles", Page::Profiles);
+    ImGui::SameLine();
     tab("About", Page::About);
     ImGui::Separator();
 
     const bool keybindsOnly = page == Page::Keybinds;
-    if (page != Page::About) {
+    if (page == Page::Profiles) {
+        DrawProfiles(registry);
+    } else if (page != Page::About) {
         ImGui::BeginChild("mods_sidebar", ImVec2(220.0F, -66.0F), ImGuiChildFlags_Borders);
         ImGui::TextDisabled("REGISTERED MODS");
         ImGui::Separator();
@@ -321,6 +453,8 @@ void RenderSettings(Registry& registry, bool& open)
 void OnOverlayHidden(bool persisted)
 {
     g_capture.active = false;
+    g_confirmOverwrite = false;
+    g_confirmDelete = false;
     if (persisted) g_dirty = false;
 }
 
