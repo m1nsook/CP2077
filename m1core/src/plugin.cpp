@@ -225,6 +225,16 @@ void Reset(Scriptable*, Frame* frame, bool* out, int64_t)
     Output(out, g_settings && g_settings->Reset(mod.hash, id.hash));
 }
 
+void SetSettingGroup(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod, id, group;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    RED4ext::GetParameter(frame, &group);
+    frame->code++;
+    Output(out, g_settings && g_settings->SetGroup(mod.hash, id.hash, group.hash));
+}
+
 void Save(Scriptable*, Frame* frame, bool* out, int64_t)
 {
     frame->code++;
@@ -284,6 +294,9 @@ void RegisterNatives()
                    {{"CName", "modName"}, {"CName", "settingId"}, {"Float", "value"}}, "Bool");
     RegisterNative("M1Core_ResetSetting", &Reset,
                    {{"CName", "modName"}, {"CName", "settingId"}}, "Bool");
+    RegisterNative("M1Core_SetSettingGroup", &SetSettingGroup,
+                   {{"CName", "modName"}, {"CName", "settingId"},
+                    {"CName", "groupName"}}, "Bool");
     RegisterNative("M1Core_SaveSettings", &Save, {}, "Bool");
 }
 

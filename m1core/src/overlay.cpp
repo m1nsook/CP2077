@@ -683,6 +683,14 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
     registry.RegisterEnum(mod.hash, RED4ext::CNamePool::Add("Camera Mode").hash,
                           1, {"Off", "First Person", "Cinematic"});
     registry.RegisterKeybind(mod.hash, RED4ext::CNamePool::Add("Quick Action").hash, VK_F8);
+    const auto general = RED4ext::CNamePool::Add("General");
+    const auto gameplay = RED4ext::CNamePool::Add("Gameplay");
+    const auto controls = RED4ext::CNamePool::Add("Controls");
+    registry.SetGroup(mod.hash, RED4ext::CNamePool::Add("Enabled").hash, general.hash);
+    registry.SetGroup(mod.hash, RED4ext::CNamePool::Add("Level").hash, gameplay.hash);
+    registry.SetGroup(mod.hash, RED4ext::CNamePool::Add("Multiplier").hash, gameplay.hash);
+    registry.SetGroup(mod.hash, RED4ext::CNamePool::Add("Camera Mode").hash, gameplay.hash);
+    registry.SetGroup(mod.hash, RED4ext::CNamePool::Add("Quick Action").hash, controls.hash);
     g_enabled.store(true);
     Log("m1core overlay: opted in; waiting for Cyberpunk swap chain");
 }

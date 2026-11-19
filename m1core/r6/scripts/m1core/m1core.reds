@@ -22,3 +22,7 @@ public static native func M1Core_SetEnumSetting(modName: CName, settingId: CName
 public static native func M1Core_RegisterKeybindSetting(modName: CName, settingId: CName, defaultVirtualKey: Int32) -> Bool;
 public static native func M1Core_GetKeybindSetting(modName: CName, settingId: CName) -> Int32;
 public static native func M1Core_SetKeybindSetting(modName: CName, settingId: CName, virtualKey: Int32) -> Bool;
+
+// Optional display grouping (register the setting first). Group labels are
+// presentation metadata, not persisted values; mods should set them on startup.
+public static native func M1Core_SetSettingGroup(modName: CName, settingId: CName, groupName: CName) -> Bool;
