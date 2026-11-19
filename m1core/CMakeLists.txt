@@ -31,7 +31,7 @@ target_link_libraries(m1core_settings PUBLIC nlohmann_json::nlohmann_json)
 if(WIN32)
     add_library(m1core SHARED src/plugin.cpp)
     target_link_libraries(m1core PRIVATE m1core_settings RED4ext::SDK)
-    target_compile_definitions(m1core PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+    target_compile_definitions(m1core PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE RED4EXT_HEADER_ONLY)
     set_target_properties(m1core PROPERTIES OUTPUT_NAME "m1core" PREFIX "")
 endif()
 
