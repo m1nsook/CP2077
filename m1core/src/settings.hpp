@@ -82,6 +82,9 @@ public:
     bool SetKeybind(Id mod, Id id, std::int32_t virtualKey);
 
     bool Reset(Id mod, Id id);
+    // Bulk resets update only registered values. Call Save() to persist.
+    bool ResetMod(Id mod);
+    bool ResetGroup(Id mod, Id group);
     bool SetGroup(Id mod, Id id, Id group);
     std::vector<ModSnapshot> Snapshot() const;
 

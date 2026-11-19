@@ -225,6 +225,23 @@ void Reset(Scriptable*, Frame* frame, bool* out, int64_t)
     Output(out, g_settings && g_settings->Reset(mod.hash, id.hash));
 }
 
+void ResetModSettings(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod;
+    RED4ext::GetParameter(frame, &mod);
+    frame->code++;
+    Output(out, g_settings && g_settings->ResetMod(mod.hash));
+}
+
+void ResetGroupSettings(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod, group;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &group);
+    frame->code++;
+    Output(out, g_settings && g_settings->ResetGroup(mod.hash, group.hash));
+}
+
 void SetSettingGroup(Scriptable*, Frame* frame, bool* out, int64_t)
 {
     Name mod, id, group;
@@ -294,6 +311,10 @@ void RegisterNatives()
                    {{"CName", "modName"}, {"CName", "settingId"}, {"Float", "value"}}, "Bool");
     RegisterNative("M1Core_ResetSetting", &Reset,
                    {{"CName", "modName"}, {"CName", "settingId"}}, "Bool");
+    RegisterNative("M1Core_ResetModSettings", &ResetModSettings,
+                   {{"CName", "modName"}}, "Bool");
+    RegisterNative("M1Core_ResetGroupSettings", &ResetGroupSettings,
+                   {{"CName", "modName"}, {"CName", "groupName"}}, "Bool");
     RegisterNative("M1Core_SetSettingGroup", &SetSettingGroup,
                    {{"CName", "modName"}, {"CName", "settingId"},
                     {"CName", "groupName"}}, "Bool");

@@ -152,6 +152,46 @@ int main()
         CHECK(registry.GetEnum(1, 4) != std::nullopt);
     }
     {
+        // Bulk resets affect only the requested mod/group and persist
+        // existing schema-v1 values through Save/Load without touching peers.
+        const auto bulkFile = directory / "bulk.json";
+        m1core::Registry registry(bulkFile);
+        CHECK(registry.Load());
+        CHECK(registry.RegisterBool(10, 1, true));
+        CHECK(registry.RegisterInt(10, 2, 3, 0, 10));
+        CHECK(registry.RegisterKeybind(10, 3, 65));
+        CHECK(registry.RegisterBool(20, 1, true));
+        CHECK(registry.SetGroup(10, 1, 100));
+        CHECK(registry.SetGroup(10, 2, 100));
+        CHECK(registry.SetBool(10, 1, false));
+        CHECK(registry.SetInt(10, 2, 9));
+        CHECK(registry.SetKeybind(10, 3, 66));
+        CHECK(registry.SetBool(20, 1, false));
+        CHECK(!registry.ResetGroup(10, 999));
+        CHECK(!registry.ResetMod(999));
+        CHECK(registry.ResetGroup(10, 100));
+        CHECK(registry.GetBool(10, 1) == true);
+        CHECK(registry.GetInt(10, 2) == 3);
+        CHECK(registry.GetKeybind(10, 3) == 66);
+        CHECK(registry.GetBool(20, 1) == false);
+        CHECK(registry.ResetGroup(10, 0)); // Ungrouped.
+        CHECK(registry.GetKeybind(10, 3) == 65);
+        CHECK(registry.SetInt(10, 2, 8));
+        CHECK(registry.SetBool(10, 1, false));
+        CHECK(registry.ResetMod(10));
+        CHECK(registry.GetBool(10, 1) == true);
+        CHECK(registry.GetInt(10, 2) == 3);
+        CHECK(registry.GetBool(20, 1) == false);
+        CHECK(registry.Save());
+        m1core::Registry reloaded(bulkFile);
+        CHECK(reloaded.Load());
+        CHECK(reloaded.RegisterBool(10, 1, false));
+        CHECK(reloaded.RegisterBool(20, 1, true));
+        CHECK(reloaded.GetBool(10, 1) == true);
+        CHECK(reloaded.GetBool(20, 1) == false);
+    }
+
+    {
         std::ofstream output(profilesFile, std::ios::trunc);
         output << "{ damaged profiles";
     }

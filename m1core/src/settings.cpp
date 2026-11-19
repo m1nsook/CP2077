@@ -543,6 +543,34 @@ bool Registry::Reset(Id mod, Id id)
     setting->second.value = setting->second.defaultValue;
     return true;
 }
+bool Registry::ResetMod(Id mod)
+{
+    std::lock_guard lock(mutex_);
+    const auto module = registered_.find(mod);
+    if (module == registered_.end() || module->second.empty())
+        return false;
+    for (auto& [_, setting] : module->second)
+        setting.value = setting.defaultValue;
+    return true;
+}
+
+bool Registry::ResetGroup(Id mod, Id group)
+{
+    std::lock_guard lock(mutex_);
+    const auto module = registered_.find(mod);
+    if (module == registered_.end())
+        return false;
+    bool found = false;
+    for (auto& [_, setting] : module->second)
+    {
+        if (setting.group != group)
+            continue;
+        setting.value = setting.defaultValue;
+        found = true;
+    }
+    return found;
+}
+
 bool Registry::SetGroup(Id mod, Id id, Id group)
 {
     std::lock_guard lock(mutex_);

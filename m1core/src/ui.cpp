@@ -35,6 +35,10 @@ std::string g_profileMessage;
 bool g_profileError = false;
 bool g_confirmOverwrite = false;
 bool g_confirmDelete = false;
+bool g_confirmGroupReset = false;
+Id g_pendingGroupMod = 0;
+Id g_pendingGroup = 0;
+Id g_pendingModReset = 0;
 
 std::string Label(Id id)
 {
@@ -188,7 +192,10 @@ bool DrawSettingsTable(Registry& registry, Id mod, const std::vector<SettingSnap
     std::map<Id, std::vector<const SettingSnapshot*>> grouped;
     for (const auto& setting : settings) {
         if (onlyKeybinds && setting.kind != Kind::Keybind) continue;
-        if (!Matches(Label(setting.id), query)) continue;
+        if (!Matches(Label(setting.id), query) &&
+            !(setting.group != 0 && Matches(Label(setting.group), query)) &&
+            !(setting.group == 0 && Matches("General", query)))
+            continue;
         grouped[setting.group].push_back(&setting);
     }
     std::vector<Id> order;
@@ -215,6 +222,21 @@ bool DrawSettingsTable(Registry& registry, Id mod, const std::vector<SettingSnap
                 ImGui::TextDisabled("%s", groupName.c_str());
                 ImGui::TableSetColumnIndex(1);
                 ImGui::TextDisabled("%zu settings", members.size());
+                ImGui::SameLine();
+                ImGui::PushID(static_cast<int>(group));
+                const bool pending = g_confirmGroupReset &&
+                                     g_pendingGroupMod == mod && g_pendingGroup == group;
+                if (ImGui::SmallButton(pending ? "Confirm reset group" : "Reset group")) {
+                    if (pending) {
+                        changed |= registry.ResetGroup(mod, group);
+                        g_confirmGroupReset = false;
+                    } else {
+                        g_confirmGroupReset = true;
+                        g_pendingGroupMod = mod;
+                        g_pendingGroup = group;
+                    }
+                }
+                ImGui::PopID();
             }
             for (const auto* setting : members)
                 changed |= DrawSetting(registry, mod, *setting);
@@ -231,7 +253,9 @@ bool ModMatches(const ModSnapshot& mod, std::string_view query, bool keybindsOnl
     for (const auto& setting : mod.settings) {
         if (keybindsOnly && setting.kind != Kind::Keybind) continue;
         hasMatchingType = true;
-        if (Matches(Label(setting.id), query)) return true;
+        if (Matches(Label(setting.id), query) ||
+            (setting.group != 0 && Matches(Label(setting.group), query)) ||
+            (setting.group == 0 && Matches("General", query))) return true;
     }
     return hasMatchingType && Matches(Label(mod.id), query);
 }
@@ -434,6 +458,18 @@ void RenderSettings(Registry& registry, bool& open)
             ImGui::TextUnformatted(name.c_str());
             ImGui::SameLine();
             ImGui::TextDisabled("(%zu settings)", current->settings.size());
+            ImGui::SameLine();
+            const bool pendingReset = g_pendingModReset == current->id;
+            if (ImGui::SmallButton(pendingReset ? "Confirm reset mod" : "Reset mod to defaults")) {
+                if (pendingReset) {
+                    g_dirty |= registry.ResetMod(current->id);
+                    g_pendingModReset = 0;
+                    g_confirmGroupReset = false;
+                } else {
+                    g_pendingModReset = current->id;
+                    g_confirmGroupReset = false;
+                }
+            }
             ImGui::Separator();
             ImGui::PushID(std::to_string(current->id).c_str());
             // If the module name is what matched, show its full setting list.
@@ -483,6 +519,8 @@ void OnOverlayHidden(bool persisted)
     g_capture.active = false;
     g_confirmOverwrite = false;
     g_confirmDelete = false;
+    g_confirmGroupReset = false;
+    g_pendingModReset = 0;
     if (persisted) g_dirty = false;
 }
 

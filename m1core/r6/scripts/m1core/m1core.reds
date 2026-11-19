@@ -26,3 +26,7 @@ public static native func M1Core_SetKeybindSetting(modName: CName, settingId: CN
 // Optional display grouping (register the setting first). Group labels are
 // presentation metadata, not persisted values; mods should set them on startup.
 public static native func M1Core_SetSettingGroup(modName: CName, settingId: CName, groupName: CName) -> Bool;
+// Bulk resets change only the registered settings. SaveSettings() persists them.
+// The zero/unassigned group is also supported by ResetGroupSettings.
+public static native func M1Core_ResetModSettings(modName: CName) -> Bool;
+public static native func M1Core_ResetGroupSettings(modName: CName, groupName: CName) -> Bool;

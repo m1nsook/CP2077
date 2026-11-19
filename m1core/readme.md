@@ -82,6 +82,20 @@ The All Mods and Keybinds pages render categories in named sections. If a mod do
 
 The development preview now demonstrates General, Gameplay and Controls groups. These new grouping controls, along with the Profiles tab, still need an in-game UI test.
 
+## Bulk reset controls (post-v0.4.0 development)
+
+The All Mods page has a two-click **Reset mod to defaults** action. Each named
+group (including the default General section) has its own two-click **Reset
+group** action. These controls only reset currently registered settings to
+mod-declared defaults. Other mods and groups are left unchanged. The existing
+Save button or F11 close persists the reset values using the unchanged
+schema-v1 `settings.json` format. No profiles are removed or altered.
+
+Mod authors can call `M1Core_ResetModSettings(modName)` or
+`M1Core_ResetGroupSettings(modName, groupName)` and then
+`M1Core_SaveSettings()`. Group metadata must have been registered first.
+The settings search now matches group names as well as setting/mod names.
+
 ## Enum & keybind API (v0.3.0 development)
 
 Existing Bool, Int32 and Float APIs remain unchanged. The new optional types use their own
