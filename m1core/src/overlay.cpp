@@ -81,6 +81,7 @@ std::vector<MSG> g_messages;
 std::vector<RawSample> g_rawSamples;
 RawInputBridge g_rawBridge;
 bool g_wasCapturingLastFrame = false;
+UINT g_pendingFrames = 0;
 std::atomic_bool g_enabled{false};
 std::atomic_bool g_renderError{false};
 bool g_hooked = false;
@@ -440,15 +441,22 @@ void ProcessHotkeys()
     }
 }
 
+void DisableOverlayAfterRenderFailure(const char* reason)
+{
+    g_renderError.store(true);
+    g_enabled.store(false); // Also stop intercepting F11 and legacy input.
+    CloseOverlay();         // Always restore the game's cursor/clip.
+    Warn(reason);
+}
+
 void Draw(IDXGISwapChain* swapchain)
 {
     std::lock_guard renderLock(g_renderMutex);
     if (!g_enabled.load() || g_renderError.load()) return;
 
     if (!g_graphics.ready && !InitializeGraphics(swapchain)) {
-        g_renderError.store(true);
         DestroyGraphics();
-        Warn("m1core overlay: renderer initialization failed; overlay disabled for this launch");
+        DisableOverlayAfterRenderFailure("m1core overlay: renderer initialization failed; disabled safely");
         return;
     }
     ProcessHotkeys();
@@ -465,13 +473,23 @@ void Draw(IDXGISwapChain* swapchain)
 
     auto& gfx = g_graphics;
     ComPtr<IDXGISwapChain3> chain;
-    if (FAILED(swapchain->QueryInterface(IID_PPV_ARGS(&chain)))) return;
+    if (FAILED(swapchain->QueryInterface(IID_PPV_ARGS(&chain)))) {
+        DisableOverlayAfterRenderFailure("m1core overlay: swap chain query failed; disabling input capture");
+        return;
+    }
     const auto index = chain->GetCurrentBackBufferIndex();
-    if (index >= gfx.frames.size()) return;
+    if (index >= gfx.frames.size()) {
+        DisableOverlayAfterRenderFailure("m1core overlay: invalid back buffer index; disabling input capture");
+        return;
+    }
     auto& frame = gfx.frames[index];
     // Never reset a command allocator while the GPU is still using it.
-    if (frame.pendingFence && gfx.fence->GetCompletedValue() < frame.pendingFence)
+    if (frame.pendingFence && gfx.fence->GetCompletedValue() < frame.pendingFence) {
+        if (++g_pendingFrames > 120)
+            DisableOverlayAfterRenderFailure("m1core overlay: graphics queue stalled; disabling input capture");
         return;
+    }
+    g_pendingFrames = 0;
 
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
@@ -488,8 +506,14 @@ void Draw(IDXGISwapChain* swapchain)
     if (g_registry) RenderSettings(*g_registry);
     ImGui::Render();
 
-    if (FAILED(frame.allocator->Reset())) return;
-    if (FAILED(gfx.commandList->Reset(frame.allocator.Get(), nullptr))) return;
+    if (FAILED(frame.allocator->Reset())) {
+        DisableOverlayAfterRenderFailure("m1core overlay: allocator reset failed; disabling input capture");
+        return;
+    }
+    if (FAILED(gfx.commandList->Reset(frame.allocator.Get(), nullptr))) {
+        DisableOverlayAfterRenderFailure("m1core overlay: command list reset failed; disabling input capture");
+        return;
+    }
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = frame.buffer.Get();
@@ -503,11 +527,15 @@ void Draw(IDXGISwapChain* swapchain)
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), gfx.commandList.Get());
     std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
     gfx.commandList->ResourceBarrier(1, &barrier);
-    if (FAILED(gfx.commandList->Close())) return;
+    if (FAILED(gfx.commandList->Close())) {
+        DisableOverlayAfterRenderFailure("m1core overlay: command list close failed; disabling input capture");
+        return;
+    }
     ID3D12CommandList* lists[] = { gfx.commandList.Get() };
     gfx.queue->ExecuteCommandLists(1, lists);
     frame.pendingFence = ++gfx.nextFence;
-    gfx.queue->Signal(gfx.fence.Get(), frame.pendingFence);
+    if (FAILED(gfx.queue->Signal(gfx.fence.Get(), frame.pendingFence)))
+        DisableOverlayAfterRenderFailure("m1core overlay: command queue signal failed; disabling input capture");
 }
 
 HRESULT STDMETHODCALLTYPE PresentHook(IDXGISwapChain* chain, UINT sync, UINT flags)
