@@ -70,3 +70,32 @@ jobs:
           path: m1core/game-package/
           if-no-files-found: error
           retention-days: 7
+
+      # Verify the actual downloaded artifact, not just staging directory.
+      - name: Download package for layout verification
+        uses: actions/download-artifact@v4
+        with:
+          name: m1core-game-ready-x64-dev
+          path: m1core/verify-extract
+
+      - name: Verify ZIP has r6 and red4ext at its root
+        shell: pwsh
+        run: |
+          $root = "m1core/verify-extract"
+          $top = @(Get-ChildItem -LiteralPath $root -Directory | ForEach-Object { $_.Name } | Sort-Object)
+          if (($top -join ",") -ne "r6,red4ext") {
+            throw "Expected only r6/ and red4ext/ at ZIP root; found: $($top -join ', ')"
+          }
+          foreach ($file in @(
+            "r6/scripts/m1core/m1core.reds",
+            "r6/scripts/m1core/m1core_smoke.reds",
+            "red4ext/plugins/m1core/m1core.dll",
+            "red4ext/plugins/m1core/overlay.enable"
+          )) {
+            if (!(Test-Path -LiteralPath (Join-Path $root $file) -PathType Leaf)) {
+              throw "ZIP missing: $file"
+            }
+          }
+          if (Get-ChildItem -LiteralPath $root -Recurse -Filter "*.zip") {
+            throw "Nested ZIP found in downloaded artifact"
+          }
