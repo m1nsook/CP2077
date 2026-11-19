@@ -26,6 +26,7 @@ struct BindCapture {
 };
 
 BindCapture g_capture;
+bool g_dirty = false;
 
 std::string Label(Id id)
 {
@@ -209,7 +210,6 @@ void RenderSettings(Registry& registry, bool& open)
     static Id selected = 0;
     static Page page = Page::Mods;
     static bool saveFailed = false;
-    static bool dirty = false;
 
     const auto mods = registry.Snapshot();
     if (mods.empty()) selected = 0;
@@ -278,7 +278,7 @@ void RenderSettings(Registry& registry, bool& open)
             ImGui::PushID(std::to_string(current->id).c_str());
             // If the module name is what matched, show its full setting list.
             const std::string_view filter = Matches(name, search) ? std::string_view{} : search;
-            dirty |= DrawSettingsTable(registry, current->id, current->settings, filter, keybindsOnly);
+            g_dirty |= DrawSettingsTable(registry, current->id, current->settings, filter, keybindsOnly);
             ImGui::PopID();
         }
         ImGui::EndChild();
@@ -300,22 +300,28 @@ void RenderSettings(Registry& registry, bool& open)
     // Footer is a functional action area. Apply = immediate; Save persists to
     // JSON. The normal F11 close is handled by the overlay input gate.
     ImGui::Separator();
-    if (dirty) ImGui::TextUnformatted("Unsaved changes");
+    if (g_dirty) ImGui::TextUnformatted("Unsaved changes");
     else ImGui::TextDisabled("Settings applied in memory");
     ImGui::SameLine();
     if (ImGui::Button("Save")) {
         saveFailed = !registry.Save();
-        if (!saveFailed) dirty = false;
+        if (!saveFailed) g_dirty = false;
     }
     ImGui::SameLine();
     if (ImGui::Button("Save & Close")) {
         saveFailed = !registry.Save();
-        if (!saveFailed) { dirty = false; open = false; }
+        if (!saveFailed) { g_dirty = false; open = false; }
     }
     ImGui::SameLine();
     if (ImGui::Button("Close")) open = false;
     if (saveFailed) ImGui::TextUnformatted("Failed saving settings.json");
-    dirty |= PollCapture(registry);
+    g_dirty |= PollCapture(registry);
     ImGui::End();
 }
+void OnOverlayHidden(bool persisted)
+{
+    g_capture.active = false;
+    if (persisted) g_dirty = false;
+}
+
 } // namespace m1core

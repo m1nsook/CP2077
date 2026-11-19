@@ -411,20 +411,28 @@ void ProcessHotkeys()
     g_emergencyWasDown = emergency;
 
     bool capture = false;
+    bool closed = false;
     {
         std::lock_guard lock(g_stateMutex);
+        const bool wasOpen = g_gate.IsOpen();
         g_gate.SetGameFocused(IsFocused());
         if (g_enabled.load()) {
             if (f11 && !g_f11WasDown && !emergency)
                 g_gate.Toggle();
         }
         capture = g_gate.MayCaptureInput();
+        closed = wasOpen && !capture;
         if (!capture) {
             g_messages.clear();
             g_rawSamples.clear();
         }
     }
     g_f11WasDown = f11;
+
+    if (closed) {
+        const bool saved = g_registry && g_registry->Save();
+        OnOverlayHidden(saved);
+    }
 
     // Never call user32 trampolines while holding the state mutex. Both
     // open and close transitions must update the game's cursor clip.
@@ -507,8 +515,11 @@ void Draw(IDXGISwapChain* swapchain)
         ImVec2(0.0F, 0.0F), io.DisplaySize, IM_COL32(0, 0, 0, 140));
     bool windowOpen = true;
     if (g_registry) RenderSettings(*g_registry, windowOpen);
-    if (!windowOpen)
+    if (!windowOpen) {
+        const bool saved = g_registry && g_registry->Save();
+        OnOverlayHidden(saved);
         CloseOverlay();
+    }
     ImGui::Render();
 
     if (FAILED(frame.allocator->Reset())) {
