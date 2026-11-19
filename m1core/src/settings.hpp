@@ -51,6 +51,14 @@ public:
     bool Load();
     bool Save() const;
 
+    // Named snapshots of all currently known values, including temporarily
+    // unregistered mods. Profiles are stored independently of settings.json.
+    bool LoadProfiles();
+    bool SaveProfile(const std::string& name);
+    bool ActivateProfile(const std::string& name);
+    bool DeleteProfile(const std::string& name);
+    std::vector<std::string> ListProfiles() const;
+
     bool RegisterBool(Id mod, Id id, bool defaultValue);
     bool RegisterInt(Id mod, Id id, std::int32_t defaultValue, std::int32_t minValue, std::int32_t maxValue);
     bool RegisterFloat(Id mod, Id id, float defaultValue, float minValue, float maxValue);
@@ -78,15 +86,19 @@ private:
     using Settings = std::map<Id, Setting>;
     using Modules = std::map<Id, Settings>;
     using Values = std::map<Id, std::map<Id, std::pair<Kind, Value>>>;
+    using Profiles = std::map<std::string, Values>;
 
     bool Register(Id mod, Id id, Setting setting);
     bool Set(Id mod, Id id, Kind kind, Value value);
     std::optional<Value> Get(Id mod, Id id, Kind kind) const;
     static Value Clamp(const Setting& setting, Value value);
+    std::filesystem::path ProfilesPath() const;
+    bool WriteProfiles(const Profiles& profiles) const;
 
     std::filesystem::path file_;
     mutable std::mutex mutex_;
     Modules registered_;
     Values persisted_;
+    Profiles profiles_;
 };
 } // namespace m1core

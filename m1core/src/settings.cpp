@@ -95,6 +95,46 @@ json Encode(Kind kind, const Value& value)
     std::visit([&encoded](const auto& v) { encoded["value"] = v; }, value);
     return encoded;
 }
+
+bool ValidProfileName(std::string_view name)
+{
+    if (name.empty() || name.size() > 64 || name.front() == ' ' || name.back() == ' ')
+        return false;
+    for (unsigned char byte : name)
+        if (byte < 0x20 || byte == 0x7f || byte == '/' || byte == '\\')
+            return false;
+    return true;
+}
+
+bool WriteJsonAtomic(const std::filesystem::path& file, const json& doc)
+{
+    try
+    {
+        std::filesystem::create_directories(file.parent_path());
+        auto temporary = file;
+        temporary += ".tmp";
+        {
+            std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+            if (!output) return false;
+            output << doc.dump(2) << '\n';
+            output.flush();
+            if (!output) return false;
+        }
+#ifdef _WIN32
+        if (!MoveFileExW(temporary.c_str(), file.c_str(),
+                         MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        {
+            std::error_code ignored;
+            std::filesystem::remove(temporary, ignored);
+            return false;
+        }
+#else
+        std::filesystem::rename(temporary, file);
+#endif
+        return true;
+    }
+    catch (...) { return false; }
+}
 } // namespace
 
 Registry::Registry(std::filesystem::path file) : file_(std::move(file)) {}
@@ -167,34 +207,162 @@ bool Registry::Save() const
                 mod[Key(id)] = Encode(setting.first, setting.second);
         }
 
-        std::filesystem::create_directories(file_.parent_path());
-        auto temporary = file_;
-        temporary += ".tmp";
-        {
-            std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
-            if (!output)
-                return false;
-            output << doc.dump(2) << '\n';
-            output.flush();
-            if (!output)
-                return false;
-        }
-#ifdef _WIN32
-        if (!MoveFileExW(temporary.c_str(), file_.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-        {
-            std::error_code ignored;
-            std::filesystem::remove(temporary, ignored);
-            return false;
-        }
-#else
-        std::filesystem::rename(temporary, file_);
-#endif
-        return true;
+        return WriteJsonAtomic(file_, doc);
     }
     catch (...)
     {
         return false;
     }
+}
+
+std::filesystem::path Registry::ProfilesPath() const
+{
+    auto profiles = file_;
+    profiles.replace_filename("profiles.json");
+    return profiles;
+}
+
+bool Registry::WriteProfiles(const Profiles& profiles) const
+{
+    json doc = {{"schemaVersion", 1}, {"profiles", json::object()}};
+    for (const auto& [name, mods] : profiles)
+    {
+        auto& profile = doc["profiles"][name];
+        profile = json::object();
+        for (const auto& [modId, settings] : mods)
+        {
+            auto& mod = profile[Key(modId)];
+            mod = json::object();
+            for (const auto& [id, value] : settings)
+                mod[Key(id)] = Encode(value.first, value.second);
+        }
+    }
+    return WriteJsonAtomic(ProfilesPath(), doc);
+}
+
+bool Registry::LoadProfiles()
+{
+    try
+    {
+        const auto path = ProfilesPath();
+        if (!std::filesystem::exists(path))
+        {
+            std::lock_guard lock(mutex_);
+            profiles_.clear();
+            return true;
+        }
+        // A damaged or unexpectedly large file must not stop game startup.
+        if (std::filesystem::file_size(path) > 4 * 1024 * 1024)
+            return false;
+        std::ifstream input(path, std::ios::binary);
+        if (!input) return false;
+        const auto doc = json::parse(input);
+        if (!doc.is_object() || !doc.contains("schemaVersion") ||
+            !doc["schemaVersion"].is_number_integer() ||
+            doc["schemaVersion"].get<int>() != 1 ||
+            !doc.contains("profiles") || !doc["profiles"].is_object())
+            return false;
+
+        Profiles loaded;
+        for (const auto& [name, modules] : doc["profiles"].items())
+        {
+            if (!ValidProfileName(name) || !modules.is_object())
+                continue;
+            if (loaded.size() >= 24)
+                break;
+            Values values;
+            for (const auto& [modText, settings] : modules.items())
+            {
+                const auto modId = ParseKey(modText);
+                if (!modId || !settings.is_object()) continue;
+                for (const auto& [idText, entry] : settings.items())
+                {
+                    const auto id = ParseKey(idText);
+                    const auto decoded = Decode(entry);
+                    if (id && decoded)
+                        values[*modId][*id] = *decoded;
+                }
+            }
+            if (!values.empty())
+                loaded.emplace(name, std::move(values));
+        }
+        std::lock_guard lock(mutex_);
+        profiles_ = std::move(loaded);
+        return true;
+    }
+    catch (...) { return false; }
+}
+
+bool Registry::SaveProfile(const std::string& name)
+{
+    if (!ValidProfileName(name)) return false;
+    std::lock_guard lock(mutex_);
+    if (!profiles_.contains(name) && profiles_.size() >= 24)
+        return false;
+    Values values = persisted_;
+    // Overlay the latest values for registered mods, not stale disk state.
+    for (const auto& [modId, settings] : registered_)
+        for (const auto& [id, setting] : settings)
+            values[modId][id] = {setting.kind, setting.value};
+    if (values.empty())
+        return false;
+
+    auto next = profiles_;
+    next[name] = std::move(values);
+    if (!WriteProfiles(next))
+        return false;
+    profiles_ = std::move(next);
+    return true;
+}
+
+bool Registry::ActivateProfile(const std::string& name)
+{
+    std::lock_guard lock(mutex_);
+    const auto found = profiles_.find(name);
+    if (found == profiles_.end()) return false;
+    for (const auto& [modId, settings] : found->second)
+        for (const auto& [id, stored] : settings)
+        {
+            const auto module = registered_.find(modId);
+            if (module != registered_.end())
+            {
+                const auto current = module->second.find(id);
+                if (current != module->second.end())
+                {
+                    // Never corrupt an existing setting whose type changed.
+                    if (current->second.kind != stored.first)
+                        continue;
+                    current->second.value = Clamp(current->second, stored.second);
+                    persisted_[modId][id] = {stored.first, current->second.value};
+                    continue;
+                }
+            }
+            // Preserve values for mods that are installed but do not
+            // currently register settings; they take effect on registration.
+            persisted_[modId][id] = stored;
+        }
+    return true;
+}
+
+bool Registry::DeleteProfile(const std::string& name)
+{
+    std::lock_guard lock(mutex_);
+    if (!profiles_.contains(name)) return false;
+    auto next = profiles_;
+    next.erase(name);
+    if (!WriteProfiles(next)) return false;
+    profiles_ = std::move(next);
+    return true;
+}
+
+std::vector<std::string> Registry::ListProfiles() const
+{
+    std::lock_guard lock(mutex_);
+    std::vector<std::string> names;
+    names.reserve(profiles_.size());
+    for (const auto& [name, _] : profiles_)
+        names.push_back(name);
+    return names;
 }
 
 Value Registry::Clamp(const Setting& setting, Value value)
