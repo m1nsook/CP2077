@@ -1,6 +1,6 @@
 # m1core — native settings foundation (development)
 
-**Status: experimental v0.3.0-dev, not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The first D3D12 ImGui renderer is now included, but is **not yet in-game verified**. The supplied HTML demo is a *layout reference*, not the final visual design.
+**Status: experimental v0.3.0-dev, not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The F11 D3D12 ImGui overlay and cursor movement were **confirmed in-game**; new enum/keybind features are pending user verification. The supplied HTML demo is a *layout reference*, not the final visual design.
 
 ## Architecture
 
@@ -27,15 +27,17 @@ cmake --build m1core/build --config Release --parallel
 ctest --test-dir m1core/build -C Release --output-on-failure
 ```
 
-CMake downloads pinned RED4ext.SDK (revision `a34f0ad`, which defines game v2.50), nlohmann/json v3.11.3, and Dear ImGui v1.92.4 including the Win32 and D3D12 backends. CI creates a development ZIP containing the DLL and the bindings at game-root-relative paths.
+CMake downloads pinned RED4ext.SDK (revision `a34f0ad`, which defines game v2.50), nlohmann/json v3.11.3, and Dear ImGui v1.92.4 including the Win32 and D3D12 backends. CI uploads one game-ready artifact ZIP with `r6/` and `red4ext/` directly at its root; there are no inner ZIPs.
 
 **Development prerequisite:** RED4ext, redscript compiler / redscript mod support, and Cyberpunk 2077 2.50. No CET or Mod Settings is required for the m1core library itself. Other mods may retain their own dependencies until migration.
 
 ## Opt-in ImGui overlay preview — v0.3.0-dev
 
-**New cursor/input build not yet verified in-game. Do not install during important gameplay.** The usual `m1core-windows-x64-dev` package is still **headless**: it does not install `overlay.enable`, so it never creates graphics/window hooks.
+**Experimental development build.** The F11 overlay and cursor have been confirmed working in-game; the newer enum and keybind controls still require testing. This single development package includes `overlay.enable` for convenient UI testing. Remove that marker to run the settings API without graphics/input hooks.
 
-For a first UI test, GitHub Actions publishes **`m1core-overlay-preview-x64-dev`** as a separate artifact. It includes an `overlay.enable` file which explicitly enables the experimental DXGI Present/Resize renderer. The overlay adds temporary sample settings under `m1core.preview` to demonstrate the sidebar, toggle, integer/float sliders, enum dropdown and keybind capture before other mods migrate.
+For testing, download the single **`m1core-game-ready-x64-dev`** artifact from the latest successful GitHub Actions run **by clicking the artifact name, not "Download all"**. GitHub already delivers a ZIP, so extract it **once** into the Cyberpunk 2077 game root. The ZIP begins directly with `r6/` and `red4ext/`; there is no extra wrapper folder, nested ZIP, or manual assembly.
+
+The dev ZIP includes the native DLL, matching REDscript API, optional smoke-test helper, and `overlay.enable`. The smoke helper performs no actions until explicitly invoked from a test console. It also includes temporary sample settings under `m1core.preview` to demonstrate bool/int/float sliders, an enum dropdown and keybind capture before mods migrate.
 
 - **F11** — open or close the settings window with the same key.
 - **Ctrl+Shift+F11** — emergency disable until game restart.
@@ -48,7 +50,7 @@ The overlay has fail-closed focus rules and releases back-buffer references befo
 
 **In-game test:** the user confirmed the overlay and cursor controls work on 2026-11-19. F11 is the only normal keyboard open/close shortcut; Escape is not handled by m1core.
 
-**Known limitations:** this cursor rewrite has not been verified in-game. The user32 hooks are process-wide while the preview is enabled, though they act only during m1core capture; they may interact with other overlay mods. Virtual cursor movement works from relative RAWINPUT even if OS cursor recenter suppression fails. Non-US keyboard layouts, IME composition, controller navigation, and third-party overlay coexistence still need testing. If the UI is visible but input behaves unexpectedly, press the emergency shortcut, exit the game, delete `overlay.enable` and send logs. Do not treat a successful CI build as proof that real input behavior is correct.
+**Known limitations:** cursor movement and basic overlay behavior work in-game, but broader compatibility tests are pending. The user32 hooks are process-wide while the preview is enabled, though they act only during m1core capture; they may interact with other overlay mods. Virtual cursor movement works from relative RAWINPUT even if OS cursor recenter suppression fails. Non-US keyboard layouts, IME composition, controller navigation, and third-party overlay coexistence still need testing. If the UI is visible but input behaves unexpectedly, press the emergency shortcut, exit the game, delete `overlay.enable` and send logs. Do not treat a successful CI build as proof that real input behavior is correct.
 
 ## Enum & keybind API (v0.3.0 development)
 
@@ -78,18 +80,20 @@ M1Core_SetKeybindSetting(n"ExampleMod", n"Action", 118);
 - The preview registers `Camera Mode` and `Quick Action` fields to validate
   the dropdown, key capture and two-phase settings persistence.
 - The v0.3.0 C++ build and CTest cover these types; **new REDscript native calls still
-  require in-game verification** after installing the matching DLL and `.reds`.
+  require in-game verification** after installing the single matching dev package.
 
 ## Optional in-game native API test
 
-The CI workflow produces a second, separately labeled artifact `m1core-smoke-test-x64-dev`. It includes the same DLL/bindings plus the test-only `m1core_smoke.reds` helper. The normal build does not include the helper.
+The **same single development ZIP** contains `r6/scripts/m1core/m1core_smoke.reds`.
+The helper does nothing unless you explicitly call it; CET is only a test console,
+not a runtime dependency of m1core.
 
-1. When ready to test, install the **smoke-test ZIP**, not both ZIPs, into the game root and load a save.
-2. In CET console run `print(Game.GetPlayer():M1Core_SmokeTest(1))`. Expected result is **0**. It tests native registration/getters/setters/reset and writes test values to `red4ext/plugins/m1core/settings.json`.
-3. Fully close the game, relaunch, and load the save. Run `print(Game.GetPlayer():M1Core_SmokeTest(2))`. Expected result is **0** if saved values survived restart.
-4. Delete `r6/scripts/m1core/m1core_smoke.reds` after testing; the test does not change gameplay, inventory, or quest state.
+1. Install the **one** game-ready ZIP into the game root and load a save.
+2. In CET console run `print(Game.GetPlayer():M1Core_SmokeTest(1))`. Result **0** means the native API can register, get, set, reset, and save test settings.
+3. Close the game, restart, and load a save. Run `print(Game.GetPlayer():M1Core_SmokeTest(2))`. Result **0** means values persisted across restart.
+4. Delete `r6/scripts/m1core/m1core_smoke.reds` whenever you no longer need this optional test helper.
 
-A nonzero result is a failure bitmask and should be reported with the m1core/RED4ext/redscript logs. This test is opt-in because CET is used only as a test console, never as an m1core runtime dependency.
+**Safe recovery:** delete `red4ext/plugins/m1core/overlay.enable` and restart to turn off UI/input hooks while keeping the core settings DLL installed.
 
 ## API example
 
