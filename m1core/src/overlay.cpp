@@ -145,6 +145,36 @@ bool IsMouseMessage(UINT msg)
     }
 }
 
+// An input release may occur after a game key was pressed but before the
+// overlay opened. Always deliver those releases so the game cannot get stuck
+// treating a key or mouse button as held down.
+bool RawReleaseOrUnrelated(LPARAM param)
+{
+    UINT bytes = 0;
+    auto input = reinterpret_cast<HRAWINPUT>(param);
+    if (GetRawInputData(input, RID_INPUT, nullptr, &bytes, sizeof(RAWINPUTHEADER)) != 0 ||
+        bytes < sizeof(RAWINPUTHEADER) || bytes > sizeof(RAWINPUT) + 32)
+        return true; // Unknown input: never steal it from the game.
+    alignas(RAWINPUT) std::array<BYTE, sizeof(RAWINPUT) + 32> storage{};
+    if (GetRawInputData(input, RID_INPUT, storage.data(), &bytes, sizeof(RAWINPUTHEADER)) ==
+        static_cast<UINT>(-1))
+        return true;
+    const auto& data = *reinterpret_cast<const RAWINPUT*>(storage.data());
+    if (data.header.dwType == RIM_TYPEKEYBOARD)
+        return (data.data.keyboard.Flags & RI_KEY_BREAK) != 0;
+    if (data.header.dwType == RIM_TYPEMOUSE) {
+        const auto flags = data.data.mouse.usButtonFlags;
+        constexpr USHORT pressed = RI_MOUSE_LEFT_BUTTON_DOWN | RI_MOUSE_RIGHT_BUTTON_DOWN |
+                                   RI_MOUSE_MIDDLE_BUTTON_DOWN | RI_MOUSE_BUTTON_4_DOWN |
+                                   RI_MOUSE_BUTTON_5_DOWN;
+        constexpr USHORT released = RI_MOUSE_LEFT_BUTTON_UP | RI_MOUSE_RIGHT_BUTTON_UP |
+                                    RI_MOUSE_MIDDLE_BUTTON_UP | RI_MOUSE_BUTTON_4_UP |
+                                    RI_MOUSE_BUTTON_5_UP;
+        return (flags & pressed) == 0 && (flags & released) != 0;
+    }
+    return true; // Other HID events are not ours.
+}
+
 LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM lparam,
                                  UINT_PTR, DWORD_PTR)
 {
@@ -208,8 +238,10 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     }
 
     if (capture && message == WM_INPUT) {
-        // Let Windows perform the required RIM_INPUT cleanup, but do not
-        // forward raw keyboard/mouse data into the game while the menu is open.
+        if (RawReleaseOrUnrelated(lparam))
+            return DefSubclassProc(window, message, wparam, lparam);
+        // Let Windows perform required RIM_INPUT cleanup. Raw key/button
+        // presses and movement are not delivered to the game while active.
         return DefWindowProcW(window, message, wparam, lparam);
     }
 
