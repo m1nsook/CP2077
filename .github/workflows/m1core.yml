@@ -1,172 +1,94 @@
-name: m1core native CI
+name: m1core CET Lua CI
 
 on:
   push:
     branches:
       - dev/m1core
     paths:
-      - 'm1core/**'
-      - '.github/workflows/m1core.yml'
+      - "m1core/**"
+      - ".github/workflows/m1core.yml"
   pull_request:
     paths:
-      - 'm1core/**'
-      - '.github/workflows/m1core.yml'
+      - "m1core/**"
+      - ".github/workflows/m1core.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
   actions: read
 
-# PR and branch pushes otherwise build the identical commit twice.
-# Use the same key for both events and keep only the newest validation run.
 concurrency:
-  group: m1core-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: m1core-cet-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
-  windows-build:
-    name: Build Windows x64 plugin and settings tests
-    runs-on: windows-2022
-    timeout-minutes: 20
+  verify:
+    name: Verify CET Lua source, tests and game-ready ZIP
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Configure
-        run: cmake -S m1core -B m1core/build -A x64 -DBUILD_TESTING=ON
-      - name: Compile
-        run: cmake --build m1core/build --config Release --parallel 4
-      - name: Run registry tests
-        run: ctest --test-dir m1core/build -C Release --output-on-failure
-      # GitHub Actions artifacts are ZIPs already. Upload the two game-root
-      # directories directly, NOT an archive-inside-an-archive.
-      - name: Stage game-ready development build
-        shell: pwsh
+
+      - name: Install Lua 5.4
+        run: sudo apt-get update -qq && sudo apt-get install -y lua5.4
+
+      - name: Parse every Lua source and test
+        shell: bash
         run: |
-          $root = "m1core/game-package"
-          New-Item -ItemType Directory -Force -Path "$root/red4ext/plugins/m1core" | Out-Null
-          New-Item -ItemType Directory -Force -Path "$root/r6/scripts/m1core" | Out-Null
-          Copy-Item "m1core/build/Release/m1core.dll" "$root/red4ext/plugins/m1core/m1core.dll"
-          Copy-Item "m1core/r6/scripts/m1core/m1core.reds" "$root/r6/scripts/m1core/m1core.reds"
+          set -euo pipefail
+          find m1core/src m1core/tests -name '*.lua' -print0 | xargs -0 -n1 luac5.4 -p
 
-          # This is a development artifact: the optional test helper only runs
-          # when explicitly called from a console and changes no game state.
-          Copy-Item "m1core/tests/ingame/m1core_smoke.reds" "$root/r6/scripts/m1core/m1core_smoke.reds"
+      - name: Run registry, profile and persistence tests
+        run: lua5.4 m1core/tests/test_core.lua
 
-          # Opt-in M5 sample: real gameplay integration of the native
-          # keybind polling and persistent carry-weight settings API.
-          New-Item -ItemType Directory -Force -Path "$root/r6/scripts/m1core_sample_weight" | Out-Null
-          Copy-Item "m1core/samples/carry_weight/m1core_sample_weight.reds" "$root/r6/scripts/m1core_sample_weight/m1core_sample_weight.reds"
+      - name: Test CET ImGui call structure and return order
+        run: lua5.4 m1core/tests/test_ui.lua
 
-          # Bundle pinned, OFL-licensed UI fonts. Native ImGui reads these
-          # from disk; there are no browser/CDN requests at game runtime.
-          $fontDir = "$root/red4ext/plugins/m1core/fonts"
-          New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
-          $geist = "https://raw.githubusercontent.com/vercel/geist-font/ef2597cfc42f4797676df105517ccc0a1cfa6569"
-          $mono = "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/19371302b95d218af43299bce79ddbddd0bc364d"
-          $fonts = @(
-            @{ Name = "Geist-Regular.ttf"; Url = "$geist/fonts/Geist/ttf/Geist-Regular.ttf" },
-            @{ Name = "Geist-Medium.ttf"; Url = "$geist/fonts/Geist/ttf/Geist-Medium.ttf" },
-            @{ Name = "Geist-SemiBold.ttf"; Url = "$geist/fonts/Geist/ttf/Geist-SemiBold.ttf" },
-            @{ Name = "JetBrainsMono-Regular.ttf"; Url = "$mono/fonts/ttf/JetBrainsMono-Regular.ttf" },
-            @{ Name = "fa-solid-900.ttf"; Url = "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/0698449d50f2b95517562295a59d414afc68b369/webfonts/fa-solid-900.ttf" },
-            @{ Name = "FontAwesome-Free-LICENSE.txt"; Url = "https://raw.githubusercontent.com/m1nsook/NCREC/bea31026b9fff0f8a8df73d624500a30425b0c29/licenses/FontAwesome-Free-LICENSE.txt" },
-            @{ Name = "Geist-OFL.txt"; Url = "$geist/OFL.txt" },
-            @{ Name = "JetBrainsMono-OFL.txt"; Url = "$mono/OFL.txt" }
-          )
-          foreach ($font in $fonts) {
-            $target = Join-Path $fontDir $font.Name
-            Invoke-WebRequest -Uri $font.Url -OutFile $target -ErrorAction Stop
-            if ((Get-Item -LiteralPath $target).Length -lt 1000) {
-              throw "Font asset was not downloaded correctly: $($font.Name)"
-            }
+      - name: Stage one CET game-ready mod
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=m1core/game-package/bin/x64/plugins/cyber_engine_tweaks/mods/m1core
+          mkdir -p "$target"
+          cp m1core/src/{init,core,storage,ui}.lua "$target/"
+          cp m1core/LICENSE "$target/LICENSE"
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("m1core/game-package")
+          assert {p.name for p in root.iterdir()} == {"bin"}
+          files = root/"bin/x64/plugins/cyber_engine_tweaks/mods/m1core"
+          assert {p.name for p in files.iterdir()} == {
+              "init.lua", "core.lua", "storage.lua", "ui.lua", "LICENSE"
           }
+          assert all(p.stat().st_size > 0 for p in files.iterdir())
+          assert not list(root.rglob("*.zip"))
+          print("Verified CET package: bin/ at archive root, no nested ZIP")
+          PY
 
-          # Enable the player-configured overlay in this development artifact.
-          # For a headless installation, simply delete overlay.enable.
-          Set-Content -Path "$root/red4ext/plugins/m1core/overlay.enable" -Value "development overlay enabled"
-
-          $required = @(
-            "$root/red4ext/plugins/m1core/m1core.dll",
-            "$root/red4ext/plugins/m1core/overlay.enable",
-            "$root/red4ext/plugins/m1core/fonts/Geist-Regular.ttf",
-            "$root/red4ext/plugins/m1core/fonts/Geist-Medium.ttf",
-            "$root/red4ext/plugins/m1core/fonts/fa-solid-900.ttf",
-            "$root/red4ext/plugins/m1core/fonts/FontAwesome-Free-LICENSE.txt",
-            "$root/red4ext/plugins/m1core/fonts/Geist-SemiBold.ttf",
-            "$root/red4ext/plugins/m1core/fonts/JetBrainsMono-Regular.ttf",
-            "$root/red4ext/plugins/m1core/fonts/Geist-OFL.txt",
-            "$root/red4ext/plugins/m1core/fonts/JetBrainsMono-OFL.txt",
-            "$root/r6/scripts/m1core/m1core.reds",
-            "$root/r6/scripts/m1core/m1core_smoke.reds",
-            "$root/r6/scripts/m1core_sample_weight/m1core_sample_weight.reds"
-          )
-          foreach ($file in $required) {
-            if (!(Test-Path -LiteralPath $file -PathType Leaf)) {
-              throw "Missing required package file: $file"
-            }
-          }
-          if (Get-ChildItem -Path $root -Filter "*.zip" -Recurse) {
-            throw "Nested ZIP found in game package"
-          }
-
-      - name: Upload ONE game-ready ZIP (no nested archives)
+      - name: Upload ONE game-ready ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: m1core-game-ready-x64-dev
+          name: m1core-cet-game-ready
           path: m1core/game-package/
           if-no-files-found: error
           retention-days: 7
 
-      # GitHub artifact indexing can lag immediately after upload. Retry the
-      # download of the *same run's* actual artifact, then verify its contents.
-      - name: Download package for layout verification
-        shell: pwsh
+      - name: Download the same artifact and verify its root
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $PSNativeCommandUseErrorActionPreference = $false
-          $target = "m1core/verify-extract"
-          $downloaded = $false
-          for ($attempt = 1; $attempt -le 8; $attempt++) {
-            New-Item -ItemType Directory -Force -Path $target | Out-Null
-            gh run download "$env:GITHUB_RUN_ID" --repo "$env:GITHUB_REPOSITORY" --name "m1core-game-ready-x64-dev" --dir $target
-            if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath "$target/red4ext/plugins/m1core/m1core.dll")) {
-              $downloaded = $true
+          set -euo pipefail
+          mkdir -p m1core/artifact-check
+          downloaded=0
+          for attempt in 1 2 3 4 5 6; do
+            if gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+               --name m1core-cet-game-ready --dir m1core/artifact-check; then
+              downloaded=1
               break
-            }
-            Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
-            if ($attempt -lt 8) { Start-Sleep -Seconds 7 }
-          }
-          if (!$downloaded) {
-            throw "Unable to download the artifact uploaded in this same run"
-          }
-
-      - name: Verify ZIP has r6 and red4ext at its root
-        shell: pwsh
-        run: |
-          $root = "m1core/verify-extract"
-          $top = @(Get-ChildItem -LiteralPath $root -Directory | ForEach-Object { $_.Name } | Sort-Object)
-          if (($top -join ",") -ne "r6,red4ext") {
-            throw "Expected only r6/ and red4ext/ at ZIP root; found: $($top -join ', ')"
-          }
-          foreach ($file in @(
-            "r6/scripts/m1core/m1core.reds",
-            "r6/scripts/m1core/m1core_smoke.reds",
-            "r6/scripts/m1core_sample_weight/m1core_sample_weight.reds",
-            "red4ext/plugins/m1core/m1core.dll",
-            "red4ext/plugins/m1core/overlay.enable",
-            "red4ext/plugins/m1core/fonts/Geist-Regular.ttf",
-            "red4ext/plugins/m1core/fonts/Geist-Medium.ttf",
-            "red4ext/plugins/m1core/fonts/fa-solid-900.ttf",
-            "red4ext/plugins/m1core/fonts/FontAwesome-Free-LICENSE.txt",
-            "red4ext/plugins/m1core/fonts/Geist-SemiBold.ttf",
-            "red4ext/plugins/m1core/fonts/JetBrainsMono-Regular.ttf",
-            "red4ext/plugins/m1core/fonts/Geist-OFL.txt",
-            "red4ext/plugins/m1core/fonts/JetBrainsMono-OFL.txt"
-          )) {
-            if (!(Test-Path -LiteralPath (Join-Path $root $file) -PathType Leaf)) {
-              throw "ZIP missing: $file"
-            }
-          }
-          if (Get-ChildItem -LiteralPath $root -Recurse -Filter "*.zip") {
-            throw "Nested ZIP found in downloaded artifact"
-          }
+            fi
+            sleep 5
+          done
+          test "$downloaded" -eq 1
+          test -f m1core/artifact-check/bin/x64/plugins/cyber_engine_tweaks/mods/m1core/init.lua
+          test "$(find m1core/artifact-check -mindepth 1 -maxdepth 1 -printf '%f\n')" = "bin"
