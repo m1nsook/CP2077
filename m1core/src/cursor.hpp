@@ -14,7 +14,7 @@ bool InstallCursorDetours(RED4ext::v1::PluginHandle plugin, const RED4ext::v1::S
 
 // Called on every overlay open/close and focus-loss transition.
 // Does not require an ImGui context and is safe to call repeatedly.
-void SetCursorCaptured(bool active);
+void SetCursorCaptured(bool active, bool focusLost = false);
 
 // Restore the game's desired clipping rectangle before removing hooks.
 void RemoveCursorDetours();

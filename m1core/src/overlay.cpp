@@ -193,7 +193,7 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         // Suspend input, but keep the settings window open across monitors.
     }
     if (message == WM_KILLFOCUS || (message == WM_ACTIVATEAPP && !wparam))
-        SetCursorCaptured(false);
+        SetCursorCaptured(false, true);
 
     if (g_enabled.load() && (message == WM_KEYDOWN || message == WM_SYSKEYDOWN)
         && wparam == VK_F11

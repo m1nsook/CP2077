@@ -134,7 +134,7 @@ bool CursorDetoursAvailable()
     return g_hooksInstalled;
 }
 
-void SetCursorCaptured(bool active)
+void SetCursorCaptured(bool active, bool focusLost)
 {
     if (!g_hooksInstalled || !g_originalClip) {
         g_capture.store(false, std::memory_order_release);
@@ -145,8 +145,11 @@ void SetCursorCaptured(bool active)
     {
         std::lock_guard lock(g_clipMutex);
         const bool wasActive = g_capture.exchange(active, std::memory_order_acq_rel);
-        if (wasActive == active)
+        if (wasActive == active) {
+            if (focusLost && !active)
+                g_originalClip(nullptr);
             return;
+        }
 
         if (active) {
             RECT oldClip{};
@@ -156,7 +159,11 @@ void SetCursorCaptured(bool active)
             }
             g_originalClip(nullptr);
         } else {
-            const bool focused = g_gameWindow && GetForegroundWindow() == g_gameWindow;
+            // WM_KILLFOCUS can arrive before GetForegroundWindow has updated.
+            // Trust the explicit focus-loss event rather than re-clipping
+            // the cursor to the game while another monitor activates.
+            const bool focused = !focusLost && g_gameWindow &&
+                                 GetForegroundWindow() == g_gameWindow;
             g_originalClip(focused && g_hasRestoreClip ? &g_restoreClip : nullptr);
         }
     }
