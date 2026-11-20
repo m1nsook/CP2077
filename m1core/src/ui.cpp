@@ -607,11 +607,10 @@ void RenderSettings(Registry& registry, bool& open, bool interactive)
         ImGui::End();
         return;
     }
-    ImGui::TextColored(ImVec4(0.22F, 0.74F, 0.97F, 1.0F), "m1core");
-    ImGui::SameLine(0.0F, 8.0F);
-    ImGui::TextDisabled("/ Mod Settings");
+    // The uploaded UI has a plain compact title, not a themed toolbar.
+    ImGui::TextUnformatted("m1core");
     ImGui::SameLine();
-    ImGui::TextDisabled("v0.5.0-dev");
+    ImGui::TextDisabled("Mod Settings");
     ImGui::Separator();
     ImGui::SetNextItemWidth((std::max)(150.0F, ImGui::GetContentRegionAvail().x * 0.42F));
     ImGui::InputTextWithHint("##search", "Search mods and settings", search, sizeof(search));
@@ -723,6 +722,13 @@ void RenderSettings(Registry& registry, bool& open, bool interactive)
         ImGui::TextColored(ImVec4(0.96F, 0.62F, 0.04F, 1.0F), "Unsaved changes");
     else
         ImGui::TextDisabled("Settings applied in memory");
+    ImGui::SameLine();
+    // Keep the newer Discard behavior even though the older ZIP had no
+    // button for it. Only the UI layout is restored, not backend capability.
+    if (ImGui::Button("Discard")) {
+        if (registry.Load()) { g_dirty = false; saveFailed = false; }
+        else saveFailed = true;
+    }
     ImGui::SameLine();
     if (ImGui::Button("Save")) {
         saveFailed = !registry.Save();
