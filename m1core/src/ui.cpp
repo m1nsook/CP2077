@@ -60,6 +60,15 @@ bool Matches(std::string_view text, std::string_view query)
         }) != text.end();
 }
 
+bool MatchesSetting(const SettingSnapshot& setting, std::string_view query)
+{
+    return Matches(Label(setting.id), query) ||
+           Matches(setting.displayName, query) ||
+           Matches(setting.description, query) ||
+           (setting.group != 0 && Matches(Label(setting.group), query)) ||
+           (setting.group == 0 && Matches("General", query));
+}
+
 std::string KeyLabel(int key)
 {
     if (key <= 0) return "Unbound";
@@ -118,8 +127,15 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
     ImGui::TableNextRow();
     ImGui::TableSetColumnIndex(0);
     ImGui::AlignTextToFramePadding();
-    const auto name = Label(setting.id);
+    const auto name = setting.displayName.empty() ? Label(setting.id) : setting.displayName;
     ImGui::TextUnformatted(name.c_str());
+    if (!setting.description.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 38.0F);
+        ImGui::TextUnformatted(setting.description.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
     ImGui::TableSetColumnIndex(1);
 
     bool changed = false;
@@ -193,10 +209,7 @@ bool DrawSettingsTable(Registry& registry, Id mod, const std::vector<SettingSnap
     std::map<Id, std::vector<const SettingSnapshot*>> grouped;
     for (const auto& setting : settings) {
         if (onlyKeybinds && setting.kind != Kind::Keybind) continue;
-        if (!Matches(Label(setting.id), query) &&
-            !(setting.group != 0 && Matches(Label(setting.group), query)) &&
-            !(setting.group == 0 && Matches("General", query)))
-            continue;
+        if (!MatchesSetting(setting, query)) continue;
         grouped[setting.group].push_back(&setting);
     }
     std::vector<Id> order;
@@ -254,9 +267,7 @@ bool ModMatches(const ModSnapshot& mod, std::string_view query, bool keybindsOnl
     for (const auto& setting : mod.settings) {
         if (keybindsOnly && setting.kind != Kind::Keybind) continue;
         hasMatchingType = true;
-        if (Matches(Label(setting.id), query) ||
-            (setting.group != 0 && Matches(Label(setting.group), query)) ||
-            (setting.group == 0 && Matches("General", query))) return true;
+        if (MatchesSetting(setting, query)) return true;
     }
     return hasMatchingType && Matches(Label(mod.id), query);
 }

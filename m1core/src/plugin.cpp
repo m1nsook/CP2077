@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -255,6 +256,39 @@ void SetSettingGroup(Scriptable*, Frame* frame, bool* out, int64_t)
     Output(out, g_settings && g_settings->SetGroup(mod.hash, id.hash, group.hash));
 }
 
+void SetDisplayNameNative(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod, id;
+    RED4ext::CString label;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    RED4ext::GetParameter(frame, &label);
+    frame->code++;
+    Output(out, g_settings && g_settings->SetDisplayName(
+        mod.hash, id.hash, std::string_view(label.c_str(), label.Length())));
+}
+
+void SetDescriptionNative(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod, id;
+    RED4ext::CString description;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    RED4ext::GetParameter(frame, &description);
+    frame->code++;
+    Output(out, g_settings && g_settings->SetDescription(
+        mod.hash, id.hash, std::string_view(description.c_str(), description.Length())));
+}
+
+void GetSettingRevisionNative(Scriptable*, Frame* frame, std::int32_t* out, int64_t)
+{
+    Name mod, id;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    frame->code++;
+    Output(out, g_settings ? g_settings->Revision(mod.hash, id.hash).value_or(-1) : -1);
+}
+
 void WriteLog(Scriptable*, Frame* frame, bool* out, int64_t)
 {
     Name mod;
@@ -343,6 +377,12 @@ void RegisterNatives()
     RegisterNative("M1Core_SetSettingGroup", &SetSettingGroup,
                    {{"CName", "modName"}, {"CName", "settingId"},
                     {"CName", "groupName"}}, "Bool");
+    RegisterNative("M1Core_SetSettingDisplayName", &SetDisplayNameNative,
+                   {{"CName", "modName"}, {"CName", "settingId"}, {"String", "displayName"}}, "Bool");
+    RegisterNative("M1Core_SetSettingDescription", &SetDescriptionNative,
+                   {{"CName", "modName"}, {"CName", "settingId"}, {"String", "description"}}, "Bool");
+    RegisterNative("M1Core_GetSettingRevision", &GetSettingRevisionNative,
+                   {{"CName", "modName"}, {"CName", "settingId"}}, "Int32");
     RegisterNative("M1Core_LogEvent", &WriteLog,
                    {{"CName", "modName"}, {"Int32", "level"}, {"String", "message"}}, "Bool");
     RegisterNative("M1Core_SaveSettings", &Save, {}, "Bool");
@@ -368,7 +408,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"m1core";
     info->author = L"m1nsook";
-    info->version = RED4EXT_V1_SEMVER(0, 4, 0);
+    info->version = RED4EXT_V1_SEMVER(0, 5, 0);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_2_50;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }
@@ -397,7 +437,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
         }
         m1core::Diagnostics::Get().Initialize(config.parent_path());
         m1core::Diagnostics::Get().Write(m1core::LogLevel::Info, "m1core",
-                                         "v0.4.0-dev loading; Cyberpunk 2.50");
+                                         "v0.5.0-dev loading; Cyberpunk 2.50");
         g_settings = std::make_unique<m1core::Registry>(config);
         if (!g_settings->Load())
         {
@@ -416,7 +456,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
         RED4ext::CRTTISystem::Get()->AddPostRegisterCallback(RegisterNatives);
         m1core::StartOverlay(*g_settings, config.parent_path(), handle, sdk);
         if (g_logger)
-            g_logger->Info(g_handle, "m1core 0.4.0-dev: settings API active; renderer opt-in");
+            g_logger->Info(g_handle, "m1core 0.5.0-dev: settings API active; renderer opt-in");
         return true;
     }
     case RED4ext::v1::EMainReason::Unload:

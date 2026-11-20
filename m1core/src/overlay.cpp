@@ -727,6 +727,15 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
     registry.SetGroup(mod.hash, RED4ext::CNamePool::Add("Multiplier").hash, gameplay.hash);
     registry.SetGroup(mod.hash, RED4ext::CNamePool::Add("Camera Mode").hash, gameplay.hash);
     registry.SetGroup(mod.hash, RED4ext::CNamePool::Add("Quick Action").hash, controls.hash);
+    // M5 opt-in metadata: display names and hints do not modify saved IDs.
+    registry.SetDisplayName(mod.hash, RED4ext::CNamePool::Add("Enabled").hash, "Preview Enabled");
+    registry.SetDescription(mod.hash, RED4ext::CNamePool::Add("Enabled").hash,
+                            "Demonstrates optional labels and hover descriptions for m1nsook mods.");
+    registry.SetDisplayName(mod.hash, RED4ext::CNamePool::Add("Multiplier").hash, "Gameplay Multiplier");
+    registry.SetDescription(mod.hash, RED4ext::CNamePool::Add("Multiplier").hash,
+                            "Try changing the slider. The mod can detect an actual value change using its revision token.");
+    registry.SetDescription(mod.hash, RED4ext::CNamePool::Add("Quick Action").hash,
+                            "Press the button to record a key. F11 remains reserved for m1core.");
     g_enabled.store(true);
     Log("m1core overlay: opted in; waiting for Cyberpunk swap chain");
 }

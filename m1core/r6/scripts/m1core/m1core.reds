@@ -1,4 +1,4 @@
-// m1core v0.3 native API. These names must match plugin.cpp exactly.
+// m1core v0.5 development API. These names must match plugin.cpp exactly.
 // Do not copy this file into the game without its matching m1core.dll.
 public static native func M1Core_IsAvailable() -> Bool;
 public static native func M1Core_RegisterBoolSetting(modName: CName, settingId: CName, defaultValue: Bool) -> Bool;
@@ -28,6 +28,13 @@ public static native func M1Core_SetKeybindSetting(modName: CName, settingId: CN
 // Optional display grouping (register the setting first). Group labels are
 // presentation metadata, not persisted values; mods should set them on startup.
 public static native func M1Core_SetSettingGroup(modName: CName, settingId: CName, groupName: CName) -> Bool;
+// Optional UI-only metadata: call after setting registration on every startup.
+// Empty displayName restores the original CName label; empty description clears help.
+public static native func M1Core_SetSettingDisplayName(modName: CName, settingId: CName, displayName: String) -> Bool;
+public static native func M1Core_SetSettingDescription(modName: CName, settingId: CName, description: String) -> Bool;
+// Session-local token: 0 before changes, increments only on effective changes.
+// Returns -1 for unknown settings. Compare tokens, do not subtract them.
+public static native func M1Core_GetSettingRevision(modName: CName, settingId: CName) -> Int32;
 // Bulk resets change only the registered settings. SaveSettings() persists them.
 // The zero/unassigned group is also supported by ResetGroupSettings.
 public static native func M1Core_ResetModSettings(modName: CName) -> Bool;
