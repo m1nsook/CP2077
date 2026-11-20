@@ -111,3 +111,49 @@ public func M1Core_SmokeTest(stage: Int32) -> Int32 {
     }
     return failed;
 }
+
+// M5 optional runtime test. Returns 0 on success, otherwise a failure bitmask.
+// Console: print(Game.GetPlayer():M1Core_M5SmokeTest())
+@addMethod(PlayerPuppet)
+public func M1Core_M5SmokeTest() -> Int32 {
+    if !M1Core_IsAvailable() {
+        return 1;
+    }
+    if !M1Core_RegisterBoolSetting(n"m1core.m5.smoke", n"Feature", false) {
+        return 2;
+    }
+    if !M1Core_SetSettingDisplayName(n"m1core.m5.smoke", n"Feature", "M5 Feature") {
+        return 4;
+    }
+    if !M1Core_SetSettingDescription(n"m1core.m5.smoke", n"Feature", "Revision test for m1core") {
+        return 8;
+    }
+    if !M1Core_ResetSetting(n"m1core.m5.smoke", n"Feature") {
+        return 16;
+    }
+
+    let before: Int32 = M1Core_GetSettingRevision(n"m1core.m5.smoke", n"Feature");
+    if before < 0 {
+        return 32;
+    }
+    if !M1Core_SetBoolSetting(n"m1core.m5.smoke", n"Feature", true) {
+        return 64;
+    }
+    let changed: Int32 = M1Core_GetSettingRevision(n"m1core.m5.smoke", n"Feature");
+    if changed == before || !M1Core_GetBoolSetting(n"m1core.m5.smoke", n"Feature") {
+        return 128;
+    }
+    if !M1Core_SetBoolSetting(n"m1core.m5.smoke", n"Feature", true) {
+        return 256;
+    }
+    if M1Core_GetSettingRevision(n"m1core.m5.smoke", n"Feature") != changed {
+        return 512;
+    }
+    if !M1Core_ResetSetting(n"m1core.m5.smoke", n"Feature") {
+        return 1024;
+    }
+    if M1Core_GetSettingRevision(n"m1core.m5.smoke", n"Feature") == changed {
+        return 2048;
+    }
+    return 0;
+}

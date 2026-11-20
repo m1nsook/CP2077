@@ -1,6 +1,6 @@
 # m1core — native settings foundation (development)
 
-**Status: experimental v0.4.0-dev, not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The F11 D3D12 ImGui overlay and cursor movement were **confirmed in-game**; enum dropdowns, tabs, and keybind persistence have also been confirmed in-game. The supplied HTML demo is a *layout reference*, not the final visual design.
+**Status: experimental v0.5.0-dev (M5 in progress), not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The F11 D3D12 ImGui overlay and cursor movement were **confirmed in-game**; enum dropdowns, tabs, and keybind persistence have also been confirmed in-game. The supplied HTML demo is a *layout reference*, not the final visual design.
 
 ## Architecture
 
@@ -83,6 +83,53 @@ M1Core_SetSettingGroup(n"ExampleMod", n"Intensity", n"Gameplay");
 The All Mods and Keybinds pages render categories in named sections. If a mod does not set a category, settings stay in the default General section. Group metadata is **not** written to `settings.json`: the mod declares categories again when it registers settings on the next startup. A later registration preserves categories already supplied during that process.
 
 The development preview now demonstrates General, Gameplay and Controls groups. The grouping controls and Profiles tab were confirmed working in-game on 2026-11-19.
+
+## M5 — advanced mod integration (v0.5.0-dev, first increment)
+
+Three optional native APIs make registered settings easier to integrate with
+m1nsook mods without changing their stable CName IDs or saved values:
+
+- `M1Core_SetSettingDisplayName(modName, settingId, text)` — separate
+  player-facing label (up to 96 UTF-8 bytes, empty clears the override).
+- `M1Core_SetSettingDescription(modName, settingId, text)` — hover help
+  (up to 512 UTF-8 bytes, empty clears it). Control characters are rejected.
+- `M1Core_GetSettingRevision(modName, settingId)` — session-only
+  integer token, initially 0, advancing only when the *effective* value
+  changes. Returns **-1** for unregistered IDs. Mods may compare the last
+  observed token and read their typed value only when it changes.
+
+The revision covers changes through the UI, typed setters, individual and bulk
+resets, profile activation, and re-registration that clamps a value because
+the declared range changed. No-op writes and repeated profile activation do
+not increment the token. Revisions start at 0 each game launch; they are not
+saved, and are not a durable event queue. Token changes are **polled**, not
+automatic REDscript callbacks.
+
+Example:
+
+```redscript
+M1Core_RegisterFloatSetting(n"MyMod", n"Intensity", 1.0, 0.5, 3.0);
+M1Core_SetSettingGroup(n"MyMod", n"Intensity", n"Gameplay");
+M1Core_SetSettingDisplayName(n"MyMod", n"Intensity", "Effect Intensity");
+M1Core_SetSettingDescription(n"MyMod", n"Intensity", "Controls the strength of this effect.");
+// Store this number after registration. Compare it in your mod's update loop:
+let revision: Int32 = M1Core_GetSettingRevision(n"MyMod", n"Intensity");
+```
+
+Metadata must be declared **after registration each startup**. It is deliberately
+absent from `settings.json` and `profiles.json`. Existing mods work
+without calling these new functions. The built-in `m1core.preview` now
+demonstrates a renamed setting and a tooltip in the All Mods interface.
+
+For optional native smoke testing, call
+`print(Game.GetPlayer():M1Core_M5SmokeTest())` in a development
+console if one is installed. Return **0** means registration, metadata,
+revision and reset checks succeeded. This console is only a test mechanism,
+not a required dependency of m1core.
+
+**Remaining M5 work:** mod-owned keybind action/event delivery, additional
+configuration metadata, and profile-management UX. Do not mistake the
+new polling revision API for a full gameplay event system.
 
 ## Native diagnostic log and in-game Logs panel (post-v0.4.0 development)
 
