@@ -60,6 +60,7 @@ if(WIN32)
     add_library(m1core SHARED
         src/plugin.cpp
         src/ui.cpp
+        src/ui_theme.cpp
         src/overlay.cpp
         src/cursor.cpp
         src/raw_input.cpp

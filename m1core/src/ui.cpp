@@ -1,6 +1,7 @@
 #include "ui.hpp"
 #include "settings.hpp"
 #include "diagnostics.hpp"
+#include "ui_theme.hpp"
 
 #include <RED4ext/CName.hpp>
 #include <RED4ext/CNamePool.hpp>
@@ -337,6 +338,7 @@ void DrawLogs()
     ImGui::Separator();
 
     ImGui::BeginChild("log_lines", ImVec2(0.0F, 0.0F), ImGuiChildFlags_Borders);
+    if (MonoFont()) ImGui::PushFont(MonoFont());
     if (lines.empty()) {
         ImGui::TextDisabled("No events match the filter.");
     } else {
@@ -346,6 +348,7 @@ void DrawLogs()
             for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
                 ImGui::TextUnformatted(lines[static_cast<std::size_t>(i)].c_str());
     }
+    if (MonoFont()) ImGui::PopFont();
     ImGui::EndChild();
     ImGui::EndChild();
 }
@@ -527,9 +530,11 @@ void RenderSettings(Registry& registry, bool& open)
         ImGui::End();
         return;
     }
-    ImGui::TextUnformatted("m1core");
+    ImGui::TextColored(ImVec4(0.22F, 0.74F, 0.97F, 1.0F), "m1core");
+    ImGui::SameLine(0.0F, 8.0F);
+    ImGui::TextDisabled("/ Mod Settings");
     ImGui::SameLine();
-    ImGui::TextDisabled("Mod Settings");
+    ImGui::TextDisabled("v0.5.0-dev");
     ImGui::Separator();
     if (menuKey == 0) {
         ImGui::TextWrapped("No m1core menu key is assigned. Choose one now: "
@@ -552,11 +557,19 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::InputTextWithHint("##search", "Search mods and settings", search, sizeof(search));
     ImGui::SameLine();
     auto tab = [](const char* name, Page value) {
+        const bool selected = page == value;
+        ImGui::PushStyleColor(ImGuiCol_Button, selected ?
+            ImVec4(0.09F, 0.19F, 0.25F, 1.0F) : ImVec4(0.06F, 0.07F, 0.09F, 1.0F));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.13F, 0.25F, 0.32F, 1.0F));
+        ImGui::PushStyleColor(ImGuiCol_Text, selected ?
+            ImVec4(0.98F, 0.98F, 0.98F, 1.0F) : ImVec4(0.63F, 0.63F, 0.67F, 1.0F));
         if (ImGui::Button(name)) page = value;
+        ImGui::PopStyleColor(3);
         if (page == value) {
             const auto a = ImGui::GetItemRectMin();
             const auto b = ImGui::GetItemRectMax();
-            ImGui::GetWindowDrawList()->AddLine(ImVec2(a.x, b.y), b, IM_COL32(220, 220, 220, 200), 2.0F);
+            ImGui::GetWindowDrawList()->AddLine(ImVec2(a.x + 4.0F, b.y), 
+                ImVec2(b.x - 4.0F, b.y), IM_COL32(56, 189, 248, 200), 2.0F);
         }
     };
     tab("All Mods", Page::Mods);
@@ -643,8 +656,10 @@ void RenderSettings(Registry& registry, bool& open)
     // Footer is a functional action area. Apply = immediate; Save persists to
     // JSON. Closing with the player-selected key uses the overlay input gate.
     ImGui::Separator();
-    if (g_dirty) ImGui::TextUnformatted("Unsaved changes");
-    else ImGui::TextDisabled("Settings applied in memory");
+    if (g_dirty)
+        ImGui::TextColored(ImVec4(0.96F, 0.62F, 0.04F, 1.0F), "Unsaved changes");
+    else
+        ImGui::TextDisabled("Settings applied in memory");
     ImGui::SameLine();
     if (ImGui::Button("Save")) {
         saveFailed = !registry.Save();

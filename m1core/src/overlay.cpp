@@ -6,6 +6,7 @@
 #include "keybind_actions.hpp"
 #include "menu_shortcut.hpp"
 #include "ui.hpp"
+#include "ui_theme.hpp"
 
 #include <RED4ext/RED4ext.hpp>
 #include <RED4ext/GpuApi/DeviceData.hpp>
@@ -72,6 +73,7 @@ struct Graphics {
 
 std::mutex g_stateMutex;
 std::mutex g_renderMutex;
+std::filesystem::path g_overlayDirectory;
 InputGate g_gate;
 Graphics g_graphics;
 Registry* g_registry = nullptr;
@@ -455,6 +457,8 @@ bool InitializeGraphics(IDXGISwapChain* swapchain)
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     ImGui::GetIO().IniFilename = nullptr; // Never write imgui.ini into the game directory.
     ImGui::StyleColorsDark();
+    ApplyNativeTheme();
+    LoadOptionalFonts(g_overlayDirectory);
     gfx.win32Ready = ImGui_ImplWin32_Init(g_window);
     if (!gfx.win32Ready) return false;
 
@@ -775,6 +779,7 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
                   RED4ext::v1::PluginHandle handle, const RED4ext::v1::Sdk* sdk)
 {
     g_registry = &registry;
+    g_overlayDirectory = directory;
     g_coreMod = RED4ext::CNamePool::Add("m1core").hash;
     g_coreToggle = RED4ext::CNamePool::Add("Overlay Toggle").hash;
     g_setupAutoOpened = false;
