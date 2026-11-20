@@ -349,3 +349,7 @@ A further native ImGui-only refinement addresses the player feedback that the fi
 ## UI preference: classic ImGui layout from files.zip
 
 The user chose the earlier `files.zip` UI over the later full-screen native layout. The menu now uses the original classic **940×600 ImGui window**, left 220px sidebar, simple tab buttons and a two-column settings table with hover descriptions. Unlike a code rollback, this is deliberately **UI only**: the existing engine cursor, focus safeguards, compact first-run binding dialog, registry, profiles and input logic remain unchanged. See [the UI preference note](design/CLASSIC_IMGUI_FROM_USER_ZIP.md). This still needs one visual in-game check.
+
+## M1CORE black-and-color toolbar reference
+
+The latest UI pass replaces only the classic layout and its theme with the player's newer black/white, sharp-edged color-tab mockup: white header, black CLOSE, blue SETTINGS, white KEYBINDS, green PROFILES, amber LOGS, orange ABOUT, black mod sidebar and real native ImGui settings panel. Screenshot background blur was **Photoshop only**, so no shader or screen blur was added. Native cursor/input and saved settings remain unchanged. [Design contract](design/COLORED_TOOLBAR_UI.md).

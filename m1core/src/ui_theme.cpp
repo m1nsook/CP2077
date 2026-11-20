@@ -35,12 +35,12 @@ void ApplyNativeTheme()
     // A restrained native ImGui theme. All controls use ImGui's built-in
     // interaction and navigation, while fonts, spacing and color are configurable.
     ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding = 8.0F; // restored classic floating ImGui settings window
-    style.ChildRounding = 6.0F;
-    style.FrameRounding = 6.0F;
-    style.PopupRounding = 7.0F;
-    style.ScrollbarRounding = 8.0F;
-    style.GrabRounding = 8.0F;
+    style.WindowRounding = 0.0F; // flat sharp M1CORE reference
+    style.ChildRounding = 0.0F;
+    style.FrameRounding = 0.0F;
+    style.PopupRounding = 0.0F;
+    style.ScrollbarRounding = 0.0F;
+    style.GrabRounding = 1.0F;
     style.TabRounding = 7.0F;
     style.WindowBorderSize = 1.0F;
     style.ChildBorderSize = 1.0F;
@@ -57,14 +57,14 @@ void ApplyNativeTheme()
 
     Set(ImGuiCol_Text,              Color(250, 250, 250));
     Set(ImGuiCol_TextDisabled,      Color(161, 161, 170));
-    Set(ImGuiCol_WindowBg,          Color(9, 9, 11));
-    Set(ImGuiCol_ChildBg,           Color(17, 17, 20));
-    Set(ImGuiCol_PopupBg,           Color(12, 12, 14));
-    Set(ImGuiCol_Border,            Color(39, 39, 42));
+    Set(ImGuiCol_WindowBg,          Color(3, 3, 3));
+    Set(ImGuiCol_ChildBg,           Color(5, 5, 5));
+    Set(ImGuiCol_PopupBg,           Color(9, 9, 9));
+    Set(ImGuiCol_Border,            Color(64, 64, 64));
     Set(ImGuiCol_BorderShadow,      Color(0, 0, 0, 0));
-    Set(ImGuiCol_FrameBg,           Color(28, 28, 32));
-    Set(ImGuiCol_FrameBgHovered,    Color(41, 41, 46));
-    Set(ImGuiCol_FrameBgActive,     Color(47, 47, 52));
+    Set(ImGuiCol_FrameBg,           Color(14, 14, 14));
+    Set(ImGuiCol_FrameBgHovered,    Color(32, 32, 32));
+    Set(ImGuiCol_FrameBgActive,     Color(44, 44, 44));
     Set(ImGuiCol_TitleBg,           Color(17, 17, 19));
     Set(ImGuiCol_TitleBgActive,     Color(17, 17, 19));
     Set(ImGuiCol_TitleBgCollapsed,  Color(17, 17, 19));
@@ -76,23 +76,23 @@ void ApplyNativeTheme()
     Set(ImGuiCol_CheckMark,         Color(250, 250, 250));
     Set(ImGuiCol_SliderGrab,        Color(250, 250, 250));
     Set(ImGuiCol_SliderGrabActive,  Color(250, 250, 250));
-    Set(ImGuiCol_Button,            Color(35, 35, 40));
-    Set(ImGuiCol_ButtonHovered,     Color(51, 51, 57));
-    Set(ImGuiCol_ButtonActive,      Color(58, 58, 64));
-    Set(ImGuiCol_Header,            Color(35, 35, 40));
-    Set(ImGuiCol_HeaderHovered,     Color(49, 49, 55));
-    Set(ImGuiCol_HeaderActive,      Color(54, 54, 60));
+    Set(ImGuiCol_Button,            Color(27, 27, 27));
+    Set(ImGuiCol_ButtonHovered,     Color(53, 53, 53));
+    Set(ImGuiCol_ButtonActive,      Color(72, 72, 72));
+    Set(ImGuiCol_Header,            Color(35, 35, 35));
+    Set(ImGuiCol_HeaderHovered,     Color(55, 55, 55));
+    Set(ImGuiCol_HeaderActive,      Color(70, 70, 70));
     Set(ImGuiCol_Separator,         Color(39, 39, 42));
     Set(ImGuiCol_SeparatorHovered,  Color(212, 212, 216));
     Set(ImGuiCol_SeparatorActive,   Color(250, 250, 250));
     Set(ImGuiCol_ResizeGrip,        Color(52, 52, 57));
     Set(ImGuiCol_ResizeGripHovered, Color(212, 212, 216));
     Set(ImGuiCol_ResizeGripActive,  Color(250, 250, 250));
-    Set(ImGuiCol_TableHeaderBg,     Color(24, 24, 27));
+    Set(ImGuiCol_TableHeaderBg,     Color(21, 21, 21));
     Set(ImGuiCol_TableBorderStrong, Color(52, 52, 57));
     Set(ImGuiCol_TableBorderLight,  Color(43, 43, 47));
-    Set(ImGuiCol_TableRowBg,        Color(24, 24, 27));
-    Set(ImGuiCol_TableRowBgAlt,     Color(29, 29, 32));
+    Set(ImGuiCol_TableRowBg,        Color(10, 10, 10));
+    Set(ImGuiCol_TableRowBgAlt,     Color(21, 21, 21));
     Set(ImGuiCol_NavHighlight,      Color(212, 212, 216));
     Set(ImGuiCol_TextSelectedBg,    Color(161, 161, 170, 100));
     Set(ImGuiCol_ModalWindowDimBg,  Color(0, 0, 0, 175));
