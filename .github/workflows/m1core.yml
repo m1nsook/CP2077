@@ -64,8 +64,11 @@ jobs:
           $mono = "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/19371302b95d218af43299bce79ddbddd0bc364d"
           $fonts = @(
             @{ Name = "Geist-Regular.ttf"; Url = "$geist/fonts/Geist/ttf/Geist-Regular.ttf" },
+            @{ Name = "Geist-Medium.ttf"; Url = "$geist/fonts/Geist/ttf/Geist-Medium.ttf" },
             @{ Name = "Geist-SemiBold.ttf"; Url = "$geist/fonts/Geist/ttf/Geist-SemiBold.ttf" },
             @{ Name = "JetBrainsMono-Regular.ttf"; Url = "$mono/fonts/ttf/JetBrainsMono-Regular.ttf" },
+            @{ Name = "fa-solid-900.ttf"; Url = "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/0698449d50f2b95517562295a59d414afc68b369/webfonts/fa-solid-900.ttf" },
+            @{ Name = "FontAwesome-Free-LICENSE.txt"; Url = "https://raw.githubusercontent.com/m1nsook/NCREC/bea31026b9fff0f8a8df73d624500a30425b0c29/licenses/FontAwesome-Free-LICENSE.txt" },
             @{ Name = "Geist-OFL.txt"; Url = "$geist/OFL.txt" },
             @{ Name = "JetBrainsMono-OFL.txt"; Url = "$mono/OFL.txt" }
           )
@@ -85,6 +88,9 @@ jobs:
             "$root/red4ext/plugins/m1core/m1core.dll",
             "$root/red4ext/plugins/m1core/overlay.enable",
             "$root/red4ext/plugins/m1core/fonts/Geist-Regular.ttf",
+            "$root/red4ext/plugins/m1core/fonts/Geist-Medium.ttf",
+            "$root/red4ext/plugins/m1core/fonts/fa-solid-900.ttf",
+            "$root/red4ext/plugins/m1core/fonts/FontAwesome-Free-LICENSE.txt",
             "$root/red4ext/plugins/m1core/fonts/Geist-SemiBold.ttf",
             "$root/red4ext/plugins/m1core/fonts/JetBrainsMono-Regular.ttf",
             "$root/red4ext/plugins/m1core/fonts/Geist-OFL.txt",
@@ -149,6 +155,9 @@ jobs:
             "red4ext/plugins/m1core/m1core.dll",
             "red4ext/plugins/m1core/overlay.enable",
             "red4ext/plugins/m1core/fonts/Geist-Regular.ttf",
+            "red4ext/plugins/m1core/fonts/Geist-Medium.ttf",
+            "red4ext/plugins/m1core/fonts/fa-solid-900.ttf",
+            "red4ext/plugins/m1core/fonts/FontAwesome-Free-LICENSE.txt",
             "red4ext/plugins/m1core/fonts/Geist-SemiBold.ttf",
             "red4ext/plugins/m1core/fonts/JetBrainsMono-Regular.ttf",
             "red4ext/plugins/m1core/fonts/Geist-OFL.txt",

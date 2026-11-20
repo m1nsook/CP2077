@@ -44,13 +44,13 @@ bool Button(const char* label, Tone tone, ImVec2 size)
     ImU32 fg = color::Foreground;
     ImU32 border = color::Border;
     if (tone == Tone::Primary) {
-        fill = held ? IM_COL32(29, 78, 216, 255) :
-               hover ? color::BlueHover : color::Blue;
-        fg = color::Foreground;
+        fill = held ? IM_COL32(215, 215, 221, 255) :
+               hover ? IM_COL32(239, 239, 240, 255) : color::Foreground;
+        fg = color::Canvas;
         border = fill;
     } else if (tone == Tone::Ghost) {
         fill = held ? IM_COL32(45, 45, 50, 255) :
-               hover ? color::Raised : color::Surface;
+               hover ? color::Raised : color::Canvas;
         border = tone == Tone::Ghost ? fill : border;
     } else if (tone == Tone::Danger) {
         fill = held ? IM_COL32(98, 28, 33, 255) :
@@ -58,12 +58,13 @@ bool Button(const char* label, Tone tone, ImVec2 size)
         border = IM_COL32(110, 43, 52, 255);
         fg = color::Danger;
     } else if (hover) {
-        fill = IM_COL32(53, 53, 59, 255);
+        fill = IM_COL32(39, 39, 42, 255);
     }
     auto* draw = ImGui::GetWindowDrawList();
-    draw->AddRectFilled(a, b, fill, kRadius);
+    if (tone != Tone::Ghost || hover || held)
+        draw->AddRectFilled(a, b, fill, 6.0F);
     if (tone != Tone::Ghost)
-        draw->AddRect(a, b, border, kRadius);
+        draw->AddRect(a, b, border, 6.0F);
     FocusRing(draw, a, b, kRadius);
     TextCentered(draw, a, b, label, fg);
     return clicked;
@@ -96,9 +97,6 @@ bool SidebarItem(const char* label, const char* count, bool selected, float widt
     auto* draw = ImGui::GetWindowDrawList();
     if (selected || ImGui::IsItemHovered())
         draw->AddRectFilled(a, b, selected ? color::Raised : color::Card, 7.0F);
-    if (selected)
-        draw->AddRectFilled(ImVec2(a.x, a.y+9), ImVec2(a.x+2.0F, b.y-9),
-                            color::Blue, 1.0F);
     FocusRing(draw, a, b, 7.0F);
     const ImVec2 countSize = ImGui::CalcTextSize(count);
     const float textEnd = b.x - countSize.x - 18.0F;
@@ -113,15 +111,15 @@ bool SidebarItem(const char* label, const char* count, bool selected, float widt
 
 bool Switch(const char* id, bool enabled)
 {
-    constexpr float width = 42.0F, height = 24.0F;
+    constexpr float width = 36.0F, height = 20.0F;
     const bool clicked = ImGui::InvisibleButton(id, ImVec2(width, height));
     const auto a = ImGui::GetItemRectMin();
     const auto b = ImGui::GetItemRectMax();
     auto* draw = ImGui::GetWindowDrawList();
     draw->AddRectFilled(a, b, enabled ? color::Blue : color::Raised, height*0.5F);
     draw->AddRect(a, b, enabled ? color::Blue : color::Border, height*0.5F);
-    draw->AddCircleFilled(ImVec2(a.x+(enabled ? width-12 : 12), a.y+12),
-                          9.0F, color::Foreground);
+    draw->AddCircleFilled(ImVec2(a.x+(enabled ? width-10 : 10), a.y+10),
+                          7.0F, enabled ? color::Canvas : color::Muted);
     FocusRing(draw, a, b, height*0.5F);
     return clicked;
 }
@@ -130,7 +128,7 @@ bool Slider(const char* id, double& value, double min, double max,
             double step, int decimals, float width)
 {
     width = (std::max)(160.0F, width);
-    constexpr float height = 35.0F;
+    constexpr float height = 32.0F;
     constexpr float valueArea = 62.0F;
     const bool pressed = ImGui::InvisibleButton(id, ImVec2(width, height));
     const auto a = ImGui::GetItemRectMin();
@@ -159,14 +157,14 @@ bool Slider(const char* id, double& value, double min, double max,
     }
 
     auto* draw = ImGui::GetWindowDrawList();
-    const ImVec2 trackA(left, a.y+16.0F), trackB(right, a.y+21.0F);
+    const ImVec2 trackA(left, a.y+13.0F), trackB(right, a.y+19.0F);
     draw->AddRectFilled(trackA, trackB, color::Raised, 3.0F);
     const float t = valid ? static_cast<float>(std::clamp((value-min)/(max-min), 0.0, 1.0)) : 0;
     const float pos = left+(right-left)*t;
     if (pos > left)
         draw->AddRectFilled(trackA, ImVec2(pos, trackB.y), color::Blue, 3.0F);
-    draw->AddCircleFilled(ImVec2(pos, a.y+18.5F), 8.0F, color::Foreground);
-    draw->AddCircle(ImVec2(pos, a.y+18.5F), 8.0F, color::Blue, 0, 2.0F);
+    draw->AddCircleFilled(ImVec2(pos, a.y+16.0F), 7.0F, color::Canvas);
+    draw->AddCircle(ImVec2(pos, a.y+16.0F), 7.0F, color::Foreground, 0, 2.0F);
 
     const ImVec2 chipA(b.x-valueArea+2.0F, a.y+1.0F), chipB(b.x, b.y-1.0F);
     draw->AddRectFilled(chipA, chipB, color::Raised, 7.0F);
@@ -186,8 +184,8 @@ bool Select(const char* id, int& selected, const std::vector<std::string>& choic
     const auto a = ImGui::GetItemRectMin();
     const auto b = ImGui::GetItemRectMax();
     auto* draw = ImGui::GetWindowDrawList();
-    draw->AddRectFilled(a, b, color::Raised, kRadius);
-    draw->AddRect(a, b, ImGui::IsItemHovered() ? color::Blue : color::Border, kRadius);
+    draw->AddRectFilled(a, b, color::Canvas, kRadius);
+    draw->AddRect(a, b, ImGui::IsItemHovered() ? color::BlueHover : color::Border, kRadius);
     FocusRing(draw, a, b, kRadius);
     const char* preview = (selected >= 0 &&
         static_cast<std::size_t>(selected) < choices.size())
@@ -226,4 +224,41 @@ void Separator(float space)
                                         color::Border, 1.0F);
     ImGui::Dummy(ImVec2(0, 1.0F+space*0.5F));
 }
+
+bool NavTab(const char* label, const char* count, bool selected)
+{
+    const ImVec2 text = ImGui::CalcTextSize(label);
+    const ImVec2 badge = count && *count ? ImGui::CalcTextSize(count) : ImVec2{};
+    const float total = text.x + (count && *count ? badge.x + 20.0F : 0.0F) + 25.0F;
+    const bool clicked = ImGui::InvisibleButton(label, ImVec2(total, 42.0F));
+    const auto a = ImGui::GetItemRectMin();
+    const auto b = ImGui::GetItemRectMax();
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddText(ImVec2(a.x+12, a.y+(42.0F-text.y)*0.5F),
+                  selected ? color::Foreground : color::Muted, label);
+    if (count && *count) {
+        const ImVec2 aa(a.x + 16 + text.x, a.y + 11);
+        const ImVec2 bb(aa.x + badge.x+12, aa.y+19);
+        draw->AddRectFilled(aa,bb,color::Raised,4.0F);
+        draw->AddText(ImVec2(aa.x+6,aa.y+2),color::Muted,count);
+    }
+    if (selected)
+        draw->AddLine(ImVec2(a.x+10,b.y-1.0F), ImVec2(b.x-10,b.y-1.0F),
+                      color::Foreground,2.0F);
+    FocusRing(draw,a,b,4.0F);
+    return clicked;
+}
+
+void CountBadge(const char* count)
+{
+    const ImVec2 txt = ImGui::CalcTextSize(count);
+    const ImVec2 size(txt.x+13.0F, txt.y+7.0F);
+    ImGui::Dummy(size);
+    const auto a = ImGui::GetItemRectMin();
+    const auto b = ImGui::GetItemRectMax();
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(a,b,color::Raised,4.0F);
+    draw->AddText(ImVec2(a.x+6,a.y+3),color::Muted,count);
+}
+
 } // namespace m1core::ui

@@ -16,6 +16,7 @@ void LoadOptionalFonts(const std::filesystem::path& overlayDirectory);
 
 // Package-provided Geist heading and JetBrains Mono fonts.
 ImFont* HeadingFont() noexcept;
+ImFont* MediumFont() noexcept;
 
 // Optional mono typography for logs/technical values.
 ImFont* MonoFont() noexcept;
