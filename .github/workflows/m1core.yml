@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 # PR and branch pushes otherwise build the identical commit twice.
 # Use the same key for both events and keep only the newest validation run.
@@ -77,12 +78,29 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      # Verify the actual downloaded artifact, not just staging directory.
+      # GitHub artifact indexing can lag immediately after upload. Retry the
+      # download of the *same run's* actual artifact, then verify its contents.
       - name: Download package for layout verification
-        uses: actions/download-artifact@v4
-        with:
-          name: m1core-game-ready-x64-dev
-          path: m1core/verify-extract
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $target = "m1core/verify-extract"
+          $downloaded = $false
+          for ($attempt = 1; $attempt -le 8; $attempt++) {
+            New-Item -ItemType Directory -Force -Path $target | Out-Null
+            gh run download "$env:GITHUB_RUN_ID" --repo "$env:GITHUB_REPOSITORY" --name "m1core-game-ready-x64-dev" --dir $target
+            if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath "$target/red4ext/plugins/m1core/m1core.dll")) {
+              $downloaded = $true
+              break
+            }
+            Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
+            if ($attempt -lt 8) { Start-Sleep -Seconds 7 }
+          }
+          if (!$downloaded) {
+            throw "Unable to download the artifact uploaded in this same run"
+          }
 
       - name: Verify ZIP has r6 and red4ext at its root
         shell: pwsh
