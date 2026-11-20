@@ -209,6 +209,30 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         return 0;
     }
 
+    // Observe keyboard edges without consuming them. Cyberpunk can use
+    // RIDEV_NOLEGACY, so WM_INPUT is needed to catch short press+release
+    // between a REDscript mod's scheduled ticks. Reuse the *existing*
+    // game HWND subclass; this is not a new keyboard hook.
+    //
+    // Never buffer while m1core owns input or another monitor is focused.
+    // RAWINPUT and legacy key messages may duplicate each other; the
+    // keybind action state machine deduplicates repeated down/up edges.
+    if (g_enabled.load() && IsFocused() && !IsOverlayOpen()) {
+        if (message == WM_INPUT) {
+            RawSample input{};
+            if (DecodeRawInput(lparam, input) && input.type == RIM_TYPEKEYBOARD &&
+                input.vkey > 0 && input.vkey < 255) {
+                KeybindActions::Get().ObserveKeyEvent(
+                    input.vkey, (input.keyFlags & RI_KEY_BREAK) == 0);
+            }
+        } else if (message == WM_KEYDOWN || message == WM_SYSKEYDOWN ||
+                   message == WM_KEYUP || message == WM_SYSKEYUP) {
+            KeybindActions::Get().ObserveKeyEvent(
+                static_cast<int>(wparam),
+                message == WM_KEYDOWN || message == WM_SYSKEYDOWN);
+        }
+    }
+
     // F11 is polled in the Present callback, because the game may use RAWINPUT
     // (RIDEV_NOLEGACY) and never produce WM_KEYDOWN for the hotkey.
     if (g_enabled.load() && IsKeyboardMessage(message) && wparam == VK_F11)

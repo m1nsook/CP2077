@@ -151,9 +151,17 @@ if M1Core_PollKeybindPressed(n"ExampleMod", n"QuickAction") {
 - F11 is always reserved. Unbound keys and unregistered settings never fire.
 - Other mods binding the same VK are independent; collisions are not
   automatically resolved.
-- **Current limit:** this is *edge polling*, not an asynchronous event queue.
-  Mods must call every game update. A very short press entirely between two
-  polls may be missed. A future native event dispatcher can address this.
+- **Buffered edges (M5):** while the native overlay input bridge is enabled,
+  the existing Cyberpunk window subclass now observes RAWINPUT/legacy key
+  presses and releases even while the m1core menu is closed. One short
+  press+release between two mod polls is remembered and delivered on the
+  next poll. Duplicate raw/legacy events and keyboard repeats are ignored.
+  Events are discarded across focus changes, menu toggles and rebinding.
+- **Current limit:** this is still a polling API, not a REDscript callback
+  dispatcher. When the overlay bridge is disabled or raw keyboard packets
+  cannot be observed, the original GetAsyncKeyState polling remains as a
+  fallback and very quick taps can still be missed. Mods should continue
+  polling during their update loop.
 
 The internal state machine has dedicated CTest coverage for held keys, repeats,
 rebinds, focus suppression, reserved keys, and independent mod actions.

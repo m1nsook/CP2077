@@ -48,6 +48,56 @@ int main()
     CHECK(!events.Poll(1, 10, 0x75, true, true)); // Seed after unbind.
     CHECK(!events.Poll(1, 10, 0x75, false, true));
     CHECK(events.Poll(1, 10, 0x75, true, true));
+    // M5 buffered tap: press+release between two mod polls is not lost.
+    events.Reset();
+    CHECK(!events.Poll(11, 12, 0x77, false, true));
+    events.ObserveKeyEvent(0x77, true);
+    events.ObserveKeyEvent(0x77, true); // Win32 and RAWINPUT duplicate down.
+    events.ObserveKeyEvent(0x77, true); // Keyboard auto-repeat.
+    events.ObserveKeyEvent(0x77, false);
+    CHECK(events.Poll(11, 12, 0x77, false, true));
+    CHECK(!events.Poll(11, 12, 0x77, false, true));
+    // A second mod watching the same VK gets its own event, after priming.
+    CHECK(!events.Poll(22, 12, 0x77, false, true));
+    events.ObserveKeyEvent(0x77, true);
+    events.ObserveKeyEvent(0x77, false);
+    CHECK(events.Poll(11, 12, 0x77, false, true));
+    CHECK(events.Poll(22, 12, 0x77, false, true));
+    CHECK(!events.Poll(22, 12, 0x77, false, true));
+
+    // Held key may be seen by both polling and the queued edge; no double fire.
+    events.ObserveKeyEvent(0x77, true);
+    CHECK(events.Poll(11, 12, 0x77, true, true));
+    CHECK(!events.Poll(11, 12, 0x77, true, true));
+    events.ObserveKeyEvent(0x77, false);
+    CHECK(!events.Poll(11, 12, 0x77, false, true));
+
+    // Invalidate clears queued events and suppresses replay on alt-tab/F11.
+    events.ObserveKeyEvent(0x77, true);
+    events.ObserveKeyEvent(0x77, false);
+    events.Invalidate();
+    CHECK(!events.Poll(11, 12, 0x77, false, true));
+    events.ObserveKeyEvent(0x77, true);
+    events.ObserveKeyEvent(0x77, false);
+    CHECK(events.Poll(11, 12, 0x77, false, true));
+    CHECK(!events.Poll(11, 12, 0x77, false, false));
+    events.ObserveKeyEvent(0x77, true);
+    events.ObserveKeyEvent(0x77, false);
+    CHECK(events.Poll(11, 12, 0x77, false, false));
+    CHECK(!events.Poll(11, 12, 0x77, false, true)); // Forbidden event was dropped.
+
+    // Rebinding and unbinding invalidates old event history.
+    events.ObserveKeyEvent(0x77, true);
+    events.ObserveKeyEvent(0x77, false);
+    CHECK(!events.Poll(11, 12, 0, false, true));
+    CHECK(!events.Poll(11, 12, 0x77, false, true));
+    events.ObserveKeyEvent(0x77, true);
+    events.ObserveKeyEvent(0x77, false);
+    CHECK(events.Poll(11, 12, 0x77, false, true));
+    // F11 remains protected even when input is observed.
+    events.ObserveKeyEvent(0x7A, true);
+    events.ObserveKeyEvent(0x7A, false);
+    CHECK(!events.Poll(11, 12, 0x7A, false, true));
     events.Reset();
     CHECK(!events.Poll(1, 10, 0x75, true, true));
 }
