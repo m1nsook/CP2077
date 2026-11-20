@@ -83,7 +83,7 @@ int main()
     CHECK(!events.Poll(11, 12, 0x77, false, false));
     events.ObserveKeyEvent(0x77, true);
     events.ObserveKeyEvent(0x77, false);
-    CHECK(events.Poll(11, 12, 0x77, false, false));
+    CHECK(!events.Poll(11, 12, 0x77, false, false)); // Suppressed while unavailable.
     CHECK(!events.Poll(11, 12, 0x77, false, true)); // Forbidden event was dropped.
 
     // Rebinding and unbinding invalidates old event history.
