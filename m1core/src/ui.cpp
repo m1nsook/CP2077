@@ -595,7 +595,7 @@ void RenderSettings(Registry& registry, bool& open)
     const auto mods = registry.Snapshot();
     if (mods.empty()) selected = 0;
     else if (std::none_of(mods.begin(),mods.end(),
-        [selected](const ModSnapshot& mod) { return mod.id == selected; }))
+        [](const ModSnapshot& mod) { return mod.id == selected; }))
         selected = mods.front().id;
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -802,7 +802,7 @@ void RenderSettings(Registry& registry, bool& open)
     } else {
         if (keybindsOnly) DrawKeybindConflicts(mods);
         auto current = std::find_if(mods.begin(),mods.end(),
-            [selected](const ModSnapshot& mod){return mod.id==selected;});
+            [](const ModSnapshot& mod){return mod.id==selected;});
         if (current==mods.end() || !ModMatches(*current,search,keybindsOnly)) {
             ImGui::TextDisabled("Choose a mod in the sidebar to view its settings.");
         } else {
