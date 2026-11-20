@@ -1,36 +1,42 @@
--- CET already supplies sandboxed IO and the global json codec.
--- All writes stay inside the m1core CET mod directory.
+-- M1CORE settings persistence is owned by the RED4ext DLL.
+-- CET Lua only marshals JSON through native RTTI functions. No custom hooks.
 local Storage = {}
 Storage.__index = Storage
 
-function Storage.new(filename)
-  return setmetatable({ filename = filename or "settings.json" }, Storage)
+function Storage.new()
+  local success, version = pcall(function() return Game.M1Core_NativeVersion() end)
+  if not success or type(version) ~= "string" then
+    error("m1core.dll is required. Install the matching red4ext/ folder.")
+  end
+  local readyOk, ready = pcall(function() return Game.M1Core_NativeReady() end)
+  if not readyOk or not ready then
+    local errOk, err = pcall(function() return Game.M1Core_NativeLastError() end)
+    error("m1core.dll settings unavailable: " .. tostring(errOk and err or "unknown error"))
+  end
+  return setmetatable({},Storage)
 end
 
 function Storage:load()
-  local file = io.open(self.filename, "r")
-  if not file then return {} end
-  local text = file:read("*a")
-  file:close()
-  if type(text) ~= "string" or text == "" then return {} end
-  local ok, parsed = pcall(json.decode, text)
-  if not ok or type(parsed) ~= "table" then
-    error("settings.json contains invalid JSON; original file preserved")
+  local content = Game.M1Core_NativeGetState()
+  if type(content) ~= "string" then error("Native DLL returned no settings state") end
+  local ok, data = pcall(json.decode, content)
+  if not ok or type(data) ~= "table" then
+    error("Native DLL returned invalid JSON")
   end
-  return parsed
+  return data
 end
 
 function Storage:save(data)
   local ok, encoded = pcall(json.encode, data)
   if not ok or type(encoded) ~= "string" then
-    return false, "unable to encode settings"
+    return false, "Unable to encode settings"
   end
-  -- CET restricts the IO API to this mod's sandbox directory.
-  local file, err = io.open(self.filename, "w")
-  if not file then return false, err end
-  local success, failure = file:write(encoded)
-  file:close()
-  return success ~= nil, failure
+  local success, updated = pcall(function() return Game.M1Core_NativeSetState(encoded) end)
+  if not success or not updated then
+    local errOk, err = pcall(function() return Game.M1Core_NativeLastError() end)
+    return false, tostring((errOk and err ~= "" and err) or "native save failed")
+  end
+  return true
 end
 
 return Storage

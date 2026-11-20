@@ -1,0 +1,40 @@
+cmake_minimum_required(VERSION 3.23)
+project(m1core VERSION 1.0.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+include(FetchContent)
+set(RED4EXT_HEADER_ONLY ON CACHE BOOL "" FORCE)
+set(RED4EXT_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    red4ext_sdk
+    GIT_REPOSITORY https://github.com/wopss/RED4ext.SDK.git
+    GIT_TAG a34f0ad0a9e4f37cbe1fe001e4ff68c2949d0665
+)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(red4ext_sdk nlohmann_json)
+
+add_library(m1core_state STATIC native/state.cpp)
+target_include_directories(m1core_state PUBLIC native)
+target_link_libraries(m1core_state PUBLIC nlohmann_json::nlohmann_json)
+target_compile_definitions(m1core_state PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
+
+if(WIN32)
+    add_library(m1core SHARED native/plugin.cpp)
+    target_link_libraries(m1core PRIVATE m1core_state RED4ext::SDK)
+    target_compile_definitions(m1core PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE RED4EXT_HEADER_ONLY)
+    set_target_properties(m1core PROPERTIES OUTPUT_NAME "m1core" PREFIX "")
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(m1core_state_tests tests/state_tests.cpp)
+    target_link_libraries(m1core_state_tests PRIVATE m1core_state)
+    add_test(NAME m1core_state_tests COMMAND m1core_state_tests)
+endif()
