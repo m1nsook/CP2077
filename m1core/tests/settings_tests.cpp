@@ -192,6 +192,69 @@ int main()
     }
 
     {
+        // M5: per-setting revisions change only when effective values change.
+        // Display metadata never pollutes schema-v1 JSON or profiles.
+        const auto metaDir = directory / "metadata";
+        const auto metaFile = metaDir / "settings.json";
+        m1core::Registry registry(metaFile);
+        CHECK(registry.Load());
+        CHECK(!registry.SetDisplayName(7, 8, "Unregistered"));
+        CHECK(registry.RegisterBool(7, 8, true));
+        CHECK(registry.RegisterBool(9, 8, true));
+        CHECK(registry.RegisterInt(7, 9, 3, 0, 5));
+        CHECK(registry.Revision(7, 8) == 0);
+        CHECK(registry.Revision(7, 99) == std::nullopt);
+        CHECK(registry.SetDisplayName(7, 8, "Feature enabled"));
+        CHECK(registry.SetDescription(7, 8, "Enable the feature for this mod."));
+        CHECK(!registry.SetDescription(7, 8, std::string(513, 'x')));
+        CHECK(!registry.SetDisplayName(7, 8, "Invalid\nlabel"));
+        CHECK(!registry.SetDisplayName(7, 8, std::string(97, 'x')));
+        CHECK(registry.SetBool(7, 8, true)); // No effective change.
+        CHECK(registry.Revision(7, 8) == 0);
+        CHECK(registry.SetBool(7, 8, false));
+        CHECK(registry.Revision(7, 8) == 1);
+        CHECK(registry.SetBool(7, 8, false));
+        CHECK(registry.Revision(7, 8) == 1);
+        CHECK(registry.Reset(7, 8));
+        CHECK(registry.Revision(7, 8) == 2);
+        CHECK(registry.ResetMod(7)); // Already at defaults.
+        CHECK(registry.Revision(7, 8) == 2);
+        CHECK(registry.Revision(9, 8) == 0); // Isolated mod.
+        CHECK(registry.SetInt(7, 9, 999)); // Clamped to 5.
+        CHECK(registry.Revision(7, 9) == 1);
+        CHECK(registry.SetInt(7, 9, 999)); // Still 5.
+        CHECK(registry.Revision(7, 9) == 1);
+        CHECK(registry.SaveProfile("Modified"));
+        CHECK(registry.ResetMod(7));
+        CHECK(registry.Revision(7, 9) == 2);
+        CHECK(registry.ActivateProfile("Modified"));
+        CHECK(registry.Revision(7, 9) == 3);
+        CHECK(registry.ActivateProfile("Modified"));
+        CHECK(registry.Revision(7, 9) == 3);
+        CHECK(registry.RegisterBool(7, 8, true)); // Same-ID registration preserves metadata.
+        auto snapshot = registry.Snapshot();
+        CHECK(snapshot[0].settings[0].displayName == "Feature enabled");
+        CHECK(snapshot[0].settings[0].description == "Enable the feature for this mod.");
+        CHECK(snapshot[0].settings[0].revision == 2);
+        CHECK(registry.RegisterInt(7, 9, 3, 0, 4)); // New bounds clamp 5 to 4.
+        CHECK(registry.GetInt(7, 9) == 4);
+        CHECK(registry.Revision(7, 9) == 4);
+        CHECK(registry.Save());
+
+        m1core::Registry restarted(metaFile);
+        CHECK(restarted.Load());
+        CHECK(restarted.RegisterBool(7, 8, false));
+        CHECK(restarted.RegisterInt(7, 9, 0, 0, 5));
+        CHECK(restarted.GetBool(7, 8) == true);
+        CHECK(restarted.GetInt(7, 9) == 4);
+        CHECK(restarted.Revision(7, 8) == 0);
+        CHECK(restarted.Revision(7, 9) == 0);
+        snapshot = restarted.Snapshot();
+        CHECK(snapshot[0].settings[0].displayName.empty());
+        CHECK(snapshot[0].settings[0].description.empty());
+    }
+
+    {
         std::ofstream output(profilesFile, std::ios::trunc);
         output << "{ damaged profiles";
     }
