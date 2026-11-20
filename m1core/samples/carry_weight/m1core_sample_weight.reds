@@ -64,7 +64,7 @@ protected cb func OnGameAttached() -> Bool {
 }
 
 @addMethod(PlayerPuppet)
-private final func M1SampleWeightSchedule(delay: Float) -> Void {
+public final func M1SampleWeightSchedule(delay: Float) -> Void {
     let evt: ref<M1CoreSampleWeightTick> = new M1CoreSampleWeightTick();
     evt.generation = this.m_m1SampleWeightGeneration;
     GameInstance.GetDelaySystem(this.GetGame()).DelayEvent(this, evt, delay, false);
@@ -73,7 +73,7 @@ private final func M1SampleWeightSchedule(delay: Float) -> Void {
 // Own only one removable modifier. Recalculate relative to the player's
 // current base after removing ours; don't delete perks/other stat modifiers.
 @addMethod(PlayerPuppet)
-private final func M1SampleWeightReconcile(enabled: Bool, limit: Int32) -> Void {
+public final func M1SampleWeightReconcile(enabled: Bool, limit: Int32) -> Void {
     let stats: ref<StatsSystem> = GameInstance.GetStatsSystem(this.GetGame());
     if !IsDefined(stats) {
         return;

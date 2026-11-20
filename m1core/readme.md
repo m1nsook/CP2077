@@ -162,6 +162,26 @@ rebinds, focus suppression, reserved keys, and independent mod actions.
 lifecycle metadata, and further profile-management UX. Do not mistake the
 new polling revision API for a full gameplay event system.
 
+### Carry-weight sample mod (opt-in game integration)
+
+The dev ZIP includes a first real m1core consumer at
+`r6/scripts/m1core_sample_weight/m1core_sample_weight.reds`.
+Source, full installation and uninstall notes, and in-game test checklist:
+`samples/carry_weight/README.md`.
+
+- Registers Enabled, Carry Weight Limit (100–10,000, default 500 total),
+  and a rebindable Toggle Mod key (F8 by default).
+- Applies only its own tracked additive CarryCapacity modifier; it does
+  not wipe stat modifiers owned by cyberware, perks or other mods.
+- UI values are stored in m1core settings.json; the modifier is recreated
+  after player attachment/load and periodically reconciled against gameplay
+  stat rebuilds. F8 toggles and saves immediately through the new API.
+- **New in-game behavior is unverified until tested inside Cyberpunk.**
+  CI verifies the DLL and single-ZIP structure, not REDscript game compilation.
+
+To remove just this sample, delete the sample .reds from the game root
+and restart. Existing JSON settings/profiles are never overwritten.
+
 ## Native diagnostic log and in-game Logs panel (post-v0.4.0 development)
 
 The new **Logs** tab shows the last 512 diagnostic events, with source/message
