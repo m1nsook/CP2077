@@ -5,6 +5,7 @@
 #include "ui_components.hpp"
 #include "ui_icons.hpp"
 #include "workspace_layout.hpp"
+#include "overlay_ui_policy.hpp"
 #include "cursor.hpp"
 #include "keybind_conflicts.hpp"
 
@@ -165,15 +166,11 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
     switch (setting.kind) {
     case Kind::Boolean: {
         const bool value = std::get<bool>(setting.value);
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-            (std::max)(0.0F, available - 80.0F));
         if (ui::Switch("##switch", value))
             changed = registry.SetBool(mod, setting.id, !value);
         break;
     }
     case Kind::Integer: {
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-            (std::max)(0.0F, available - controlWidth - 40.0F));
         int value = std::get<std::int32_t>(setting.value);
         double number = static_cast<double>(value);
         if (ui::Slider("##value", number,
@@ -184,8 +181,6 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
         break;
     }
     case Kind::Float: {
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-            (std::max)(0.0F, available - controlWidth - 40.0F));
         float value = std::get<float>(setting.value);
         double number = static_cast<double>(value);
         if (ui::Slider("##value", number,
@@ -196,8 +191,6 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
         break;
     }
     case Kind::Enum: {
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-            (std::max)(0.0F, available - 190.0F));
         int index = std::get<std::int32_t>(setting.value);
         if (ui::Select("##value", index, setting.choices, 145.0F))
             changed = registry.SetEnum(mod, setting.id, index);
@@ -209,8 +202,6 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
         const bool coreMenuBind =
             mod == RED4ext::CNamePool::Add("m1core").hash &&
             setting.id == RED4ext::CNamePool::Add("Overlay Toggle").hash;
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-            (std::max)(0.0F, available - 230.0F));
         const auto label = capturing ? std::string(coreMenuBind ? "Press your menu key..." :
                                                   "Press key... (Esc cancels)")
                                     : KeyLabel(std::get<std::int32_t>(setting.value));
@@ -231,7 +222,7 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
     }
 
     ImGui::SameLine();
-    if (ui::Button(icons::rotate, ui::Tone::Ghost, ImVec2(30.0F, 32.0F)))
+    if (ui::Button("Reset", ui::Tone::Ghost))
         changed = registry.Reset(mod, setting.id);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
         ImGui::SetTooltip("Reset to default");
@@ -590,14 +581,37 @@ void RenderSettings(Registry& registry, bool& open, bool interactive)
     static Id selected = 0;
     static Page page = Page::Mods;
     static bool saveFailed = false;
-    static bool firstRunSelected = false;
     const auto coreMod = RED4ext::CNamePool::Add("m1core");
     const auto coreToggle = RED4ext::CNamePool::Add("Overlay Toggle");
     const int menuKey = registry.GetKeybind(coreMod.hash,coreToggle.hash).value_or(0);
-    if (menuKey == 0 && !firstRunSelected) {
-        selected = RED4ext::CNamePool::Add("m1core.preview").hash;
-        page = Page::Mods; // screenshot: action banner on All Mods
-        firstRunSelected = true;
+    if (NeedsCompactSetup(menuKey)) {
+        // CET-like compact first-run window: never open the massive settings
+        // workspace before the player has picked their own menu shortcut.
+        const auto* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5F, 0.5F));
+        ImGui::SetNextWindowSize(ImVec2(470.0F, 170.0F), ImGuiCond_Always);
+        const ImGuiWindowFlags setupFlags = ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoSavedSettings;
+        if (ImGui::Begin("m1core - First Time Setup", nullptr, setupFlags)) {
+            ImGui::TextWrapped("Choose a key to open and close m1core.");
+            ImGui::TextDisabled("No default key is assigned. The binding is saved automatically.");
+            ImGui::Spacing();
+            const bool recording = g_capture.active &&
+                g_capture.mod == coreMod.hash && g_capture.setting == coreToggle.hash;
+            if (recording) {
+                ImGui::TextUnformatted("Press your preferred menu key...");
+            } else if (ImGui::Button("Bind overlay key", ImVec2(-1.0F, 34.0F))) {
+                StartCapture(coreMod.hash, coreToggle.hash);
+            }
+        }
+        ImGui::End();
+        if (interactive) {
+            g_dirty |= PollCapture(registry);
+            if (registry.GetKeybind(coreMod.hash, coreToggle.hash).value_or(0) > 0)
+                open = false; // Return to game; the chosen key opens full UI.
+        }
+        return;
     }
 
     auto mods = registry.Snapshot();
@@ -777,32 +791,6 @@ void RenderSettings(Registry& registry, bool& open, bool interactive)
     ImGui::BeginChild("##m1coreContentScroll",ImVec2(centerWidth,0),ImGuiChildFlags_None);
     ImGui::PopStyleVar();
     ImGui::Dummy(ImVec2(0,22));
-
-    // The action banner exists only until the player sets their own key.
-    if (menuKey == 0) {
-        const auto pos = ImGui::GetCursorScreenPos();
-        const float w = ImGui::GetContentRegionAvail().x;
-        const float h = 88;
-        auto* draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(pos,ImVec2(pos.x+w,pos.y+h),
-                            IM_COL32(48,35,13,255),8.0F);
-        draw->AddRect(pos,ImVec2(pos.x+w,pos.y+h),
-                      IM_COL32(118,80,12,255),8.0F);
-        ImGui::SetCursorScreenPos(ImVec2(pos.x+18,pos.y+15));
-        ImGui::TextColored(ImVec4(0.98F,0.75F,0.14F,1.0F),
-            "%s  Action Required - No Menu Hotkey Assigned",icons::warning);
-        ImGui::SetCursorScreenPos(ImVec2(pos.x+18,pos.y+43));
-        ImGui::PushTextWrapPos(pos.x+w-200);
-        ImGui::TextDisabled("No menu key is assigned. Choose one via Keybinds > m1core > Open / Close Menu.");
-        ImGui::PopTextWrapPos();
-        ImGui::SetCursorScreenPos(ImVec2(pos.x+w-175,pos.y+26));
-        if (ui::Button("Bind my menu key",ui::Tone::Primary,ImVec2(158,34))) {
-            switchPage(Page::Keybinds);
-            selected = coreMod.hash;
-            StartCapture(coreMod.hash,coreToggle.hash);
-        }
-        ImGui::SetCursorScreenPos(ImVec2(pos.x,pos.y+h+20));
-    }
 
     if (page == Page::Profiles) {
         DrawProfiles(registry);

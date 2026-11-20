@@ -75,7 +75,7 @@ void ApplyNativeTheme()
     Set(ImGuiCol_ScrollbarGrabActive,  Color(161, 161, 170));
     Set(ImGuiCol_CheckMark,         Color(250, 250, 250));
     Set(ImGuiCol_SliderGrab,        Color(250, 250, 250));
-    Set(ImGuiCol_SliderGrabActive,  Color(59, 130, 246));
+    Set(ImGuiCol_SliderGrabActive,  Color(250, 250, 250));
     Set(ImGuiCol_Button,            Color(24, 24, 27));
     Set(ImGuiCol_ButtonHovered,     Color(39, 39, 42));
     Set(ImGuiCol_ButtonActive,      Color(52, 52, 57));

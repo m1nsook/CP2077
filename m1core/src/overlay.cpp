@@ -8,6 +8,7 @@
 #include "startup_gate.hpp"
 #include "ui.hpp"
 #include "ui_theme.hpp"
+#include "overlay_ui_policy.hpp"
 
 #include <RED4ext/RED4ext.hpp>
 #include <RED4ext/GpuApi/DeviceData.hpp>
@@ -666,6 +667,9 @@ void Draw(IDXGISwapChain* swapchain)
         }
     }
 
+    // Set before Win32_NewFrame so its OS cursor handling and ImGui's
+    // software pointer use the same capture state on the current frame.
+    ImGui::GetIO().MouseDrawCursor = ShouldDrawOverlayCursor(capturing, IsFocused());
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     // Dear ImGui must draw in the actual swapchain backbuffer coordinate
@@ -680,14 +684,16 @@ void Draw(IDXGISwapChain* swapchain)
     // No virtual RAWINPUT pointer and no process-wide Win32 cursor detours:
     // Cyberpunk owns the real cursor and Windows applies native pointer speed.
     const bool systemCursor = CursorDetoursAvailable();
-    ImGui::GetIO().MouseDrawCursor = false;
+    // Cyberpunk may hide its system cursor while ForceCursor is active.
+    // Draw the ImGui pointer at the *mapped Windows pointer position*
+    // (not a raw-delta virtual pointer). Release immediately on Alt+Tab.
     if (capturing) {
         if (systemCursor) EnsureSystemCursorVisible();
         g_rawBridge.Feed(g_window, messages, rawSamples, systemCursor);
     }
     ImGui::NewFrame();
-    // The background is a separate full-viewport ImGui layer; mod settings
-    // remain freely movable windows above it, as in CET.
+    // Fullscreen only after setup; the first-run shortcut dialog is compact
+    // and centered above the same dimmed game background.
     const ImGuiIO& io = ImGui::GetIO();
     ImGui::GetBackgroundDrawList()->AddRectFilled(
         ImVec2(0.0F, 0.0F), io.DisplaySize, IM_COL32(0, 0, 0, 140));
