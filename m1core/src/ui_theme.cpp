@@ -35,14 +35,14 @@ void ApplyNativeTheme()
     // A restrained native ImGui theme. All controls use ImGui's built-in
     // interaction and navigation, while fonts, spacing and color are configurable.
     ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding = 0.0F; // fullscreen NCREC/skeleton workspace
+    style.WindowRounding = 8.0F; // restored classic floating ImGui settings window
     style.ChildRounding = 6.0F;
     style.FrameRounding = 6.0F;
     style.PopupRounding = 7.0F;
     style.ScrollbarRounding = 8.0F;
     style.GrabRounding = 8.0F;
     style.TabRounding = 7.0F;
-    style.WindowBorderSize = 0.0F;
+    style.WindowBorderSize = 1.0F;
     style.ChildBorderSize = 1.0F;
     style.FrameBorderSize = 1.0F;
     style.PopupBorderSize = 1.0F;

@@ -345,3 +345,7 @@ Supersedes earlier custom-drawn UI plans. The native widget wrappers now delegat
 ## Standard ImGui visual polish — November 20, 2026
 
 A further native ImGui-only refinement addresses the player feedback that the first simplified UI looked worse than CET. The underlying interaction system and full-screen workflow are unchanged: Geist/JetBrains fonts are larger, built-in button variants have visible hierarchy, navigation selection is underlined rather than a filled gray rectangle, mod counts align right, sliders/checkboxes/keybinds align consistently in their table rows, and card/sidebar spacing is more readable. The only low-level drawing added is decorative separators/underline—**not custom control hit areas**. See [standard ImGui styling](design/STANDARD_IMGUI_POLISH.md). This visual pass still requires actual in-game inspection.
+
+## UI preference: classic ImGui layout from files.zip
+
+The user chose the earlier `files.zip` UI over the later full-screen native layout. The menu now uses the original classic **940×600 ImGui window**, left 220px sidebar, simple tab buttons and a two-column settings table with hover descriptions. Unlike a code rollback, this is deliberately **UI only**: the existing engine cursor, focus safeguards, compact first-run binding dialog, registry, profiles and input logic remain unchanged. See [the UI preference note](design/CLASSIC_IMGUI_FROM_USER_ZIP.md). This still needs one visual in-game check.
