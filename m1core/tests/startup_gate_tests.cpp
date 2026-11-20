@@ -10,17 +10,17 @@
 int main()
 {
     m1core::StartupGate gate;
-    // Before V is spawned, do not install a window subclass, DXGI hooks,
-    // cursor detours, or intercept the title screen's "Press to Continue".
-    CHECK(!gate.MayInstallOverlayHooks());
+    // Before V is spawned, the early DXGI/window bridge is passive; no
+    // gameplay input interception, visible menu or cursor detours.
+    CHECK(!gate.GameplayReady());
     CHECK(gate.MarkPlayerAttached());
-    CHECK(gate.MayInstallOverlayHooks());
+    CHECK(gate.GameplayReady());
     CHECK(!gate.MarkPlayerAttached());
-    CHECK(gate.MayInstallOverlayHooks());
+    CHECK(gate.GameplayReady());
 
     // A new process/game startup must begin in the safe, passive state.
     gate.Reset();
-    CHECK(!gate.MayInstallOverlayHooks());
+    CHECK(!gate.GameplayReady());
     CHECK(gate.MarkPlayerAttached());
-    CHECK(gate.MayInstallOverlayHooks());
+    CHECK(gate.GameplayReady());
 }

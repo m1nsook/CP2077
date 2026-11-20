@@ -4,9 +4,10 @@
 
 namespace m1core
 {
-// Startup safety gate: never install window, renderer or cursor hooks during
-// the logos / "Press to Continue" title sequence. Native settings APIs still
-// function, but the overlay activates only after V attaches to a loaded game.
+// Startup safety gate: CET-style rendering/window integration may install
+// early but must remain completely transparent to title-screen input.
+// Capturing input, showing the menu and installing global cursor detours
+// require a real PlayerPuppet attach after gameplay persistence hydration.
 class StartupGate final
 {
 public:
@@ -18,7 +19,7 @@ public:
         return !ready_.exchange(true, std::memory_order_acq_rel);
     }
 
-    bool MayInstallOverlayHooks() const noexcept
+    bool GameplayReady() const noexcept
     {
         return ready_.load(std::memory_order_acquire);
     }

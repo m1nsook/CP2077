@@ -20,6 +20,9 @@ namespace
 {
 HMODULE g_module = nullptr;
 std::unique_ptr<m1core::Registry> g_settings;
+// False until the in-game persistence hydration succeeded. Never let a
+// title-screen shutdown or a failed read overwrite the player's JSON.
+std::atomic_bool g_persistenceReady{false};
 RED4ext::v1::PluginHandle g_handle{};
 const RED4ext::v1::Logger* g_logger = nullptr;
 

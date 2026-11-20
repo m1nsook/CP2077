@@ -92,6 +92,7 @@ std::atomic_bool g_enabled{false};
 std::atomic_bool g_renderError{false};
 bool g_hooked = false;
 bool g_subclassed = false;
+bool g_cursorInstallAttempted = false;
 bool g_loggedThreadMismatch = false;
 bool g_toggleWasDown = false;
 int g_previousToggleKey = 0;
@@ -193,6 +194,14 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         g_window = nullptr;
         return DefSubclassProc(window, message, wparam, lparam);
     }
+
+    // CET uses an early window bridge which lets the original WndProc own
+    // all messages unless an overlay actually needs input. Follow that
+    // principle without copying CET's GPL code: while the opening title
+    // screen is active m1core neither parses RAWINPUT nor queries keyboard
+    // state nor changes focus/cursor/input. All messages pass through.
+    if (!g_startupGate.GameplayReady())
+        return DefSubclassProc(window, message, wparam, lparam);
 
     // Mouse activation on a secondary-monitor round trip must never fire a
     // weapon or activate a world interaction underneath the still-open menu.
@@ -487,6 +496,8 @@ bool InitializeGraphics(IDXGISwapChain* swapchain)
 
 void ProcessHotkeys()
 {
+    if (!g_startupGate.GameplayReady())
+        return;
     const int selectedKey = GetOverlayHotkey();
     const bool down = selectedKey > 0 && (GetAsyncKeyState(selectedKey) & 0x8000) != 0;
     const bool binding = IsCapturingKeybind();
@@ -564,6 +575,11 @@ void DisableOverlayAfterRenderFailure(const char* reason)
 
 void Draw(IDXGISwapChain* swapchain)
 {
+    // The native D3D12 Present hook is installed early, like CET's, but
+    // building the ImGui renderer and trapping input are separate decisions.
+    // No graphics/resource initialization while the title prompt owns input.
+    if (!g_startupGate.GameplayReady())
+        return;
     std::lock_guard renderLock(g_renderMutex);
     if (!g_enabled.load() || g_renderError.load()) return;
 
@@ -702,28 +718,44 @@ HRESULT STDMETHODCALLTYPE Resize1Hook(IDXGISwapChain* chain, UINT count, UINT wi
     return g_resize1(chain, count, width, height, format, flags, nodes, queues);
 }
 
+// Install DXGI + the window message bridge as soon as an actual swapchain
+// exists. This mirrors CET's *early integration, late input trapping* model:
+// m1core's subclass returns straight to the game's previous window procedure
+// throughout the title screen, and Present never builds ImGui until gameplay.
 bool OnRunningUpdate(RED4ext::CGameApplication*)
 {
-    // The SDK's Running callback can be active while Cyberpunk is still at
-    // the title screen. Installing a Win32/RAWINPUT subclass, DXGI Present
-    // hook or cursor detours before V is spawned can interfere with "Press
-    // to Continue" and other early startup input. Wait for PlayerPuppet's
-    // OnGameAttached signal instead. This callback keeps running until then.
-    if (!g_startupGate.MayInstallOverlayHooks() ||
-        !g_enabled.load() || g_hooked || !g_sdk || !g_sdk->hooking)
+    if (!g_enabled.load() || !g_sdk || !g_sdk->hooking)
         return false;
+
+    if (g_hooked) {
+        // Do not modify the game's global cursor functions until V is in
+        // gameplay. The menu opens on the player's chosen key afterward.
+        // The Running callback executes on the game window owner thread.
+        if (g_startupGate.GameplayReady() && !g_cursorInstallAttempted &&
+            g_window && IsWindow(g_window) &&
+            GetCurrentThreadId() == GetWindowThreadProcessId(g_window, nullptr)) {
+            g_cursorInstallAttempted = true;
+            if (InstallCursorDetours(g_handle, g_sdk, g_window))
+                Log("m1core: cursor detours ready for optional overlay capture");
+            else
+                Warn("m1core: cursor detours unavailable; RAWINPUT virtual-pointer fallback");
+        }
+        return true;
+    }
+
     auto* data = RED4ext::GpuApi::GetDeviceData();
-    if (!data || !data->directCommandQueue) return false;
+    if (!data || !data->directCommandQueue)
+        return false;
     for (auto& handle : data->swapChains.resources) {
         if (!handle.IsUsed()) continue;
         auto& chainData = handle.instance;
         if (!chainData.swapChain || !chainData.windowHandle ||
             !IsWindow(chainData.windowHandle)) continue;
-        // Win32 subclassing must run on the window-owning thread. If the
-        // RED4ext Running callback uses another thread, do not install.
+
+        // Win32 subclassing must run on the window-owning thread.
         if (GetCurrentThreadId() != GetWindowThreadProcessId(chainData.windowHandle, nullptr)) {
             if (!g_loggedThreadMismatch) {
-                Warn("m1core overlay: RED4ext game callback is not the window thread; waiting (no input hook)");
+                Warn("m1core: GPU callback not on window thread; retrying without input hooks");
                 g_loggedThreadMismatch = true;
             }
             continue;
@@ -731,9 +763,9 @@ bool OnRunningUpdate(RED4ext::CGameApplication*)
         g_window = chainData.windowHandle;
         g_selectedChain = chainData.swapChain.Get();
         if (!SetWindowSubclass(g_window, WindowSubclass, kSubclassId, 0)) {
-            Warn("m1core overlay: window subclass failed; no renderer hooks installed");
+            Warn("m1core: window bridge unavailable; overlay disabled");
             g_enabled.store(false);
-            return false;
+            return true;
         }
         g_subclassed = true;
         auto** vtable = *reinterpret_cast<void***>(g_selectedChain);
@@ -742,12 +774,15 @@ bool OnRunningUpdate(RED4ext::CGameApplication*)
         g_resize1Target = vtable[39];
 
         auto attach = g_sdk->hooking->Attach;
-        const bool present = attach(g_handle, g_presentTarget, reinterpret_cast<void*>(&PresentHook),
+        const bool present = attach(g_handle, g_presentTarget,
+                                    reinterpret_cast<void*>(&PresentHook),
                                     reinterpret_cast<void**>(&g_present));
         const bool resize = present && attach(g_handle, g_resizeTarget,
-                reinterpret_cast<void*>(&ResizeHook), reinterpret_cast<void**>(&g_resize));
+                                     reinterpret_cast<void*>(&ResizeHook),
+                                     reinterpret_cast<void**>(&g_resize));
         const bool resize1 = resize && attach(g_handle, g_resize1Target,
-                reinterpret_cast<void*>(&Resize1Hook), reinterpret_cast<void**>(&g_resize1));
+                                       reinterpret_cast<void*>(&Resize1Hook),
+                                       reinterpret_cast<void**>(&g_resize1));
         if (!resize1) {
             if (resize) g_sdk->hooking->Detach(g_handle, g_resizeTarget);
             if (present) g_sdk->hooking->Detach(g_handle, g_presentTarget);
@@ -756,15 +791,12 @@ bool OnRunningUpdate(RED4ext::CGameApplication*)
             g_window = nullptr;
             g_selectedChain = nullptr;
             g_enabled.store(false);
-            Warn("m1core overlay: one or more DXGI hooks failed; disabled safely");
-            return false;
+            Warn("m1core: early passive renderer bridge failed; disabled safely");
+            return true;
         }
         g_hooked = true;
-        if (InstallCursorDetours(g_handle, g_sdk, g_window))
-            Log("m1core overlay: cursor recenter/clip detours installed");
-        else
-            Warn("m1core overlay: cursor detours unavailable; using RAWINPUT virtual cursor fallback");
-        Log("m1core overlay: DXGI hooks installed (development opt-in)");
+        Log("m1core: early DXGI/window bridge installed; title input pass-through");
+        // Do not install SetCursorPos/ClipCursor hooks in the title screen.
         return false;
     }
     return false;
@@ -781,6 +813,14 @@ RED4ext::v1::GameState g_runningState{
     .OnUpdate = &OnRunningUpdate,
     .OnExit = &OnRunningExit
 };
+// Try installing the passive rendering bridge during engine initialization,
+// before the title prompt. The Running state remains as a fallback if GPU
+// resources are not available yet. No input interception takes place here.
+RED4ext::v1::GameState g_initializationState{
+    .OnEnter = nullptr,
+    .OnUpdate = &OnRunningUpdate,
+    .OnExit = nullptr
+};
 
 } // namespace
 
@@ -788,6 +828,7 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
                   RED4ext::v1::PluginHandle handle, const RED4ext::v1::Sdk* sdk)
 {
     g_startupGate.Reset();
+    g_cursorInstallAttempted = false;
     g_registry = &registry;
     g_overlayDirectory = directory;
     g_coreMod = RED4ext::CNamePool::Add("m1core").hash;
@@ -806,9 +847,13 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
     }
     if (!sdk || !sdk->gameStates || !sdk->hooking ||
         !sdk->gameStates->Add(handle, RED4ext::EGameStateType::Running, &g_runningState)) {
-        Warn("m1core overlay: unable to register game state; overlay stays disabled");
+        Warn("m1core overlay: unable to register running state; overlay stays disabled");
         return;
     }
+    // Earlier initialization is best-effort. Running is the safe fallback.
+    if (!sdk->gameStates->Add(handle, RED4ext::EGameStateType::Initialization,
+                             &g_initializationState))
+        Warn("m1core: early initialization hook unavailable; running-state fallback");
     // Deliberately no preset key: the first overlay session auto-opens so
     // the player can choose its own menu binding (and persist it).
     registry.RegisterKeybind(g_coreMod, g_coreToggle, 0);
@@ -846,15 +891,16 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
     registry.SetDescription(mod.hash, RED4ext::CNamePool::Add("Quick Action").hash,
                             "Unbound initially. Assign any available key in the Keybinds tab.");
     g_enabled.store(true);
-    Log("m1core overlay: opted in; waiting for V to enter gameplay before installing input/renderer hooks");
+    Log("m1core: waiting for swapchain to install passive bridge; input traps only on menu open");
 }
 
 void NotifyPlayerAttached()
 {
-    // REDscript runs this after real V's OnGameAttached, not on the title
-    // screen. A second attachment/reload is harmless; no hooks are duplicated.
+    // Native settings have already loaded their persisted values. The early
+    // DXGI/window bridge can now enable the *player-chosen* menu shortcut.
+    // A second player attachment/reload never installs duplicate hooks.
     if (g_startupGate.MarkPlayerAttached() && g_enabled.load())
-        Log("m1core overlay: player attached; input/renderer hooks may now install");
+        Log("m1core: gameplay ready; overlay capture permitted when menu opens");
 }
 
 int GetOverlayHotkey()
@@ -891,6 +937,7 @@ void StopOverlay()
         g_subclassed = false;
     }
     g_selectedChain = nullptr;
+    g_cursorInstallAttempted = false;
     g_registry = nullptr;
     g_coreMod = 0;
     g_coreToggle = 0;
