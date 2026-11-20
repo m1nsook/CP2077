@@ -5,6 +5,7 @@
 #include "settings.hpp"
 #include "keybind_actions.hpp"
 #include "menu_shortcut.hpp"
+#include "startup_gate.hpp"
 #include "ui.hpp"
 #include "ui_theme.hpp"
 
@@ -75,6 +76,7 @@ std::mutex g_stateMutex;
 std::mutex g_renderMutex;
 std::filesystem::path g_overlayDirectory;
 InputGate g_gate;
+StartupGate g_startupGate;
 Graphics g_graphics;
 Registry* g_registry = nullptr;
 RED4ext::v1::PluginHandle g_handle{};
@@ -702,7 +704,14 @@ HRESULT STDMETHODCALLTYPE Resize1Hook(IDXGISwapChain* chain, UINT count, UINT wi
 
 bool OnRunningUpdate(RED4ext::CGameApplication*)
 {
-    if (!g_enabled.load() || g_hooked || !g_sdk || !g_sdk->hooking) return false;
+    // The SDK's Running callback can be active while Cyberpunk is still at
+    // the title screen. Installing a Win32/RAWINPUT subclass, DXGI Present
+    // hook or cursor detours before V is spawned can interfere with "Press
+    // to Continue" and other early startup input. Wait for PlayerPuppet's
+    // OnGameAttached signal instead. This callback keeps running until then.
+    if (!g_startupGate.MayInstallOverlayHooks() ||
+        !g_enabled.load() || g_hooked || !g_sdk || !g_sdk->hooking)
+        return false;
     auto* data = RED4ext::GpuApi::GetDeviceData();
     if (!data || !data->directCommandQueue) return false;
     for (auto& handle : data->swapChains.resources) {
@@ -778,6 +787,7 @@ RED4ext::v1::GameState g_runningState{
 void StartOverlay(Registry& registry, const std::filesystem::path& directory,
                   RED4ext::v1::PluginHandle handle, const RED4ext::v1::Sdk* sdk)
 {
+    g_startupGate.Reset();
     g_registry = &registry;
     g_overlayDirectory = directory;
     g_coreMod = RED4ext::CNamePool::Add("m1core").hash;
@@ -836,7 +846,15 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
     registry.SetDescription(mod.hash, RED4ext::CNamePool::Add("Quick Action").hash,
                             "Unbound initially. Assign any available key in the Keybinds tab.");
     g_enabled.store(true);
-    Log("m1core overlay: opted in; waiting for Cyberpunk swap chain");
+    Log("m1core overlay: opted in; waiting for V to enter gameplay before installing input/renderer hooks");
+}
+
+void NotifyPlayerAttached()
+{
+    // REDscript runs this after real V's OnGameAttached, not on the title
+    // screen. A second attachment/reload is harmless; no hooks are duplicated.
+    if (g_startupGate.MarkPlayerAttached() && g_enabled.load())
+        Log("m1core overlay: player attached; input/renderer hooks may now install");
 }
 
 int GetOverlayHotkey()

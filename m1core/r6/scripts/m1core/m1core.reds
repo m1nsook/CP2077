@@ -1,6 +1,20 @@
 // m1core v0.5 development API. These names must match plugin.cpp exactly.
 // Do not copy this file into the game without its matching m1core.dll.
 public static native func M1Core_IsAvailable() -> Bool;
+
+// Core lifecycle handshake: keep native input/GPU/cursor hooks inactive while
+// Cyberpunk displays logos and "Press to Continue" at startup. Only real V
+// attaching to a loaded game permits installation; setting APIs work earlier.
+public static native func M1Core_GameplayAttached() -> Bool;
+
+@wrapMethod(PlayerPuppet)
+protected cb func OnGameAttached() -> Bool {
+    let result: Bool = wrappedMethod();
+    if !this.IsReplacer() && !this.IsJohnnyReplacer() {
+        M1Core_GameplayAttached();
+    }
+    return result;
+}
 public static native func M1Core_RegisterBoolSetting(modName: CName, settingId: CName, defaultValue: Bool) -> Bool;
 public static native func M1Core_RegisterIntSetting(modName: CName, settingId: CName, defaultValue: Int32, minValue: Int32, maxValue: Int32) -> Bool;
 public static native func M1Core_RegisterFloatSetting(modName: CName, settingId: CName, defaultValue: Float, minValue: Float, maxValue: Float) -> Bool;
@@ -24,7 +38,8 @@ public static native func M1Core_SetEnumSetting(modName: CName, settingId: CName
 public static native func M1Core_RegisterKeybindSetting(modName: CName, settingId: CName, defaultVirtualKey: Int32) -> Bool;
 public static native func M1Core_GetKeybindSetting(modName: CName, settingId: CName) -> Int32;
 // Poll once per game update to detect a fresh key press, even with RIDEV_NOLEGACY.
-// First poll primes state; holding/repeating does not retrigger. F11 reserved.
+// First poll primes state; holding/repeating does not retrigger. The user
+// chooses the m1core menu key; no particular F-key is reserved.
 // Suppressed while m1core menu is open or Cyberpunk is not foreground.
 public static native func M1Core_PollKeybindPressed(modName: CName, settingId: CName) -> Bool;
 public static native func M1Core_SetKeybindSetting(modName: CName, settingId: CName, virtualKey: Int32) -> Bool;

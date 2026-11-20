@@ -16,4 +16,7 @@ void StopOverlay();
 bool IsOverlayOpen();
 // Core menu key is configured by the player, 0 = not bound.
 int GetOverlayHotkey();
+// Called from the core REDscript PlayerPuppet lifecycle wrapper.
+// Until this signal arrives, m1core must not hook the game HWND/GPU/cursor.
+void NotifyPlayerAttached();
 } // namespace m1core

@@ -76,6 +76,10 @@ if(BUILD_TESTING)
     target_link_libraries(m1core_settings_tests PRIVATE m1core_settings)
     add_test(NAME m1core_settings_tests COMMAND m1core_settings_tests)
 
+    add_executable(m1core_startup_gate_tests tests/startup_gate_tests.cpp)
+    target_include_directories(m1core_startup_gate_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    add_test(NAME m1core_startup_gate_tests COMMAND m1core_startup_gate_tests)
+
     add_executable(m1core_keybind_actions_tests tests/keybind_actions_tests.cpp)
     target_link_libraries(m1core_keybind_actions_tests PRIVATE m1core_keybinds)
     add_test(NAME m1core_keybind_actions_tests COMMAND m1core_keybind_actions_tests)

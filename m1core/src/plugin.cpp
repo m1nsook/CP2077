@@ -38,6 +38,15 @@ void Available(Scriptable*, Frame* frame, bool* out, int64_t)
     Output(out, g_settings != nullptr);
 }
 
+// The core REDscript PlayerPuppet wrapper calls this when real V spawns.
+// Do not install input or rendering hooks during the opening title prompt.
+void GameplayAttached(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    frame->code++;
+    m1core::NotifyPlayerAttached();
+    Output(out, true);
+}
+
 void RegisterBool(Scriptable*, Frame* frame, bool* out, int64_t)
 {
     Name mod, id;
@@ -371,6 +380,7 @@ void RegisterNative(const char* name, RED4ext::ScriptingFunction_t<T> function,
 void RegisterNatives()
 {
     RegisterNative("M1Core_IsAvailable", &Available, {}, "Bool");
+    RegisterNative("M1Core_GameplayAttached", &GameplayAttached, {}, "Bool");
     RegisterNative("M1Core_RegisterBoolSetting", &RegisterBool,
                    {{"CName", "modName"}, {"CName", "settingId"}, {"Bool", "defaultValue"}}, "Bool");
     RegisterNative("M1Core_RegisterIntSetting", &RegisterInt,
