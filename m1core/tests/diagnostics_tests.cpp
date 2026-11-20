@@ -18,6 +18,12 @@ int main()
     auto& logs = m1core::Diagnostics::Get();
     CHECK(!logs.Write(m1core::LogLevel::Info, "core", "Not initialized"));
     logs.Initialize(directory);
+    logs.SetDiskEnabled(false);
+    CHECK(logs.Write(m1core::LogLevel::Info, "boot", "Title screen log is memory-only"));
+    CHECK(!std::filesystem::exists(directory / "m1core.log"));
+    CHECK(logs.Snapshot().size() == 1);
+    logs.ClearView();
+    logs.SetDiskEnabled(true);
     CHECK(!logs.Write(m1core::LogLevel::Info, "", "missing source"));
     CHECK(!logs.Write(m1core::LogLevel::Info, "core", ""));
     CHECK(!logs.Write(static_cast<m1core::LogLevel>(99), "core", "invalid level"));

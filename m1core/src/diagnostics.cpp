@@ -68,6 +68,13 @@ void Diagnostics::Initialize(const std::filesystem::path& directory)
     file_ = directory / "m1core.log";
     events_.clear();
     initialized_ = !directory.empty();
+    diskEnabled_ = true; // tests and normal standalone callers retain old behavior.
+}
+
+void Diagnostics::SetDiskEnabled(bool enabled)
+{
+    std::lock_guard lock(mutex_);
+    diskEnabled_ = enabled;
 }
 
 bool Diagnostics::Write(LogLevel level, std::string_view source, std::string_view message)
@@ -83,6 +90,11 @@ bool Diagnostics::Write(LogLevel level, std::string_view source, std::string_vie
     if (events_.size() == kMemoryLimit)
         events_.pop_front();
     events_.push_back(event);
+
+    // Never open or flush files while Cyberpunk is still displaying its
+    // opening splash/title screen. Events remain visible in the log panel.
+    if (!diskEnabled_)
+        return true;
 
     // If disk is unwritable, keep the event in memory without crashing.
     std::error_code ec;

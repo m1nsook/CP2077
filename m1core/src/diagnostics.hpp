@@ -26,6 +26,9 @@ class Diagnostics final
 public:
     static Diagnostics& Get();
     void Initialize(const std::filesystem::path& directory);
+    // Keep early plugin loading memory-only; avoid blocking the title screen
+    // on log-file create/append/flush. Enable disk logging after gameplay.
+    void SetDiskEnabled(bool enabled);
     bool Write(LogLevel level, std::string_view source, std::string_view message);
     std::vector<LogEvent> Snapshot() const;
     void ClearView();
@@ -35,6 +38,7 @@ private:
     std::filesystem::path file_;
     std::deque<LogEvent> events_;
     bool initialized_ = false;
+    bool diskEnabled_ = true;
 };
 
 const char* LogLevelName(LogLevel level);

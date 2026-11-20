@@ -9,7 +9,9 @@
 
 #include <Windows.h>
 #include <filesystem>
+#include <atomic>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -43,6 +45,27 @@ void Available(Scriptable*, Frame* frame, bool* out, int64_t)
 void GameplayAttached(Scriptable*, Frame* frame, bool* out, int64_t)
 {
     frame->code++;
+    // CET keeps its input bridge passive until input is explicitly trapped.
+    // The other startup cost in m1core was disk JSON loading and log flushing
+    // from plugin Main(Load). Perform those operations only *after* the
+    // title screen, before mods register their gameplay settings.
+    static std::once_flag persistenceOnce;
+    std::call_once(persistenceOnce, [] {
+        if (g_settings) {
+            const bool settingsLoaded = g_settings->Load();
+            const bool profilesLoaded = g_settings->LoadProfiles();
+            g_persistenceReady.store(settingsLoaded, std::memory_order_release);
+            m1core::Diagnostics::Get().SetDiskEnabled(true);
+            if (!settingsLoaded)
+                m1core::Diagnostics::Get().Write(m1core::LogLevel::Warning,
+                    "m1core", "settings.json unreadable; retained until manually fixed");
+            if (!profilesLoaded)
+                m1core::Diagnostics::Get().Write(m1core::LogLevel::Warning,
+                    "m1core", "profiles.json unreadable; profiles unavailable");
+            m1core::Diagnostics::Get().Write(m1core::LogLevel::Info,
+                "m1core", "gameplay attached; persisted settings now hydrated");
+        }
+    });
     m1core::NotifyPlayerAttached();
     Output(out, true);
 }
@@ -359,7 +382,9 @@ void WriteLog(Scriptable*, Frame* frame, bool* out, int64_t)
 void Save(Scriptable*, Frame* frame, bool* out, int64_t)
 {
     frame->code++;
-    Output(out, g_settings && g_settings->Save());
+    // Saving before the first load could wipe an existing settings.json.
+    Output(out, g_settings && g_persistenceReady.load(std::memory_order_acquire)
+                          && g_settings->Save());
 }
 
 template<typename T>
@@ -484,23 +509,13 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
             return false;
         }
         m1core::Diagnostics::Get().Initialize(config.parent_path());
+        m1core::Diagnostics::Get().SetDiskEnabled(false);
         m1core::Diagnostics::Get().Write(m1core::LogLevel::Info, "m1core",
                                          "v0.5.0-dev loading; Cyberpunk 2.50");
+        // Do not touch user configuration files during splash/title input.
+        // The first real PlayerPuppet attach loads and hydrates saved values.
         g_settings = std::make_unique<m1core::Registry>(config);
-        if (!g_settings->Load())
-        {
-            if (g_logger)
-                g_logger->Warn(g_handle, "m1core: settings.json could not be read; defaults will be used");
-            m1core::Diagnostics::Get().Write(m1core::LogLevel::Warning, "m1core",
-                                              "settings.json unreadable; using defaults");
-        }
-        if (!g_settings->LoadProfiles())
-        {
-            if (g_logger)
-                g_logger->Warn(g_handle, "m1core: profiles.json could not be read; profiles unavailable");
-            m1core::Diagnostics::Get().Write(m1core::LogLevel::Warning, "m1core",
-                                              "profiles.json unreadable; profiles unavailable");
-        }
+        g_persistenceReady.store(false, std::memory_order_release);
         RED4ext::CRTTISystem::Get()->AddPostRegisterCallback(RegisterNatives);
         m1core::StartOverlay(*g_settings, config.parent_path(), handle, sdk);
         if (g_logger)
@@ -509,7 +524,10 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
     }
     case RED4ext::v1::EMainReason::Unload:
         m1core::StopOverlay();
-        if (g_settings && !g_settings->Save())
+        // Do not overwrite existing JSON if the player quit on the title
+        // screen, or if its saved config could not be read successfully.
+        if (g_settings && g_persistenceReady.load(std::memory_order_acquire) &&
+            !g_settings->Save())
         {
             if (g_logger)
                 g_logger->Warn(g_handle, "m1core: settings save failed");

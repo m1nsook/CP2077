@@ -158,6 +158,11 @@ bool Registry::Load()
             return true;
         }
 
+        // A broken or unexpectedly large settings file must not stall the
+        // first gameplay attach or exhaust memory. Profiles already have a
+        // matching cap.
+        if (std::filesystem::file_size(file_) > 4 * 1024 * 1024)
+            return false;
         std::ifstream input(file_, std::ios::binary);
         if (!input)
             return false;
@@ -184,6 +189,21 @@ bool Registry::Load()
 
         std::lock_guard lock(mutex_);
         persisted_ = std::move(loaded);
+        // Startup is now non-blocking: the framework registers its own menu
+        // key and preview controls *before* the saved JSON is loaded in-game.
+        // Hydrate already-registered controls too, or the player's chosen
+        // menu key would appear unbound until another restart. Preserve
+        // settings metadata and increment revision only on real changes.
+        for (auto& [modId, settings] : registered_) {
+            const auto savedMod = persisted_.find(modId);
+            if (savedMod == persisted_.end()) continue;
+            for (auto& [settingId, setting] : settings) {
+                const auto saved = savedMod->second.find(settingId);
+                if (saved != savedMod->second.end() &&
+                    saved->second.first == setting.kind)
+                    UpdateValue(setting, Clamp(setting, saved->second.second));
+            }
+        }
         return true;
     }
     catch (...)

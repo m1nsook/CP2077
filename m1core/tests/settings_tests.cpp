@@ -86,6 +86,25 @@ int main()
         CHECK(registry.Save());
     }
     {
+        // CET-style passive startup: core/menu controls can be registered
+        // before reading disk, then hydrated from saved values on gameplay
+        // attach. Metadata and the chosen key must survive unchanged.
+        m1core::Registry late(file);
+        CHECK(late.RegisterKeybind(1, 5, 0));
+        CHECK(late.SetDisplayName(1, 5, "Open / Close Menu"));
+        CHECK(late.RegisterBool(1, 1, true));
+        CHECK(late.GetKeybind(1, 5) == 0);
+        CHECK(late.GetBool(1, 1) == true);
+        CHECK(late.Load());
+        CHECK(late.GetKeybind(1, 5) == 0x72); // Previously saved F3.
+        CHECK(late.GetBool(1, 1) == true); // Reset in the prior block.
+        CHECK(late.Revision(1, 5) == 1);
+        const auto snap = late.Snapshot();
+        CHECK(snap[0].settings[4].displayName == "Open / Close Menu");
+        CHECK(late.Save());
+    }
+
+    {
         // An inactive module must not lose its saved values.
         m1core::Registry registry(file);
         CHECK(registry.Load());
