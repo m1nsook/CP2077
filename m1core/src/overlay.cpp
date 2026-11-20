@@ -668,6 +668,15 @@ void Draw(IDXGISwapChain* swapchain)
 
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
+    // Dear ImGui must draw in the actual swapchain backbuffer coordinate
+    // space, not assume the HWND client pixels are identical. When they
+    // differ, RawInputBridge maps the physical pointer accordingly. This
+    // prevents cropped/oversized fullscreen panels and offset hit targets.
+    const auto backbuffer = frame.buffer->GetDesc();
+    if (backbuffer.Width > 0 && backbuffer.Width <= 16384 &&
+        backbuffer.Height > 0 && backbuffer.Height <= 16384)
+        ImGui::GetIO().DisplaySize = ImVec2(static_cast<float>(backbuffer.Width),
+                                             static_cast<float>(backbuffer.Height));
     // No virtual RAWINPUT pointer and no process-wide Win32 cursor detours:
     // Cyberpunk owns the real cursor and Windows applies native pointer speed.
     const bool systemCursor = CursorDetoursAvailable();

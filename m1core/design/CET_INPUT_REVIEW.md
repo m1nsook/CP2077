@@ -81,3 +81,9 @@ speed), validates that the OS cursor is within the client bounds, and
 resets mouse position to unavailable when another monitor owns it.
 The new test covers matched resolutions, unequal client/render sizes,
 negative coordinates and invalid dimensions.
+
+The Present hook also now sets `ImGuiIO::DisplaySize` from the actual
+swapchain backbuffer dimensions *before* `ImGui::NewFrame()`; the stock Win32
+backend otherwise reports HWND client size even when render dimensions differ.
+This completes the client-to-render mapping instead of adding a scaling helper
+that would never be exercised. It is not a user-configurable sensitivity.
