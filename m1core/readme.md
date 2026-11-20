@@ -128,8 +128,38 @@ console if one is installed. Return **0** means registration, metadata,
 revision and reset checks succeeded. This console is only a test mechanism,
 not a required dependency of m1core.
 
-**Remaining M5 work:** mod-owned keybind action/event delivery, additional
-configuration metadata, and further profile-management UX. Do not mistake the
+### M5 native keybind actions (polling API)
+
+`M1Core_PollKeybindPressed(modName, settingId)` returns true once per
+fresh key press of that mod's **registered Keybind setting**. Example:
+
+```redscript
+// Register once on initialization:
+M1Core_RegisterKeybindSetting(n"ExampleMod", n"QuickAction", 117); // F6
+// In the mod's regular game update (call every tick, not only when held):
+if M1Core_PollKeybindPressed(n"ExampleMod", n"QuickAction") {
+    // Run the mod's own action here.
+}
+```
+
+- No CET dependency and no Win32 keyboard hook needed in the consuming mod.
+- Keybind values already saved in settings.json are used as-is.
+- First call primes the current state (a key already held will not fire).
+- Repeats and held keys produce no extra event; release and repress to fire.
+- The call is suppressed while the m1core window is open or Cyberpunk is not
+  the foreground application; overlay/focus changes invalidate held keys.
+- F11 is always reserved. Unbound keys and unregistered settings never fire.
+- Other mods binding the same VK are independent; collisions are not
+  automatically resolved.
+- **Current limit:** this is *edge polling*, not an asynchronous event queue.
+  Mods must call every game update. A very short press entirely between two
+  polls may be missed. A future native event dispatcher can address this.
+
+The internal state machine has dedicated CTest coverage for held keys, repeats,
+rebinds, focus suppression, reserved keys, and independent mod actions.
+
+**Remaining M5 work:** native action event buffering/dispatch, improved mod
+lifecycle metadata, and further profile-management UX. Do not mistake the
 new polling revision API for a full gameplay event system.
 
 ## Native diagnostic log and in-game Logs panel (post-v0.4.0 development)

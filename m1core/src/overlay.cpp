@@ -3,6 +3,7 @@
 #include "cursor.hpp"
 #include "raw_input.hpp"
 #include "settings.hpp"
+#include "keybind_actions.hpp"
 #include "ui.hpp"
 
 #include <RED4ext/RED4ext.hpp>
@@ -117,6 +118,7 @@ bool IsFocused()
 
 void CloseOverlay()
 {
+    KeybindActions::Get().Invalidate();
     {
         std::lock_guard lock(g_stateMutex);
         g_gate.Close();
@@ -182,12 +184,14 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     }
 
     if (message == WM_SETFOCUS || (message == WM_ACTIVATEAPP && wparam)) {
+        KeybindActions::Get().Invalidate();
         std::lock_guard lock(g_stateMutex);
         if (g_gate.IsOpen())
             g_gate.SetGameFocused(true);
     }
 
     if (message == WM_KILLFOCUS || (message == WM_ACTIVATEAPP && !wparam)) {
+        KeybindActions::Get().Invalidate();
         std::lock_guard lock(g_stateMutex);
         g_gate.SetGameFocused(false);
         g_messages.clear();
@@ -436,6 +440,7 @@ void ProcessHotkeys()
 
     bool capture = false;
     bool closed = false;
+    bool toggled = false;
     {
         std::lock_guard lock(g_stateMutex);
         const bool wasOpen = g_gate.IsOpen();
@@ -446,12 +451,15 @@ void ProcessHotkeys()
             g_gate.Toggle();
         capture = g_gate.MayCaptureInput();
         closed = wasOpen && !g_gate.IsOpen();
+        toggled = wasOpen != g_gate.IsOpen();
         if (!capture) {
             g_messages.clear();
             g_rawSamples.clear();
         }
     }
     g_f11WasDown = f11;
+    if (toggled)
+        KeybindActions::Get().Invalidate();
 
     if (closed) {
         const bool saved = g_registry && g_registry->Save();
@@ -738,6 +746,12 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
                             "Press the button to record a key. F11 remains reserved for m1core.");
     g_enabled.store(true);
     Log("m1core overlay: opted in; waiting for Cyberpunk swap chain");
+}
+
+bool IsOverlayOpen()
+{
+    std::lock_guard lock(g_stateMutex);
+    return g_gate.IsOpen();
 }
 
 void StopOverlay()

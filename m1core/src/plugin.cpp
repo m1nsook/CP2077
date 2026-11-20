@@ -1,6 +1,7 @@
 #include "settings.hpp"
 #include "overlay.hpp"
 #include "diagnostics.hpp"
+#include "keybind_actions.hpp"
 
 #include <RED4ext/RED4ext.hpp>
 #include <RED4ext/CName.hpp>
@@ -154,6 +155,34 @@ void GetEnum(Scriptable*, Frame* frame, std::int32_t* out, int64_t)
     RED4ext::GetParameter(frame, &id);
     frame->code++;
     Output(out, g_settings ? g_settings->GetEnum(mod.hash, id.hash).value_or(0) : 0);
+}
+
+void PollKeybindPressed(Scriptable*, Frame* frame, bool* out, int64_t)
+{
+    Name mod, id;
+    RED4ext::GetParameter(frame, &mod);
+    RED4ext::GetParameter(frame, &id);
+    frame->code++;
+
+    // The REDscript mod calls this from its own update. No callback,
+    // input interception, or CET dependency is introduced.
+    const auto vk = g_settings ? g_settings->GetKeybind(mod.hash, id.hash) : std::nullopt;
+    if (!vk)
+    {
+        Output(out, false);
+        return;
+    }
+
+    const HWND foreground = GetForegroundWindow();
+    DWORD process = 0;
+    if (foreground)
+        GetWindowThreadProcessId(foreground, &process);
+    const bool allowed = foreground && process == GetCurrentProcessId() &&
+                         !m1core::IsOverlayOpen();
+    const bool pressed = *vk > 0 && *vk < 256 &&
+                         (GetAsyncKeyState(*vk) & 0x8000) != 0;
+    Output(out, m1core::KeybindActions::Get().Poll(mod.hash, id.hash,
+                                                   *vk, pressed, allowed));
 }
 
 void GetKeybind(Scriptable*, Frame* frame, std::int32_t* out, int64_t)
@@ -350,6 +379,8 @@ void RegisterNatives()
                    {{"CName", "modName"}, {"CName", "settingId"}, {"Int32", "defaultVirtualKey"}}, "Bool");
     RegisterNative("M1Core_GetEnumSetting", &GetEnum,
                    {{"CName", "modName"}, {"CName", "settingId"}}, "Int32");
+    RegisterNative("M1Core_PollKeybindPressed", &PollKeybindPressed,
+                   {{"CName", "modName"}, {"CName", "settingId"}}, "Bool");
     RegisterNative("M1Core_GetKeybindSetting", &GetKeybind,
                    {{"CName", "modName"}, {"CName", "settingId"}}, "Int32");
     RegisterNative("M1Core_SetEnumSetting", &SetEnum,
@@ -470,6 +501,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
         }
         m1core::Diagnostics::Get().Write(m1core::LogLevel::Info, "m1core", "plugin unloaded");
         g_settings.reset();
+        m1core::KeybindActions::Get().Reset();
         return true;
     }
     return true;

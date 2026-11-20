@@ -23,6 +23,10 @@ public static native func M1Core_SetEnumSetting(modName: CName, settingId: CName
 // execute mod actions; the mod consumes this setting through its own input code.
 public static native func M1Core_RegisterKeybindSetting(modName: CName, settingId: CName, defaultVirtualKey: Int32) -> Bool;
 public static native func M1Core_GetKeybindSetting(modName: CName, settingId: CName) -> Int32;
+// Poll once per game update to detect a fresh key press, even with RIDEV_NOLEGACY.
+// First poll primes state; holding/repeating does not retrigger. F11 reserved.
+// Suppressed while m1core menu is open or Cyberpunk is not foreground.
+public static native func M1Core_PollKeybindPressed(modName: CName, settingId: CName) -> Bool;
 public static native func M1Core_SetKeybindSetting(modName: CName, settingId: CName, virtualKey: Int32) -> Bool;
 
 // Optional display grouping (register the setting first). Group labels are

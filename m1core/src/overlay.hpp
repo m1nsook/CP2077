@@ -12,4 +12,6 @@ class Registry;
 void StartOverlay(Registry& registry, const std::filesystem::path& directory,
                   RED4ext::v1::PluginHandle handle, const RED4ext::v1::Sdk* sdk);
 void StopOverlay();
+// Read-only visibility guard for the mod-owned keybind polling API.
+bool IsOverlayOpen();
 } // namespace m1core
