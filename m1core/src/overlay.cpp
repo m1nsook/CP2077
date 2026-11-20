@@ -215,7 +215,10 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
             message == WM_MBUTTONUP || message == WM_XBUTTONUP)
             return DefSubclassProc(window, message, wparam, lparam);
         if (message == WM_SETCURSOR) {
-            SetCursor(nullptr); // ImGui draws its own cursor while active.
+            // In the normal path use the actual Windows pointer. Never hide
+            // it while disabling ImGui's separate painted cursor.
+            SetCursor(CursorDetoursAvailable() ?
+                      LoadCursorW(nullptr, IDC_ARROW) : nullptr);
             return TRUE;
         }
         return 0;

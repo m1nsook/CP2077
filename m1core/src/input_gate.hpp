@@ -34,6 +34,9 @@ public:
 
     bool Toggle() noexcept
     {
+        // Ignore toggles while using a different desktop window.
+        if (!focused_)
+            return false;
         if (open_)
         {
             Close();
