@@ -21,10 +21,21 @@ void* g_setPosTarget = nullptr;
 void* g_clipTarget = nullptr;
 RED4ext::v1::PluginHandle g_handle{};
 const RED4ext::v1::Sdk* g_sdk = nullptr;
-bool g_hooksInstalled = false;
+std::atomic_bool g_hooksInstalled{false};
 HWND g_gameWindow = nullptr;
-int g_cursorShowAdjustments = 0;
+UINT g_cursorSyncMessage = 0;
+std::atomic_bool g_visibilityUpdateQueued{false};
+int g_cursorShowAdjustments = 0; // Modified only on the game HWND thread.
 constexpr int kMaxCursorShowAdjustments = 32;
+
+void ScheduleCursorVisibilityUpdate()
+{
+    if (!g_gameWindow || !g_cursorSyncMessage ||
+        g_visibilityUpdateQueued.exchange(true, std::memory_order_acq_rel))
+        return;
+    if (!PostMessageW(g_gameWindow, g_cursorSyncMessage, 0, 0))
+        g_visibilityUpdateQueued.store(false, std::memory_order_release);
+}
 
 // ShowCursor has a display counter, not a boolean. Balance only our own
 // increments on close; never call it unconditionally every frame.
@@ -96,6 +107,9 @@ bool InstallCursorDetours(RED4ext::v1::PluginHandle plugin, const RED4ext::v1::S
     g_handle = plugin;
     g_sdk = sdk;
     g_gameWindow = gameWindow;
+    g_cursorSyncMessage = RegisterWindowMessageW(L"m1core.cursor.visibility.v1");
+    if (!g_cursorSyncMessage)
+        return false;
     const bool setPosOk = sdk->hooking->Attach(plugin, g_setPosTarget,
         reinterpret_cast<void*>(&SetCursorPosHook),
         reinterpret_cast<void**>(&g_originalSetPos));
@@ -107,6 +121,8 @@ bool InstallCursorDetours(RED4ext::v1::PluginHandle plugin, const RED4ext::v1::S
             sdk->hooking->Detach(plugin, g_setPosTarget);
         g_originalSetPos = nullptr;
         g_originalClip = nullptr;
+        g_gameWindow = nullptr;
+        g_cursorSyncMessage = 0;
         return false;
     }
     g_hooksInstalled = true;
@@ -125,47 +141,93 @@ void SetCursorCaptured(bool active)
         return;
     }
 
-    // Focus notifications can arrive on the window thread while Present is
-    // running on the render thread: serialize pointer/clip transitions.
-    std::lock_guard lock(g_clipMutex);
-    const bool wasActive = g_capture.exchange(active, std::memory_order_acq_rel);
-    if (wasActive == active)
-        return;
+    // Clip transitions can occur from the Present or HWND thread.
+    {
+        std::lock_guard lock(g_clipMutex);
+        const bool wasActive = g_capture.exchange(active, std::memory_order_acq_rel);
+        if (wasActive == active)
+            return;
 
-    if (active) {
-        RECT oldClip{};
-        if (GetClipCursor(&oldClip)) {
-            g_restoreClip = oldClip;
-            g_hasRestoreClip = true;
+        if (active) {
+            RECT oldClip{};
+            if (GetClipCursor(&oldClip)) {
+                g_restoreClip = oldClip;
+                g_hasRestoreClip = true;
+            }
+            g_originalClip(nullptr);
+        } else {
+            const bool focused = g_gameWindow && GetForegroundWindow() == g_gameWindow;
+            g_originalClip(focused && g_hasRestoreClip ? &g_restoreClip : nullptr);
         }
-        // Call original APIs to prevent recursion in our user32 detours.
-        g_originalClip(nullptr);
-        ShowSystemPointerWhenNeeded();
-    } else {
-        // Never trap the pointer inside the game after switching monitors.
-        const bool focused = g_gameWindow && GetForegroundWindow() == g_gameWindow;
-        g_originalClip(focused && g_hasRestoreClip ? &g_restoreClip : nullptr);
-        RestoreCursorVisibility();
     }
+    // The ShowCursor counter is PER-THREAD. Never adjust it on the DX12
+    // Present thread: hand visibility changes to the HWND owner instead.
+    if (GetCurrentThreadId() == GetWindowThreadProcessId(g_gameWindow, nullptr)) {
+        std::lock_guard lock(g_clipMutex);
+        if (active) ShowSystemPointerWhenNeeded();
+        else RestoreCursorVisibility();
+    } else {
+        ScheduleCursorVisibilityUpdate();
+    }
+}
+
+bool HandleCursorVisibilityMessage(UINT message)
+{
+    if (!g_cursorSyncMessage || message != g_cursorSyncMessage)
+        return false;
+    g_visibilityUpdateQueued.store(false, std::memory_order_release);
+    std::lock_guard lock(g_clipMutex);
+    if (g_capture.load(std::memory_order_acquire))
+        ShowSystemPointerWhenNeeded();
+    else
+        RestoreCursorVisibility();
+    return true;
+}
+
+void RestoreSystemCursorOnWindowThread()
+{
+    std::lock_guard lock(g_clipMutex);
+    RestoreCursorVisibility();
 }
 
 void EnsureSystemCursorVisible()
 {
-    if (!g_hooksInstalled)
+    if (!g_hooksInstalled || !g_capture.load(std::memory_order_acquire))
         return;
-    std::lock_guard lock(g_clipMutex);
-    ShowSystemPointerWhenNeeded();
+    CURSORINFO info{sizeof(info)};
+    if (GetCursorInfo(&info) && (info.flags & CURSOR_SHOWING))
+        return;
+    if (GetCurrentThreadId() == GetWindowThreadProcessId(g_gameWindow, nullptr)) {
+        std::lock_guard lock(g_clipMutex);
+        ShowSystemPointerWhenNeeded();
+    } else {
+        ScheduleCursorVisibilityUpdate();
+    }
 }
 
 void RemoveCursorDetours()
 {
     SetCursorCaptured(false);
+    if (g_gameWindow && g_cursorSyncMessage &&
+        GetCurrentThreadId() != GetWindowThreadProcessId(g_gameWindow, nullptr))
+    {
+        // Flush a pending visibility restoration on the HWND thread before
+        // detaching, without ever waiting indefinitely for a hung window.
+        DWORD_PTR ignored = 0;
+        SendMessageTimeoutW(g_gameWindow, g_cursorSyncMessage, 0, 0,
+                            SMTO_ABORTIFHUNG | SMTO_BLOCK, 250, &ignored);
+    }
+    else if (g_gameWindow)
+        RestoreSystemCursorOnWindowThread();
     if (g_hooksInstalled && g_sdk && g_sdk->hooking) {
         // Restore BEFORE detaching, while both original trampolines exist.
         g_sdk->hooking->Detach(g_handle, g_clipTarget);
         g_sdk->hooking->Detach(g_handle, g_setPosTarget);
     }
     g_hooksInstalled = false;
+    g_visibilityUpdateQueued.store(false, std::memory_order_release);
+    g_cursorSyncMessage = 0;
+    // All ShowCursor adjustments were restored on the HWND thread above.
     g_cursorShowAdjustments = 0;
     g_originalSetPos = nullptr;
     g_originalClip = nullptr;

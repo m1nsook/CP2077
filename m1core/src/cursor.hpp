@@ -23,4 +23,8 @@ void RemoveCursorDetours();
 // These never reposition the real cursor or constrain it to the game monitor.
 bool CursorDetoursAvailable();
 void EnsureSystemCursorVisible();
+// Called from the game's WndProc subclass, so ShowCursor always executes on
+// the game window's own thread (its visibility counter is per-thread).
+bool HandleCursorVisibilityMessage(UINT message);
+void RestoreSystemCursorOnWindowThread();
 } // namespace m1core

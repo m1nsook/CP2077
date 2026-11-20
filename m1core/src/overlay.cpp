@@ -158,8 +158,12 @@ bool IsMouseMessage(UINT msg)
 LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM lparam,
                                  UINT_PTR, DWORD_PTR)
 {
+    if (HandleCursorVisibilityMessage(message))
+        return 0;
+
     if (message == WM_NCDESTROY) {
         CloseOverlay();
+        RestoreSystemCursorOnWindowThread();
         RemoveWindowSubclass(window, WindowSubclass, kSubclassId);
         g_subclassed = false;
         g_window = nullptr;
