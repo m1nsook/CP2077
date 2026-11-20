@@ -109,8 +109,10 @@ void Warn(const char* message)
 
 bool IsFocused()
 {
-    return g_window && IsWindow(g_window) &&
-           (GetForegroundWindow() == g_window || GetActiveWindow() == g_window);
+    // GetActiveWindow is thread-relative and may still name Cyberpunk while
+    // another monitor's application owns the desktop foreground. Capture
+    // only when the game really is the foreground window.
+    return g_window && IsWindow(g_window) && GetForegroundWindow() == g_window;
 }
 
 void CloseOverlay()
