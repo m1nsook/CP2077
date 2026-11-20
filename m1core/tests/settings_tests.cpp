@@ -255,6 +255,33 @@ int main()
     }
 
     {
+        const auto renameFile = directory / "rename" / "settings.json";
+        m1core::Registry registry(renameFile);
+        CHECK(registry.Load());
+        CHECK(registry.LoadProfiles());
+        CHECK(registry.RegisterBool(12, 1, true));
+        CHECK(registry.SaveProfile("Stealth"));
+        CHECK(registry.SetBool(12, 1, false));
+        CHECK(registry.SaveProfile("Combat"));
+        CHECK(!registry.RenameProfile("Combat", "Stealth"));
+        CHECK(!registry.RenameProfile("Unknown", "Explorer"));
+        CHECK(!registry.RenameProfile("Combat", " bad "));
+        CHECK(!registry.RenameProfile("Combat", "Combat"));
+        CHECK(registry.RenameProfile("Combat", "Explorer"));
+        CHECK(!registry.ActivateProfile("Combat"));
+        CHECK(registry.GetBool(12, 1) == false);
+        CHECK(registry.ListProfiles().size() == 2);
+        CHECK(registry.ActivateProfile("Stealth"));
+        CHECK(registry.GetBool(12, 1) == true);
+        m1core::Registry reloaded(renameFile);
+        CHECK(reloaded.LoadProfiles());
+        CHECK(reloaded.ListProfiles().size() == 2);
+        CHECK(reloaded.RegisterBool(12, 1, true));
+        CHECK(reloaded.ActivateProfile("Explorer"));
+        CHECK(reloaded.GetBool(12, 1) == false);
+    }
+
+    {
         std::ofstream output(profilesFile, std::ios::trunc);
         output << "{ damaged profiles";
     }

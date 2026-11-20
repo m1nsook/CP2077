@@ -363,6 +363,23 @@ bool Registry::DeleteProfile(const std::string& name)
     return true;
 }
 
+bool Registry::RenameProfile(const std::string& oldName, const std::string& newName)
+{
+    if (!ValidProfileName(oldName) || !ValidProfileName(newName) || oldName == newName)
+        return false;
+    std::lock_guard lock(mutex_);
+    if (!profiles_.contains(oldName) || profiles_.contains(newName))
+        return false;
+    auto next = profiles_;
+    auto moved = next.extract(oldName);
+    moved.key() = newName;
+    next.insert(std::move(moved));
+    if (!WriteProfiles(next))
+        return false;
+    profiles_ = std::move(next);
+    return true;
+}
+
 std::vector<std::string> Registry::ListProfiles() const
 {
     std::lock_guard lock(mutex_);

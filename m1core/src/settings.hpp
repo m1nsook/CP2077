@@ -66,6 +66,8 @@ public:
     bool SaveProfile(const std::string& name);
     bool ActivateProfile(const std::string& name);
     bool DeleteProfile(const std::string& name);
+    // Atomic rename; cannot overwrite another profile or modify active values.
+    bool RenameProfile(const std::string& oldName, const std::string& newName);
     std::vector<std::string> ListProfiles() const;
 
     bool RegisterBool(Id mod, Id id, bool defaultValue);
