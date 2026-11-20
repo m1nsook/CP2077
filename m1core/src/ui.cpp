@@ -256,10 +256,18 @@ bool DrawSettingsTable(Registry& registry, Id mod, const std::vector<SettingSnap
     }
     std::vector<Id> order;
     for (const auto& [group, _] : grouped) order.push_back(group);
-    std::sort(order.begin(), order.end(), [](Id lhs, Id rhs) {
-        if (lhs == 0) return true;
-        if (rhs == 0) return false;
-        return Label(lhs) < Label(rhs);
+    // Group order mirrors the user's final.html, not a lexical hash order.
+    const auto priority = [](Id group) {
+        if (group == 0) return 0;
+        const auto name = Label(group);
+        if (name == "General") return 0;
+        if (name == "Gameplay") return 1;
+        if (name == "Controls" || name == "Hotkeys") return 2;
+        return 3;
+    };
+    std::stable_sort(order.begin(), order.end(), [&](Id lhs, Id rhs) {
+        const int a = priority(lhs), b = priority(rhs);
+        return a != b ? a < b : Label(lhs) < Label(rhs);
     });
     bool changed = false;
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0F);
@@ -573,7 +581,7 @@ void DrawProfiles(Registry& registry)
 
 } // namespace
 
-void RenderSettings(Registry& registry, bool& open)
+void RenderSettings(Registry& registry, bool& open, bool interactive)
 {
     // Fullscreen workspace follows the user's m1core-skeleton/main.cpp and
     // NCREC fixed-region composition. No floating/resizeable cheat-menu
@@ -592,7 +600,11 @@ void RenderSettings(Registry& registry, bool& open)
         firstRunSelected = true;
     }
 
-    const auto mods = registry.Snapshot();
+    auto mods = registry.Snapshot();
+    // Present mods in an understandable order; hashed IDs aren't a UI order.
+    std::stable_sort(mods.begin(), mods.end(), [](const ModSnapshot& a, const ModSnapshot& b) {
+        return Label(a.id) < Label(b.id);
+    });
     if (mods.empty()) selected = 0;
     else if (std::none_of(mods.begin(),mods.end(),
         [](const ModSnapshot& mod) { return mod.id == selected; }))
@@ -616,6 +628,10 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::PopStyleVar(3);
     if (!visible) { ImGui::End(); return; }
 
+    // Child widgets are explicitly positioned within the viewport. Dear
+    // ImGui's ItemSpacing after BeginChild otherwise adds 9px per region,
+    // pushing the bottom footer off-screen even at 1920x1080.
+    ImGui::SetCursorPos(ImVec2(0.0F, layout.header.y));
     // Header: the fixed 56px dark toolbar from the user's source.
     ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(7/255.0F,7/255.0F,9/255.0F,1));
     ImGui::BeginChild("##m1coreHeader",ImVec2(0,layout.header.height),
@@ -651,6 +667,7 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::PopStyleColor();
 
     // Navigation is a separate fixed 44px strip, never inside a scrolling pane.
+    ImGui::SetCursorPos(ImVec2(0.0F, layout.tabs.y));
     ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(9/255.0F,9/255.0F,11/255.0F,1));
     ImGui::BeginChild("##m1coreTabs",ImVec2(0,layout.tabs.height),
         ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
@@ -692,14 +709,24 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::EndChild();
     ImGui::PopStyleColor();
 
+    ImGui::SetCursorPos(ImVec2(0.0F, layout.body.y));
     ImGui::BeginChild("##m1coreBody",ImVec2(0,layout.body.height),
         ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
     const bool keybindsOnly = page == Page::Keybinds;
     if (layout.showSidebar && sidebarOn) {
         ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(10/255.0F,10/255.0F,13/255.0F,1));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0F);
         ImGui::BeginChild("##m1coreSidebar",ImVec2(layout.sidebar.width,0),
-            ImGuiChildFlags_Borders,ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+            ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        ImGui::PopStyleVar();
+        // Only a straight 1px separator, as in the user's flat sidebar.
+        const ImVec2 sideMin = ImGui::GetWindowPos();
+        const ImVec2 sideSize = ImGui::GetWindowSize();
+        ImGui::GetWindowDrawList()->AddLine(
+            ImVec2(sideMin.x+sideSize.x-1.0F,sideMin.y),
+            ImVec2(sideMin.x+sideSize.x-1.0F,sideMin.y+sideSize.y),
+            IM_COL32(39,39,42,255));
         ImGui::SetCursorPos(ImVec2(14,14));
         ImGui::TextDisabled("REGISTERED MODS");
         ImGui::SameLine();
@@ -742,7 +769,8 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::BeginChild("##m1coreContentHost",ImVec2(0,0),
         ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     const float availableWidth = ImGui::GetContentRegionAvail().x;
-    const float centerWidth = (std::min)(940.0F,(std::max)(300.0F,availableWidth-48.0F));
+    const float centerWidth = (std::max)(1.0F,
+        (std::min)(940.0F, availableWidth - (availableWidth > 360.0F ? 48.0F : 16.0F)));
     const float offset = (std::max)(0.0F,(availableWidth-centerWidth)*0.5F);
     ImGui::SetCursorPosX(ImGui::GetCursorPosX()+offset);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));
@@ -849,6 +877,7 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::EndChild(); // body
 
     // Fixed bottom action bar. All actions connect to real Registry methods.
+    ImGui::SetCursorPos(ImVec2(0.0F, layout.footer.y));
     ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(7/255.0F,7/255.0F,9/255.0F,1));
     ImGui::BeginChild("##m1coreFooter",ImVec2(0,layout.footer.height),
         ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
@@ -893,8 +922,15 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::EndChild();
     ImGui::PopStyleColor();
 
-    g_dirty |= PollCapture(registry);
+    if (interactive)
+        g_dirty |= PollCapture(registry);
     ImGui::End();
+}
+
+void OnOverlayFocusLost()
+{
+    g_capture.active = false;
+    g_bindCaptureActive.store(false);
 }
 
 void OnOverlayHidden(bool persisted)

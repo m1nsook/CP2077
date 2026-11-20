@@ -90,6 +90,7 @@ bool g_wasCapturingLastFrame = false;
 UINT g_pendingFrames = 0;
 std::atomic_bool g_enabled{false};
 std::atomic_bool g_renderError{false};
+std::atomic_bool g_focusLostPending{false};
 bool g_hooked = false;
 bool g_subclassed = false;
 bool g_cursorInstallAttempted = false;
@@ -178,7 +179,9 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     // Windows must always be able to close or shut down Cyberpunk. Drop
     // overlay input ownership BEFORE the underlying game handles WM_CLOSE,
     // WM_DESTROY or an OS session-ending message. Never consume these.
-    if (IsWindowCloseMessage(message)) {
+    if (IsWindowCloseMessage(message) ||
+        IsSystemCloseCommand(message, wparam) ||
+        IsAltF4Command(message, wparam, lparam)) {
         g_enabled.store(false);
         CloseOverlay();
         SetCursorCaptured(false, true); // Never restore a stale game clip.
@@ -208,7 +211,7 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     // Activate the window, but consume only that first activation click.
     if (message == WM_MOUSEACTIVATE && g_enabled.load()) {
         std::lock_guard lock(g_stateMutex);
-        if (g_gate.IsOpen() && !g_gate.MayCaptureInput())
+        if (g_gate.IsOpen() && !IsFocused())
             return MA_ACTIVATEANDEAT;
     }
 
@@ -216,10 +219,11 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         KeybindActions::Get().Invalidate();
         std::lock_guard lock(g_stateMutex);
         if (g_gate.IsOpen())
-            g_gate.SetGameFocused(true);
+            g_gate.SetGameFocused(IsFocused());
     }
 
     if (message == WM_KILLFOCUS || (message == WM_ACTIVATEAPP && !wparam)) {
+        g_focusLostPending.store(true, std::memory_order_release);
         KeybindActions::Get().Invalidate();
         std::lock_guard lock(g_stateMutex);
         g_gate.SetGameFocused(false);
@@ -229,6 +233,13 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     }
     if (message == WM_KILLFOCUS || (message == WM_ACTIVATEAPP && !wparam))
         SetCursorCaptured(false, true);
+
+    // Focus messages are allowed through above. From this point, never
+    // inspect global keyboard state, queue RAWINPUT, toggle or consume an
+    // event whose real desktop foreground is not the game HWND. The old
+    // code allowed stale cached focus during cross-monitor transitions.
+    if (!IsFocused())
+        return DefSubclassProc(window, message, wparam, lparam);
 
     const int assignedMenuKey = GetOverlayHotkey();
     const bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
@@ -280,7 +291,7 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     bool capture = false;
     if (g_enabled.load()) {
         std::lock_guard lock(g_stateMutex);
-        capture = g_gate.MayCaptureInput();
+        capture = g_gate.MayCaptureInput() && IsFocused();
         if (capture && (IsKeyboardMessage(message) || IsMouseMessage(message))) {
             // Win32 backend receives events on the render thread: never call
             // ImGui from this window thread, where IO would race with NewFrame().
@@ -316,6 +327,16 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         RawSample sample{};
         if (!DecodeRawInput(lparam, sample))
             return DefSubclassProc(window, message, wparam, lparam);
+
+        // RIDEV_NOLEGACY can suppress WM_SYSKEYDOWN entirely. Preserve the
+        // OS quit chord even when m1core is capturing raw input.
+        if (IsRawAltF4(sample.type, sample.vkey, sample.keyFlags,
+                       (GetAsyncKeyState(VK_MENU) & 0x8000) != 0)) {
+            CloseOverlay();
+            SetCursorCaptured(false, true);
+            PostMessageW(window, WM_CLOSE, 0, 0);
+            return DefWindowProcW(window, message, wparam, lparam);
+        }
 
         // Copy raw data NOW, on the window thread. A HRAWINPUT handle may
         // become invalid before the DX12 Present thread processes it.
@@ -498,14 +519,23 @@ void ProcessHotkeys()
 {
     if (!g_startupGate.GameplayReady())
         return;
+    // WndProc runs on the HWND thread and may lose/regain focus between
+    // Present frames. Cancel recorded keys on the render thread even if the
+    // next frame is rendered only after focus has already returned.
+    if (g_focusLostPending.exchange(false, std::memory_order_acq_rel))
+        OnOverlayFocusLost();
+    const bool focused = IsFocused();
     const int selectedKey = GetOverlayHotkey();
-    const bool down = selectedKey > 0 && (GetAsyncKeyState(selectedKey) & 0x8000) != 0;
-    const bool binding = IsCapturingKeybind();
-    const bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
-    const bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
-    const bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
-    const bool win = (GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 ||
-                     (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0;
+    // GetAsyncKeyState is GLOBAL desktop state. Do not poll a key belonging
+    // to another application after Alt+Tab, including the emergency chord.
+    const bool down = focused && selectedKey > 0 &&
+                      (GetAsyncKeyState(selectedKey) & 0x8000) != 0;
+    const bool binding = focused && IsCapturingKeybind();
+    const bool ctrl = focused && (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+    const bool shift = focused && (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+    const bool alt = focused && (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+    const bool win = focused && ((GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 ||
+                                (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0);
     const bool anyModifier = ctrl || shift || alt || win;
     const bool emergency = down && !binding && ctrl && shift && !alt && !win;
     // When a user binds a key while holding it, the first press assigns it,
@@ -525,7 +555,6 @@ void ProcessHotkeys()
     {
         std::lock_guard lock(g_stateMutex);
         const bool wasOpen = g_gate.IsOpen();
-        const bool focused = IsFocused();
         g_gate.SetGameFocused(focused);
         // First-run onboarding is opened by m1core itself (no default key).
         // A key pressed in another app or during binding never toggles it.
@@ -559,11 +588,11 @@ void ProcessHotkeys()
 
     if (capture != g_wasCapturingLastFrame) {
         if (capture)
-            Log(CursorDetoursAvailable()
-                ? "m1core overlay: mouse path = Windows system pointer"
-                : "m1core overlay: mouse path = raw relative fallback (unscaled 1:1)");
+            Log("m1core overlay: mouse path = Cyberpunk engine-owned Windows cursor");
+        else
+            OnOverlayFocusLost(); // Cancel key recording before external keys can bind.
         g_rawBridge.Reset();
-        // ImGui must not retain a pressed button after an Alt+Tab.
+        // ImGui must not retain pressed buttons after Alt+Tab.
         ImGui::GetIO().AddFocusEvent(capture);
         g_wasCapturingLastFrame = capture;
     }
@@ -639,10 +668,10 @@ void Draw(IDXGISwapChain* swapchain)
 
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
+    // No virtual RAWINPUT pointer and no process-wide Win32 cursor detours:
+    // Cyberpunk owns the real cursor and Windows applies native pointer speed.
     const bool systemCursor = CursorDetoursAvailable();
-    // Windows draws the one real cursor, with normal OS acceleration/speed.
-    // Draw a virtual cursor only when the detours are unavailable.
-    ImGui::GetIO().MouseDrawCursor = capturing && !systemCursor;
+    ImGui::GetIO().MouseDrawCursor = false;
     if (capturing) {
         if (systemCursor) EnsureSystemCursorVisible();
         g_rawBridge.Feed(g_window, messages, rawSamples, systemCursor);
@@ -654,7 +683,7 @@ void Draw(IDXGISwapChain* swapchain)
     ImGui::GetBackgroundDrawList()->AddRectFilled(
         ImVec2(0.0F, 0.0F), io.DisplaySize, IM_COL32(0, 0, 0, 140));
     bool windowOpen = true;
-    if (g_registry) RenderSettings(*g_registry, windowOpen);
+    if (g_registry) RenderSettings(*g_registry, windowOpen, capturing);
     if (!windowOpen) {
         const bool saved = g_registry && g_registry->Save();
         OnOverlayHidden(saved);
@@ -739,10 +768,15 @@ bool OnRunningUpdate(RED4ext::CGameApplication*)
             g_window && IsWindow(g_window) &&
             GetCurrentThreadId() == GetWindowThreadProcessId(g_window, nullptr)) {
             g_cursorInstallAttempted = true;
-            if (InstallCursorDetours(g_handle, g_sdk, g_window))
-                Log("m1core: cursor detours ready for optional overlay capture");
-            else
-                Warn("m1core: cursor detours unavailable; RAWINPUT virtual-pointer fallback");
+            if (InstallCursorDetours(g_handle, g_sdk, g_window)) {
+                Log("m1core: Cyberpunk engine cursor service ready; no Win32 detours installed");
+            } else {
+                // Never fall back to a slow virtual pointer or hook the
+                // process-wide Windows cursor. Leave Cyberpunk in control.
+                Warn("m1core: engine cursor unavailable; overlay disabled safely");
+                g_enabled.store(false);
+                CloseOverlay();
+            }
         }
         return true;
     }
@@ -841,6 +875,7 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
     g_previousToggleKey = 0;
     g_toggleWasDown = false;
     g_emergencyWasDown = false;
+    g_focusLostPending.store(false, std::memory_order_release);
     g_handle = handle;
     g_sdk = sdk;
     std::error_code error;

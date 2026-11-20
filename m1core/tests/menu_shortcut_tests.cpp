@@ -30,4 +30,17 @@ int main()
     CHECK(m1core::IsWindowCloseMessage(WM_ENDSESSION));
     CHECK(!m1core::IsWindowCloseMessage(WM_KEYDOWN));
     CHECK(!m1core::IsWindowCloseMessage(WM_SYSCOMMAND));
+    CHECK(m1core::IsSystemCloseCommand(WM_SYSCOMMAND, SC_CLOSE));
+    CHECK(m1core::IsSystemCloseCommand(WM_SYSCOMMAND, SC_CLOSE | 1));
+    CHECK(!m1core::IsSystemCloseCommand(WM_SYSCOMMAND, SC_MINIMIZE));
+    CHECK(!m1core::IsSystemCloseCommand(WM_KEYDOWN, SC_CLOSE));
+    CHECK(m1core::IsAltF4Command(WM_SYSKEYDOWN, VK_F4, static_cast<LPARAM>(1ull << 29)));
+    CHECK(!m1core::IsAltF4Command(WM_KEYDOWN, VK_F4, static_cast<LPARAM>(1ull << 29)));
+    CHECK(!m1core::IsAltF4Command(WM_SYSKEYDOWN, VK_F4, 0));
+    CHECK(!m1core::IsAltF4Command(WM_SYSKEYDOWN, VK_F3, static_cast<LPARAM>(1ull << 29)));
+    CHECK(m1core::IsRawAltF4(RIM_TYPEKEYBOARD, VK_F4, 0, true));
+    CHECK(!m1core::IsRawAltF4(RIM_TYPEKEYBOARD, VK_F4, RI_KEY_BREAK, true));
+    CHECK(!m1core::IsRawAltF4(RIM_TYPEKEYBOARD, VK_F4, 0, false));
+    CHECK(!m1core::IsRawAltF4(RIM_TYPEMOUSE, VK_F4, 0, true));
+    CHECK(!m1core::IsRawAltF4(RIM_TYPEKEYBOARD, VK_F3, 0, true));
 }

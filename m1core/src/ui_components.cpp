@@ -242,10 +242,12 @@ bool NavTab(const char* label, const char* count, bool selected)
         draw->AddRectFilled(aa,bb,color::Raised,4.0F);
         draw->AddText(ImVec2(aa.x+6,aa.y+2),color::Muted,count);
     }
-    if (selected)
+    // Never draw a full rectangular focus ring around navigation tabs:
+    // the user's final.html has only a thin underline. Keyboard focus
+    // shares that indicator without changing the tab into a bordered pill.
+    if (selected || Focused())
         draw->AddLine(ImVec2(a.x+10,b.y-1.0F), ImVec2(b.x-10,b.y-1.0F),
                       color::Foreground,2.0F);
-    FocusRing(draw,a,b,4.0F);
     return clicked;
 }
 

@@ -1,246 +1,167 @@
 #include "cursor.hpp"
 
-#include <RED4ext/RED4ext.hpp>
+#include <RED4ext/CNamePool.hpp>
+#include <RED4ext/GameEngine.hpp>
 
 #include <Windows.h>
 #include <atomic>
-#include <mutex>
+#include <cstdint>
 
 namespace m1core {
 namespace {
-using SetPosFn = BOOL(WINAPI*)(int, int);
-using ClipFn = BOOL(WINAPI*)(const RECT*);
+// m1core uses Cyberpunk's cursor service, rather than intercepting global
+// SetCursorPos/ClipCursor or synthesizing raw mouse movement. The stable
+// engine address hash is also used by CET, but this implementation neither
+// includes nor copies CET's GPL source.
+//
+// Resolve the address gracefully: RED4ext::UniversalRelocFunc terminates
+// the process if the symbol is unavailable. An optional development overlay
+// must never do that to Cyberpunk.
+constexpr std::uint32_t kForceCursorHash = 2130646213u;
+using ForceCursorFn = void (*)(RED4ext::CBaseEngine::UnkD0*, RED4ext::CName, bool);
+using ResolveFn = std::uintptr_t (*)(std::uint32_t);
 
-std::atomic_bool g_capture{false};
-std::mutex g_clipMutex;
-RECT g_restoreClip{};
-bool g_hasRestoreClip = false;
-SetPosFn g_originalSetPos = nullptr;
-ClipFn g_originalClip = nullptr;
-void* g_setPosTarget = nullptr;
-void* g_clipTarget = nullptr;
-RED4ext::v1::PluginHandle g_handle{};
-const RED4ext::v1::Sdk* g_sdk = nullptr;
-std::atomic_bool g_hooksInstalled{false};
-HWND g_gameWindow = nullptr;
-UINT g_cursorSyncMessage = 0;
-std::atomic_bool g_visibilityUpdateQueued{false};
-int g_cursorShowAdjustments = 0; // Modified only on the game HWND thread.
-constexpr int kMaxCursorShowAdjustments = 32;
+std::atomic<ForceCursorFn> g_force{nullptr};
+std::atomic<HWND> g_gameWindow{nullptr};
+std::atomic<UINT> g_syncMessage{0};
+std::atomic_bool g_requested{false};
+std::atomic_bool g_updateQueued{false};
+bool g_applied = false; // HWND thread only
 
-void ScheduleCursorVisibilityUpdate()
+bool IsWindowThread(HWND window)
 {
-    if (!g_gameWindow || !g_cursorSyncMessage ||
-        g_visibilityUpdateQueued.exchange(true, std::memory_order_acq_rel))
+    return window && GetWindowThreadProcessId(window, nullptr) == GetCurrentThreadId();
+}
+
+void ApplyEngineCursorOnWindowThread()
+{
+    const HWND window = g_gameWindow.load(std::memory_order_acquire);
+    const auto function = g_force.load(std::memory_order_acquire);
+    if (!window || !IsWindowThread(window) || !function)
         return;
-    if (!PostMessageW(g_gameWindow, g_cursorSyncMessage, 0, 0))
-        g_visibilityUpdateQueued.store(false, std::memory_order_release);
-}
 
-// ShowCursor has a display counter, not a boolean. Balance only our own
-// increments on close; never call it unconditionally every frame.
-void ShowSystemPointerWhenNeeded()
-{
-    if (!g_capture.load(std::memory_order_acquire))
+    const bool wanted = g_requested.load(std::memory_order_acquire) &&
+                        GetForegroundWindow() == window;
+    if (wanted == g_applied)
         return;
-    CURSORINFO info{sizeof(info)};
-    if (GetCursorInfo(&info) && (info.flags & CURSOR_SHOWING))
+
+    const auto* engine = RED4ext::CGameEngine::Get();
+    if (!engine || !engine->unkD0)
         return;
-    while (g_cursorShowAdjustments < kMaxCursorShowAdjustments)
-    {
-        ++g_cursorShowAdjustments;
-        if (ShowCursor(TRUE) >= 0)
-            break;
-    }
+    static const RED4ext::CName reason = RED4ext::CNamePool::Add("m1core");
+    function(engine->unkD0, reason, wanted);
+    g_applied = wanted;
 }
 
-void RestoreCursorVisibility()
+void RequestWindowThreadUpdate()
 {
-    while (g_cursorShowAdjustments > 0)
-    {
-        ShowCursor(FALSE);
-        --g_cursorShowAdjustments;
+    const HWND window = g_gameWindow.load(std::memory_order_acquire);
+    const UINT message = g_syncMessage.load(std::memory_order_acquire);
+    if (!window || !message)
+        return;
+    if (IsWindowThread(window)) {
+        ApplyEngineCursorOnWindowThread();
+        return;
     }
-}
-
-BOOL WINAPI SetCursorPosHook(int x, int y)
-{
-    // Return success without recentering while m1core owns mouse input.
-    if (g_capture.load(std::memory_order_acquire))
-        return TRUE;
-    return g_originalSetPos ? g_originalSetPos(x, y) : FALSE;
-}
-
-BOOL WINAPI ClipCursorHook(const RECT* requested)
-{
-    if (g_capture.load(std::memory_order_acquire)) {
-        // Record the *latest* clip requested by the game, then keep mouse free.
-        {
-            std::lock_guard lock(g_clipMutex);
-            if (requested) {
-                g_restoreClip = *requested;
-                g_hasRestoreClip = true;
-            } else {
-                g_hasRestoreClip = false;
-            }
-        }
-        return g_originalClip ? g_originalClip(nullptr) : FALSE;
-    }
-    return g_originalClip ? g_originalClip(requested) : FALSE;
+    if (g_updateQueued.exchange(true, std::memory_order_acq_rel))
+        return;
+    if (!PostMessageW(window, message, 0, 0))
+        g_updateQueued.store(false, std::memory_order_release);
 }
 } // namespace
 
-bool InstallCursorDetours(RED4ext::v1::PluginHandle plugin, const RED4ext::v1::Sdk* sdk, HWND gameWindow)
+bool InstallCursorDetours(RED4ext::v1::PluginHandle, const RED4ext::v1::Sdk*,
+                          HWND gameWindow)
 {
-    if (g_hooksInstalled)
-        return true;
-    if (!sdk || !sdk->hooking)
-        return false;
-    auto* user32 = GetModuleHandleW(L"user32.dll");
-    if (!user32)
-        return false;
-    g_setPosTarget = reinterpret_cast<void*>(GetProcAddress(user32, "SetCursorPos"));
-    g_clipTarget = reinterpret_cast<void*>(GetProcAddress(user32, "ClipCursor"));
-    if (!g_setPosTarget || !g_clipTarget)
+    // Retain the public function name for one compatibility cycle; there are
+    // NO SetCursorPos, ClipCursor or other process-wide detours installed.
+    if (!gameWindow || !IsWindowThread(gameWindow))
         return false;
 
-    g_handle = plugin;
-    g_sdk = sdk;
-    g_gameWindow = gameWindow;
-    g_cursorSyncMessage = RegisterWindowMessageW(L"m1core.cursor.visibility.v1");
-    if (!g_cursorSyncMessage)
+    HMODULE red4ext = GetModuleHandleW(L"RED4ext.dll");
+    if (!red4ext)
         return false;
-    const bool setPosOk = sdk->hooking->Attach(plugin, g_setPosTarget,
-        reinterpret_cast<void*>(&SetCursorPosHook),
-        reinterpret_cast<void**>(&g_originalSetPos));
-    const bool clipOk = setPosOk && sdk->hooking->Attach(plugin, g_clipTarget,
-        reinterpret_cast<void*>(&ClipCursorHook),
-        reinterpret_cast<void**>(&g_originalClip));
-    if (!clipOk) {
-        if (setPosOk)
-            sdk->hooking->Detach(plugin, g_setPosTarget);
-        g_originalSetPos = nullptr;
-        g_originalClip = nullptr;
-        g_gameWindow = nullptr;
-        g_cursorSyncMessage = 0;
+    const auto resolver = reinterpret_cast<ResolveFn>(
+        GetProcAddress(red4ext, "RED4ext_ResolveAddress"));
+    if (!resolver)
         return false;
-    }
-    g_hooksInstalled = true;
+    const auto address = resolver(kForceCursorHash);
+    if (!address)
+        return false;
+
+    const UINT message = RegisterWindowMessageW(L"m1core.EngineCursorUpdate.v1");
+    if (!message)
+        return false;
+
+    g_gameWindow.store(gameWindow, std::memory_order_release);
+    g_syncMessage.store(message, std::memory_order_release);
+    g_force.store(reinterpret_cast<ForceCursorFn>(address), std::memory_order_release);
+    g_requested.store(false, std::memory_order_release);
+    g_updateQueued.store(false, std::memory_order_release);
+    g_applied = false;
     return true;
 }
 
 bool CursorDetoursAvailable()
 {
-    return g_hooksInstalled;
+    // Compatibility alias: this now reports ENGINE cursor availability.
+    return g_force.load(std::memory_order_acquire) != nullptr;
 }
 
-void SetCursorCaptured(bool active, bool focusLost)
+void SetCursorCaptured(bool active, bool)
 {
-    if (!g_hooksInstalled || !g_originalClip) {
-        g_capture.store(false, std::memory_order_release);
-        return;
-    }
-
-    // Clip transitions can occur from the Present or HWND thread.
-    {
-        std::lock_guard lock(g_clipMutex);
-        const bool wasActive = g_capture.exchange(active, std::memory_order_acq_rel);
-        if (wasActive == active) {
-            if (focusLost && !active)
-                g_originalClip(nullptr);
-            return;
-        }
-
-        if (active) {
-            RECT oldClip{};
-            if (GetClipCursor(&oldClip)) {
-                g_restoreClip = oldClip;
-                g_hasRestoreClip = true;
-            }
-            g_originalClip(nullptr);
-        } else {
-            // Never reapply a potentially stale centered clip captured before
-            // the menu was opened. That can trap the Windows pointer or leave
-            // the game/window unable to process normal close/Alt+Tab actions.
-            // Release it now; while m1core is closed the game's own ClipCursor
-            // calls pass directly through the detour and can recapture normally.
-            g_originalClip(nullptr);
-        }
-    }
-    // The ShowCursor counter is PER-THREAD. Never adjust it on the DX12
-    // Present thread: hand visibility changes to the HWND owner instead.
-    if (GetCurrentThreadId() == GetWindowThreadProcessId(g_gameWindow, nullptr)) {
-        std::lock_guard lock(g_clipMutex);
-        if (active) ShowSystemPointerWhenNeeded();
-        else RestoreCursorVisibility();
-    } else {
-        ScheduleCursorVisibilityUpdate();
-    }
+    if (!CursorDetoursAvailable()) return;
+    const HWND window = g_gameWindow.load(std::memory_order_acquire);
+    const bool desired = active && window && GetForegroundWindow() == window;
+    if (g_requested.exchange(desired, std::memory_order_acq_rel) != desired)
+        RequestWindowThreadUpdate();
+    else if (IsWindowThread(window))
+        ApplyEngineCursorOnWindowThread();
 }
 
 bool HandleCursorVisibilityMessage(UINT message)
 {
-    if (!g_cursorSyncMessage || message != g_cursorSyncMessage)
+    const UINT expected = g_syncMessage.load(std::memory_order_acquire);
+    if (!expected || message != expected)
         return false;
-    g_visibilityUpdateQueued.store(false, std::memory_order_release);
-    std::lock_guard lock(g_clipMutex);
-    if (g_capture.load(std::memory_order_acquire))
-        ShowSystemPointerWhenNeeded();
-    else
-        RestoreCursorVisibility();
+    g_updateQueued.store(false, std::memory_order_release);
+    ApplyEngineCursorOnWindowThread();
     return true;
-}
-
-void RestoreSystemCursorOnWindowThread()
-{
-    std::lock_guard lock(g_clipMutex);
-    RestoreCursorVisibility();
 }
 
 void EnsureSystemCursorVisible()
 {
-    if (!g_hooksInstalled || !g_capture.load(std::memory_order_acquire))
-        return;
-    CURSORINFO info{sizeof(info)};
-    if (GetCursorInfo(&info) && (info.flags & CURSOR_SHOWING))
-        return;
-    if (GetCurrentThreadId() == GetWindowThreadProcessId(g_gameWindow, nullptr)) {
-        std::lock_guard lock(g_clipMutex);
-        ShowSystemPointerWhenNeeded();
-    } else {
-        ScheduleCursorVisibilityUpdate();
-    }
+    // Cyberpunk's ForceCursor owns show/hide and the ordinary Windows pointer
+    // acceleration. Never tamper with the process/thread ShowCursor count.
+}
+
+void RestoreSystemCursorOnWindowThread()
+{
+    g_requested.store(false, std::memory_order_release);
+    RequestWindowThreadUpdate();
 }
 
 void RemoveCursorDetours()
 {
-    SetCursorCaptured(false);
-    if (g_gameWindow && g_cursorSyncMessage &&
-        GetCurrentThreadId() != GetWindowThreadProcessId(g_gameWindow, nullptr))
-    {
-        // Flush a pending visibility restoration on the HWND thread before
-        // detaching, without ever waiting indefinitely for a hung window.
-        DWORD_PTR ignored = 0;
-        SendMessageTimeoutW(g_gameWindow, g_cursorSyncMessage, 0, 0,
-                            SMTO_ABORTIFHUNG | SMTO_BLOCK, 250, &ignored);
+    // Synchronously release engine cursor on shutdown when possible; never
+    // wait indefinitely for an unresponsive game window.
+    g_requested.store(false, std::memory_order_release);
+    const HWND window = g_gameWindow.load(std::memory_order_acquire);
+    const UINT message = g_syncMessage.load(std::memory_order_acquire);
+    if (window && message) {
+        if (IsWindowThread(window)) {
+            ApplyEngineCursorOnWindowThread();
+        } else {
+            DWORD_PTR ignored = 0;
+            SendMessageTimeoutW(window, message, 0, 0,
+                                SMTO_ABORTIFHUNG | SMTO_BLOCK, 200, &ignored);
+        }
     }
-    else if (g_gameWindow)
-        RestoreSystemCursorOnWindowThread();
-    if (g_hooksInstalled && g_sdk && g_sdk->hooking) {
-        // Restore BEFORE detaching, while both original trampolines exist.
-        g_sdk->hooking->Detach(g_handle, g_clipTarget);
-        g_sdk->hooking->Detach(g_handle, g_setPosTarget);
-    }
-    g_hooksInstalled = false;
-    g_visibilityUpdateQueued.store(false, std::memory_order_release);
-    g_cursorSyncMessage = 0;
-    // All ShowCursor adjustments were restored on the HWND thread above.
-    g_cursorShowAdjustments = 0;
-    g_originalSetPos = nullptr;
-    g_originalClip = nullptr;
-    g_setPosTarget = nullptr;
-    g_clipTarget = nullptr;
-    g_sdk = nullptr;
-    g_gameWindow = nullptr;
+    g_force.store(nullptr, std::memory_order_release);
+    g_requested.store(false, std::memory_order_release);
+    g_updateQueued.store(false, std::memory_order_release);
+    g_gameWindow.store(nullptr, std::memory_order_release);
+    g_syncMessage.store(0, std::memory_order_release);
+    // g_applied is written only by the window thread and is reinitialized on install.
 }
 } // namespace m1core

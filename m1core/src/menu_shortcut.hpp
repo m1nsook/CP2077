@@ -24,6 +24,28 @@ inline bool MayToggleMenu(bool focused, bool recording,
     return focused && !recording && down && !previouslyDown && !anyModifier;
 }
 
+// A system close command must never enter the overlay's keyboard capture.
+inline bool IsSystemCloseCommand(UINT message, WPARAM command) noexcept
+{
+    return message == WM_SYSCOMMAND && (command & 0xFFF0u) == SC_CLOSE;
+}
+
+// Alt+F4 is a window-management command even when the user chose F4 as a
+// menu key. The ALT context bit comes with WM_SYSKEYDOWN from Windows.
+inline bool IsAltF4Command(UINT message, WPARAM key, LPARAM data) noexcept
+{
+    return message == WM_SYSKEYDOWN && key == VK_F4 &&
+           (static_cast<unsigned long long>(data) & (1ull << 29)) != 0;
+}
+
+// Some games suppress ordinary WM_SYSKEYDOWN via RAWINPUT NOLEGACY.
+// The user's Alt+F4 must still reach the native close path in that case.
+inline bool IsRawAltF4(DWORD type, USHORT key, USHORT flags, bool altHeld) noexcept
+{
+    return type == RIM_TYPEKEYBOARD && key == VK_F4 &&
+           (flags & RI_KEY_BREAK) == 0 && altHeld;
+}
+
 inline bool IsWindowCloseMessage(UINT message) noexcept
 {
     return message == WM_CLOSE || message == WM_DESTROY ||
