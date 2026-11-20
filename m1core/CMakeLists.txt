@@ -88,6 +88,11 @@ if(BUILD_TESTING)
     add_test(NAME m1core_input_gate_tests COMMAND m1core_input_gate_tests)
 
     if(WIN32)
+        add_executable(m1core_menu_shortcut_tests tests/menu_shortcut_tests.cpp)
+        target_include_directories(m1core_menu_shortcut_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+        target_compile_definitions(m1core_menu_shortcut_tests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+        add_test(NAME m1core_menu_shortcut_tests COMMAND m1core_menu_shortcut_tests)
+
         add_executable(m1core_raw_input_tests tests/raw_input_tests.cpp src/raw_input.cpp)
         target_include_directories(m1core_raw_input_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
         target_link_libraries(m1core_raw_input_tests PRIVATE m1core_imgui)

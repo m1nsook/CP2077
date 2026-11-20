@@ -4,6 +4,7 @@
 #include "raw_input.hpp"
 #include "settings.hpp"
 #include "keybind_actions.hpp"
+#include "menu_shortcut.hpp"
 #include "ui.hpp"
 
 #include <RED4ext/RED4ext.hpp>
@@ -169,6 +170,17 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     if (HandleCursorVisibilityMessage(message))
         return 0;
 
+    // Windows must always be able to close or shut down Cyberpunk. Drop
+    // overlay input ownership BEFORE the underlying game handles WM_CLOSE,
+    // WM_DESTROY or an OS session-ending message. Never consume these.
+    if (IsWindowCloseMessage(message)) {
+        g_enabled.store(false);
+        CloseOverlay();
+        SetCursorCaptured(false, true); // Never restore a stale game clip.
+        RestoreSystemCursorOnWindowThread();
+        return DefSubclassProc(window, message, wparam, lparam);
+    }
+
     if (message == WM_NCDESTROY) {
         CloseOverlay();
         RestoreSystemCursorOnWindowThread();
@@ -206,12 +218,15 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         SetCursorCaptured(false, true);
 
     const int assignedMenuKey = GetOverlayHotkey();
+    const bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+    const bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+    const bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+    const bool win = (GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 ||
+                     (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0;
     if (g_enabled.load() && assignedMenuKey > 0 &&
         (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) &&
         static_cast<int>(wparam) == assignedMenuKey &&
-        !IsCapturingKeybind() &&
-        (GetAsyncKeyState(VK_CONTROL) & 0x8000) &&
-        (GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
+        !IsCapturingKeybind() && ctrl && shift && !alt && !win) {
         EmergencyDisable();
         return 0;
     }
@@ -240,11 +255,13 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         }
     }
 
-    // Block only the user-configured menu key, not a built-in function key.
-    // Present also polls its physical state (RAWINPUT may disable WM_KEYDOWN).
-    if (g_enabled.load() && assignedMenuKey > 0 &&
-        IsKeyboardMessage(message) && static_cast<int>(wparam) == assignedMenuKey &&
-        !IsCapturingKeybind())
+    // IMPORTANT: Never swallow a key-UP. The old early return ate the
+    // player's menu key release *before* the normal release-to-game path,
+    // potentially leaving a key logically held and preventing OS shortcuts.
+    // Alt+F4 and all other modifier chords must also pass through untouched.
+    if (g_enabled.load() && ConsumeMenuKey(
+            message, wparam, assignedMenuKey, IsCapturingKeybind(),
+            ctrl || shift || alt || win))
         return 0;
 
     bool capture = false;
@@ -467,9 +484,13 @@ void ProcessHotkeys()
     const int selectedKey = GetOverlayHotkey();
     const bool down = selectedKey > 0 && (GetAsyncKeyState(selectedKey) & 0x8000) != 0;
     const bool binding = IsCapturingKeybind();
-    const bool emergency = down && !binding &&
-                           (GetAsyncKeyState(VK_CONTROL) & 0x8000) &&
-                           (GetAsyncKeyState(VK_SHIFT) & 0x8000);
+    const bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+    const bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+    const bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+    const bool win = (GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 ||
+                     (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0;
+    const bool anyModifier = ctrl || shift || alt || win;
+    const bool emergency = down && !binding && ctrl && shift && !alt && !win;
     // When a user binds a key while holding it, the first press assigns it,
     // not immediately dismisses the menu on the following frame.
     if (selectedKey != g_previousToggleKey) {
@@ -494,8 +515,8 @@ void ProcessHotkeys()
         if (g_enabled.load() && focused && selectedKey == 0 && !g_setupAutoOpened) {
             g_gate.Toggle();
             g_setupAutoOpened = true;
-        } else if (g_enabled.load() && focused && selectedKey > 0 &&
-                   down && !g_toggleWasDown && !emergency && !binding) {
+        } else if (g_enabled.load() && selectedKey > 0 && !emergency &&
+                   MayToggleMenu(focused, binding, down, g_toggleWasDown, anyModifier)) {
             g_gate.Toggle();
         }
         capture = g_gate.MayCaptureInput();

@@ -159,12 +159,12 @@ void SetCursorCaptured(bool active, bool focusLost)
             }
             g_originalClip(nullptr);
         } else {
-            // WM_KILLFOCUS can arrive before GetForegroundWindow has updated.
-            // Trust the explicit focus-loss event rather than re-clipping
-            // the cursor to the game while another monitor activates.
-            const bool focused = !focusLost && g_gameWindow &&
-                                 GetForegroundWindow() == g_gameWindow;
-            g_originalClip(focused && g_hasRestoreClip ? &g_restoreClip : nullptr);
+            // Never reapply a potentially stale centered clip captured before
+            // the menu was opened. That can trap the Windows pointer or leave
+            // the game/window unable to process normal close/Alt+Tab actions.
+            // Release it now; while m1core is closed the game's own ClipCursor
+            // calls pass directly through the detour and can recapture normally.
+            g_originalClip(nullptr);
         }
     }
     // The ShowCursor counter is PER-THREAD. Never adjust it on the DX12

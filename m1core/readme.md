@@ -289,3 +289,20 @@ The bindings are installed only with their matching DLL. Never ship the `.reds` 
 5. **After m1core is stable:** migrate existing CP2077 mods individually, maintaining their working behavior.
 
 No existing mod is changed by this milestone. Do not call m1core finished based on a successful build alone.
+
+
+### Input-safe close regression fix (2026-11-20)
+
+The player-selected menu key's **release is always forwarded** to Cyberpunk,
+including when a press opens/closes m1core. The input hook no longer swallows
+WM_KEYUP/WM_SYSKEYUP for the configured key. Alt, Ctrl, Shift and Windows
+modifier combinations are excluded from the normal toggle, preserving
+Alt+F4 and other OS shortcuts. Native WM_CLOSE / session-end messages disable
+the overlay and release its clip/cursor ownership before forwarding them to
+the game. On normal menu close, m1core releases the clip rather than forcibly
+reapplying a stale game clip rectangle captured before the overlay opened.
+
+These protections have a separate CTest suite, but the game exit, cursor,
+multi-monitor, chosen-key hotkeys and live sample settings require in-game
+regression verification. If an earlier build becomes unresponsive, remove
+`red4ext/plugins/m1core/overlay.enable` before launching the game again.
