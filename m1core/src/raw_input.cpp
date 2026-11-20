@@ -1,4 +1,5 @@
 #include "raw_input.hpp"
+#include "pointer_transform.hpp"
 
 #include <imgui.h>
 #include <backends/imgui_impl_win32.h>
@@ -161,11 +162,18 @@ void RawInputBridge::Feed(HWND window, const std::vector<MSG>& legacy,
         POINT pointer{};
         RECT client{};
         if (GetCursorPos(&pointer) && ScreenToClient(window, &pointer) &&
-            GetClientRect(window, &client) && PtInRect(&client, pointer))
-            io.AddMousePosEvent(static_cast<float>(pointer.x),
-                                static_cast<float>(pointer.y));
-        else
+            GetClientRect(window, &client)) {
+            const auto position = MapClientPointer(
+                pointer.x - client.left, pointer.y - client.top,
+                client.right - client.left, client.bottom - client.top,
+                io.DisplaySize.x, io.DisplaySize.y);
+            if (position.valid)
+                io.AddMousePosEvent(position.x, position.y);
+            else
+                io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+        } else {
             io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+        }
     } else {
         if (!positionReady_) {
             mouseX_ = io.DisplaySize.x * 0.5F;

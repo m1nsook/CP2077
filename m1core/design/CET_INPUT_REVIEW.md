@@ -67,3 +67,17 @@ actual Cyberpunk session can prove: no input after Alt+Tab, native pointer
 speed/acceleration, working Alt+F4 and manual game quit, second-monitor use,
 hotkey persistence, renderer teardown and close/reopen behavior. Do not
 call these gameplay issues resolved until the user confirms them.
+
+## Physical mouse to ImGui coordinate mapping
+
+CET's customized `src/imgui_impl/win32.cpp` measures the **Win32 client
+size** separately from ImGui's **DisplaySize**, and scales cursor positions
+between them in fullscreen/resolution-scaling cases. The earlier m1core
+`RawInputBridge` fed unscaled client coordinates to the renderer.
+
+m1core now computes mapped absolute pointer positions with
+`MapClientPointer` (never multiplies RAWINPUT deltas or Windows pointer
+speed), validates that the OS cursor is within the client bounds, and
+resets mouse position to unavailable when another monitor owns it.
+The new test covers matched resolutions, unequal client/render sizes,
+negative coordinates and invalid dimensions.

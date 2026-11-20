@@ -93,6 +93,10 @@ if(BUILD_TESTING)
     target_include_directories(m1core_input_gate_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
     add_test(NAME m1core_input_gate_tests COMMAND m1core_input_gate_tests)
 
+    add_executable(m1core_pointer_transform_tests tests/pointer_transform_tests.cpp)
+    target_include_directories(m1core_pointer_transform_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    add_test(NAME m1core_pointer_transform_tests COMMAND m1core_pointer_transform_tests)
+
     add_executable(m1core_workspace_layout_tests tests/workspace_layout_tests.cpp)
     target_include_directories(m1core_workspace_layout_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
     add_test(NAME m1core_workspace_layout_tests COMMAND m1core_workspace_layout_tests)
