@@ -133,7 +133,11 @@ protected cb func OnM1CoreSampleWeightTick(evt: ref<M1CoreSampleWeightTick>) -> 
         // Reconcile instantly after setting change and periodically for stat
         // resets triggered by death, reload or other game systems.
         this.m_m1SampleWeightRefreshTicks += 1;
-        if enabled != this.m_m1SampleWeightLastEnabled ||
+        // REDscript has no Bool/Bool OperatorNotEqual overload.
+        let enabledChanged: Bool =
+            (enabled && !this.m_m1SampleWeightLastEnabled) ||
+            (!enabled && this.m_m1SampleWeightLastEnabled);
+        if enabledChanged ||
            limit != this.m_m1SampleWeightLastLimit ||
            this.m_m1SampleWeightRefreshTicks >= 15 {
             this.m_m1SampleWeightRefreshTicks = 0;
