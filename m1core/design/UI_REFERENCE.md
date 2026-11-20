@@ -38,7 +38,13 @@ HTML/JavaScript/CSS runtime for the game's native RED4ext + Dear ImGui UI.
   key-up or OS close shortcuts; release cursor and capture on close.
 - The original HTML contains example F10 values, **not a new default key**.
 
-The first ImGui theme pass covers core palette, rounded components, spacing,
-tab treatments and optional local fonts. Lucide/Font Awesome asset pipeline,
-full card layout and customized sliders/toggles are follow-up UI work only
-after the critical input regression is confirmed resolved in-game.
+The native M5 UI batch now includes grouped setting cards with visible
+per-setting descriptions, cyan pill toggle switches, responsive sidebar,
+search clearing, global keybind-conflict warnings, safer first-run key
+selection, readable About diagnostics (including pointer mode), and profile
+selection improvements. Native slider/combobox rendering remains ImGui-based.
+
+**Still future work:** embedded icon atlas integration (Lucide/Font Awesome),
+more advanced slider styling, animation refinement, and broader controller / IME
+accessibility. This implementation is a testable native ImGui UI, not a webview.
+Only CI has checked these new controls; player visual/runtime testing remains open.

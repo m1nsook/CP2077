@@ -1,6 +1,6 @@
 # m1core — native settings foundation (development)
 
-**Status: experimental v0.5.0-dev (M5 in progress), not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The F11 D3D12 ImGui overlay and cursor movement were **confirmed in-game**; enum dropdowns, tabs, and keybind persistence have also been confirmed in-game. The supplied HTML demo is a *layout reference*, not the final visual design.
+**Status: experimental v0.5.0-dev (M5 in progress), not released.** Cyberpunk 2.50, RED4ext 1.31.1 and redscript startup were verified on 2026-11-19. User's opt-in smoke test returned **0 for both phases**, verifying registry API and restart persistence. The native D3D12 ImGui overlay, cursor movement, enum dropdowns, tabs, and keybind persistence have been confirmed in-game. **All keyboard assignments are player-selected, including the overlay menu key; no key is preset.** The newer uploaded m1core_mod_settings.html is the active native UI visual reference.
 
 ## Architecture
 
@@ -34,7 +34,7 @@ CMake downloads pinned RED4ext.SDK (revision `a34f0ad`, which defines game v2.50
 
 ## Opt-in ImGui overlay preview — v0.4.0-dev
 
-**Experimental development build.** The F11 overlay, cursor, enum dropdowns, keybind capture and persistence were confirmed working in-game on 2026-11-19. This single development package includes `overlay.enable` for convenient UI testing. Remove that marker to run the settings API without graphics/input hooks.
+**Experimental development build.** The native overlay, cursor, enum dropdowns, keybind capture and persistence were confirmed working in-game in earlier builds. This single development package includes `overlay.enable` for convenient UI testing. Remove that marker to run the settings API without graphics/input hooks.
 
 For testing, download the single **`m1core-game-ready-x64-dev`** artifact from the latest successful GitHub Actions run **by clicking the artifact name, not "Download all"**. GitHub already delivers a ZIP, so extract it **once** into the Cyberpunk 2077 game root. The ZIP begins directly with `r6/` and `red4ext/`; there is no extra wrapper folder, nested ZIP, or manual assembly.
 
@@ -49,9 +49,9 @@ The overlay draws a dimmed fullscreen backdrop via ImGui's background draw list 
 
 The overlay has fail-closed focus rules and releases back-buffer references before swap-chain resize. It only hooks when the RED4ext Running callback executes on the owner thread of the game window; if this thread check fails, it **does not** attach hooks. Normal builds contain the renderer code but leave it inactive.
 
-**In-game test:** the user confirmed the overlay and cursor controls work on 2026-11-19. F11 is the only normal keyboard open/close shortcut; Escape is not handled by m1core.
+**In-game test:** the user confirmed overlay and cursor controls. The player-selected menu key opens and closes m1core; there is no built-in F-key shortcut. Escape is not an implicit close shortcut.
 
-**Multi-monitor input follow-up (requires in-game testing):** The normal overlay path now uses the physical Windows cursor and its system pointer speed, instead of a separately drawn ImGui pointer. Cursor visibility changes run on the game window thread so the per-thread Windows ShowCursor counter is balanced on opening, focus loss, and closing. Clicking another monitor temporarily suspends m1core input but preserves the open menu; returning to the game restores interaction, and F11 still closes it. The raw-relative painted pointer remains only as a reduced-speed fallback if cursor detours cannot be installed. Automated input-gate tests cover focus preservation, but multi-monitor runtime behavior must be checked before this is considered fixed.
+**Multi-monitor input:** The primary path uses the physical Windows cursor and native system pointer speed. Focus transfer to another monitor suspends capture but keeps the settings UI open. The player already confirmed earlier multi-monitor checks in-game. The RAWINPUT fallback now uses unscaled 1:1 device deltas instead of the old artificial 0.40 multiplier; the new mouse-speed correction still needs a fresh in-game check.
 
 **Known limitations:** cursor movement and basic overlay behavior work in-game, but broader compatibility tests are pending. The user32 hooks are process-wide while the preview is enabled, though they act only during m1core capture; they may interact with other overlay mods. Virtual cursor movement works from relative RAWINPUT even if OS cursor recenter suppression fails. Non-US keyboard layouts, IME composition, controller navigation, and third-party overlay coexistence still need testing. If the UI is visible but input behaves unexpectedly, press the emergency shortcut, exit the game, delete `overlay.enable` and send logs. Do not treat a successful CI build as proof that real input behavior is correct.
 
@@ -135,7 +135,7 @@ fresh key press of that mod's **registered Keybind setting**. Example:
 
 ```redscript
 // Register once on initialization:
-M1Core_RegisterKeybindSetting(n"ExampleMod", n"QuickAction", 117); // F6
+M1Core_RegisterKeybindSetting(n"ExampleMod", n"QuickAction", 0); // Unbound: player assigns it in m1core
 // In the mod's regular game update (call every tick, not only when held):
 if M1Core_PollKeybindPressed(n"ExampleMod", n"QuickAction") {
     // Run the mod's own action here.
@@ -238,7 +238,7 @@ let mode = M1Core_GetEnumSetting(n"ExampleMod", n"Mode");
 M1Core_SetEnumSetting(n"ExampleMod", n"Mode", 2);
 
 // Key codes are Windows VK values; 0 means "Unbound"; e.g. 117 is F6.
-M1Core_RegisterKeybindSetting(n"ExampleMod", n"Action", 117);
+M1Core_RegisterKeybindSetting(n"ExampleMod", n"Action", 0);
 let key = M1Core_GetKeybindSetting(n"ExampleMod", n"Action");
 M1Core_SetKeybindSetting(n"ExampleMod", n"Action", 118);
 ```
@@ -249,8 +249,8 @@ M1Core_SetKeybindSetting(n"ExampleMod", n"Action", 118);
 - Keybinds use Win32 virtual-key numbers from 0 to 255 and persist as typed `keybind`.
   **m1core stores the code; it does not execute the mod's action.** The consuming mod
   remains responsible for checking keyboard events when appropriate.
-- The UI reserves **F11** for opening and closing m1core. Escape cancels an active
-  *key-capture operation* only, and does not close the m1core overlay.
+- **No function key is reserved:** the player's assigned menu key opens and closes m1core.
+  Escape cancels ordinary mod key-capture operations; it does not close the overlay.
 - The preview registers `Camera Mode` and `Quick Action` fields to validate
   the dropdown, key capture and two-phase settings persistence.
 - The v0.3.0 C++ build and CTest cover these types. The user confirmed dropdowns and keybind persistence in-game on 2026-11-19; the newest bulk reset and diagnostic APIs still require an in-game smoke check.
@@ -283,8 +283,8 @@ The bindings are installed only with their matching DLL. Never ship the `.reds` 
 ## Roadmap
 
 1. **Milestone 1 (compiled and launched):** native RED4ext plugin, versioned REDscript API, registry, persistence, CTest and Windows CI build; optional API/persistence runtime test awaiting results.
-2. **Milestone 2 (in-game validated):** opt-in D3D12/ImGui render path, guarded Win32 input, three exit mechanisms, game focus and resize handling. F11 toggle and mouse cursor were user-tested in game on 2026-11-19. The enum/keybind UI was confirmed in-game on 2026-11-19. F11 toggle, Close button, and emergency recovery must work; never leave game input blocked.
-3. **Milestone 3 (partially implemented):** searchable sidebar, separate Keybinds/Profiles/About tabs, enum dropdowns, keybind capture, and named profiles. Named profiles now exist; finer per-mod grouping and final visual customization remain future work.
+2. **Milestone 2 (in-game validated):** opt-in D3D12/ImGui render path, guarded Win32 input, three exit mechanisms, game focus and resize handling. User-selected menu key, cursor, enum/keybind UI and multi-monitor controls were previously tested in game. Close button and emergency recovery must remain reliable.
+3. **Milestone 3 (implemented; redesign in progress):** searchable sidebar, native grouped cards, Keybinds/Profiles/Logs/About tabs, dropdowns, configurable keybinds, named profiles and native control styling. More icon/visual polish remains.
 4. **Milestone 4:** live in-game validation, compatibility audit, test mod, release ZIP and API freeze.
 5. **After m1core is stable:** migrate existing CP2077 mods individually, maintaining their working behavior.
 
@@ -306,3 +306,16 @@ These protections have a separate CTest suite, but the game exit, cursor,
 multi-monitor, chosen-key hotkeys and live sample settings require in-game
 regression verification. If an earlier build becomes unresponsive, remove
 `red4ext/plugins/m1core/overlay.enable` before launching the game again.
+
+## M5 native UI and input usability batch (November 20, 2026)
+
+This batch consolidates the 1:1 raw pointer-speed regression fix with a native UI refresh based on the supplied `m1core_mod_settings.html`:
+
+- Dark grouped setting cards, readable inline descriptions and a custom cyan pill toggle; existing live bool/int/float/enum/keybind actions remain native Dear ImGui controls.
+- Responsive sidebar, clearer search with a reset action, profile auto-selection and the complete About/status panel with system-pointer vs RAWINPUT fallback diagnostics.
+- Global keybind-collision warning for any two registered actions sharing the same nonzero key (including the menu key). Warnings **never** override user assignments.
+- First-run safety: if the menu key is unbound, its Close/X controls are disabled until the user assigns a key, so the overlay cannot become inaccessible before restart.
+- Fixed a stale global key-capture flag after loading a profile; first menu key binding now correctly clears dirty status only when it actually saves.
+- Dedicated unit test of cross-mod and same-mod conflicts, cleared keys and rebinding. Existing startup, persistence, focus, mouse and API tests stay in CI.
+
+All changes are confined to m1core; the development ZIP still contains exactly `r6/` and `red4ext/` at the root, without saved JSON files or nested archives. **The batch is not marked in-game verified until the player tests it.**

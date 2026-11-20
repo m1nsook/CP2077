@@ -2,6 +2,8 @@
 #include "settings.hpp"
 #include "diagnostics.hpp"
 #include "ui_theme.hpp"
+#include "cursor.hpp"
+#include "keybind_conflicts.hpp"
 
 #include <RED4ext/CName.hpp>
 #include <RED4ext/CNamePool.hpp>
@@ -131,10 +133,32 @@ bool PollCapture(Registry& registry)
         g_capture.active = false;
         g_bindCaptureActive.store(false);
         if (saved && coreMenuCapture)
-            registry.Save(); // The very first menu key survives restart immediately.
+            return !registry.Save(); // The first binding persists immediately; only failed saves are dirty.
         return saved;
     }
     return false;
+}
+
+// Native ImGui switch painted with the same dimensions as the HTML
+// reference. InvisibleButton preserves mouse and keyboard navigation.
+bool DrawToggleSwitch(bool enabled)
+{
+    constexpr float width = 40.0F;
+    constexpr float height = 22.0F;
+    const bool clicked = ImGui::InvisibleButton("##switch", ImVec2(width, height));
+    const auto a = ImGui::GetItemRectMin();
+    const auto b = ImGui::GetItemRectMax();
+    const ImU32 track = enabled ? IM_COL32(56, 189, 248, 255)
+                                : IM_COL32(48, 51, 61, 255);
+    const ImU32 thumb = enabled ? IM_COL32(9, 9, 11, 255)
+                                : IM_COL32(161, 161, 170, 255);
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(a, b, track, height * 0.5F);
+    draw->AddCircleFilled(ImVec2(a.x + (enabled ? width - 11.0F : 11.0F),
+                                a.y + height * 0.5F), 8.0F, thumb);
+    if (ImGui::IsItemFocused())
+        draw->AddRect(a, b, IM_COL32(250, 250, 250, 190), height * 0.5F, 0, 1.5F);
+    return clicked;
 }
 
 bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
@@ -145,28 +169,29 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
     ImGui::TableSetColumnIndex(0);
     ImGui::AlignTextToFramePadding();
     const auto name = setting.displayName.empty() ? Label(setting.id) : setting.displayName;
-    ImGui::TextUnformatted(name.c_str());
-    if (!setting.description.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-        ImGui::BeginTooltip();
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 38.0F);
-        ImGui::TextUnformatted(setting.description.c_str());
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
+    ImGui::TextWrapped("%s", name.c_str());
+    if (!setting.description.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.63F, 0.63F, 0.67F, 1.0F));
+        ImGui::TextWrapped("%s", setting.description.c_str());
+        ImGui::PopStyleColor();
     }
     ImGui::TableSetColumnIndex(1);
-
     bool changed = false;
-    const auto width = (std::max)(90.0F, ImGui::GetContentRegionAvail().x - 63.0F);
-    ImGui::SetNextItemWidth(width);
+    const float available = ImGui::GetContentRegionAvail().x;
+    const float controlWidth = (std::max)(95.0F, available - 75.0F);
+
     switch (setting.kind) {
     case Kind::Boolean: {
-        bool value = std::get<bool>(setting.value);
-        if (ImGui::Checkbox("##value", &value))
-            changed = registry.SetBool(mod, setting.id, value);
+        const bool value = std::get<bool>(setting.value);
+        if (DrawToggleSwitch(value))
+            changed = registry.SetBool(mod, setting.id, !value);
+        ImGui::SameLine();
+        ImGui::TextDisabled(value ? "On" : "Off");
         break;
     }
     case Kind::Integer: {
         int value = std::get<std::int32_t>(setting.value);
+        ImGui::SetNextItemWidth(controlWidth);
         if (ImGui::SliderInt("##value", &value, std::get<std::int32_t>(setting.minimum),
                              std::get<std::int32_t>(setting.maximum)))
             changed = registry.SetInt(mod, setting.id, value);
@@ -174,6 +199,7 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
     }
     case Kind::Float: {
         float value = std::get<float>(setting.value);
+        ImGui::SetNextItemWidth(controlWidth);
         if (ImGui::SliderFloat("##value", &value, std::get<float>(setting.minimum),
                                std::get<float>(setting.maximum), "%.2f"))
             changed = registry.SetFloat(mod, setting.id, value);
@@ -183,9 +209,10 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
         const auto index = std::get<std::int32_t>(setting.value);
         const bool valid = index >= 0 && static_cast<std::size_t>(index) < setting.choices.size();
         const auto preview = valid ? setting.choices[static_cast<std::size_t>(index)].c_str() : "Select...";
+        ImGui::SetNextItemWidth(controlWidth);
         if (ImGui::BeginCombo("##value", preview)) {
             for (std::size_t i = 0; i < setting.choices.size(); ++i) {
-                const auto selected = index == static_cast<std::int32_t>(i);
+                const bool selected = index == static_cast<std::int32_t>(i);
                 if (ImGui::Selectable(setting.choices[i].c_str(), selected))
                     changed = registry.SetEnum(mod, setting.id, static_cast<std::int32_t>(i));
                 if (selected) ImGui::SetItemDefaultFocus();
@@ -203,10 +230,12 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
         const auto label = capturing ? std::string(coreMenuBind ? "Press your menu key..." :
                                                   "Press key... (Esc cancels)")
                                     : KeyLabel(std::get<std::int32_t>(setting.value));
-        if (ImGui::Button(label.c_str(), ImVec2(width, 0.0F)))
+        if (MonoFont()) ImGui::PushFont(MonoFont());
+        if (ImGui::Button(label.c_str(), ImVec2((std::max)(95.0F, available - 111.0F), 0.0F)))
             StartCapture(mod, setting.id);
+        if (MonoFont()) ImGui::PopFont();
         ImGui::SameLine();
-        if (ImGui::SmallButton("X")) {
+        if (ImGui::SmallButton("Clear")) {
             if (capturing) {
                 g_capture.active = false;
                 g_bindCaptureActive.store(false);
@@ -216,8 +245,8 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
         break;
     }
     }
-    if (setting.kind != Kind::Keybind)
-        ImGui::SameLine();
+
+    ImGui::SameLine();
     if (ImGui::SmallButton("Reset"))
         changed = registry.Reset(mod, setting.id);
     ImGui::PopID();
@@ -228,60 +257,95 @@ bool DrawSettingsTable(Registry& registry, Id mod, const std::vector<SettingSnap
                        std::string_view query, bool onlyKeybinds)
 {
     bool changed = false;
-    // Group settings by the owning mod's optional category metadata. The
-    // underlying values, stable IDs and schema remain unchanged.
+    // Render one elevated native ImGui card per group, with readable
+    // descriptions always visible. No browser/webview or schema changes.
     std::map<Id, std::vector<const SettingSnapshot*>> grouped;
     for (const auto& setting : settings) {
         if (onlyKeybinds && setting.kind != Kind::Keybind) continue;
         if (!MatchesSetting(setting, query)) continue;
         grouped[setting.group].push_back(&setting);
     }
+    if (grouped.empty()) {
+        ImGui::TextDisabled("No matching settings found for this mod.");
+        return false;
+    }
+
     std::vector<Id> order;
-    order.reserve(grouped.size());
     for (const auto& [group, _] : grouped) order.push_back(group);
     std::sort(order.begin(), order.end(), [](Id lhs, Id rhs) {
-        if (lhs == 0) return true;       // Ungrouped first.
+        if (lhs == 0) return true;
         if (rhs == 0) return false;
-        return Label(lhs) < Label(rhs);  // Actual category names, not hashes.
+        return Label(lhs) < Label(rhs);
     });
 
-    if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg |
-                          ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerH)) {
-        ImGui::TableSetupColumn("Setting", ImGuiTableColumnFlags_WidthStretch, 0.45F);
-        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.55F);
-        ImGui::TableHeadersRow();
-
-        for (Id group : order) {
-            const auto& members = grouped.at(group);
-            if (group != 0 || order.size() > 1) {
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-                const auto groupName = group == 0 ? std::string("General") : Label(group);
-                ImGui::TextDisabled("%s", groupName.c_str());
-                ImGui::TableSetColumnIndex(1);
-                ImGui::TextDisabled("%zu settings", members.size());
-                ImGui::SameLine();
-                ImGui::PushID(static_cast<int>(group));
-                const bool pending = g_confirmGroupReset &&
-                                     g_pendingGroupMod == mod && g_pendingGroup == group;
-                if (ImGui::SmallButton(pending ? "Confirm reset group" : "Reset group")) {
-                    if (pending) {
-                        changed |= registry.ResetGroup(mod, group);
-                        g_confirmGroupReset = false;
-                    } else {
-                        g_confirmGroupReset = true;
-                        g_pendingGroupMod = mod;
-                        g_pendingGroup = group;
-                    }
+    for (Id group : order) {
+        const auto& members = grouped.at(group);
+        ImGui::PushID(std::to_string(group).c_str());
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.059F, 0.063F, 0.078F, 1.0F));
+        const bool visible = ImGui::BeginChild("group_card", ImVec2(0, 0),
+            ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        if (visible) {
+            const auto groupName = group == 0 ? std::string("General") : Label(group);
+            ImGui::TextUnformatted(groupName.c_str());
+            ImGui::SameLine();
+            ImGui::TextDisabled("%zu settings", members.size());
+            const bool pending = g_confirmGroupReset &&
+                                 g_pendingGroupMod == mod && g_pendingGroup == group;
+            ImGui::SameLine();
+            if (ImGui::SmallButton(pending ? "Confirm reset group" : "Reset group")) {
+                if (pending) {
+                    changed |= registry.ResetGroup(mod, group);
+                    g_confirmGroupReset = false;
+                } else {
+                    g_confirmGroupReset = true;
+                    g_pendingGroupMod = mod;
+                    g_pendingGroup = group;
                 }
-                ImGui::PopID();
             }
-            for (const auto* setting : members)
-                changed |= DrawSetting(registry, mod, *setting);
+            ImGui::Separator();
+            if (ImGui::BeginTable("settings_rows", 2,
+                    ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerH |
+                    ImGuiTableFlags_PadOuterX)) {
+                ImGui::TableSetupColumn("Setting", ImGuiTableColumnFlags_WidthStretch, 0.54F);
+                ImGui::TableSetupColumn("Control", ImGuiTableColumnFlags_WidthStretch, 0.46F);
+                for (const auto* setting : members)
+                    changed |= DrawSetting(registry, mod, *setting);
+                ImGui::EndTable();
+            }
         }
-        ImGui::EndTable();
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+        ImGui::PopID();
+        ImGui::Spacing();
     }
     return changed;
+}
+
+void DrawKeybindConflicts(const std::vector<ModSnapshot>& mods)
+{
+    const auto conflicts = FindKeybindConflicts(mods);
+    if (conflicts.empty()) return;
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12F, 0.086F, 0.03F, 1.0F));
+    const bool visible = ImGui::BeginChild("keybind_conflicts", ImVec2(0, 0),
+        ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    if (visible) {
+        ImGui::TextColored(ImVec4(0.96F, 0.62F, 0.04F, 1.0F),
+            "Keybind conflicts - %zu", conflicts.size());
+        ImGui::TextWrapped("These actions share a key. The selected m1core menu key takes priority.");
+        for (const auto& conflict : conflicts) {
+            std::string owners;
+            for (const auto& owner : conflict.owners) {
+                if (!owners.empty()) owners += ", ";
+                owners += Label(owner.mod) + " / " + Label(owner.setting);
+            }
+            ImGui::TextWrapped("%s: %s", KeyLabel(conflict.virtualKey).c_str(), owners.c_str());
+        }
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+    ImGui::Spacing();
 }
 
 bool ModMatches(const ModSnapshot& mod, std::string_view query, bool keybindsOnly)
@@ -359,6 +423,11 @@ void DrawProfiles(Registry& registry)
     if (!g_selectedProfile.empty() &&
         std::find(names.begin(), names.end(), g_selectedProfile) == names.end())
         g_selectedProfile.clear();
+    if (g_selectedProfile.empty() && !names.empty()) {
+        g_selectedProfile = names.front();
+        std::snprintf(g_renameProfileName, sizeof(g_renameProfileName),
+                      "%s", g_selectedProfile.c_str());
+    }
 
     ImGui::BeginChild("profiles_panel", ImVec2(0.0F, -66.0F), ImGuiChildFlags_Borders);
     ImGui::TextUnformatted("SETTINGS PROFILES");
@@ -421,6 +490,7 @@ void DrawProfiles(Registry& registry)
                                       : "Profile applied in memory, but settings.json could not be saved.";
         }
         g_capture.active = false;
+        g_bindCaptureActive.store(false); // Don't leave the menu shortcut disabled after loading a profile.
         g_confirmOverwrite = false;
         g_confirmDelete = false;
     }
@@ -502,7 +572,7 @@ void DrawProfiles(Registry& registry)
 
 void RenderSettings(Registry& registry, bool& open)
 {
-    // Keep the functional layout from the supplied prototype, not its colors.
+    // Fully native ImGui layout and colors based on the supplied HTML reference.
     static char search[160]{};
     static Id selected = 0;
     static Page page = Page::Mods;
@@ -526,7 +596,10 @@ void RenderSettings(Registry& registry, bool& open)
         selected = mods.front().id;
 
     ImGui::SetNextWindowSize(ImVec2(940.0F, 600.0F), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("m1core - Mod Settings", &open, ImGuiWindowFlags_NoCollapse)) {
+    // Never strand the player behind a closed, unbound menu. The X and
+    // footer Close actions become available after a menu key is assigned.
+    if (!ImGui::Begin("m1core - Mod Settings", menuKey > 0 ? &open : nullptr,
+                      ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }
@@ -539,7 +612,8 @@ void RenderSettings(Registry& registry, bool& open)
     if (menuKey == 0) {
         ImGui::TextWrapped("No m1core menu key is assigned. Choose one now: "
                            "Keybinds > m1core > Open / Close Menu. "
-                           "The menu opens automatically when no key has ever been assigned.");
+                           "The menu cannot be closed until a key is assigned, "
+                           "so you can always reopen it.");
         if (ImGui::Button("Bind my menu key"))
             StartCapture(coreMod.hash, coreToggle.hash);
         if (g_capture.active && g_capture.mod == coreMod.hash &&
@@ -555,6 +629,10 @@ void RenderSettings(Registry& registry, bool& open)
 
     ImGui::SetNextItemWidth((std::max)(150.0F, ImGui::GetContentRegionAvail().x * 0.42F));
     ImGui::InputTextWithHint("##search", "Search mods and settings", search, sizeof(search));
+    if (search[0] != '\0') {
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Clear search")) search[0] = '\0';
+    }
     ImGui::SameLine();
     auto tab = [](const char* name, Page value) {
         const bool selected = page == value;
@@ -589,7 +667,8 @@ void RenderSettings(Registry& registry, bool& open)
     } else if (page == Page::Logs) {
         DrawLogs();
     } else if (page != Page::About) {
-        ImGui::BeginChild("mods_sidebar", ImVec2(220.0F, -66.0F), ImGuiChildFlags_Borders);
+        const float sidebarWidth = (std::clamp)(ImGui::GetContentRegionAvail().x * 0.28F, 155.0F, 220.0F);
+        ImGui::BeginChild("mods_sidebar", ImVec2(sidebarWidth, -66.0F), ImGuiChildFlags_Borders);
         ImGui::TextDisabled("REGISTERED MODS");
         ImGui::Separator();
         for (const auto& mod : mods) {
@@ -607,6 +686,7 @@ void RenderSettings(Registry& registry, bool& open)
 
         ImGui::SameLine();
         ImGui::BeginChild("mod_settings", ImVec2(0.0F, -66.0F), ImGuiChildFlags_Borders);
+        if (keybindsOnly) DrawKeybindConflicts(mods);
         auto current = std::find_if(mods.begin(), mods.end(),
             [](const ModSnapshot& mod) { return mod.id == selected; });
         if (current == mods.end() || !ModMatches(*current, search, keybindsOnly)) {
@@ -640,16 +720,22 @@ void RenderSettings(Registry& registry, bool& open)
         ImGui::BeginChild("about", ImVec2(0.0F, -66.0F), ImGuiChildFlags_Borders);
         ImGui::TextUnformatted("m1core native settings framework");
         ImGui::Separator();
-        ImGui::TextWrapped("A single RED4ext plugin hosts the ImGui settings interface and persistent configuration for compatible Cyberpunk 2077 mods.");
+        ImGui::TextWrapped("RED4ext + Dear ImGui, independent of CET. Compatible mods register their own live settings and keybinds.");
         ImGui::Spacing();
         ImGui::Text("Registered mods: %zu", mods.size());
         const auto shortcut = KeyLabel(menuKey);
         ImGui::Text("Open / close overlay: %s", shortcut.c_str());
-        ImGui::Text("Emergency disable: Ctrl + Shift + %s", shortcut.c_str());
-        ImGui::TextDisabled("No menu key is preset; assign it in Keybinds > m1core.");
-        ImGui::TextUnformatted("Settings file: red4ext/plugins/m1core/settings.json");
+        if (menuKey > 0) ImGui::Text("Emergency disable: Ctrl + Shift + %s", shortcut.c_str());
+        else ImGui::TextDisabled("Emergency shortcut: assign a menu key first");
+        ImGui::Text("Mouse mode: %s", CursorDetoursAvailable() ? "Windows system cursor" : "RAWINPUT fallback");
+        ImGui::Separator();
+        ImGui::TextDisabled("No default menu key is assigned. Choose one in Keybinds > m1core.");
+        ImGui::TextUnformatted("Settings: red4ext/plugins/m1core/settings.json");
+        ImGui::TextUnformatted("Profiles: red4ext/plugins/m1core/profiles.json");
+        ImGui::TextUnformatted("Logs: red4ext/plugins/m1core/m1core.log");
         ImGui::Spacing();
-        ImGui::TextDisabled("Development preview. The overlay visuals and additional setting types are still evolving.");
+        ImGui::TextWrapped("Emergency recovery: close the game and delete red4ext/plugins/m1core/overlay.enable to disable m1core graphics and input hooks.");
+        ImGui::TextDisabled("Development preview - native controls and typography are evolving.");
         ImGui::EndChild();
     }
 
@@ -666,12 +752,14 @@ void RenderSettings(Registry& registry, bool& open)
         if (!saveFailed) g_dirty = false;
     }
     ImGui::SameLine();
+    if (menuKey == 0) ImGui::BeginDisabled();
     if (ImGui::Button("Save & Close")) {
         saveFailed = !registry.Save();
         if (!saveFailed) { g_dirty = false; open = false; }
     }
     ImGui::SameLine();
     if (ImGui::Button("Close")) open = false;
+    if (menuKey == 0) ImGui::EndDisabled();
     if (saveFailed) ImGui::TextUnformatted("Failed saving settings.json");
     g_dirty |= PollCapture(registry);
     ImGui::End();

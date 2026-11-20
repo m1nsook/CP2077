@@ -92,6 +92,10 @@ if(BUILD_TESTING)
     target_include_directories(m1core_input_gate_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
     add_test(NAME m1core_input_gate_tests COMMAND m1core_input_gate_tests)
 
+    add_executable(m1core_keybind_conflicts_tests tests/keybind_conflicts_tests.cpp)
+    target_link_libraries(m1core_keybind_conflicts_tests PRIVATE m1core_settings)
+    add_test(NAME m1core_keybind_conflicts_tests COMMAND m1core_keybind_conflicts_tests)
+
     if(WIN32)
         add_executable(m1core_menu_shortcut_tests tests/menu_shortcut_tests.cpp)
         target_include_directories(m1core_menu_shortcut_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
