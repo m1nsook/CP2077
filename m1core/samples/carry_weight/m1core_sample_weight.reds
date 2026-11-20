@@ -43,8 +43,8 @@ protected cb func OnGameAttached() -> Bool {
     if M1Core_IsAvailable() {
         M1Core_RegisterBoolSetting(n"m1core.sample.weight", n"Enabled", true);
         M1Core_RegisterIntSetting(n"m1core.sample.weight", n"WeightLimit", 500, 100, 10000);
-        // F8 = VK 119. Can be changed/unbound through the m1core UI.
-        M1Core_RegisterKeybindSetting(n"m1core.sample.weight", n"Toggle", 119);
+        // No preset key. The player chooses a shortcut in m1core.
+        M1Core_RegisterKeybindSetting(n"m1core.sample.weight", n"Toggle", 0);
         M1Core_SetSettingGroup(n"m1core.sample.weight", n"Enabled", n"Carry Weight");
         M1Core_SetSettingGroup(n"m1core.sample.weight", n"WeightLimit", n"Carry Weight");
         M1Core_SetSettingGroup(n"m1core.sample.weight", n"Toggle", n"Hotkeys");
@@ -56,7 +56,7 @@ protected cb func OnGameAttached() -> Bool {
         M1Core_SetSettingDescription(n"m1core.sample.weight", n"WeightLimit",
             "Target total carry capacity, including perks. Reapplied on game reload.");
         M1Core_SetSettingDescription(n"m1core.sample.weight", n"Toggle",
-            "Press during gameplay to toggle the weight limit. Default F8.");
+            "Optional: assign your own key to toggle this sample. Unbound by default.");
     }
 
     this.M1SampleWeightSchedule(0.5);

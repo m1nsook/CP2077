@@ -10,4 +10,6 @@ void RenderSettings(Registry& registry, bool& open);
 
 // Render-thread callback when the overlay closes, also cancelling key capture.
 void OnOverlayHidden(bool persisted);
+// Thread-safe flag: menu-toggle must not interrupt the bind recorder.
+bool IsCapturingKeybind();
 } // namespace m1core

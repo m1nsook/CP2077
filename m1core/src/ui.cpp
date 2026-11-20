@@ -8,6 +8,7 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <cctype>
 #include <cstdio>
@@ -29,6 +30,7 @@ struct BindCapture {
 };
 
 BindCapture g_capture;
+std::atomic_bool g_bindCaptureActive{false};
 bool g_dirty = false;
 char g_newProfileName[80]{};
 char g_renameProfileName[80]{};
@@ -91,6 +93,7 @@ std::string KeyLabel(int key)
 void StartCapture(Id mod, Id id)
 {
     g_capture.active = true;
+    g_bindCaptureActive.store(true);
     g_capture.mod = mod;
     g_capture.setting = id;
     for (int key = 0; key < 256; ++key)
@@ -105,17 +108,29 @@ bool PollCapture(Registry& registry)
         const bool rising = down && !g_capture.wasDown[key];
         g_capture.wasDown[key] = down;
         if (!rising) continue;
-        // Never steal the overlay's reserved open/close key or a system
-        // shortcut; Escape only cancels *keybind capture*, never m1core itself.
-        if (key == VK_ESCAPE) {
+        // A key is chosen by the player, never reserved at compile time.
+        // Escape cancels ordinary mod key capture, but can be selected as
+        // m1core's own menu key when deliberately configuring that control.
+        const bool coreMenuCapture =
+            g_capture.mod == RED4ext::CNamePool::Add("m1core").hash &&
+            g_capture.setting == RED4ext::CNamePool::Add("Overlay Toggle").hash;
+        if (key == VK_ESCAPE && !coreMenuCapture) {
             g_capture.active = false;
+            g_bindCaptureActive.store(false);
             return false;
         }
-        if (key == VK_F11 || key == VK_LWIN || key == VK_RWIN ||
+        // Windows/meta and standalone modifiers interfere with desktop
+        // focus or the emergency chord. All regular VK keys are selectable.
+        if (key == VK_LWIN || key == VK_RWIN || key == VK_CONTROL ||
+            key == VK_LCONTROL || key == VK_RCONTROL ||
+            key == VK_SHIFT || key == VK_LSHIFT || key == VK_RSHIFT ||
             key == VK_MENU || key == VK_LMENU || key == VK_RMENU)
             continue;
         const bool saved = registry.SetKeybind(g_capture.mod, g_capture.setting, key);
         g_capture.active = false;
+        g_bindCaptureActive.store(false);
+        if (saved && coreMenuCapture)
+            registry.Save(); // The very first menu key survives restart immediately.
         return saved;
     }
     return false;
@@ -181,13 +196,20 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
     case Kind::Keybind: {
         const bool capturing = g_capture.active &&
             g_capture.mod == mod && g_capture.setting == setting.id;
-        const auto label = capturing ? std::string("Press key... (Esc cancels)")
+        const bool coreMenuBind =
+            mod == RED4ext::CNamePool::Add("m1core").hash &&
+            setting.id == RED4ext::CNamePool::Add("Overlay Toggle").hash;
+        const auto label = capturing ? std::string(coreMenuBind ? "Press your menu key..." :
+                                                  "Press key... (Esc cancels)")
                                     : KeyLabel(std::get<std::int32_t>(setting.value));
         if (ImGui::Button(label.c_str(), ImVec2(width, 0.0F)))
             StartCapture(mod, setting.id);
         ImGui::SameLine();
         if (ImGui::SmallButton("X")) {
-            if (capturing) g_capture.active = false;
+            if (capturing) {
+                g_capture.active = false;
+                g_bindCaptureActive.store(false);
+            }
             changed = registry.SetKeybind(mod, setting.id, 0);
         }
         break;
@@ -482,6 +504,17 @@ void RenderSettings(Registry& registry, bool& open)
     static Id selected = 0;
     static Page page = Page::Mods;
     static bool saveFailed = false;
+    static bool firstRunSelected = false;
+    const auto coreMod = RED4ext::CNamePool::Add("m1core");
+    const auto coreToggle = RED4ext::CNamePool::Add("Overlay Toggle");
+    const int menuKey = registry.GetKeybind(coreMod.hash, coreToggle.hash).value_or(0);
+    if (menuKey == 0 && !firstRunSelected) {
+        // First run needs no preassigned key: menu auto-opens and selects
+        // the binding control. A user can choose a key without editing files.
+        selected = coreMod.hash;
+        page = Page::Keybinds;
+        firstRunSelected = true;
+    }
 
     const auto mods = registry.Snapshot();
     if (mods.empty()) selected = 0;
@@ -498,6 +531,22 @@ void RenderSettings(Registry& registry, bool& open)
     ImGui::SameLine();
     ImGui::TextDisabled("Mod Settings");
     ImGui::Separator();
+    if (menuKey == 0) {
+        ImGui::TextWrapped("No m1core menu key is assigned. Choose one now: "
+                           "Keybinds > m1core > Open / Close Menu. "
+                           "The menu opens automatically when no key has ever been assigned.");
+        if (ImGui::Button("Bind my menu key"))
+            StartCapture(coreMod.hash, coreToggle.hash);
+        if (g_capture.active && g_capture.mod == coreMod.hash &&
+            g_capture.setting == coreToggle.hash) {
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Cancel key selection")) {
+                g_capture.active = false;
+                g_bindCaptureActive.store(false);
+            }
+        }
+        ImGui::Separator();
+    }
 
     ImGui::SetNextItemWidth((std::max)(150.0F, ImGui::GetContentRegionAvail().x * 0.42F));
     ImGui::InputTextWithHint("##search", "Search mods and settings", search, sizeof(search));
@@ -581,8 +630,10 @@ void RenderSettings(Registry& registry, bool& open)
         ImGui::TextWrapped("A single RED4ext plugin hosts the ImGui settings interface and persistent configuration for compatible Cyberpunk 2077 mods.");
         ImGui::Spacing();
         ImGui::Text("Registered mods: %zu", mods.size());
-        ImGui::TextUnformatted("Open / close overlay: F11");
-        ImGui::TextUnformatted("Emergency disable: Ctrl + Shift + F11");
+        const auto shortcut = KeyLabel(menuKey);
+        ImGui::Text("Open / close overlay: %s", shortcut.c_str());
+        ImGui::Text("Emergency disable: Ctrl + Shift + %s", shortcut.c_str());
+        ImGui::TextDisabled("No menu key is preset; assign it in Keybinds > m1core.");
         ImGui::TextUnformatted("Settings file: red4ext/plugins/m1core/settings.json");
         ImGui::Spacing();
         ImGui::TextDisabled("Development preview. The overlay visuals and additional setting types are still evolving.");
@@ -590,7 +641,7 @@ void RenderSettings(Registry& registry, bool& open)
     }
 
     // Footer is a functional action area. Apply = immediate; Save persists to
-    // JSON. The normal F11 close is handled by the overlay input gate.
+    // JSON. Closing with the player-selected key uses the overlay input gate.
     ImGui::Separator();
     if (g_dirty) ImGui::TextUnformatted("Unsaved changes");
     else ImGui::TextDisabled("Settings applied in memory");
@@ -613,6 +664,7 @@ void RenderSettings(Registry& registry, bool& open)
 void OnOverlayHidden(bool persisted)
 {
     g_capture.active = false;
+    g_bindCaptureActive.store(false);
     g_confirmOverwrite = false;
     g_confirmDelete = false;
     g_confirmGroupReset = false;
@@ -620,4 +672,8 @@ void OnOverlayHidden(bool persisted)
     if (persisted) g_dirty = false;
 }
 
+bool IsCapturingKeybind()
+{
+    return g_bindCaptureActive.load();
+}
 } // namespace m1core

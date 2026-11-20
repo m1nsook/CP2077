@@ -14,4 +14,6 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
 void StopOverlay();
 // Read-only visibility guard for the mod-owned keybind polling API.
 bool IsOverlayOpen();
+// Core menu key is configured by the player, 0 = not bound.
+int GetOverlayHotkey();
 } // namespace m1core

@@ -39,9 +39,11 @@ int main()
     CHECK(!events.Poll(1, 10, 0x76, false, true));
     CHECK(events.Poll(1, 10, 0x76, true, true));
 
-    // Reserved key and unbound settings never dispatch.
+    // No F-key is globally reserved. 0 still means Unbound.
     CHECK(!events.Poll(1, 10, 0, true, true));
-    CHECK(!events.Poll(1, 10, 0x7A, true, true));
+    CHECK(!events.Poll(1, 10, 0x7A, true, true)); // First poll primes state.
+    CHECK(!events.Poll(1, 10, 0x7A, false, true));
+    CHECK(events.Poll(1, 10, 0x7A, true, true));
     CHECK(!events.Poll(0, 10, 0x75, true, true));
     CHECK(!events.Poll(1, 0, 0x75, true, true));
     CHECK(!events.Poll(1, 10, 256, true, true));
@@ -94,10 +96,14 @@ int main()
     events.ObserveKeyEvent(0x77, true);
     events.ObserveKeyEvent(0x77, false);
     CHECK(events.Poll(11, 12, 0x77, false, true));
-    // F11 remains protected even when input is observed.
+    // Any F-key, including F11, is assignable to a mod when not used
+    // as the user's menu key. First observation after rebind is primed.
     events.ObserveKeyEvent(0x7A, true);
     events.ObserveKeyEvent(0x7A, false);
     CHECK(!events.Poll(11, 12, 0x7A, false, true));
+    events.ObserveKeyEvent(0x7A, true);
+    events.ObserveKeyEvent(0x7A, false);
+    CHECK(events.Poll(11, 12, 0x7A, false, true));
     events.Reset();
     CHECK(!events.Poll(1, 10, 0x75, true, true));
 }

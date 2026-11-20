@@ -173,6 +173,13 @@ void PollKeybindPressed(Scriptable*, Frame* frame, bool* out, int64_t)
         return;
     }
 
+    // The player's chosen menu shortcut has priority over mod actions.
+    // No particular F-key is reserved by the runtime.
+    if (*vk > 0 && *vk == m1core::GetOverlayHotkey()) {
+        m1core::KeybindActions::Get().Poll(mod.hash, id.hash, 0, false, false);
+        Output(out, false);
+        return;
+    }
     const HWND foreground = GetForegroundWindow();
     DWORD process = 0;
     if (foreground)

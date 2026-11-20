@@ -88,8 +88,12 @@ std::atomic_bool g_renderError{false};
 bool g_hooked = false;
 bool g_subclassed = false;
 bool g_loggedThreadMismatch = false;
-bool g_f11WasDown = false;
+bool g_toggleWasDown = false;
+int g_previousToggleKey = 0;
+bool g_setupAutoOpened = false;
 bool g_emergencyWasDown = false;
+Id g_coreMod = 0;
+Id g_coreToggle = 0;
 PresentFn g_present = nullptr;
 ResizeFn g_resize = nullptr;
 Resize1Fn g_resize1 = nullptr;
@@ -201,10 +205,13 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
     if (message == WM_KILLFOCUS || (message == WM_ACTIVATEAPP && !wparam))
         SetCursorCaptured(false, true);
 
-    if (g_enabled.load() && (message == WM_KEYDOWN || message == WM_SYSKEYDOWN)
-        && wparam == VK_F11
-        && (GetAsyncKeyState(VK_CONTROL) & 0x8000)
-        && (GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
+    const int assignedMenuKey = GetOverlayHotkey();
+    if (g_enabled.load() && assignedMenuKey > 0 &&
+        (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) &&
+        static_cast<int>(wparam) == assignedMenuKey &&
+        !IsCapturingKeybind() &&
+        (GetAsyncKeyState(VK_CONTROL) & 0x8000) &&
+        (GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
         EmergencyDisable();
         return 0;
     }
@@ -233,9 +240,11 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         }
     }
 
-    // F11 is polled in the Present callback, because the game may use RAWINPUT
-    // (RIDEV_NOLEGACY) and never produce WM_KEYDOWN for the hotkey.
-    if (g_enabled.load() && IsKeyboardMessage(message) && wparam == VK_F11)
+    // Block only the user-configured menu key, not a built-in function key.
+    // Present also polls its physical state (RAWINPUT may disable WM_KEYDOWN).
+    if (g_enabled.load() && assignedMenuKey > 0 &&
+        IsKeyboardMessage(message) && static_cast<int>(wparam) == assignedMenuKey &&
+        !IsCapturingKeybind())
         return 0;
 
     bool capture = false;
@@ -449,15 +458,25 @@ bool InitializeGraphics(IDXGISwapChain* swapchain)
         std::lock_guard lock(g_stateMutex);
         g_gate.SetRendererReady(true);
     }
-    Log("m1core overlay: renderer ready; F11 opens and closes, Ctrl+Shift+F11 emergency disable");
+    Log("m1core overlay: renderer ready; waiting for user-selected menu hotkey");
     return true;
 }
 
 void ProcessHotkeys()
 {
-    const bool f11 = (GetAsyncKeyState(VK_F11) & 0x8000) != 0;
-    const bool emergency = f11 && (GetAsyncKeyState(VK_CONTROL) & 0x8000) &&
-                                    (GetAsyncKeyState(VK_SHIFT) & 0x8000);
+    const int selectedKey = GetOverlayHotkey();
+    const bool down = selectedKey > 0 && (GetAsyncKeyState(selectedKey) & 0x8000) != 0;
+    const bool binding = IsCapturingKeybind();
+    const bool emergency = down && !binding &&
+                           (GetAsyncKeyState(VK_CONTROL) & 0x8000) &&
+                           (GetAsyncKeyState(VK_SHIFT) & 0x8000);
+    // When a user binds a key while holding it, the first press assigns it,
+    // not immediately dismisses the menu on the following frame.
+    if (selectedKey != g_previousToggleKey) {
+        g_previousToggleKey = selectedKey;
+        g_toggleWasDown = down;
+        g_emergencyWasDown = emergency;
+    }
     if (emergency && !g_emergencyWasDown)
         EmergencyDisable();
     g_emergencyWasDown = emergency;
@@ -470,9 +489,15 @@ void ProcessHotkeys()
         const bool wasOpen = g_gate.IsOpen();
         const bool focused = IsFocused();
         g_gate.SetGameFocused(focused);
-        // Hotkeys pressed in another monitor's app must not toggle m1core.
-        if (g_enabled.load() && focused && f11 && !g_f11WasDown && !emergency)
+        // First-run onboarding is opened by m1core itself (no default key).
+        // A key pressed in another app or during binding never toggles it.
+        if (g_enabled.load() && focused && selectedKey == 0 && !g_setupAutoOpened) {
             g_gate.Toggle();
+            g_setupAutoOpened = true;
+        } else if (g_enabled.load() && focused && selectedKey > 0 &&
+                   down && !g_toggleWasDown && !emergency && !binding) {
+            g_gate.Toggle();
+        }
         capture = g_gate.MayCaptureInput();
         closed = wasOpen && !g_gate.IsOpen();
         toggled = wasOpen != g_gate.IsOpen();
@@ -481,7 +506,7 @@ void ProcessHotkeys()
             g_rawSamples.clear();
         }
     }
-    g_f11WasDown = f11;
+    g_toggleWasDown = down;
     if (toggled)
         KeybindActions::Get().Invalidate();
 
@@ -505,7 +530,7 @@ void ProcessHotkeys()
 void DisableOverlayAfterRenderFailure(const char* reason)
 {
     g_renderError.store(true);
-    g_enabled.store(false); // Also stop intercepting F11 and legacy input.
+    g_enabled.store(false); // Stop intercepting the selected key and legacy input.
     CloseOverlay();         // Always restore the game's cursor/clip.
     Warn(reason);
 }
@@ -729,6 +754,12 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
                   RED4ext::v1::PluginHandle handle, const RED4ext::v1::Sdk* sdk)
 {
     g_registry = &registry;
+    g_coreMod = RED4ext::CNamePool::Add("m1core").hash;
+    g_coreToggle = RED4ext::CNamePool::Add("Overlay Toggle").hash;
+    g_setupAutoOpened = false;
+    g_previousToggleKey = 0;
+    g_toggleWasDown = false;
+    g_emergencyWasDown = false;
     g_handle = handle;
     g_sdk = sdk;
     std::error_code error;
@@ -742,6 +773,16 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
         Warn("m1core overlay: unable to register game state; overlay stays disabled");
         return;
     }
+    // Deliberately no preset key: the first overlay session auto-opens so
+    // the player can choose its own menu binding (and persist it).
+    registry.RegisterKeybind(g_coreMod, g_coreToggle, 0);
+    registry.SetGroup(g_coreMod, g_coreToggle,
+                      RED4ext::CNamePool::Add("Controls").hash);
+    registry.SetDisplayName(g_coreMod, g_coreToggle, "Open / Close Menu");
+    registry.SetDescription(g_coreMod, g_coreToggle,
+                            "Choose your own key to open and close m1core. "
+                            "Ctrl+Shift+that key emergency-disables the overlay.");
+
     // A tiny local preview for testing the UI before external mods migrate.
     const auto mod = RED4ext::CNamePool::Add("m1core.preview");
     registry.RegisterBool(mod.hash, RED4ext::CNamePool::Add("Enabled").hash, true);
@@ -750,7 +791,7 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
                            1.0F, 0.5F, 5.0F);
     registry.RegisterEnum(mod.hash, RED4ext::CNamePool::Add("Camera Mode").hash,
                           1, {"Off", "First Person", "Cinematic"});
-    registry.RegisterKeybind(mod.hash, RED4ext::CNamePool::Add("Quick Action").hash, VK_F8);
+    registry.RegisterKeybind(mod.hash, RED4ext::CNamePool::Add("Quick Action").hash, 0);
     const auto general = RED4ext::CNamePool::Add("General");
     const auto gameplay = RED4ext::CNamePool::Add("Gameplay");
     const auto controls = RED4ext::CNamePool::Add("Controls");
@@ -767,9 +808,16 @@ void StartOverlay(Registry& registry, const std::filesystem::path& directory,
     registry.SetDescription(mod.hash, RED4ext::CNamePool::Add("Multiplier").hash,
                             "Try changing the slider. The mod can detect an actual value change using its revision token.");
     registry.SetDescription(mod.hash, RED4ext::CNamePool::Add("Quick Action").hash,
-                            "Press the button to record a key. F11 remains reserved for m1core.");
+                            "Unbound initially. Assign any available key in the Keybinds tab.");
     g_enabled.store(true);
     Log("m1core overlay: opted in; waiting for Cyberpunk swap chain");
+}
+
+int GetOverlayHotkey()
+{
+    if (!g_registry || !g_coreMod || !g_coreToggle)
+        return 0;
+    return g_registry->GetKeybind(g_coreMod, g_coreToggle).value_or(0);
 }
 
 bool IsOverlayOpen()
@@ -800,6 +848,8 @@ void StopOverlay()
     }
     g_selectedChain = nullptr;
     g_registry = nullptr;
+    g_coreMod = 0;
+    g_coreToggle = 0;
 }
 
 } // namespace m1core

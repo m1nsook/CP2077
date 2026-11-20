@@ -16,9 +16,9 @@ bool KeybindActions::Poll(std::uint64_t mod, std::uint64_t setting, int vk,
     std::lock_guard lock(mutex_);
     const auto id = std::pair{mod, setting};
 
-    // F11 is m1core's reserved toggle. Do not ever dispatch it as a mod
-    // action (VK_F11 = 0x7A); zero is an unbound key.
-    if (!mod || !setting || vk <= 0 || vk > 255 || vk == 0x7A)
+    // Nothing is reserved by fixed VK. The runtime rejects the player's
+    // current menu key dynamically before calling this state machine.
+    if (!mod || !setting || vk <= 0 || vk > 255)
     {
         keys_.erase(id);
         return false;
@@ -74,7 +74,7 @@ bool KeybindActions::Poll(std::uint64_t mod, std::uint64_t setting, int vk,
 
 void KeybindActions::ObserveKeyEvent(int vk, bool down)
 {
-    if (vk <= 0 || vk > 255 || vk == 0x7A)
+    if (vk <= 0 || vk > 255)
         return;
 
     std::lock_guard lock(mutex_);

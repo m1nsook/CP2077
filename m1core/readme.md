@@ -40,8 +40,8 @@ For testing, download the single **`m1core-game-ready-x64-dev`** artifact from t
 
 The dev ZIP includes the native DLL, matching REDscript API, optional smoke-test helper, and `overlay.enable`. The smoke helper performs no actions until explicitly invoked from a test console. It also includes temporary sample settings under `m1core.preview` to demonstrate bool/int/float sliders, an enum dropdown and keybind capture before mods migrate.
 
-- **F11** — open or close the settings window with the same key.
-- **Ctrl+Shift+F11** — emergency disable until game restart.
+- **Your selected key** — opens and closes the menu. No key is preassigned.
+- **Ctrl+Shift+your selected key** — emergency disable until game restart.
 - **Recovery before next launch:** delete `red4ext/plugins/m1core/overlay.enable`. This fully disables our graphics and window hooks, without removing m1core itself.
 - **Full uninstall:** remove the DLL and `m1core.reds` together.
 
@@ -64,7 +64,7 @@ The **Profiles** tab provides named configurations, such as `Stealth`, `Combat`,
 - **Overwrite selected:** Replace the saved snapshot only after a second confirmation click.
 - **Delete selected:** Delete only that named snapshot after confirmation; it does not change currently active mod settings.
 - **Rename selected (M5):** Rename a snapshot without changing its values or the active settings. Existing profile names cannot be overwritten. Changes are atomically written to `profiles.json`.
-- **F11 to close:** Continues to save active settings automatically.
+- **your configured menu key to close:** Continues to save active settings automatically.
 
 Profiles are stored in a separate `profiles.json` beside `settings.json`, using a versioned schema and temporary-file replacement. Up to 24 profiles are supported; names may use UTF-8 (up to 64 bytes) but cannot contain control characters or path separators. A damaged or unexpectedly large profiles file does not prevent loading the plugin or the original settings.
 
@@ -148,7 +148,7 @@ if M1Core_PollKeybindPressed(n"ExampleMod", n"QuickAction") {
 - Repeats and held keys produce no extra event; release and repress to fire.
 - The call is suppressed while the m1core window is open or Cyberpunk is not
   the foreground application; overlay/focus changes invalidate held keys.
-- F11 is always reserved. Unbound keys and unregistered settings never fire.
+- No fixed F-key is reserved. The user's current m1core menu key takes priority over mod actions.
 - Other mods binding the same VK are independent; collisions are not
   automatically resolved.
 - **Buffered edges (M5):** while the native overlay input bridge is enabled,
@@ -178,12 +178,12 @@ Source, full installation and uninstall notes, and in-game test checklist:
 `samples/carry_weight/README.md`.
 
 - Registers Enabled, Carry Weight Limit (100–10,000, default 500 total),
-  and a rebindable Toggle Mod key (F8 by default).
+  and a rebindable Toggle Mod key (Unbound by default).
 - Applies only its own tracked additive CarryCapacity modifier; it does
   not wipe stat modifiers owned by cyberware, perks or other mods.
 - UI values are stored in m1core settings.json; the modifier is recreated
   after player attachment/load and periodically reconciled against gameplay
-  stat rebuilds. F8 toggles and saves immediately through the new API.
+  stat rebuilds. The user-selected toggle key saves immediately through the native API.
 - **New in-game behavior is unverified until tested inside Cyberpunk.**
   CI verifies the DLL and single-ZIP structure, not REDscript game compilation.
 
@@ -218,7 +218,7 @@ The All Mods page has a two-click **Reset mod to defaults** action. Each named
 group (including the default General section) has its own two-click **Reset
 group** action. These controls only reset currently registered settings to
 mod-declared defaults. Other mods and groups are left unchanged. The existing
-Save button or F11 close persists the reset values using the unchanged
+Save button or closing the menu persists the reset values using the unchanged
 schema-v1 `settings.json` format. No profiles are removed or altered.
 
 Mod authors can call `M1Core_ResetModSettings(modName)` or
