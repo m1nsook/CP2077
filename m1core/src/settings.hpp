@@ -7,6 +7,7 @@
 #include <optional>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <variant>
 
 namespace m1core
@@ -25,6 +26,9 @@ struct Setting
     Value maximum;
     std::vector<std::string> choices;
     Id group = 0; // UI metadata only; zero means ungrouped.
+    std::string displayName;
+    std::string description;
+    std::int32_t revision = 0; // Session-local token, not persisted.
 };
 
 // Immutable copy of registry state for UI rendering and diagnostics.
@@ -37,6 +41,9 @@ struct SettingSnapshot {
     Value maximum;
     std::vector<std::string> choices;
     Id group = 0; // UI metadata only; zero means ungrouped.
+    std::string displayName;
+    std::string description;
+    std::int32_t revision = 0; // Session-local token, not persisted.
 };
 struct ModSnapshot {
     Id id;
@@ -86,6 +93,10 @@ public:
     bool ResetMod(Id mod);
     bool ResetGroup(Id mod, Id group);
     bool SetGroup(Id mod, Id id, Id group);
+    bool SetDisplayName(Id mod, Id id, std::string_view label);
+    bool SetDescription(Id mod, Id id, std::string_view description);
+    // 0 initially; token advances only for effective value changes.
+    std::optional<std::int32_t> Revision(Id mod, Id id) const;
     std::vector<ModSnapshot> Snapshot() const;
 
 private:
@@ -98,6 +109,7 @@ private:
     bool Set(Id mod, Id id, Kind kind, Value value);
     std::optional<Value> Get(Id mod, Id id, Kind kind) const;
     static Value Clamp(const Setting& setting, Value value);
+    static bool UpdateValue(Setting& setting, Value value);
     std::filesystem::path ProfilesPath() const;
     bool WriteProfiles(const Profiles& profiles) const;
 

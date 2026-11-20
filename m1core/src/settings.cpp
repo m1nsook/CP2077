@@ -96,6 +96,14 @@ json Encode(Kind kind, const Value& value)
     return encoded;
 }
 
+bool ValidMetadata(std::string_view text, std::size_t maxLength)
+{
+    if (text.size() > maxLength) return false;
+    for (unsigned char byte : text)
+        if (byte < 0x20 || byte == 0x7F) return false;
+    return true;
+}
+
 bool ValidProfileName(std::string_view name)
 {
     if (name.empty() || name.size() > 64 || name.front() == ' ' || name.back() == ' ')
@@ -332,7 +340,7 @@ bool Registry::ActivateProfile(const std::string& name)
                     // Never corrupt an existing setting whose type changed.
                     if (current->second.kind != stored.first)
                         continue;
-                    current->second.value = Clamp(current->second, stored.second);
+                    UpdateValue(current->second, Clamp(current->second, stored.second));
                     persisted_[modId][id] = {stored.first, current->second.value};
                     continue;
                 }
@@ -378,6 +386,16 @@ Value Registry::Clamp(const Setting& setting, Value value)
     return value;
 }
 
+bool Registry::UpdateValue(Setting& setting, Value value)
+{
+    if (setting.value == value) return false;
+    setting.value = std::move(value);
+    // Clients compare tokens. Avoid overflowing signed Int32 REDscript.
+    setting.revision = setting.revision == std::numeric_limits<std::int32_t>::max()
+                           ? 1 : setting.revision + 1;
+    return true;
+}
+
 bool Registry::Register(Id mod, Id id, Setting setting)
 {
     if (!mod || !id)
@@ -389,8 +407,12 @@ bool Registry::Register(Id mod, Id id, Setting setting)
     {
         if (it->second.kind != setting.kind)
             return false;
-        setting.value = Clamp(setting, it->second.value);
-        setting.group = it->second.group; // Preserve display metadata on re-registration.
+        setting.group = it->second.group;
+        setting.displayName = it->second.displayName;
+        setting.description = it->second.description;
+        setting.revision = it->second.revision;
+        setting.value = it->second.value;
+        UpdateValue(setting, Clamp(setting, it->second.value));
     }
     else if (const auto loadedMod = persisted_.find(mod); loadedMod != persisted_.end())
     {
@@ -498,7 +520,7 @@ bool Registry::Set(Id mod, Id id, Kind kind, Value value)
     const auto setting = module->second.find(id);
     if (setting == module->second.end() || setting->second.kind != kind)
         return false;
-    setting->second.value = Clamp(setting->second, value);
+    UpdateValue(setting->second, Clamp(setting->second, value));
     return true;
 }
 
@@ -540,7 +562,7 @@ bool Registry::Reset(Id mod, Id id)
     const auto setting = module->second.find(id);
     if (setting == module->second.end())
         return false;
-    setting->second.value = setting->second.defaultValue;
+    UpdateValue(setting->second, setting->second.defaultValue);
     return true;
 }
 bool Registry::ResetMod(Id mod)
@@ -550,7 +572,7 @@ bool Registry::ResetMod(Id mod)
     if (module == registered_.end() || module->second.empty())
         return false;
     for (auto& [_, setting] : module->second)
-        setting.value = setting.defaultValue;
+        UpdateValue(setting, setting.defaultValue);
     return true;
 }
 
@@ -565,7 +587,7 @@ bool Registry::ResetGroup(Id mod, Id group)
     {
         if (setting.group != group)
             continue;
-        setting.value = setting.defaultValue;
+        UpdateValue(setting, setting.defaultValue);
         found = true;
     }
     return found;
@@ -584,6 +606,40 @@ bool Registry::SetGroup(Id mod, Id id, Id group)
     return true;
 }
 
+bool Registry::SetDisplayName(Id mod, Id id, std::string_view label)
+{
+    if (!ValidMetadata(label, 96)) return false;
+    std::lock_guard lock(mutex_);
+    const auto module = registered_.find(mod);
+    if (module == registered_.end()) return false;
+    const auto setting = module->second.find(id);
+    if (setting == module->second.end()) return false;
+    setting->second.displayName.assign(label);
+    return true;
+}
+
+bool Registry::SetDescription(Id mod, Id id, std::string_view description)
+{
+    if (!ValidMetadata(description, 512)) return false;
+    std::lock_guard lock(mutex_);
+    const auto module = registered_.find(mod);
+    if (module == registered_.end()) return false;
+    const auto setting = module->second.find(id);
+    if (setting == module->second.end()) return false;
+    setting->second.description.assign(description);
+    return true;
+}
+
+std::optional<std::int32_t> Registry::Revision(Id mod, Id id) const
+{
+    std::lock_guard lock(mutex_);
+    const auto module = registered_.find(mod);
+    if (module == registered_.end()) return std::nullopt;
+    const auto setting = module->second.find(id);
+    if (setting == module->second.end()) return std::nullopt;
+    return setting->second.revision;
+}
+
 std::vector<ModSnapshot> Registry::Snapshot() const
 {
     std::lock_guard lock(mutex_);
@@ -595,7 +651,8 @@ std::vector<ModSnapshot> Registry::Snapshot() const
         mod.settings.reserve(settings.size());
         for (const auto& [id, setting] : settings)
             mod.settings.push_back({id, setting.kind, setting.value, setting.defaultValue,
-                                    setting.minimum, setting.maximum, setting.choices, setting.group});
+                                    setting.minimum, setting.maximum, setting.choices, setting.group,
+                                    setting.displayName, setting.description, setting.revision});
         modules.push_back(std::move(mod));
     }
     return modules;
