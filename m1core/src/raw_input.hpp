@@ -32,10 +32,10 @@ public:
 
     // Feed legacy Win32 messages and copied RAWINPUT to ImGui, on the graphics
     // thread only, after the platform NewFrame and before ImGui::NewFrame.
-    // Raw relative mouse deltas provide a virtual cursor even if the game
-    // continues recentring or clipping the physical Windows cursor.
+    // Prefer real Win32 cursor coordinates, matching Windows multi-monitor
+    // movement/speed. Use reduced-gain relative movement only as a fallback.
     void Feed(HWND window, const std::vector<MSG>& legacy,
-              const std::vector<RawSample>& raw);
+              const std::vector<RawSample>& raw, bool systemCursor);
 
 private:
     bool virtualActive_ = false;

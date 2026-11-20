@@ -20,9 +20,9 @@ public:
 
     void SetGameFocused(bool focused) noexcept
     {
+        // Alt-tab or clicking another monitor must release game input without
+        // dismissing the settings window. F11 still explicitly closes it.
         focused_ = focused;
-        if (!focused)
-            Close();
     }
 
     void SetOtherOverlayActive(bool active) noexcept
@@ -51,6 +51,7 @@ public:
     }
 
     bool IsOpen() const noexcept { return open_; }
+    bool IsGameFocused() const noexcept { return focused_; }
 
     bool MayCaptureInput() const noexcept
     {

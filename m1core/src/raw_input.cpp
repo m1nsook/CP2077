@@ -9,6 +9,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM,
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cfloat>
 
 namespace m1core {
 namespace {
@@ -138,7 +139,7 @@ void RawInputBridge::Reset() noexcept
 }
 
 void RawInputBridge::Feed(HWND window, const std::vector<MSG>& legacy,
-                          const std::vector<RawSample>& raw)
+                          const std::vector<RawSample>& raw, bool systemCursor)
 {
     ImGuiIO& io = ImGui::GetIO();
     // With queued platform + raw events in one frame, consume all of them
@@ -153,25 +154,42 @@ void RawInputBridge::Feed(HWND window, const std::vector<MSG>& legacy,
         ImGui_ImplWin32_WndProcHandler(msg.hwnd, msg.message, msg.wParam, msg.lParam);
     }
 
-    if (!positionReady_) {
-        mouseX_ = io.DisplaySize.x * 0.5F;
-        mouseY_ = io.DisplaySize.y * 0.5F;
-        positionReady_ = true;
-    }
-
-    for (const RawSample& sample : raw) {
-        if (sample.type == RIM_TYPEMOUSE &&
-            (sample.mouseFlags & MOUSE_MOVE_ABSOLUTE) == 0 &&
-            (sample.dx || sample.dy)) {
-            virtualActive_ = true;
-            mouseX_ += static_cast<float>(sample.dx);
-            mouseY_ += static_cast<float>(sample.dy);
+    if (systemCursor) {
+        // Do not accumulate RAWINPUT deltas on top of the Windows pointer.
+        // ScreenToClient handles negative desktop coordinates and monitors to
+        // the left or above the game's display without applying extra speed.
+        POINT pointer{};
+        RECT client{};
+        if (GetCursorPos(&pointer) && ScreenToClient(window, &pointer) &&
+            GetClientRect(window, &client) && PtInRect(&client, pointer))
+            io.AddMousePosEvent(static_cast<float>(pointer.x),
+                                static_cast<float>(pointer.y));
+        else
+            io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+    } else {
+        if (!positionReady_) {
+            mouseX_ = io.DisplaySize.x * 0.5F;
+            mouseY_ = io.DisplaySize.y * 0.5F;
+            positionReady_ = true;
         }
-    }
-    if (virtualActive_) {
-        mouseX_ = std::clamp(mouseX_, 0.0F, (std::max)(0.0F, io.DisplaySize.x - 1.0F));
-        mouseY_ = std::clamp(mouseY_, 0.0F, (std::max)(0.0F, io.DisplaySize.y - 1.0F));
-        io.AddMousePosEvent(mouseX_, mouseY_);
+
+        // Only the emergency fallback uses relative motion. Its gain is
+        // deliberately lower than the previous 1:1 raw delta mapping.
+        constexpr float kFallbackGain = 0.40F;
+        for (const RawSample& sample : raw) {
+            if (sample.type == RIM_TYPEMOUSE &&
+                (sample.mouseFlags & MOUSE_MOVE_ABSOLUTE) == 0 &&
+                (sample.dx || sample.dy)) {
+                virtualActive_ = true;
+                mouseX_ += static_cast<float>(sample.dx) * kFallbackGain;
+                mouseY_ += static_cast<float>(sample.dy) * kFallbackGain;
+            }
+        }
+        if (virtualActive_) {
+            mouseX_ = std::clamp(mouseX_, 0.0F, (std::max)(0.0F, io.DisplaySize.x - 1.0F));
+            mouseY_ = std::clamp(mouseY_, 0.0F, (std::max)(0.0F, io.DisplaySize.y - 1.0F));
+            io.AddMousePosEvent(mouseX_, mouseY_);
+        }
     }
 
     for (const RawSample& sample : raw) {

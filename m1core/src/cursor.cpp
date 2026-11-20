@@ -23,6 +23,34 @@ RED4ext::v1::PluginHandle g_handle{};
 const RED4ext::v1::Sdk* g_sdk = nullptr;
 bool g_hooksInstalled = false;
 HWND g_gameWindow = nullptr;
+int g_cursorShowAdjustments = 0;
+constexpr int kMaxCursorShowAdjustments = 32;
+
+// ShowCursor has a display counter, not a boolean. Balance only our own
+// increments on close; never call it unconditionally every frame.
+void ShowSystemPointerWhenNeeded()
+{
+    if (!g_capture.load(std::memory_order_acquire))
+        return;
+    CURSORINFO info{sizeof(info)};
+    if (GetCursorInfo(&info) && (info.flags & CURSOR_SHOWING))
+        return;
+    while (g_cursorShowAdjustments < kMaxCursorShowAdjustments)
+    {
+        ++g_cursorShowAdjustments;
+        if (ShowCursor(TRUE) >= 0)
+            break;
+    }
+}
+
+void RestoreCursorVisibility()
+{
+    while (g_cursorShowAdjustments > 0)
+    {
+        ShowCursor(FALSE);
+        --g_cursorShowAdjustments;
+    }
+}
 
 BOOL WINAPI SetCursorPosHook(int x, int y)
 {
@@ -96,6 +124,10 @@ void SetCursorCaptured(bool active)
         g_capture.store(false, std::memory_order_release);
         return;
     }
+
+    // Focus notifications can arrive on the window thread while Present is
+    // running on the render thread: serialize pointer/clip transitions.
+    std::lock_guard lock(g_clipMutex);
     const bool wasActive = g_capture.exchange(active, std::memory_order_acq_rel);
     if (wasActive == active)
         return;
@@ -103,27 +135,26 @@ void SetCursorCaptured(bool active)
     if (active) {
         RECT oldClip{};
         if (GetClipCursor(&oldClip)) {
-            std::lock_guard lock(g_clipMutex);
             g_restoreClip = oldClip;
             g_hasRestoreClip = true;
         }
-        // Use trampoline rather than the detoured API; avoid recursion.
+        // Call original APIs to prevent recursion in our user32 detours.
         g_originalClip(nullptr);
+        ShowSystemPointerWhenNeeded();
     } else {
-        RECT restore{};
-        bool hasRestore = false;
-        {
-            std::lock_guard lock(g_clipMutex);
-            restore = g_restoreClip;
-            hasRestore = g_hasRestoreClip;
-        }
-        // Never trap the OS pointer inside the game's window after Alt+Tab.
-        // On return to the game, its own clip policy can resume.
-        if (!g_gameWindow || GetForegroundWindow() != g_gameWindow)
-            g_originalClip(nullptr);
-        else
-            g_originalClip(hasRestore ? &restore : nullptr);
+        // Never trap the pointer inside the game after switching monitors.
+        const bool focused = g_gameWindow && GetForegroundWindow() == g_gameWindow;
+        g_originalClip(focused && g_hasRestoreClip ? &g_restoreClip : nullptr);
+        RestoreCursorVisibility();
     }
+}
+
+void EnsureSystemCursorVisible()
+{
+    if (!g_hooksInstalled)
+        return;
+    std::lock_guard lock(g_clipMutex);
+    ShowSystemPointerWhenNeeded();
 }
 
 void RemoveCursorDetours()
@@ -135,6 +166,7 @@ void RemoveCursorDetours()
         g_sdk->hooking->Detach(g_handle, g_setPosTarget);
     }
     g_hooksInstalled = false;
+    g_cursorShowAdjustments = 0;
     g_originalSetPos = nullptr;
     g_originalClip = nullptr;
     g_setPosTarget = nullptr;

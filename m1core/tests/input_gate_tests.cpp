@@ -32,11 +32,16 @@ int main()
 
     CHECK(input.Toggle());
     input.SetGameFocused(false); // Alt-tab / focus loss.
-    CHECK(!input.IsOpen());
+    CHECK(input.IsOpen()); // Second monitor must NOT dismiss the overlay.
+    CHECK(!input.IsGameFocused());
     CHECK(!input.MayCaptureInput());
-    CHECK(!input.Toggle());
+    CHECK(!input.Toggle()); // F11 handling itself is focus-gated by overlay.
 
     input.SetGameFocused(true);
+    CHECK(input.IsOpen());
+    CHECK(input.IsGameFocused());
+    CHECK(input.MayCaptureInput());
+    CHECK(!input.Toggle()); // F11 still closes after returning to the game.
     CHECK(input.Toggle());
     input.SetOtherOverlayActive(true); // E.g. CET overlay.
     CHECK(!input.IsOpen());

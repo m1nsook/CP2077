@@ -171,7 +171,7 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         g_gate.SetGameFocused(false);
         g_messages.clear();
         g_rawSamples.clear();
-        // The OS cursor must be freed/restored without holding g_stateMutex.
+        // Suspend input, but keep the settings window open across monitors.
     }
     if (message == WM_KILLFOCUS || (message == WM_ACTIVATEAPP && !wparam))
         SetCursorCaptured(false);
@@ -415,13 +415,13 @@ void ProcessHotkeys()
     {
         std::lock_guard lock(g_stateMutex);
         const bool wasOpen = g_gate.IsOpen();
-        g_gate.SetGameFocused(IsFocused());
-        if (g_enabled.load()) {
-            if (f11 && !g_f11WasDown && !emergency)
-                g_gate.Toggle();
-        }
+        const bool focused = IsFocused();
+        g_gate.SetGameFocused(focused);
+        // Hotkeys pressed in another monitor's app must not toggle m1core.
+        if (g_enabled.load() && focused && f11 && !g_f11WasDown && !emergency)
+            g_gate.Toggle();
         capture = g_gate.MayCaptureInput();
-        closed = wasOpen && !capture;
+        closed = wasOpen && !g_gate.IsOpen();
         if (!capture) {
             g_messages.clear();
             g_rawSamples.clear();
@@ -440,6 +440,8 @@ void ProcessHotkeys()
 
     if (capture != g_wasCapturingLastFrame) {
         g_rawBridge.Reset();
+        // ImGui must not retain a pressed button after an Alt+Tab.
+        ImGui::GetIO().AddFocusEvent(capture);
         g_wasCapturingLastFrame = capture;
     }
 }
@@ -469,7 +471,9 @@ void Draw(IDXGISwapChain* swapchain)
     // They remain queued until a frame can actually render.
     {
         std::lock_guard lock(g_stateMutex);
-        if (!g_gate.MayCaptureInput()) return;
+        // Render the existing menu while temporarily unfocused; only mouse
+        // and keyboard capture are suspended until the game is foreground.
+        if (!g_gate.IsOpen()) return;
     }
 
     auto& gfx = g_graphics;
@@ -494,19 +498,27 @@ void Draw(IDXGISwapChain* swapchain)
 
     std::vector<MSG> messages;
     std::vector<RawSample> rawSamples;
+    bool capturing = false;
     {
         std::lock_guard lock(g_stateMutex);
-        if (!g_gate.MayCaptureInput()) return;
-        messages.swap(g_messages);
-        rawSamples.swap(g_rawSamples);
+        if (!g_gate.IsOpen()) return;
+        capturing = g_gate.MayCaptureInput();
+        if (capturing) {
+            messages.swap(g_messages);
+            rawSamples.swap(g_rawSamples);
+        }
     }
 
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
-    ImGui::GetIO().MouseDrawCursor = true;
-    // The game may use RIDEV_NOLEGACY and recenter the physical pointer.
-    // ImGui must instead consume the raw deltas, buttons, wheel and keys.
-    g_rawBridge.Feed(g_window, messages, rawSamples);
+    const bool systemCursor = CursorDetoursAvailable();
+    // Windows draws the one real cursor, with normal OS acceleration/speed.
+    // Draw a virtual cursor only when the detours are unavailable.
+    ImGui::GetIO().MouseDrawCursor = capturing && !systemCursor;
+    if (capturing) {
+        if (systemCursor) EnsureSystemCursorVisible();
+        g_rawBridge.Feed(g_window, messages, rawSamples, systemCursor);
+    }
     ImGui::NewFrame();
     // The background is a separate full-viewport ImGui layer; mod settings
     // remain freely movable windows above it, as in CET.

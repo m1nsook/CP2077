@@ -19,5 +19,8 @@ void SetCursorCaptured(bool active);
 // Restore the game's desired clipping rectangle before removing hooks.
 void RemoveCursorDetours();
 
+// System pointer is the primary input mode when detours are installed.
+// These never reposition the real cursor or constrain it to the game monitor.
 bool CursorDetoursAvailable();
+void EnsureSystemCursorVisible();
 } // namespace m1core
