@@ -170,6 +170,21 @@ LRESULT CALLBACK WindowSubclass(HWND window, UINT message, WPARAM wparam, LPARAM
         return DefSubclassProc(window, message, wparam, lparam);
     }
 
+    // Mouse activation on a secondary-monitor round trip must never fire a
+    // weapon or activate a world interaction underneath the still-open menu.
+    // Activate the window, but consume only that first activation click.
+    if (message == WM_MOUSEACTIVATE && g_enabled.load()) {
+        std::lock_guard lock(g_stateMutex);
+        if (g_gate.IsOpen() && !g_gate.MayCaptureInput())
+            return MA_ACTIVATEANDEAT;
+    }
+
+    if (message == WM_SETFOCUS || (message == WM_ACTIVATEAPP && wparam)) {
+        std::lock_guard lock(g_stateMutex);
+        if (g_gate.IsOpen())
+            g_gate.SetGameFocused(true);
+    }
+
     if (message == WM_KILLFOCUS || (message == WM_ACTIVATEAPP && !wparam)) {
         std::lock_guard lock(g_stateMutex);
         g_gate.SetGameFocused(false);
