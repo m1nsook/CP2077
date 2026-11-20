@@ -26,6 +26,14 @@ bool DecodeRawInput(LPARAM rawHandle, RawSample& out);
 // a key/mouse button held before opening the overlay remaining stuck.
 bool ForwardToGame(const RawSample& sample);
 
+// The relative-pointer fallback must not artificially slow mouse movement.
+// Windows cursor coordinates remain preferred where the user32 detours work.
+// Raw device counts are used 1:1 when the physical cursor is unavailable.
+constexpr float RawMotionToPointerPixels(LONG delta) noexcept
+{
+    return static_cast<float>(delta);
+}
+
 class RawInputBridge {
 public:
     void Reset() noexcept;
@@ -33,7 +41,7 @@ public:
     // Feed legacy Win32 messages and copied RAWINPUT to ImGui, on the graphics
     // thread only, after the platform NewFrame and before ImGui::NewFrame.
     // Prefer real Win32 cursor coordinates, matching Windows multi-monitor
-    // movement/speed. Use reduced-gain relative movement only as a fallback.
+    // movement/speed. Use unscaled relative movement only as a fallback.
     void Feed(HWND window, const std::vector<MSG>& legacy,
               const std::vector<RawSample>& raw, bool systemCursor);
 

@@ -558,6 +558,10 @@ void ProcessHotkeys()
     SetCursorCaptured(capture);
 
     if (capture != g_wasCapturingLastFrame) {
+        if (capture)
+            Log(CursorDetoursAvailable()
+                ? "m1core overlay: mouse path = Windows system pointer"
+                : "m1core overlay: mouse path = raw relative fallback (unscaled 1:1)");
         g_rawBridge.Reset();
         // ImGui must not retain a pressed button after an Alt+Tab.
         ImGui::GetIO().AddFocusEvent(capture);

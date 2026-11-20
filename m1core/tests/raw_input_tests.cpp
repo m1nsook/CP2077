@@ -10,6 +10,12 @@
 
 int main()
 {
+    // Regression: an artificial 0.40 multiplier previously made the
+    // RAWINPUT fallback pointer around 2.5x slower than physical movement.
+    CHECK(m1core::RawMotionToPointerPixels(0) == 0.0F);
+    CHECK(m1core::RawMotionToPointerPixels(10) == 10.0F);
+    CHECK(m1core::RawMotionToPointerPixels(-3) == -3.0F);
+
     m1core::RawSample key{};
     key.type = RIM_TYPEKEYBOARD;
     key.vkey = 'A';

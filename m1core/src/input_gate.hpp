@@ -21,7 +21,7 @@ public:
     void SetGameFocused(bool focused) noexcept
     {
         // Alt-tab or clicking another monitor must release game input without
-        // dismissing the settings window. F11 still explicitly closes it.
+        // dismissing the settings window. The player-selected key closes it.
         focused_ = focused;
     }
 

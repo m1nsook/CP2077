@@ -173,16 +173,16 @@ void RawInputBridge::Feed(HWND window, const std::vector<MSG>& legacy,
             positionReady_ = true;
         }
 
-        // Only the emergency fallback uses relative motion. Its gain is
-        // deliberately lower than the previous 1:1 raw delta mapping.
-        constexpr float kFallbackGain = 0.40F;
+        // Only the emergency fallback uses relative motion. Never reduce
+        // counts with a magic gain: the old 0.40 factor made this pointer
+        // approximately 2.5x slower than the player's normal mouse.
         for (const RawSample& sample : raw) {
             if (sample.type == RIM_TYPEMOUSE &&
                 (sample.mouseFlags & MOUSE_MOVE_ABSOLUTE) == 0 &&
                 (sample.dx || sample.dy)) {
                 virtualActive_ = true;
-                mouseX_ += static_cast<float>(sample.dx) * kFallbackGain;
-                mouseY_ += static_cast<float>(sample.dy) * kFallbackGain;
+                mouseX_ += RawMotionToPointerPixels(sample.dx);
+                mouseY_ += RawMotionToPointerPixels(sample.dy);
             }
         }
         if (virtualActive_) {

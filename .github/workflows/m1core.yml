@@ -56,7 +56,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$root/r6/scripts/m1core_sample_weight" | Out-Null
           Copy-Item "m1core/samples/carry_weight/m1core_sample_weight.reds" "$root/r6/scripts/m1core_sample_weight/m1core_sample_weight.reds"
 
-          # Enable the known-working F11 overlay in this dev/test artifact.
+          # Enable the player-configured overlay in this development artifact.
           # For a headless installation, simply delete overlay.enable.
           Set-Content -Path "$root/red4ext/plugins/m1core/overlay.enable" -Value "development overlay enabled"
 
