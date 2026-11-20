@@ -31,6 +31,7 @@ struct BindCapture {
 BindCapture g_capture;
 bool g_dirty = false;
 char g_newProfileName[80]{};
+char g_renameProfileName[80]{};
 std::string g_selectedProfile;
 std::string g_profileMessage;
 bool g_profileError = false;
@@ -347,6 +348,7 @@ void DrawProfiles(Registry& registry)
         for (const auto& name : names) {
             if (ImGui::Selectable(name.c_str(), g_selectedProfile == name)) {
                 g_selectedProfile = name;
+                std::snprintf(g_renameProfileName, sizeof(g_renameProfileName), "%s", name.c_str());
                 g_confirmOverwrite = false;
                 g_confirmDelete = false;
                 g_profileMessage.clear();
@@ -366,6 +368,7 @@ void DrawProfiles(Registry& registry)
             g_profileMessage = "A profile already has that name. Select it to overwrite.";
         } else if (registry.SaveProfile(name)) {
             g_selectedProfile = name;
+            std::snprintf(g_renameProfileName, sizeof(g_renameProfileName), "%s", name.c_str());
             g_newProfileName[0] = '\0';
             g_profileError = false;
             g_profileMessage = "Profile created. Your current settings were saved.";
@@ -420,13 +423,35 @@ void DrawProfiles(Registry& registry)
             g_profileError = !ok;
             g_profileMessage = ok ? "Profile deleted. Current game settings are unchanged."
                                   : "Unable to delete profile.";
-            if (ok) g_selectedProfile.clear();
+            if (ok) {
+                g_selectedProfile.clear();
+                g_renameProfileName[0] = '\0';
+            }
             g_confirmDelete = false;
         } else {
             g_confirmDelete = true;
             g_confirmOverwrite = false;
             g_profileMessage = "Click Confirm delete to permanently remove this profile.";
             g_profileError = false;
+        }
+    }
+
+    ImGui::Spacing();
+    ImGui::SetNextItemWidth((std::max)(200.0F, ImGui::GetContentRegionAvail().x * 0.55F));
+    ImGui::InputTextWithHint("##renameProfile", "New name for selected profile",
+                             g_renameProfileName, sizeof(g_renameProfileName));
+    ImGui::SameLine();
+    if (ImGui::Button("Rename selected")) {
+        const std::string name(g_renameProfileName);
+        if (registry.RenameProfile(g_selectedProfile, name)) {
+            g_selectedProfile = name;
+            g_profileError = false;
+            g_profileMessage = "Profile renamed. Saved values and current settings are unchanged.";
+            g_confirmOverwrite = false;
+            g_confirmDelete = false;
+        } else {
+            g_profileError = true;
+            g_profileMessage = "Rename failed. Enter a unique valid name (up to 64 bytes).";
         }
     }
 

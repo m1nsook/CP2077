@@ -63,6 +63,7 @@ The **Profiles** tab provides named configurations, such as `Stealth`, `Combat`,
 - **Load selected:** Apply saved values immediately and write `settings.json` so they survive restart.
 - **Overwrite selected:** Replace the saved snapshot only after a second confirmation click.
 - **Delete selected:** Delete only that named snapshot after confirmation; it does not change currently active mod settings.
+- **Rename selected (M5):** Rename a snapshot without changing its values or the active settings. Existing profile names cannot be overwritten. Changes are atomically written to `profiles.json`.
 - **F11 to close:** Continues to save active settings automatically.
 
 Profiles are stored in a separate `profiles.json` beside `settings.json`, using a versioned schema and temporary-file replacement. Up to 24 profiles are supported; names may use UTF-8 (up to 64 bytes) but cannot contain control characters or path separators. A damaged or unexpectedly large profiles file does not prevent loading the plugin or the original settings.
@@ -128,7 +129,7 @@ revision and reset checks succeeded. This console is only a test mechanism,
 not a required dependency of m1core.
 
 **Remaining M5 work:** mod-owned keybind action/event delivery, additional
-configuration metadata, and profile-management UX. Do not mistake the
+configuration metadata, and further profile-management UX. Do not mistake the
 new polling revision API for a full gameplay event system.
 
 ## Native diagnostic log and in-game Logs panel (post-v0.4.0 development)
