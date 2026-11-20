@@ -56,6 +56,27 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$root/r6/scripts/m1core_sample_weight" | Out-Null
           Copy-Item "m1core/samples/carry_weight/m1core_sample_weight.reds" "$root/r6/scripts/m1core_sample_weight/m1core_sample_weight.reds"
 
+          # Bundle pinned, OFL-licensed UI fonts. Native ImGui reads these
+          # from disk; there are no browser/CDN requests at game runtime.
+          $fontDir = "$root/red4ext/plugins/m1core/fonts"
+          New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
+          $geist = "https://raw.githubusercontent.com/vercel/geist-font/ef2597cfc42f4797676df105517ccc0a1cfa6569"
+          $mono = "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/19371302b95d218af43299bce79ddbddd0bc364d"
+          $fonts = @(
+            @{ Name = "Geist-Regular.ttf"; Url = "$geist/fonts/Geist/ttf/Geist-Regular.ttf" },
+            @{ Name = "Geist-SemiBold.ttf"; Url = "$geist/fonts/Geist/ttf/Geist-SemiBold.ttf" },
+            @{ Name = "JetBrainsMono-Regular.ttf"; Url = "$mono/fonts/ttf/JetBrainsMono-Regular.ttf" },
+            @{ Name = "Geist-OFL.txt"; Url = "$geist/OFL.txt" },
+            @{ Name = "JetBrainsMono-OFL.txt"; Url = "$mono/OFL.txt" }
+          )
+          foreach ($font in $fonts) {
+            $target = Join-Path $fontDir $font.Name
+            Invoke-WebRequest -Uri $font.Url -OutFile $target -ErrorAction Stop
+            if ((Get-Item -LiteralPath $target).Length -lt 1000) {
+              throw "Font asset was not downloaded correctly: $($font.Name)"
+            }
+          }
+
           # Enable the player-configured overlay in this development artifact.
           # For a headless installation, simply delete overlay.enable.
           Set-Content -Path "$root/red4ext/plugins/m1core/overlay.enable" -Value "development overlay enabled"
@@ -63,6 +84,11 @@ jobs:
           $required = @(
             "$root/red4ext/plugins/m1core/m1core.dll",
             "$root/red4ext/plugins/m1core/overlay.enable",
+            "$root/red4ext/plugins/m1core/fonts/Geist-Regular.ttf",
+            "$root/red4ext/plugins/m1core/fonts/Geist-SemiBold.ttf",
+            "$root/red4ext/plugins/m1core/fonts/JetBrainsMono-Regular.ttf",
+            "$root/red4ext/plugins/m1core/fonts/Geist-OFL.txt",
+            "$root/red4ext/plugins/m1core/fonts/JetBrainsMono-OFL.txt",
             "$root/r6/scripts/m1core/m1core.reds",
             "$root/r6/scripts/m1core/m1core_smoke.reds",
             "$root/r6/scripts/m1core_sample_weight/m1core_sample_weight.reds"
@@ -121,7 +147,12 @@ jobs:
             "r6/scripts/m1core/m1core_smoke.reds",
             "r6/scripts/m1core_sample_weight/m1core_sample_weight.reds",
             "red4ext/plugins/m1core/m1core.dll",
-            "red4ext/plugins/m1core/overlay.enable"
+            "red4ext/plugins/m1core/overlay.enable",
+            "red4ext/plugins/m1core/fonts/Geist-Regular.ttf",
+            "red4ext/plugins/m1core/fonts/Geist-SemiBold.ttf",
+            "red4ext/plugins/m1core/fonts/JetBrainsMono-Regular.ttf",
+            "red4ext/plugins/m1core/fonts/Geist-OFL.txt",
+            "red4ext/plugins/m1core/fonts/JetBrainsMono-OFL.txt"
           )) {
             if (!(Test-Path -LiteralPath (Join-Path $root $file) -PathType Leaf)) {
               throw "ZIP missing: $file"

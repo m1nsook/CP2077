@@ -60,6 +60,7 @@ if(WIN32)
     add_library(m1core SHARED
         src/plugin.cpp
         src/ui.cpp
+        src/ui_components.cpp
         src/ui_theme.cpp
         src/overlay.cpp
         src/cursor.cpp
@@ -91,6 +92,10 @@ if(BUILD_TESTING)
     add_executable(m1core_input_gate_tests tests/input_gate_tests.cpp)
     target_include_directories(m1core_input_gate_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
     add_test(NAME m1core_input_gate_tests COMMAND m1core_input_gate_tests)
+
+    add_executable(m1core_ui_components_tests tests/ui_components_tests.cpp)
+    target_include_directories(m1core_ui_components_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    add_test(NAME m1core_ui_components_tests COMMAND m1core_ui_components_tests)
 
     add_executable(m1core_keybind_conflicts_tests tests/keybind_conflicts_tests.cpp)
     target_link_libraries(m1core_keybind_conflicts_tests PRIVATE m1core_settings)

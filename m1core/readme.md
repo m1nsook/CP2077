@@ -319,3 +319,11 @@ This batch consolidates the 1:1 raw pointer-speed regression fix with a native U
 - Dedicated unit test of cross-mod and same-mod conflicts, cleared keys and rebinding. Existing startup, persistence, focus, mouse and API tests stay in CI.
 
 All changes are confined to m1core; the development ZIP still contains exactly `r6/` and `red4ext/` at the root, without saved JSON files or nested archives. **The batch is not marked in-game verified until the player tests it.**
+
+## Native shadcn-style UI refresh (November 20, 2026)
+
+The latest **combined M5** build includes a custom ImGui drawing layer (`ui_components.*`) for the shell, tabs, mod sidebar, toggle switches, sliders, dropdown shells, keycap/action buttons and solid section cards. Unlike earlier iterations, this changes actual component geometry and layout rather than merely recoloring stock widgets. The style uses opaque dark zinc surfaces, distinct semantic borders and restrained blue selection. Existing settings, profile, keybind, live-update, startup and multi-monitor input behavior remain delegated to the proven native APIs.
+
+The game-ready ZIP now includes pinned OFL-licensed **Geist Regular/SemiBold** and **JetBrains Mono** fonts plus font license notices in `red4ext/plugins/m1core/fonts/`. There is **no browser or runtime font download**. Source checkout (without packaged fonts) falls back to ImGui's built-in font. The latest bundle also includes the earlier RAWINPUT mouse gain correction; both UI and mouse behavior require one combined in-game check.
+
+See [native design system](design/SHADCN_NATIVE.md) for the visual contract and exact component boundary. The source still does not embed shadcn/React; it implements a similar native aesthetic with ImDrawList. CI checks the C++ build, all registered regression tests and one ZIP with `r6/` and `red4ext/` at the root.
