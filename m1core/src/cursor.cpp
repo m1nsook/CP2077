@@ -1,7 +1,8 @@
 #include "cursor.hpp"
 
-#include <RED4ext/CNamePool.hpp>
-#include <RED4ext/GameEngine.hpp>
+// In header-only SDK mode CName.hpp's inline implementation requires the
+// aggregate RED4ext header to declare CNamePool before CName-inl.hpp.
+#include <RED4ext/RED4ext.hpp>
 
 #include <Windows.h>
 #include <atomic>
