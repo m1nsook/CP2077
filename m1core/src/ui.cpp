@@ -148,29 +148,41 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
 {
     const auto stableId = std::to_string(mod) + ":" + std::to_string(setting.id);
     ImGui::PushID(stableId.c_str());
-    ImGui::TableNextRow(ImGuiTableRowFlags_None, 64.0F);
+    ImGui::TableNextRow(ImGuiTableRowFlags_None, 76.0F);
     ImGui::TableSetColumnIndex(0);
     ImGui::AlignTextToFramePadding();
     const auto name = setting.displayName.empty() ? Label(setting.id) : setting.displayName;
+    if (MediumFont()) ImGui::PushFont(MediumFont());
     ImGui::TextWrapped("%s", name.c_str());
+    if (MediumFont()) ImGui::PopFont();
     if (!setting.description.empty()) {
+        ImGui::Dummy(ImVec2(0, 2.0F));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.63F, 0.63F, 0.67F, 1.0F));
         ImGui::TextWrapped("%s", setting.description.c_str());
         ImGui::PopStyleColor();
     }
     ImGui::TableSetColumnIndex(1);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0F);
     bool changed = false;
     const float available = ImGui::GetContentRegionAvail().x;
-    const float controlWidth = (std::min)(235.0F, (std::max)(160.0F, available - 48.0F));
+    constexpr float resetWidth = 64.0F;
+    constexpr float gap = 8.0F;
+    // Leave room for the built-in Reset button, including at small resolutions.
+    const float controlWidth = (std::min)(215.0F,
+        (std::max)(90.0F, available - resetWidth - gap));
 
     switch (setting.kind) {
     case Kind::Boolean: {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+            (std::max)(0.0F, available - 34.0F - gap - resetWidth));
         const bool value = std::get<bool>(setting.value);
         if (ui::Switch("##switch", value))
             changed = registry.SetBool(mod, setting.id, !value);
         break;
     }
     case Kind::Integer: {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+            (std::max)(0.0F, available - controlWidth - gap - resetWidth));
         int value = std::get<std::int32_t>(setting.value);
         double number = static_cast<double>(value);
         if (ui::Slider("##value", number,
@@ -181,6 +193,8 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
         break;
     }
     case Kind::Float: {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+            (std::max)(0.0F, available - controlWidth - gap - resetWidth));
         float value = std::get<float>(setting.value);
         double number = static_cast<double>(value);
         if (ui::Slider("##value", number,
@@ -191,12 +205,17 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
         break;
     }
     case Kind::Enum: {
+        const float enumWidth = (std::min)(190.0F, controlWidth);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+            (std::max)(0.0F, available - enumWidth - gap - resetWidth));
         int index = std::get<std::int32_t>(setting.value);
-        if (ui::Select("##value", index, setting.choices, 145.0F))
+        if (ui::Select("##value", index, setting.choices, enumWidth))
             changed = registry.SetEnum(mod, setting.id, index);
         break;
     }
     case Kind::Keybind: {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+            (std::max)(0.0F, available - 170.0F - gap - 58.0F - gap - resetWidth));
         const bool capturing = g_capture.active &&
             g_capture.mod == mod && g_capture.setting == setting.id;
         const bool coreMenuBind =
@@ -206,11 +225,11 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
                                                   "Press key... (Esc cancels)")
                                     : KeyLabel(std::get<std::int32_t>(setting.value));
         if (MonoFont()) ImGui::PushFont(MonoFont());
-        if (ui::Button(label.c_str(), ui::Tone::Secondary, ImVec2(140.0F, 32.0F)))
+        if (ui::Button(label.c_str(), ui::Tone::Secondary, ImVec2(170.0F, 34.0F)))
             StartCapture(mod, setting.id);
         if (MonoFont()) ImGui::PopFont();
         ImGui::SameLine();
-        if (ui::Button("Clear", ui::Tone::Ghost, ImVec2(42.0F, 32.0F))) {
+        if (ui::Button("Clear", ui::Tone::Ghost, ImVec2(58.0F, 34.0F))) {
             if (capturing) {
                 g_capture.active = false;
                 g_bindCaptureActive.store(false);
@@ -221,8 +240,8 @@ bool DrawSetting(Registry& registry, Id mod, const SettingSnapshot& setting)
     }
     }
 
-    ImGui::SameLine();
-    if (ui::Button("Reset", ui::Tone::Ghost))
+    ImGui::SameLine(0, gap);
+    if (ui::Button("Reset", ui::Tone::Ghost, ImVec2(resetWidth, 34.0F)))
         changed = registry.Reset(mod, setting.id);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
         ImGui::SetTooltip("Reset to default");
@@ -270,23 +289,23 @@ bool DrawSettingsTable(Registry& registry, Id mod, const std::vector<SettingSnap
             ImGui::PushID(std::to_string(group).c_str());
             const auto& members = grouped.at(group);
             ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(24/255.0F,24/255.0F,27/255.0F,1));
-            ImGui::BeginChild("##groupHeader", ImVec2(0,42),
+            ImGui::BeginChild("##groupHeader", ImVec2(0,48),
                               ImGuiChildFlags_None,
                               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
             const float right = ImGui::GetWindowContentRegionMax().x;
-            ImGui::SetCursorPos(ImVec2(16,10));
+            ImGui::SetCursorPos(ImVec2(16,13));
             if (MediumFont()) ImGui::PushFont(MediumFont());
             const auto groupName = group == 0 ? std::string("General") : Label(group);
             ImGui::TextUnformatted(groupName.c_str());
             if (MediumFont()) ImGui::PopFont();
-            ImGui::SetCursorPos(ImVec2((std::max)(130.0F,right-195.0F),8));
+            ImGui::SetCursorPos(ImVec2((std::max)(130.0F,right-202.0F),11));
             ImGui::TextDisabled("%zu settings", members.size());
             ImGui::SameLine(0,9);
             const bool pending = g_confirmGroupReset &&
                 g_pendingGroupMod == mod && g_pendingGroup == group;
             if (ui::Button(pending ? "Confirm reset" : "Reset group",
                            pending ? ui::Tone::Danger : ui::Tone::Secondary,
-                           ImVec2(99,26))) {
+                           ImVec2(104,28))) {
                 if (pending) {
                     changed |= registry.ResetGroup(mod,group);
                     g_confirmGroupReset = false;
@@ -302,8 +321,8 @@ bool DrawSettingsTable(Registry& registry, Id mod, const std::vector<SettingSnap
             if (ImGui::BeginTable("##settingRows",2,
                     ImGuiTableFlags_SizingStretchProp |
                     ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_PadOuterX)) {
-                ImGui::TableSetupColumn("Setting",ImGuiTableColumnFlags_WidthStretch,0.66F);
-                ImGui::TableSetupColumn("Control",ImGuiTableColumnFlags_WidthStretch,0.34F);
+                ImGui::TableSetupColumn("Setting",ImGuiTableColumnFlags_WidthStretch,0.60F);
+                ImGui::TableSetupColumn("Control",ImGuiTableColumnFlags_WidthStretch,0.40F);
                 for (const auto* setting : members)
                     changed |= DrawSetting(registry,mod,*setting);
                 ImGui::EndTable();
@@ -652,7 +671,7 @@ void RenderSettings(Registry& registry, bool& open, bool interactive)
         ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::SetCursorPos(ImVec2(22,16));
     ImGui::TextUnformatted(icons::cube);
-    ImGui::SameLine(0,9);
+    ImGui::SameLine(0,10);
     if (MediumFont()) ImGui::PushFont(MediumFont());
     ImGui::TextUnformatted("m1core");
     if (MediumFont()) ImGui::PopFont();
@@ -677,10 +696,17 @@ void RenderSettings(Registry& registry, bool& open, bool interactive)
         ImGui::SetCursorPosX(ImGui::GetCursorPosX()+14.0F);
         ImGui::TextDisabled("RED4ext");
     }
+    {
+        const ImVec2 p = ImGui::GetWindowPos();
+        const ImVec2 z = ImGui::GetWindowSize();
+        ImGui::GetWindowDrawList()->AddLine(
+            ImVec2(p.x, p.y+z.y-1), ImVec2(p.x+z.x, p.y+z.y-1),
+            IM_COL32(39,39,42,255));
+    }
     ImGui::EndChild();
     ImGui::PopStyleColor();
 
-    // Navigation is a separate fixed 44px strip, never inside a scrolling pane.
+    // Navigation is a separate fixed strip, never inside a scrolling pane.
     ImGui::SetCursorPos(ImVec2(0.0F, layout.tabs.y));
     ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(9/255.0F,9/255.0F,11/255.0F,1));
     ImGui::BeginChild("##m1coreTabs",ImVec2(0,layout.tabs.height),
@@ -720,6 +746,13 @@ void RenderSettings(Registry& registry, bool& open, bool interactive)
     if (ui::NavTab(tabs[3].c_str(),logText.c_str(),page==Page::Logs)) switchPage(Page::Logs);
     ImGui::SameLine(0,4);
     if (ui::NavTab(tabs[4].c_str(),nullptr,page==Page::About)) switchPage(Page::About);
+    {
+        const ImVec2 p = ImGui::GetWindowPos();
+        const ImVec2 z = ImGui::GetWindowSize();
+        ImGui::GetWindowDrawList()->AddLine(
+            ImVec2(p.x, p.y+z.y-1), ImVec2(p.x+z.x, p.y+z.y-1),
+            IM_COL32(39,39,42,255));
+    }
     ImGui::EndChild();
     ImGui::PopStyleColor();
 
@@ -742,12 +775,14 @@ void RenderSettings(Registry& registry, bool& open, bool interactive)
             ImVec2(sideMin.x+sideSize.x-1.0F,sideMin.y+sideSize.y),
             IM_COL32(39,39,42,255));
         ImGui::SetCursorPos(ImVec2(14,14));
+        if (MediumFont()) ImGui::PushFont(MediumFont());
         ImGui::TextDisabled("REGISTERED MODS");
+        if (MediumFont()) ImGui::PopFont();
         ImGui::SameLine();
         ImGui::SetCursorPosX(layout.sidebar.width-30.0F);
         ImGui::TextDisabled("%zu",mods.size());
         ImGui::SetCursorPos(ImVec2(8,47));
-        ImGui::BeginChild("##m1coreModList",ImVec2(layout.sidebar.width-16.0F,-112.0F),
+        ImGui::BeginChild("##m1coreModList",ImVec2(layout.sidebar.width-16.0F,-144.0F),
             ImGuiChildFlags_None);
         for (const auto& mod : mods) {
             if (!ModMatches(mod,search,keybindsOnly)) continue;
@@ -764,9 +799,9 @@ void RenderSettings(Registry& registry, bool& open, bool interactive)
             ImGui::Dummy(ImVec2(0,2));
         }
         ImGui::EndChild();
-        ImGui::SetCursorPos(ImVec2(12,layout.body.height-102));
+        ImGui::SetCursorPos(ImVec2(12,layout.body.height-132));
         ImGui::PushStyleColor(ImGuiCol_ChildBg,ImVec4(24/255.0F,24/255.0F,27/255.0F,1));
-        ImGui::BeginChild("##revisionStatus",ImVec2(layout.sidebar.width-24,86),
+        ImGui::BeginChild("##revisionStatus",ImVec2(layout.sidebar.width-24,116),
                           ImGuiChildFlags_Borders);
         ImGui::TextColored(ImVec4(0.98F,0.75F,0.14F,1.0F),
             "%s  Live Revision Sync",icons::bolt);
@@ -778,13 +813,13 @@ void RenderSettings(Registry& registry, bool& open, bool interactive)
         ImGui::SameLine(0,0);
     }
 
-    // The center pane is capped at the same practical width as the HTML.
-    // Only this pane scrolls; header, nav, sidebar and footer remain fixed.
+    // A readable centered workspace. Only this pane scrolls; the header,
+    // navigation, sidebar and footer remain fixed during settings changes.
     ImGui::BeginChild("##m1coreContentHost",ImVec2(0,0),
         ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     const float availableWidth = ImGui::GetContentRegionAvail().x;
     const float centerWidth = (std::max)(1.0F,
-        (std::min)(940.0F, availableWidth - (availableWidth > 360.0F ? 48.0F : 16.0F)));
+        (std::min)(980.0F, availableWidth - (availableWidth > 360.0F ? 48.0F : 16.0F)));
     const float offset = (std::max)(0.0F,(availableWidth-centerWidth)*0.5F);
     ImGui::SetCursorPosX(ImGui::GetCursorPosX()+offset);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));

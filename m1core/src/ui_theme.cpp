@@ -32,13 +32,13 @@ ImFont* AddExistingFont(const std::filesystem::path& file, float size)
 
 void ApplyNativeTheme()
 {
-    // Solid shadcn-inspired zinc surfaces and semantic contrast. No fake
-    // glass/transparency effects: ImDrawList renders the custom controls.
+    // A restrained native ImGui theme. All controls use ImGui's built-in
+    // interaction and navigation, while fonts, spacing and color are configurable.
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 0.0F; // fullscreen NCREC/skeleton workspace
-    style.ChildRounding = 8.0F;
-    style.FrameRounding = 8.0F;
-    style.PopupRounding = 9.0F;
+    style.ChildRounding = 6.0F;
+    style.FrameRounding = 6.0F;
+    style.PopupRounding = 7.0F;
     style.ScrollbarRounding = 8.0F;
     style.GrabRounding = 8.0F;
     style.TabRounding = 7.0F;
@@ -46,13 +46,13 @@ void ApplyNativeTheme()
     style.ChildBorderSize = 1.0F;
     style.FrameBorderSize = 1.0F;
     style.PopupBorderSize = 1.0F;
-    style.WindowPadding = {16.0F, 16.0F};
-    style.FramePadding = {10.0F, 6.0F};
-    style.CellPadding = {16.0F, 11.0F};
-    style.ItemSpacing = {10.0F, 9.0F};
+    style.WindowPadding = {20.0F, 18.0F};
+    style.FramePadding = {11.0F, 8.0F};
+    style.CellPadding = {14.0F, 13.0F};
+    style.ItemSpacing = {11.0F, 10.0F};
     style.ItemInnerSpacing = {8.0F, 6.0F};
-    style.ScrollbarSize = 6.0F;
-    style.GrabMinSize = 14.0F;
+    style.ScrollbarSize = 9.0F;
+    style.GrabMinSize = 16.0F;
     style.IndentSpacing = 20.0F;
 
     Set(ImGuiCol_Text,              Color(250, 250, 250));
@@ -62,9 +62,9 @@ void ApplyNativeTheme()
     Set(ImGuiCol_PopupBg,           Color(12, 12, 14));
     Set(ImGuiCol_Border,            Color(39, 39, 42));
     Set(ImGuiCol_BorderShadow,      Color(0, 0, 0, 0));
-    Set(ImGuiCol_FrameBg,           Color(9, 9, 11));
-    Set(ImGuiCol_FrameBgHovered,    Color(24, 24, 27));
-    Set(ImGuiCol_FrameBgActive,     Color(39, 39, 42));
+    Set(ImGuiCol_FrameBg,           Color(28, 28, 32));
+    Set(ImGuiCol_FrameBgHovered,    Color(41, 41, 46));
+    Set(ImGuiCol_FrameBgActive,     Color(47, 47, 52));
     Set(ImGuiCol_TitleBg,           Color(17, 17, 19));
     Set(ImGuiCol_TitleBgActive,     Color(17, 17, 19));
     Set(ImGuiCol_TitleBgCollapsed,  Color(17, 17, 19));
@@ -76,12 +76,12 @@ void ApplyNativeTheme()
     Set(ImGuiCol_CheckMark,         Color(250, 250, 250));
     Set(ImGuiCol_SliderGrab,        Color(250, 250, 250));
     Set(ImGuiCol_SliderGrabActive,  Color(250, 250, 250));
-    Set(ImGuiCol_Button,            Color(24, 24, 27));
-    Set(ImGuiCol_ButtonHovered,     Color(39, 39, 42));
-    Set(ImGuiCol_ButtonActive,      Color(52, 52, 57));
-    Set(ImGuiCol_Header,            Color(39, 39, 42));
-    Set(ImGuiCol_HeaderHovered,     Color(52, 52, 57));
-    Set(ImGuiCol_HeaderActive,      Color(62, 62, 68));
+    Set(ImGuiCol_Button,            Color(35, 35, 40));
+    Set(ImGuiCol_ButtonHovered,     Color(51, 51, 57));
+    Set(ImGuiCol_ButtonActive,      Color(58, 58, 64));
+    Set(ImGuiCol_Header,            Color(35, 35, 40));
+    Set(ImGuiCol_HeaderHovered,     Color(49, 49, 55));
+    Set(ImGuiCol_HeaderActive,      Color(54, 54, 60));
     Set(ImGuiCol_Separator,         Color(39, 39, 42));
     Set(ImGuiCol_SeparatorHovered,  Color(212, 212, 216));
     Set(ImGuiCol_SeparatorActive,   Color(250, 250, 250));
@@ -93,6 +93,7 @@ void ApplyNativeTheme()
     Set(ImGuiCol_TableBorderLight,  Color(43, 43, 47));
     Set(ImGuiCol_TableRowBg,        Color(24, 24, 27));
     Set(ImGuiCol_TableRowBgAlt,     Color(29, 29, 32));
+    Set(ImGuiCol_NavHighlight,      Color(212, 212, 216));
     Set(ImGuiCol_TextSelectedBg,    Color(161, 161, 170, 100));
     Set(ImGuiCol_ModalWindowDimBg,  Color(0, 0, 0, 175));
 }
@@ -106,7 +107,7 @@ void LoadOptionalFonts(const std::filesystem::path& overlayDirectory)
     g_monoFont = g_headingFont = g_mediumFont = nullptr;
     ImFont* fallback = io.Fonts->AddFontDefault();
     const auto dir = overlayDirectory / "fonts";
-    ImFont* regular = AddExistingFont(dir / "Geist-Regular.ttf", 14.0F);
+    ImFont* regular = AddExistingFont(dir / "Geist-Regular.ttf", 16.0F);
     // FA solid is merged into the primary Geist atlas to render the user's
     // original nav/search/status glyphs. No runtime downloads.
     if (regular) {
@@ -115,14 +116,14 @@ void LoadOptionalFonts(const std::filesystem::path& overlayDirectory)
         if (std::filesystem::is_regular_file(fa, ec) && !ec) {
             ImFontConfig config{};
             config.MergeMode = true;
-            config.GlyphMinAdvanceX = 14.0F;
+            config.GlyphMinAdvanceX = 17.0F;
             static constexpr ImWchar iconRanges[] = {0xF000, 0xF8FF, 0};
-            io.Fonts->AddFontFromFileTTF(fa.string().c_str(), 13.0F, &config, iconRanges);
+            io.Fonts->AddFontFromFileTTF(fa.string().c_str(), 15.0F, &config, iconRanges);
         }
     }
-    g_mediumFont = AddExistingFont(dir / "Geist-Medium.ttf", 14.0F);
-    g_headingFont = AddExistingFont(dir / "Geist-SemiBold.ttf", 20.0F);
-    g_monoFont = AddExistingFont(dir / "JetBrainsMono-Regular.ttf", 12.5F);
+    g_mediumFont = AddExistingFont(dir / "Geist-Medium.ttf", 16.0F);
+    g_headingFont = AddExistingFont(dir / "Geist-SemiBold.ttf", 23.0F);
+    g_monoFont = AddExistingFont(dir / "JetBrainsMono-Regular.ttf", 14.0F);
     io.FontDefault = regular ? regular : fallback;
 }
 

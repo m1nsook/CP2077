@@ -341,3 +341,7 @@ The user's uploaded CET master ZIP was inspected for its full architecture, not 
 ## Standard Dear ImGui UI (player decision, Nov 20, 2026)
 
 Supersedes earlier custom-drawn UI plans. The native widget wrappers now delegate to official Dear ImGui controls (Checkbox, SliderScalar, BeginCombo, Selectable, Button). Geist, JetBrains Mono, Font Awesome, neutral dark styling and the fullscreen workspace remain. Unbound first launch opens a **small centered shortcut-setup dialog**, not the full settings page; selecting a key saves and closes it. While the menu captures input, Dear ImGui draws a cursor from the Windows pointer position rather than changing mouse gain. See [the simplified UI contract](design/STANDARD_IMGUI.md). Requires in-game verification.
+
+## Standard ImGui visual polish — November 20, 2026
+
+A further native ImGui-only refinement addresses the player feedback that the first simplified UI looked worse than CET. The underlying interaction system and full-screen workflow are unchanged: Geist/JetBrains fonts are larger, built-in button variants have visible hierarchy, navigation selection is underlined rather than a filled gray rectangle, mod counts align right, sliders/checkboxes/keybinds align consistently in their table rows, and card/sidebar spacing is more readable. The only low-level drawing added is decorative separators/underline—**not custom control hit areas**. See [standard ImGui styling](design/STANDARD_IMGUI_POLISH.md). This visual pass still requires actual in-game inspection.
