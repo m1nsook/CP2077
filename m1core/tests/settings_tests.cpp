@@ -100,7 +100,10 @@ int main()
         CHECK(late.GetBool(1, 1) == true); // Reset in the prior block.
         CHECK(late.Revision(1, 5) == 1);
         const auto snap = late.Snapshot();
-        CHECK(snap[0].settings[4].displayName == "Open / Close Menu");
+        CHECK(snap.size() == 1);
+        CHECK(snap[0].settings.size() == 2);
+        CHECK(snap[0].settings[1].id == 5);
+        CHECK(snap[0].settings[1].displayName == "Open / Close Menu");
         CHECK(late.Save());
     }
 
