@@ -51,6 +51,11 @@ jobs:
           # when explicitly called from a console and changes no game state.
           Copy-Item "m1core/tests/ingame/m1core_smoke.reds" "$root/r6/scripts/m1core/m1core_smoke.reds"
 
+          # Opt-in M5 sample: real gameplay integration of the native
+          # keybind polling and persistent carry-weight settings API.
+          New-Item -ItemType Directory -Force -Path "$root/r6/scripts/m1core_sample_weight" | Out-Null
+          Copy-Item "m1core/samples/carry_weight/m1core_sample_weight.reds" "$root/r6/scripts/m1core_sample_weight/m1core_sample_weight.reds"
+
           # Enable the known-working F11 overlay in this dev/test artifact.
           # For a headless installation, simply delete overlay.enable.
           Set-Content -Path "$root/red4ext/plugins/m1core/overlay.enable" -Value "development overlay enabled"
@@ -59,7 +64,8 @@ jobs:
             "$root/red4ext/plugins/m1core/m1core.dll",
             "$root/red4ext/plugins/m1core/overlay.enable",
             "$root/r6/scripts/m1core/m1core.reds",
-            "$root/r6/scripts/m1core/m1core_smoke.reds"
+            "$root/r6/scripts/m1core/m1core_smoke.reds",
+            "$root/r6/scripts/m1core_sample_weight/m1core_sample_weight.reds"
           )
           foreach ($file in $required) {
             if (!(Test-Path -LiteralPath $file -PathType Leaf)) {
@@ -113,6 +119,7 @@ jobs:
           foreach ($file in @(
             "r6/scripts/m1core/m1core.reds",
             "r6/scripts/m1core/m1core_smoke.reds",
+            "r6/scripts/m1core_sample_weight/m1core_sample_weight.reds",
             "red4ext/plugins/m1core/m1core.dll",
             "red4ext/plugins/m1core/overlay.enable"
           )) {
