@@ -88,6 +88,33 @@ luajit -b init.m1s init.m1c
 
 Prefer shipping the readable `.m1s` file where possible. Bytecode is not encryption and can be incompatible between LuaJIT builds.
 
+### Native Lua settings interface (first consuming sample)
+
+In addition to the REDscript/RTTI `M1Core_*` functions, m1core exposes a
+**native Lua table**, `m1core`, to sandboxed scripts. This is registered
+before `init.m1s` / `init.lua` / `init.m1c` is executed and uses the same
+data-only registry and `settings.json` as the built-in Settings tab:
+
+- `m1core.registerJson(modId, displayName, schemaJson)` returns a boolean.
+- `m1core.getJson(modId, settingId)` returns serialized JSON or `"null"`.
+- `m1core.setJson(modId, settingId, valueJson)` returns a boolean.
+- `m1core.resetSetting(modId, settingId)` returns a boolean.
+
+Read source and installable variants of the first actual mod consumer at
+[`m1core/examples/weight-limit`](examples/weight-limit/README.md).
+This example registers an enable toggle and a total carry-capacity slider;
+reads values while the game runs; applies a non-saved additive
+`CarryCapacity` stat modifier to the player; and removes only its own
+modifier on disable/shutdown. It requires **m1core and RED4ext only** (not a
+separate CET installation). The source and compiled entrypoints are alternate
+installs: **never place `init.m1s` and `init.m1c` together** if you intend
+to verify both code paths.
+
+Windows CI builds an integration test using the **actual native settings
+registry** and **actual pinned LuaJIT** for both scripts. Game stats, game
+initialization and the Cyberpunk `ScriptContext` lifecycle are not exercised
+by this mock-based CI test, and still require a real game check.
+
 ### LuaJIT integration fixture
 
 The standalone developer fixture is at
