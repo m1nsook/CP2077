@@ -72,7 +72,7 @@ target("m1core")
     set_pcxxheader("src/stdafx.h")
 
     set_configdir(path.join("src", "config"))
-    add_configfiles("src/xmake/CETVersion.h.in")
+    add_configfiles("src/xmake/M1CoreVersion.h.in")
     -- Exclude the CET ASI DllMain; RED4ext invokes Main/Query/Supports.
     add_files("src/**.cpp", "../native/state.cpp", "../native/registry.cpp")
     remove_files("src/dllmain.cpp")
@@ -85,26 +85,26 @@ target("m1core")
         "openrestry-luajit", "xbyak", "stb")
     add_deps("RED4ext.SDK")
 
-    set_configvar("CET_PRODUCT_NAME", "m1core")
+    set_configvar("M1CORE_PRODUCT_NAME", "m1core")
     on_load(function(target)
         local cfg = target:get("configvar")
-        cfg.CET_CURRENT_YEAR = tonumber(os.date("%Y"))
-        cfg.CET_PRODUCT_NAME = "m1core"
-        cfg.CET_GROUP_NAME = "MISO"
-        cfg.CET_FILE_NAME = "m1core.dll"
-        cfg.CET_DEBUG_BUILD = is_mode("release") and 0 or 1
-        cfg.CET_GIT_TAG = "v1.0.0"
-        cfg.CET_GIT_TAG_LONG = "v1.0.0-0-g0000000"
-        cfg.CET_GIT_BRANCH = "dev/m1core-cet-foundation"
-        cfg.CET_GIT_COMMIT = "0000000"
-        cfg.CET_GIT_COMMIT_LONG = "0000000000000000000000000000000000000000"
-        cfg.CET_GIT_COMMIT_DATE = "20261121"
-        cfg.CET_VERSION_MAJOR = 1
-        cfg.CET_VERSION_MINOR = 0
-        cfg.CET_VERSION_PATCH = 0
-        cfg.CET_VERSION_SIMPLE = "1.0.0"
-        cfg.CET_VERSION_FULL = "1.0.0-dev"
-        cfg.CET_VERSION = cfg.CET_VERSION_FULL
+        cfg.M1CORE_CURRENT_YEAR = tonumber(os.date("%Y"))
+        cfg.M1CORE_PRODUCT_NAME = "m1core"
+        cfg.M1CORE_GROUP_NAME = "MISO"
+        cfg.M1CORE_FILE_NAME = "m1core.dll"
+        cfg.M1CORE_DEBUG_BUILD = is_mode("release") and 0 or 1
+        cfg.M1CORE_GIT_TAG = "v1.0.0"
+        cfg.M1CORE_GIT_TAG_LONG = "v1.0.0-0-g0000000"
+        cfg.M1CORE_GIT_BRANCH = "dev/m1core-cet-foundation"
+        cfg.M1CORE_GIT_COMMIT = "0000000"
+        cfg.M1CORE_GIT_COMMIT_LONG = "0000000000000000000000000000000000000000"
+        cfg.M1CORE_GIT_COMMIT_DATE = "20261121"
+        cfg.M1CORE_VERSION_MAJOR = 1
+        cfg.M1CORE_VERSION_MINOR = 0
+        cfg.M1CORE_VERSION_PATCH = 0
+        cfg.M1CORE_VERSION_SIMPLE = "1.0.0"
+        cfg.M1CORE_VERSION_FULL = "1.0.0-dev"
+        cfg.M1CORE_VERSION = cfg.M1CORE_VERSION_FULL
         target:add("configvar",cfg)
-        if not is_mode("release") then target:add("defines","CET_DEBUG") end
+        if not is_mode("release") then target:add("defines","M1CORE_DEBUG") end
     end)

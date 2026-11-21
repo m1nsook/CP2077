@@ -298,7 +298,7 @@ void GameOptions::Dump()
     for (const auto option : s_gameOptions)
         Log::Info(option->GetInfo());
 
-    spdlog::get("scripting")->info("Dumped {} options to cyber_engine_tweaks.log", s_gameOptions.size());
+    spdlog::get("scripting")->info("Dumped {} options to m1core.log", s_gameOptions.size());
 }
 
 void GameOptions::List(const std::string& category)

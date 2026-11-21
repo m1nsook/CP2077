@@ -10,9 +10,9 @@ const std::filesystem::path& Paths::GameRoot() const
     return m_gameRoot;
 }
 
-const std::filesystem::path& Paths::CETRoot() const
+const std::filesystem::path& Paths::CoreRoot() const
 {
-    return m_cetRoot;
+    return m_coreRoot;
 }
 
 const std::filesystem::path& Paths::Config() const
@@ -60,29 +60,29 @@ Paths::Paths()
 
     // From bin/x64/Cyberpunk2077.exe, use the native RED4ext
     // plugin directory. Never read/write an existing CET installation.
-    m_cetRoot = (m_gameRoot / L".." / L".." /
+    m_coreRoot = (m_gameRoot / L".." / L".." /
                  L"red4ext" / L"plugins" / L"m1core").lexically_normal();
-    create_directories(m_cetRoot);
+    create_directories(m_coreRoot);
 
-    m_config = m_cetRoot / L"config.json";
+    m_config = m_coreRoot / L"config.json";
     // remove empty config.json
     if (exists(m_config) && !file_size(m_config))
         std::filesystem::remove(m_config);
 
-    m_persistentState = m_cetRoot / L"persistent.json";
+    m_persistentState = m_coreRoot / L"persistent.json";
     // remove empty persistentState.json
     if (exists(m_persistentState) && !file_size(m_persistentState))
         std::filesystem::remove(m_persistentState);
 
-    m_vkBindings = m_cetRoot / L"bindings.json";
+    m_vkBindings = m_coreRoot / L"bindings.json";
     // remove empty vkbindings.json
     if (exists(m_vkBindings) && !file_size(m_vkBindings))
         std::filesystem::remove(m_vkBindings);
 
-    m_modsRoot = m_cetRoot / L"mods";
+    m_modsRoot = m_coreRoot / L"mods";
     create_directories(m_modsRoot);
     // The author package has no script resources or icon scripts.
-    create_directories(m_cetRoot / L"scripts");
+    create_directories(m_coreRoot / L"scripts");
 
     m_r6CacheModdedRoot = m_gameRoot;
     m_r6CacheModdedRoot /= L"..";
@@ -91,7 +91,7 @@ Paths::Paths()
     m_r6CacheModdedRoot /= L"cache";
     m_r6CacheModdedRoot /= L"modded";
 
-    m_fonts = m_cetRoot / L"fonts";
+    m_fonts = m_coreRoot / L"fonts";
 
-    m_tweakdb = m_cetRoot / L"tweakdb";
+    m_tweakdb = m_coreRoot / L"tweakdb";
 }

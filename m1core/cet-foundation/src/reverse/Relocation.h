@@ -36,7 +36,7 @@ struct RED4ext::Detail::AddressResolverOverride<uint32_t> : std::true_type
                    stream << "Failed to get '" << dllName
                           << "' handle.\nProcess will now close.\n\nLast error: " << GetLastError();
 
-                   MessageBoxA(nullptr, stream.str().c_str(), "Cyber Engine Tweaks", MB_ICONERROR | MB_OK);
+                   MessageBoxA(nullptr, stream.str().c_str(), "m1core", MB_ICONERROR | MB_OK);
                    TerminateProcess(GetCurrentProcess(), 1);
                    return; // Disable stupid warning
                }
@@ -48,7 +48,7 @@ struct RED4ext::Detail::AddressResolverOverride<uint32_t> : std::true_type
                    stream << "Failed to get '" << functionName
                           << "' address.\nProcess will now close.\n\nLast error: " << GetLastError();
 
-                   MessageBoxA(nullptr, stream.str().c_str(), "Cyber Engine Tweaks", MB_ICONERROR | MB_OK);
+                   MessageBoxA(nullptr, stream.str().c_str(), "m1core", MB_ICONERROR | MB_OK);
                    TerminateProcess(GetCurrentProcess(), 1);
                }
            });
@@ -59,7 +59,7 @@ struct RED4ext::Detail::AddressResolverOverride<uint32_t> : std::true_type
             std::stringstream stream;
             stream << "Failed to resolve address for hash " << std::hex << std::showbase << aHash << ".\nProcess will now close.";
 
-            MessageBoxA(nullptr, stream.str().c_str(), "Cyber Engine Tweaks", MB_ICONERROR | MB_OK);
+            MessageBoxA(nullptr, stream.str().c_str(), "m1core", MB_ICONERROR | MB_OK);
             TerminateProcess(GetCurrentProcess(), 1);
         }
 

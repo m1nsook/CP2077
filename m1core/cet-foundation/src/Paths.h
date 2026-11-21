@@ -6,7 +6,7 @@ struct Paths
 
     const std::filesystem::path& Executable() const;
     const std::filesystem::path& GameRoot() const;
-    const std::filesystem::path& CETRoot() const;
+    const std::filesystem::path& CoreRoot() const;
     const std::filesystem::path& Config() const;
     const std::filesystem::path& PersistentState() const;
     const std::filesystem::path& VKBindings() const;
@@ -22,7 +22,7 @@ private:
 
     std::filesystem::path m_exe{};
     std::filesystem::path m_gameRoot{};
-    std::filesystem::path m_cetRoot{};
+    std::filesystem::path m_coreRoot{};
     std::filesystem::path m_config{};
     std::filesystem::path m_persistentState{};
     std::filesystem::path m_vkBindings{};

@@ -1,6 +1,6 @@
 #include <stdafx.h>
 
-#include "config/CETVersion.h"
+#include "config/M1CoreVersion.h"
 #include "Paths.h"
 #include "Utils.h"
 #include "RED4ext/Api/v1/Runtime.hpp"
@@ -170,7 +170,7 @@ Options::Options(Paths& aPaths)
     if (!ExeValid)
         throw std::runtime_error("Not Cyberpunk2077.exe");
 
-    set_default_logger(CreateLogger(GetAbsolutePath(L"cyber_engine_tweaks.log", m_paths.CETRoot(), true), "main", nullptr, "[%Y-%m-%d %H:%M:%S UTC%z] [%l] [%!] [%t] %v"));
+    set_default_logger(CreateLogger(GetAbsolutePath(L"m1core.log", m_paths.CoreRoot(), true), "main", nullptr, "[%Y-%m-%d %H:%M:%S UTC%z] [%l] [%!] [%t] %v"));
 
     Log::Info("m1core is starting...");
 
@@ -178,10 +178,10 @@ Options::Options(Paths& aPaths)
 
     if (GameImage.FileVersion.major != 0)
     {
-        Log::Info("M1CoreRuntime version {}", CET_VERSION_FULL);
+        Log::Info("M1CoreRuntime version {}", M1CORE_VERSION_FULL);
         Log::Info("Game version {}.{}.{}.{}", GameImage.FileVersion.major, GameImage.FileVersion.minor, GameImage.FileVersion.build, GameImage.FileVersion.revision);
         Log::Info("Root path: \"{}\"", UTF16ToUTF8(aPaths.GameRoot().native()));
-        Log::Info("m1core path: \"{}\"", UTF16ToUTF8(aPaths.CETRoot().native()));
+        Log::Info("m1core path: \"{}\"", UTF16ToUTF8(aPaths.CoreRoot().native()));
         Log::Info("Lua scripts search path: \"{}\"", UTF16ToUTF8(aPaths.ModsRoot().native()));
 
         if (GameImage.FileVersion != RED4EXT_V1_RUNTIME_VERSION_LATEST)

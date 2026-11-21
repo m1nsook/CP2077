@@ -183,7 +183,7 @@ static bool ImGui_ImplWin32_InitEx(void* hwnd, bool platform_has_own_dc)
     // M1CoreRuntime specific
     // Enable Keyboard Nav and setup INI path
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    g_LayoutPath = UTF16ToUTF8(GetAbsolutePath(L"layout.ini", M1CoreRuntime::Get().GetPaths().CETRoot(), true).native()).c_str();
+    g_LayoutPath = UTF16ToUTF8(GetAbsolutePath(L"layout.ini", M1CoreRuntime::Get().GetPaths().CoreRoot(), true).native()).c_str();
     io.IniFilename = g_LayoutPath.c_str();
 
     bd->hWnd = (HWND)hwnd;
@@ -326,7 +326,7 @@ static void ImGui_ImplWin32_UpdateKeyModifiers()
 }
 
 // M1CoreRuntime: Scale to make sure coords are correct (fixes issues in fullscreen).
-static ImVec2 CET_GetScaleFactor()
+static ImVec2 M1CORE_GetScaleFactor()
 {
     ImGui_ImplWin32_Data* bd = ImGui_ImplWin32_GetBackendData();
     ImGuiIO& io = ImGui::GetIO();
@@ -352,7 +352,7 @@ static void ImGui_ImplWin32_UpdateMouseData()
     bool has_mouse_screen_pos = ::GetCursorPos(&mouse_screen_pos) != 0;
     
     // M1CoreRuntime: Get and verify scale factor. If any scalar in the scale factor is <= 0, apply -FLT_MAX as mouse position event. Otherwise, process normally.
-    const auto scale = CET_GetScaleFactor();
+    const auto scale = M1CORE_GetScaleFactor();
     if (scale.x <= 0.0f || scale.y <= 0.0f)
     {
         io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
@@ -715,7 +715,7 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARA
     case WM_NCMOUSEMOVE:
     {
         // M1CoreRuntime: Get and verify scale factor. If any scalar in the scale factor is <= 0, apply -FLT_MAX as mouse position event. Otherwise, process normally.
-        const auto scale = CET_GetScaleFactor();
+        const auto scale = M1CORE_GetScaleFactor();
         if (scale.x <= 0.0f || scale.y <= 0.0f)
         {
             io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);

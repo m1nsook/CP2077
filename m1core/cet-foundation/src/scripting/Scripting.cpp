@@ -2,7 +2,7 @@
 
 #include "Scripting.h"
 
-#include "config/CETVersion.h"
+#include "config/M1CoreVersion.h"
 
 #include "FunctionOverride.h"
 #include "GameOptions.h"
@@ -23,7 +23,7 @@
 #include <sol_imgui/sol_imgui.h>
 #include <Utils.h>
 
-#ifdef CET_DEBUG
+#ifdef M1CORE_DEBUG
 #include "GameHooks.h"
 #include "GameDump.h"
 #include <RED4ext/Dump/Reflection.hpp>
@@ -43,8 +43,8 @@ Scripting::Scripting(const Paths& aPaths, const Options& aOptions, VKBindings& a
     , m_options(aOptions)
     , m_d3d12(aD3D12)
 {
-    CreateLogger(aPaths.CETRoot() / "scripting.log", "scripting");
-    CreateLogger(aPaths.CETRoot() / "gamelog.log", "gamelog");
+    CreateLogger(aPaths.CoreRoot() / "scripting.log", "scripting");
+    CreateLogger(aPaths.CoreRoot() / "gamelog.log", "gamelog");
 }
 
 void Scripting::Initialize()
@@ -124,7 +124,7 @@ void Scripting::Initialize()
 
     globals["GetVersion"] = []() -> std::string
     {
-        return CET_GIT_TAG;
+        return M1CORE_GIT_TAG;
     };
 
     globals["GetDisplayResolution"] = [this]() -> std::tuple<float, float>
@@ -469,7 +469,7 @@ void Scripting::PostInitializeScripting()
         logger->info("Dumped {} types", count);
     };
 
-#ifdef CET_DEBUG
+#ifdef M1CORE_DEBUG
     globals["DumpVtables"] = [this]
     {
         // Hacky RTTI dump, this should technically only dump IScriptable instances and RTTI types as they are

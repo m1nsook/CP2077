@@ -18,7 +18,7 @@ void ImGuiAssert(wchar_t const* acpMessage, wchar_t const* acpFile, unsigned aLi
     // TODO - make this log to log of the one who caused assertion instead of default log!
     spdlog::error(L"ImGui assertion failed in file \"{}\" at line {}! Expression ({}) evaluates to false!", acpFile, aLine, acpMessage);
 
-#ifdef CET_DEBUG
+#ifdef M1CORE_DEBUG
     // we want to truly assert only in debug build, as it is causing confusion when users enable it...
     _wassert(acpMessage, acpFile, aLine);
 #endif
