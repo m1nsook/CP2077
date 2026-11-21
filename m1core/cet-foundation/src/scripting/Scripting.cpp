@@ -8,7 +8,7 @@
 #include "GameOptions.h"
 #include "Texture.h"
 
-#include <CET.h>
+#include <M1CoreRuntime.h>
 #include <lsqlite3/lsqlite3.h>
 #include <reverse/Type.h>
 #include <reverse/SingletonReference.h>
@@ -63,9 +63,9 @@ void Scripting::Initialize()
     // as this could get overriden by LUA_PATH environment variable
     luaVm["package"]["path"] = "./?.lua";
 
-    // The gifted CET source does not include its legacy IconGlyphs and
+    // The gifted M1CoreRuntime source does not include its legacy IconGlyphs and
     // json/json Lua resource scripts. Do not require missing assets.
-    // Native CET Lua/sol2 remains available for optional m1core scripts.
+    // Native M1CoreRuntime Lua/sol2 remains available for optional m1core scripts.
 
     // initialize sandbox
     m_sandbox.Initialize();
@@ -513,7 +513,7 @@ void Scripting::PostInitializeTweakDB()
 
     m_sandbox.PostInitializeTweakDB();
 
-    // Due to how TweakDB modifications are implemented in CET, some REDengine functions may attempt to allocate
+    // Due to how TweakDB modifications are implemented in M1CoreRuntime, some REDengine functions may attempt to allocate
     // new data in the buffer. But these functions don't resize the buffer, so they can get out of bounds and crash.
     // This edge case can be fixed by resizing TweakDB flat buffer to max capacity beforehand.
     RED4ext::TweakDB::Get()->UpsizeFlatDataBufferToMax();
@@ -531,7 +531,7 @@ void Scripting::PostInitializeMods()
     RegisterOverrides();
 
     TriggerOnInit();
-    if (CET::Get().GetOverlay().IsEnabled())
+    if (M1CoreRuntime::Get().GetOverlay().IsEnabled())
         TriggerOnOverlayOpen();
 }
 
@@ -631,7 +631,7 @@ void Scripting::ReloadAllMods()
     TriggerOnTweak();
     TriggerOnInit();
 
-    if (CET::Get().GetOverlay().IsEnabled())
+    if (M1CoreRuntime::Get().GetOverlay().IsEnabled())
         TriggerOnOverlayOpen();
 
     spdlog::get("scripting")->info("LuaVM: Reloaded all mods!");

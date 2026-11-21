@@ -1,9 +1,9 @@
-// RED4ext-native loader for the gifted MIT CET 1.38.1 runtime.
+// RED4ext-native loader for the gifted MIT M1CoreRuntime 1.38.1 runtime.
 // Copyright (c) 2018 yamashi; Copyright (c) 2026 MISO.
 // Original MIT notices: ../LICENSE-MIT and ../../LICENSE.
 #include <stdafx.h>
 
-#include "CET.h"
+#include "M1CoreRuntime.h"
 #include "m1core_registry_api.hpp"
 #include "state.hpp"
 #include <RED4ext/RED4ext.hpp>
@@ -31,11 +31,11 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(
     {
         if (g_initialized.exchange(false))
         {
-            // Restore the donated CET loader's shutdown order: first
-            // unhook our bundled MinHook runtime, then destroy CET objects.
+            // Restore the donated M1CoreRuntime loader's shutdown order: first
+            // unhook our bundled MinHook runtime, then destroy M1CoreRuntime objects.
             // The MinHook package is statically linked into this DLL.
             if (g_ownsMinHook) MH_DisableHook(MH_ALL_HOOKS);
-            CET::Shutdown();
+            M1CoreRuntime::Shutdown();
         }
         if (g_ownsMinHook)
         {
@@ -56,15 +56,15 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(
 
     try
     {
-        // Preserve the donated CET runtime's connected subsystems:
+        // Preserve the donated M1CoreRuntime runtime's connected subsystems:
         // Window, VKBindings, D3D12, Overlay, Scripting and GameMainThread.
-        CET::Initialize();
+        M1CoreRuntime::Initialize();
         // Keep the existing m1core native registry and REDscript API.
-        // The CET window/input/render system replaces only its old frontend.
-        m1core::Store().Configure(CET::Get().GetPaths().CETRoot() / L"settings.json");
+        // The M1CoreRuntime window/input/render system replaces only its old frontend.
+        m1core::Store().Configure(M1CoreRuntime::Get().GetPaths().CETRoot() / L"settings.json");
         m1core::RegisterNativeModAPI();
         g_initialized.store(true);
-        Report(sdk,handle,"m1core: CET-derived runtime and native registry initialized");
+        Report(sdk,handle,"m1core: M1CoreRuntime-derived runtime and native registry initialized");
         return true;
     }
     catch (...)

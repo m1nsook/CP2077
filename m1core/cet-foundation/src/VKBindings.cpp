@@ -1,6 +1,6 @@
 #include <stdafx.h>
 
-#include "CET.h"
+#include "M1CoreRuntime.h"
 #include "Utils.h"
 
 std::function<void()> VKBind::DelayedCall(const bool acIsDown) const
@@ -148,7 +148,7 @@ void VKBindings::InitializeMods(const TiltedPhoques::Map<std::string, std::refer
     for (const auto& deadMod : deadMods)
         m_modIdToBinds.erase(deadMod);
 
-    // lastly, insert CET overlay bind info
+    // lastly, insert M1CoreRuntime overlay bind info
     const auto overlayBindCode{GetBindCodeForModBind(overlayToggleModBind, true)};
     if (!Bind(overlayBindCode, overlayToggleModBind))
         m_modIdToBinds[overlayToggleModBind.ModName][overlayToggleModBind.ID] = 0;
@@ -638,17 +638,17 @@ void VKBindings::ExecuteSingleInput(const USHORT acVKCode, const bool acKeyDown)
         if (const auto vkBind = m_cpVm->GetBind(modBind))
         {
             // we dont want to handle bindings when vm is not initialized or when overlay is open and we are not in
-            // binding state! only exception allowed is any CET bind
+            // binding state! only exception allowed is any M1CoreRuntime bind
             const auto& overlayToggleModBind = Bindings::GetOverlayToggleModBind();
             const auto cetModBind = modBind.ModName == overlayToggleModBind.ModName;
-            if (!cetModBind && (!m_cpVm->IsInitialized() || CET::Get().GetOverlay().IsEnabled()))
+            if (!cetModBind && (!m_cpVm->IsInitialized() || M1CoreRuntime::Get().GetOverlay().IsEnabled()))
                 return;
 
             // this handler is not for hotkeys!
             if (vkBind->IsHotkey())
                 return;
 
-            // execute CET binds immediately, otherwise cursor will not show on overlay toggle
+            // execute M1CoreRuntime binds immediately, otherwise cursor will not show on overlay toggle
             if (cetModBind)
                 vkBind->Call(acKeyDown);
             else
@@ -674,17 +674,17 @@ void VKBindings::ExecuteRecording()
         if (const auto vkBind = m_cpVm->GetBind(modBind))
         {
             // we dont want to handle bindings when vm is not initialized or when overlay is open and we are not in
-            // binding state! only exception allowed is any CET bind
+            // binding state! only exception allowed is any M1CoreRuntime bind
             const auto& overlayToggleModBind = Bindings::GetOverlayToggleModBind();
             const auto cetModBind = modBind.ModName == overlayToggleModBind.ModName;
-            if (!cetModBind && (!m_cpVm->IsInitialized() || CET::Get().GetOverlay().IsEnabled()))
+            if (!cetModBind && (!m_cpVm->IsInitialized() || M1CoreRuntime::Get().GetOverlay().IsEnabled()))
                 return;
 
             // this handler is not for inputs! it should be used only on key up event for hotkeys!
             if (vkBind->IsInput())
                 return;
 
-            // execute CET binds immediately, otherwise cursor will not show on overlay toggle
+            // execute M1CoreRuntime binds immediately, otherwise cursor will not show on overlay toggle
             if (cetModBind)
                 vkBind->Call(false);
             else

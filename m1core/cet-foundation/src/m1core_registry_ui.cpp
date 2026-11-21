@@ -1,10 +1,10 @@
-// m1core standard Dear ImGui settings frontend on yamashi's native CET-derived backend.
-// Preserves the original m1core registry and profile API; CET owns keyboard,
+// m1core standard Dear ImGui settings frontend on yamashi's native M1CoreRuntime-derived backend.
+// Preserves the original m1core registry and profile API; M1CoreRuntime owns keyboard,
 // mouse, focus, D3D12 and hotkey lifecycle. No duplicate input hooks.
 #include <stdafx.h>
 #include "m1core_registry_ui.hpp"
 #include "registry.hpp"
-#include <CET.h>
+#include <M1CoreRuntime.h>
 #include <overlay/widgets/Bindings.h>
 
 #include <algorithm>
@@ -190,13 +190,13 @@ void DrawSettingsPage()
 void DrawKeybindsPage()
 {
     ImGui::TextUnformatted("m1core menu shortcut");
-    const auto& bindings = CET::Get().GetBindings();
+    const auto& bindings = M1CoreRuntime::Get().GetBindings();
     const auto key = bindings.GetBindString(Bindings::GetOverlayToggleModBind());
     ImGui::Text("Current: %s", key.empty() ? "Not assigned" : key.c_str());
     if (ImGui::Button("Change shortcut")) {
         // Use the donated key capture engine instead of introducing another
         // raw/WM_KEYDOWN listener that can regress game input.
-        CET::Get().GetOverlay().GetBindings().Toggle();
+        M1CoreRuntime::Get().GetOverlay().GetBindings().Toggle();
     }
     ImGui::Separator();
     ImGui::TextWrapped("The same shortcut opens and closes m1core. "
@@ -243,7 +243,7 @@ void DrawAboutPage()
     ImGui::Separator();
     ImGui::TextWrapped("Native RED4ext mod settings framework.");
     ImGui::TextWrapped("Settings, keybindings and profiles with Dear ImGui.");
-    ImGui::TextWrapped("Standalone DLL. No separate CET installation required.");
+    ImGui::TextWrapped("Standalone DLL. No separate M1CoreRuntime installation required.");
 }
 } // namespace
 
@@ -285,6 +285,6 @@ void DrawNativeRegistryUI()
         }
     }
     ImGui::End();
-    if (!open) CET::Get().GetOverlay().Toggle();
+    if (!open) M1CoreRuntime::Get().GetOverlay().Toggle();
 }
 } // namespace m1core

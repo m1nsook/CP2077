@@ -4,7 +4,7 @@
 
 #include "Texture.h"
 
-#include <CET.h>
+#include <M1CoreRuntime.h>
 #include <Utils.h>
 
 static constexpr const char* s_cVMGlobalObjectsWhitelist[] = {
@@ -134,7 +134,7 @@ void LuaSandbox::Initialize()
     {
         if (auto existingLogger = spdlog::get("scripting"))
         {
-            existingLogger->warn("CET launched with MO2.");
+            existingLogger->warn("M1CoreRuntime launched with MO2.");
         }
     }
 

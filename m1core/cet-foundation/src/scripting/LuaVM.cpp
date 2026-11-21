@@ -2,7 +2,7 @@
 
 #include "LuaVM.h"
 
-#include <CET.h>
+#include <M1CoreRuntime.h>
 
 const VKBind* LuaVM::GetBind(const VKModBind& acModBind) const
 {
@@ -35,7 +35,7 @@ void LuaVM::Update(float aDeltaTime)
     if (!m_initialized)
         return;
 
-    CET::Get().GetBindings().Update();
+    M1CoreRuntime::Get().GetBindings().Update();
 
     if (m_reload)
     {

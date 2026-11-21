@@ -2,7 +2,7 @@
 
 #include "LuaVM.h"
 
-#include <CET.h>
+#include <M1CoreRuntime.h>
 #include <Utils.h>
 
 #include <reverse/RTTILocator.h>
@@ -84,7 +84,7 @@ bool InitializeTweakDBMetadata(TiltedPhoques::Map<uint64_t, TDBIDLookupEntry>& l
         return false;
     }
 
-    const auto tdbstrPathRAW = GetAbsolutePath(L"tweakdb.str", CET::Get().GetPaths().TweakDB(), false, true);
+    const auto tdbstrPathRAW = GetAbsolutePath(L"tweakdb.str", M1CoreRuntime::Get().GetPaths().TweakDB(), false, true);
     if (!tdbstrPathRAW.empty())
     {
         try
@@ -107,7 +107,7 @@ bool InitializeTweakDBMetadata(TiltedPhoques::Map<uint64_t, TDBIDLookupEntry>& l
     }
     else
     {
-        const auto tdbstrPath = GetAbsolutePath(L"tweakdbstr.kark", CET::Get().GetPaths().TweakDB(), false, true);
+        const auto tdbstrPath = GetAbsolutePath(L"tweakdbstr.kark", M1CoreRuntime::Get().GetPaths().TweakDB(), false, true);
         if (tdbstrPath.empty())
         {
             Log::Error("CDPRTweakDBMetadata::Initalize() - Missing tweakdbstr.kark!");
@@ -159,7 +159,7 @@ bool InitializeTweakDBMetadata(TiltedPhoques::Map<uint64_t, TDBIDLookupEntry>& l
     }
 
     // check if we have a tweakdb that was changed by REDmod
-    const auto moddedTweakDbFilePath = GetAbsolutePath(L"tweakdb.str", CET::Get().GetPaths().R6CacheModdedRoot(), false, true);
+    const auto moddedTweakDbFilePath = GetAbsolutePath(L"tweakdb.str", M1CoreRuntime::Get().GetPaths().R6CacheModdedRoot(), false, true);
     if (moddedTweakDbFilePath.empty())
         return true;
 
@@ -316,7 +316,7 @@ void LuaVM::HookTDBIDToStringDEBUG(RED4ext::IScriptable*, RED4ext::CStackFrame* 
 void LuaVM::HookTranslateBytecode(uintptr_t aBinder, uintptr_t aData)
 {
     // Delay our lua hook until later, to ensure that Mod Organizer's VFS is hooked up.
-    CET::Get().GetVM().Initialize();
+    M1CoreRuntime::Get().GetVM().Initialize();
 
     s_vm->m_realTranslateBytecode(aBinder, aData);
     s_vm->PostInitializeScripting();
