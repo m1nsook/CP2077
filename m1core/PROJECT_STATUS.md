@@ -43,6 +43,12 @@ Only work on the m1core development branch and draft PR unless explicitly author
 5. **Karla / JetBrains Mono / Phosphor Icons are visually working in-game (2026-11-21, user-confirmed with screenshot).** The user reports the fonts and icons appear correctly. Do not ask for another typography/icon smoke test or repeat earlier native mouse/keyboard/Profiles tests.
 6. Previous development builds established that the ImGui theme and mouse/keyboard inputs are functional. **Do not claim** all graphics modes, third-party API calls or bytecode loading are already release-tested.
 
+## Runtime directory cleanup — 2026-11-21
+
+- Removed an obsolete `create_directories(m_coreRoot / L"scripts")` call from `core/src/Paths.cpp`. Previous builds created an empty `red4ext/plugins/m1core/scripts/` folder, but all installed Lua mods are discovered exclusively under `red4ext/plugins/m1core/mods/<mod-id>/` via `ScriptStore::LoadAll()`.
+- New builds will **no longer create** that unused directory. Do **not** delete any user's pre-existing `scripts/` contents automatically: if the folder is empty, the user can remove it manually. The real `mods/`, `fonts/`, `settings.json` and keybind paths are unchanged.
+- This is a directory-creation-only cleanup; native Windows CI is required, but already user-verified Weight Limit live updates, input and UI require no repeat tests.
+
 ## Current implementation
 
 - `m1core/core/` contains the native m1core runtime derived from the **hash-verified 131-file** donor source, including CET's connected Win32, raw input, D3D12, hotkey, overlay, Lua and game hooks. `M1CoreRuntime`, `M1CoreVersion`, `red4ext_plugin.cpp`, the m1core settings UI and the REDscript/native registry API are implemented here.

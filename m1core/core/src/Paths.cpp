@@ -81,8 +81,8 @@ Paths::Paths()
 
     m_modsRoot = m_coreRoot / L"mods";
     create_directories(m_modsRoot);
-    // The author package has no script resources or icon scripts.
-    create_directories(m_coreRoot / L"scripts");
+    // m1core mod entrypoints live below ModsRoot() / <mod-id>.
+    // Do not create an unused legacy scripts/ directory.
 
     m_r6CacheModdedRoot = m_gameRoot;
     m_r6CacheModdedRoot /= L"..";
