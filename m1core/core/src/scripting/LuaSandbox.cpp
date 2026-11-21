@@ -199,7 +199,10 @@ void LuaSandbox::PostInitializeMods()
 
 void LuaSandbox::ResetState()
 {
-    if (m_modules.empty())
+    // Every mod gets a sandbox even if it never imports a module. Reset
+    // those sandboxes on reload as well: m_modules is only the require()
+    // cache and is not an indicator of whether any mods were loaded.
+    if (m_sandboxes.size() <= 1 && m_modules.empty())
         return;
 
     auto lockedState = m_pScripting->GetLockedState();
@@ -210,7 +213,8 @@ void LuaSandbox::ResetState()
 
     m_modules.clear();
 
-    m_sandboxes.erase(m_sandboxes.cbegin() + 1, m_sandboxes.cend());
+    if (m_sandboxes.size() > 1)
+        m_sandboxes.erase(m_sandboxes.cbegin() + 1, m_sandboxes.cend());
 
     luaState.collect_garbage();
 }
