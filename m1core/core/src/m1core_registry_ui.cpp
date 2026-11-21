@@ -218,7 +218,8 @@ void DrawSetting(const ModView& mod, const SettingView& setting)
     ImGui::TableSetColumnIndex(2);
     // Full-size action, exactly like the Logs page buttons. SmallButton()
     // removes vertical FramePadding and caused the tiny Reset controls.
-    if (ImGui::Button("Reset", ImVec2(-FLT_MIN, 0.0f)))
+    const char* label = m1core::HasIcons() ? M1CORE_ICON_RESET "##reset-setting" : "Reset##reset-setting";
+    if (ImGui::Button(label, ImVec2(-FLT_MIN, 0.0f)))
     {
         if (!Settings().Reset(mod.id, setting.id))
         {
@@ -228,6 +229,8 @@ void DrawSetting(const ModView& mod, const SettingView& setting)
         else
             notice.clear();
     }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+        ImGui::SetTooltip("Reset %s to default",setting.label.c_str());
     ImGui::PopID();
 }
 
@@ -235,14 +238,17 @@ void DrawSettingsFor(const ModView& mod)
 {
     // Keep the mod title aligned with a normal-height action at the
     // right edge, instead of squeezing the button against the title.
-    const char* resetLabel = confirmModReset ? "Confirm reset" : "Reset mod";
+    const char* resetLabel = confirmModReset ? "Confirm Reset" :
+        (m1core::HasIcons() ? M1CORE_ICON_RESET "  Reset Mod" : "Reset Mod");
     const float actionWidth = ImGui::CalcTextSize(resetLabel).x +
                               ImGui::GetStyle().FramePadding.x * 2.0f;
     const float rightEdge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
     ImGui::AlignTextToFramePadding();
-    if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
+    auto* headingFont = m1core::KarlaSectionTitle() ?
+        m1core::KarlaSectionTitle() : m1core::KarlaSemiBold();
+    PushLayoutFont(headingFont);
     ImGui::Text("%s (%zu settings)", mod.title.c_str(), mod.settings.size());
-    if (m1core::KarlaSemiBold()) ImGui::PopFont();
+    PopLayoutFont(headingFont);
     ImGui::SameLine();
     ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightEdge - actionWidth));
     if (ImGui::Button(resetLabel, ImVec2(actionWidth, 0.0f))) {
@@ -254,7 +260,7 @@ void DrawSettingsFor(const ModView& mod)
             confirmModReset = true;
         }
     }
-    ImGui::Separator();
+    MoveDown(16);
 
     std::map<std::string, std::vector<const SettingView*>> groups;
     for (const auto& setting : mod.settings) {
@@ -272,7 +278,15 @@ void DrawSettingsFor(const ModView& mod)
     }
 
     for (const auto& [group, rows] : groups) {
-        ImGui::SeparatorText(group.c_str());
+        ImGui::PushStyleColor(ImGuiCol_Text,Color(100,116,139));
+        ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextAlign,ImVec2(0,0.5f));
+        PushLayoutFont(m1core::KarlaCaption());
+        const auto heading = ToUppercaseASCII(group);
+        ImGui::SeparatorText(heading.c_str());
+        PopLayoutFont(m1core::KarlaCaption());
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+        MoveDown(12);
         ImGui::PushID(group.c_str());
         const ImGuiTableFlags flags =
             ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg |
@@ -281,11 +295,13 @@ void DrawSettingsFor(const ModView& mod)
         // for settings rows: full-height buttons shouldn't sit inside
         // unnecessarily tall empty table cells.
         const auto cellPadding = ImGui::GetStyle().CellPadding;
-        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(cellPadding.x, 5.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(cellPadding.x, 10.0f));
         if (ImGui::BeginTable("settings", 3, flags)) {
-            ImGui::TableSetupColumn("Setting", ImGuiTableColumnFlags_WidthStretch, 0.55f);
-            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.35f);
-            ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+            const float available = ImGui::GetContentRegionAvail().x;
+            ImGui::TableSetupColumn("Setting",ImGuiTableColumnFlags_WidthStretch,1.0f);
+            ImGui::TableSetupColumn("Value",ImGuiTableColumnFlags_WidthFixed,
+                                    std::min(240.0f,std::max(110.0f,available*0.43f)));
+            ImGui::TableSetupColumn("Action",ImGuiTableColumnFlags_WidthFixed,80.0f);
             for (const auto* setting : rows) DrawSetting(mod, *setting);
             ImGui::EndTable();
         }
@@ -297,13 +313,16 @@ void DrawSettingsFor(const ModView& mod)
 
 void DrawSettingsPage()
 {
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(12,10));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,1.0f);
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::InputTextWithHint("##settings-search",
         m1core::HasIcons() ? M1CORE_ICON_SEARCH "  Search mods or settings..." :
                              "Search mods or settings...", search, sizeof(search));
+    ImGui::PopStyleVar(2);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
         ImGui::SetTooltip("Values save automatically to m1core/settings.json.");
-    ImGui::Spacing();
+    MoveDown(12);
 
     const auto mods = Settings().Snapshot();
     if (selectedMod.empty() && !mods.empty())
@@ -311,25 +330,34 @@ void DrawSettingsPage()
     const float remainingWidth = ImGui::GetContentRegionAvail().x;
     const float modListWidth = std::min(240.0f, std::max(170.0f, remainingWidth * 0.29f));
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, Color(30,31,35));
-    if (ImGui::BeginChild("##settings-mod-list", ImVec2(modListWidth,0),
-                          ImGuiChildFlags_Borders))
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(16,14));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(30,31,35));
+    if (ImGui::BeginChild("##settings-mod-list",ImVec2(modListWidth,0),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding))
     {
-        if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
-        ImGui::TextDisabled("REGISTERED MODS (%zu)", mods.size());
-        if (m1core::KarlaSemiBold()) ImGui::PopFont();
+        PushLayoutFont(m1core::KarlaCaption());
+        ImGui::TextColored(Color(100,116,139),"REGISTERED MODS (%zu)",mods.size());
+        PopLayoutFont(m1core::KarlaCaption());
+        MoveDown(7);
         ImGui::Separator();
+        MoveDown(7);
         bool anyVisible = false;
         for (const auto& mod : mods)
         {
             if (!Matches(mod, search)) continue;
             anyVisible = true;
             ImGui::PushID(mod.id.c_str());
-            if (ImGui::Selectable(mod.title.c_str(), selectedMod == mod.id))
-            {
+            const bool selected = selectedMod == mod.id;
+            ImGui::PushStyleColor(ImGuiCol_Header,Color(35,48,72));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered,Color(42,44,49));
+            ImGui::PushStyleColor(ImGuiCol_Text,selected ? Color(96,165,250) : Color(148,163,184));
+            PushLayoutFont(m1core::KarlaMedium());
+            if (ImGui::Selectable(mod.title.c_str(),selected,0,ImVec2(0,35))) {
                 selectedMod = mod.id;
                 confirmModReset = false;
             }
+            PopLayoutFont(m1core::KarlaMedium());
+            ImGui::PopStyleColor(3);
             ImGui::PopID();
         }
         if (!anyVisible)
@@ -337,11 +365,13 @@ void DrawSettingsPage()
     }
     ImGui::EndChild();
     ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
 
-    ImGui::SameLine(0.0f, 12.0f);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, Color(30,31,35));
-    if (ImGui::BeginChild("##settings-detail", ImVec2(0,0),
-                          ImGuiChildFlags_Borders))
+    ImGui::SameLine(0.0f,20.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(24,20));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(30,31,35));
+    if (ImGui::BeginChild("##settings-detail",ImVec2(0,0),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding))
     {
         const auto selected = std::find_if(mods.begin(), mods.end(),
             [](const ModView& m) { return m.id == selectedMod; });
@@ -352,6 +382,7 @@ void DrawSettingsPage()
     }
     ImGui::EndChild();
     ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
 }
 
 
