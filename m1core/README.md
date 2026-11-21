@@ -7,7 +7,7 @@ settings interface, keybinds, profiles, persistent mod settings, and an embedded
 LuaJIT runtime. It installs as `red4ext/plugins/m1core/m1core.dll` and **does
 not require a separate Cyber Engine Tweaks installation**.
 
-Project license: **MIT — Copyright (c) 2026 민숙 MISO** ([LICENSE](LICENSE)).
+Project license: **MIT — Copyright (c) 2026 민숙 MISO @m1nsook** ([LICENSE](LICENSE)).
 m1core is its own framework with its own name, API, design, fonts and icons.
 Its internal rendering and input implementation includes code donated with
 permission from the original author; there is no runtime dependence on the

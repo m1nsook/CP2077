@@ -6,6 +6,7 @@ on:
       - dev/m1core-cet-foundation
     paths:
       - "m1core/core/**"
+      - "m1core/LICENSE"
       - "m1core/native/ImGuiCustomTheme.h"
       - "m1core/native/registry.*"
       - "m1core/native/state.*"
@@ -209,7 +210,7 @@ jobs:
             throw "A donor-specific license was re-added to m1core's standalone package"
           }
           $projectLicense = Get-Content -LiteralPath "$dir/LICENSE" -Raw
-          if ($projectLicense -notmatch 'Copyright \(c\) 2026' -or $projectLicense -notmatch 'MISO') {
+          if ($projectLicense -notlike '*Copyright (c) 2026 민숙 MISO @m1nsook*') {
             throw "m1core's own project MIT license is missing from the release"
           }
           if (!(Test-Path "$dir/THIRD_PARTY_LICENSES")) {
