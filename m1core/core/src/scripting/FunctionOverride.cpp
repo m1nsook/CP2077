@@ -134,8 +134,14 @@ bool FunctionOverride::HookRunPureScriptFunction(RED4ext::CClassFunction* apFunc
         const auto itor = s_pOverride->m_functions.find(apFunction);
         if (itor == std::end(s_pOverride->m_functions))
         {
-            spdlog::get("scripting")->error("Function appears to be hooked but isn't?");
-            return false;
+            // The donated CET 1.38.1 hook ran in the path of unrelated
+            // native game functions. In Cyberpunk 2.50, isNative alone
+            // does NOT mean that m1core registered a Lua override.
+            // Returning false here aborts ordinary game script calls,
+            // including possible main-menu service / cloud-sync calls.
+            // Hand control back to the original engine interpreter.
+            lock.unlock(); // Do not execute game code under our shared lock.
+            return RealRunPureScriptFunction(apFunction, apStack, a3);
         }
 
         const auto& chain = itor->second;

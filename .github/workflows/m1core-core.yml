@@ -73,6 +73,18 @@ jobs:
           if ($gui -match 'M1CoreRuntime installation|Cyber Engine Tweaks') {
             throw "User-facing m1core UI must not contain legacy CET branding"
           }
+          # Regression guard: native game functions outside the override
+          # registry MUST pass through to the original script interpreter.
+          # Aborting them caused repeated "hooked but isn't" console errors.
+          $script = Get-Content "$root/src/scripting/FunctionOverride.cpp" -Raw
+          $native = ($script -split 'bool FunctionOverride::HookRunPureScriptFunction', 2)[1]
+          $native = ($native -split 'void FunctionOverride::HandleOverridenFunction', 2)[0]
+          if (!$native -or $native -notmatch 'lock\.unlock\(\);\s*return RealRunPureScriptFunction\(apFunction, apStack, a3\);') {
+            throw "Unregistered native game functions must execute original script interpreter"
+          }
+          if ($native -match 'Function appears to be hooked but isn.t\?"\);\s*return false;') {
+            throw "Never abort unregistered game native functions"
+          }
           $entry = Get-Content "$root/src/red4ext_plugin.cpp" -Raw
           if ($entry -match 'GetPaths\(\)\.CETRoot\(') {
             throw "RED4ext entry point must use renamed CoreRoot() accessor"

@@ -20,3 +20,12 @@ The active runtime source is now under `m1core/core` (formerly `m1core/cet-found
 ### Windows CI dependencies
 
 Windows CI caches the local xmake package/build cache between runs. It compiles the actual renamed native runtime (including the m1core registry UI), verifies the original author's licensing notices, and produces a single game-root install artifact only on successful compilation. A compiled DLL is not a substitute for an in-game check.
+
+
+### Cyberpunk 2.50 menu/cloud-sync investigation
+
+The last in-game build displayed the m1core window but, with the DLL loaded, the game's "Cloud sync in progress" notice never completed and gameplay input remained blocked. Removing the DLL immediately removed the problem (reported by the user). The earlier CET-derived Console displayed repeated `Function appears to be hooked but isn't?` messages.
+
+Found a concrete defect in the gifted runtime's `FunctionOverride::HookRunPureScriptFunction`: it treated *every* game script function with `isNative` set as if it belonged to the m1core override table and, if absent, returned `false`. The global hook was therefore aborting ordinary game script calls that m1core never registered. We now unlock and forward unregistered calls to `RealRunPureScriptFunction`, leaving registered Lua overrides and the original CET input/DirectX systems unchanged. The Windows CI includes a fail-closed source guard for this case.
+
+**Root cause attribution:** the early script-abort behavior is directly confirmed by source. Whether it alone explains the cloud-sync loop still requires validation in Cyberpunk. Steam cloud settings and the user's saves are not modified.
