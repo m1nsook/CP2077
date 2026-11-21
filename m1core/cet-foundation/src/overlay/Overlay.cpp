@@ -7,6 +7,7 @@
 #include <d3d12/D3D12.h>
 #include <scripting/LuaVM.h>
 #include <Utils.h>
+#include "m1core_registry_ui.hpp"
 
 void Overlay::PostInitialize()
 {
@@ -232,6 +233,7 @@ void Overlay::Update()
     m_tweakDBEditor.Draw();
     m_gameLog.Draw();
     m_imguiDebug.Draw();
+    m1core::DrawNativeRegistryUI();
 }
 
 bool Overlay::IsInitialized() const noexcept

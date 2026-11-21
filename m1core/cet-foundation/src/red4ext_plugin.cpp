@@ -4,6 +4,8 @@
 #include <stdafx.h>
 
 #include "CET.h"
+#include "m1core_registry_api.hpp"
+#include "state.hpp"
 #include <RED4ext/RED4ext.hpp>
 
 #include <atomic>
@@ -29,9 +31,10 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(
     {
         if (g_initialized.exchange(false))
         {
-            // CET is destroyed before the hook library. Never call the
-            // original DllMain's MH_DisableHook(nullptr), which can disable
-            // hooks belonging to unrelated plugins.
+            // Restore the donated CET loader's shutdown order: first
+            // unhook our bundled MinHook runtime, then destroy CET objects.
+            // The MinHook package is statically linked into this DLL.
+            if (g_ownsMinHook) MH_DisableHook(MH_ALL_HOOKS);
             CET::Shutdown();
         }
         if (g_ownsMinHook)
@@ -56,8 +59,12 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(
         // Preserve the donated CET runtime's connected subsystems:
         // Window, VKBindings, D3D12, Overlay, Scripting and GameMainThread.
         CET::Initialize();
+        // Keep the existing m1core native registry and REDscript API.
+        // The CET window/input/render system replaces only its old frontend.
+        m1core::Store().Configure(CET::Get().GetPaths().CETRoot() / L"settings.json");
+        m1core::RegisterNativeModAPI();
         g_initialized.store(true);
-        Report(sdk,handle,"m1core: CET-derived MIT runtime initialized");
+        Report(sdk,handle,"m1core: CET-derived runtime and native registry initialized");
         return true;
     }
     catch (...)

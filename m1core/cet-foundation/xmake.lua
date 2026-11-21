@@ -74,7 +74,7 @@ target("m1core")
     set_configdir(path.join("src", "config"))
     add_configfiles("src/xmake/CETVersion.h.in")
     -- Exclude the CET ASI DllMain; RED4ext invokes Main/Query/Supports.
-    add_files("src/**.cpp")
+    add_files("src/**.cpp", "../native/state.cpp", "../native/registry.cpp")
     remove_files("src/dllmain.cpp")
     add_headerfiles("src/**.h", "src/**.hpp")
     add_includedirs("src", "build", "../native")
