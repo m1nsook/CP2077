@@ -29,47 +29,55 @@ void ScriptStore::LoadAll()
     const auto consoleLogger = spdlog::get("scripting");
 
     const auto& cModsRoot = m_paths.ModsRoot();
-    for (const auto& file : std::filesystem::directory_iterator(cModsRoot))
+    const auto discovery = m1core::scripts::DiscoverModDirectories(cModsRoot);
+    if (discovery.error)
+        consoleLogger->error("Could not fully scan m1core mods at '{}': {}",
+                             UTF16ToUTF8(cModsRoot.native()), discovery.error.message());
+
+    for (const auto& modDir : discovery.directories)
     {
-        if (!file.is_directory() && !file.is_symlink())
-            continue;
+        const auto name = UTF16ToUTF8(modDir.filename().native());
+        const auto pathStr = UTF16ToUTF8(modDir.native());
 
-        const auto name = UTF16ToUTF8(file.path().filename().native());
-        const auto pathStr = UTF16ToUTF8((cModsRoot / file.path()).native());
-
-        if (file.path().native().starts_with(L"cet\\"))
+        if (name == "cet")
         {
             consoleLogger->warn("Ignoring mod using reserved name! ('{}')", pathStr);
             continue;
         }
 
-        const auto path = GetAbsolutePath(file.path(), cModsRoot, false);
-        if (path.empty())
+        // A broken junction, inaccessible directory or malformed entrypoint
+        // should only fail the affected mod, never stop loading other mods.
+        try
         {
-            consoleLogger->error("Tried to access invalid directory! ('{}')", pathStr);
-            continue;
-        }
+            const auto path = GetAbsolutePath(modDir, cModsRoot, false);
+            if (path.empty())
+            {
+                consoleLogger->error("Tried to access invalid directory! ('{}')", pathStr);
+                continue;
+            }
 
-        if (!is_directory(path))
-        {
-            // no error message, path was probably symlink to file
-            continue;
-        }
+            if (!is_directory(path))
+                continue; // Could be a symlink to a file.
 
-        if (m1core::scripts::FindEntrypoint(path).empty())
-        {
-            consoleLogger->warn("Ignoring mod without init.m1s, init.lua or init.m1c! ('{}')", pathStr);
-            continue;
-        }
+            if (m1core::scripts::FindEntrypoint(path).empty())
+            {
+                consoleLogger->warn("Ignoring mod without init.m1s, init.lua or init.m1c! ('{}')", pathStr);
+                continue;
+            }
 
-        auto ctx = ScriptContext{m_sandbox, path, name};
-        if (ctx.IsValid())
-        {
-            m_contexts.emplace(name, std::move(ctx));
-            consoleLogger->info("Mod {} loaded! ('{}')", name, pathStr);
+            auto ctx = ScriptContext{m_sandbox, path, name};
+            if (ctx.IsValid())
+            {
+                m_contexts.emplace(name, std::move(ctx));
+                consoleLogger->info("Mod {} loaded! ('{}')", name, pathStr);
+            }
+            else
+                consoleLogger->error("Mod {} failed to load! ('{}')", name, pathStr);
         }
-        else
-            consoleLogger->error("Mod {} failed to load! ('{}')", name, pathStr);
+        catch (const std::exception& error)
+        {
+            consoleLogger->error("Mod {} could not be loaded: {} ('{}')", name, error.what(), pathStr);
+        }
     }
 
     for (auto& contextIt : m_contexts)
