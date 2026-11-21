@@ -8,6 +8,8 @@ on:
       - "m1core/**"
       - ".github/workflows/m1core.yml"
   pull_request:
+    branches:
+      - main
     paths:
       - "m1core/**"
       - ".github/workflows/m1core.yml"

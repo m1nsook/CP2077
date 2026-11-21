@@ -35,7 +35,7 @@ static sol::object Execute(sol::state& vm, const fs::path& file)
     sol::protected_function runner = chunk;
     sol::protected_function_result result = runner();
     REQUIRE(result.valid());
-    return result.get<sol::object>();
+    return result.return_count() > 0 ? result.get<sol::object>() : sol::make_object(vm, sol::nil);
 }
 
 int main(int argc, char** argv)
@@ -51,11 +51,10 @@ int main(int argc, char** argv)
     REQUIRE(fs::is_regular_file(source));
     REQUIRE(m1core::scripts::FindEntrypoint(fixture) == source);
     int events = 0;
+    sol::protected_function onInit;
     vm.set_function("registerForEvent", [&](const std::string& event, sol::function callback) {
         REQUIRE(event == "onInit");
-        sol::protected_function fn = callback;
-        sol::protected_function_result called = fn();
-        REQUIRE(called.valid());
+        onInit = callback; // Actual lifecycle: register now, invoke later.
         ++events;
     });
     vm.set_function("require", [&](const std::string& module) -> sol::object {
@@ -67,14 +66,22 @@ int main(int argc, char** argv)
         }
         throw std::runtime_error("Module does not exist: " + module);
     });
+    std::cerr << "LuaJIT STEP 1: execute init.m1s" << std::endl;
     Execute(vm, source);
     REQUIRE(events == 1);
+    REQUIRE(onInit.valid());
+    std::cerr << "LuaJIT STEP 2: run registered onInit" << std::endl;
+    sol::protected_function_result callbackResult = onInit();
+    REQUIRE(callbackResult.valid());
     REQUIRE(vm["smoke_result"].get<int>() == 42);
-    REQUIRE(Execute(vm, fixture / "helper.m1s").as<sol::table>()["answer"].get<int>() == 42);
+    std::cerr << "LuaJIT STEP 3: execute .m1s and legacy .lua modules" << std::endl;
+    sol::table module = Execute(vm, fixture / "helper.m1s");
+    REQUIRE(module["answer"].get<int>() == 42);
     REQUIRE(Execute(vm, fixture / "compat.lua").as<int>() == 7);
 
     // Generate genuine bytecode using the same LuaJIT engine linked into
     // the m1core DLL. The bytecode test is NOT a header-only simulation.
+    std::cerr << "LuaJIT STEP 4: compile real bytecode" << std::endl;
     auto* state = vm.lua_state();
     REQUIRE(luaL_loadstring(state, "return 21 * 2") == 0);
     std::string compiled;
@@ -87,7 +94,9 @@ int main(int argc, char** argv)
         REQUIRE(output.good());
         output.write(compiled.data(), static_cast<std::streamsize>(compiled.size()));
     }
+    std::cerr << "LuaJIT STEP 5: execute .m1c bytecode" << std::endl;
     REQUIRE(Execute(vm, temporary).as<int>() == 42);
+    std::cerr << "LuaJIT STEP 6: reject wrong load modes" << std::endl;
     REQUIRE(!vm.load("return 10", "@notbytecode.m1c", sol::load_mode::binary).valid());
     REQUIRE(!vm.load(compiled, "@masked.m1s", sol::load_mode::text).valid());
     fs::remove(temporary);
