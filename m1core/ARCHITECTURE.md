@@ -27,8 +27,11 @@ Standalone m1core must:
    foreground focus changes. No event polling outside the game HWND.
 9. Use a native first-run keybind window with user-chosen toggle key,
    persisted to disk, without overriding the user's existing CET key.
-10. Use normal ImGui controls, consistent fonts and spacing, with the
-    user's chosen black/white/colored-tab design.
+10. Use **only stock Dear ImGui widgets and its default dark style** for the
+    current stage: a normal window, BeginTabBar/BeginTabItem, BeginChild,
+    BeginTable, Selectable, SliderInt/Float, Checkbox, BeginCombo and Button.
+    Do not reintroduce colored navigation, custom draw lists, fixed-position
+    widget hit areas, custom fonts, or pixel-perfect Photoshop designs.
 11. Test render lifecycle, focus rules, hotkeys and UI layout with
     native automated tests. CI success does not replace real in-game QA.
 
@@ -49,8 +52,8 @@ replace the CET-dependent prototype, not augment it:
 - \`native/input.*\`: foreground-only Win32 message routing and native
   REDengine \`ForceCursor\` ownership, one physical pointer and no API detours.
   OS shutdown commands remain pass-through.
-- \`native/ui.*\`: standard Dear ImGui tables, colored navigation and typed
-  settings backed directly by the independent native registry.
+- \`native/ui.*\`: stock Dear ImGui tabs, setting tables, default dark style and
+  typed settings backed directly by the independent native registry.
 - \`native/plugin.cpp\`: new native RED4ext RTTI access to register, read,
   write and reset settings. **No CET Lua files or CET installation.**
 
@@ -62,3 +65,7 @@ intermediate builds. Do not upload or label any developer build as an
 installable CET replacement until graphics lifecycle, first-run key
 binding, cursor ownership, shutdown and non-game focus handling receive
 end-to-end verification.
+
+### UI decision (November 21, 2026)
+
+The user explicitly requested a **plain standard ImGui interface** during the standalone restart. The custom colored-header reference is not the active design target. Prioritize reliability and functionality; do not return to custom UI controls unless the user explicitly changes direction. Keep the RED4ext DLL standalone without CET.

@@ -57,3 +57,7 @@ The old unreleased implementation remains in Git history and the
 never released, no migration layer or compatibility bridge is required.
 
 No changes are made to any other mod.
+
+## Current UI contract (November 21, 2026)
+
+The user has explicitly selected a **standard Dear ImGui interface for now**. The UI is a normal movable/resizable ImGui window with built-in tab items, mod selector, native controls and settings tables. The renderer uses ImGui's default dark style; no colored navigation, drawn borders, overlay chrome, custom fonts or layout mimicry. This decision affects only `native/ui.cpp` and the renderer's ImGui styling. The native RED4ext plugin, cursor/input code and persistence framework are unchanged. Runtime appearance remains unverified; this is a development build.

@@ -105,13 +105,8 @@ bool Renderer::Initialize(const GameFrame& source) noexcept
     ImGui::CreateContext();
     ownsContext_ = true;
     ImGui::StyleColorsDark();
-    auto& style = ImGui::GetStyle();
-    style.WindowRounding = 0.0F;
-    style.ChildRounding = 0.0F;
-    style.FrameRounding = 0.0F;
-    style.PopupRounding = 0.0F;
-    style.FramePadding = ImVec2(10.0F,7.0F);
-    style.ItemSpacing = ImVec2(10.0F,9.0F);
+    // Use standard Dear ImGui dark styling; only cursor ownership remains
+    // explicitly configured because Cyberpunk supplies the physical cursor.
     ImGui::GetIO().MouseDrawCursor = false; // Always one: engine's real cursor
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
