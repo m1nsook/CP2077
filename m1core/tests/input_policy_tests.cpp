@@ -28,5 +28,13 @@ int main()
     REQUIRE(!CanCaptureInput(false,true,true));
     REQUIRE(!CanCaptureInput(true,false,true)); // game lost foreground
     REQUIRE(CanCaptureInput(true,true,true));
+    std::array<bool,256> keys{};
+    using m1core::TrackKeyEdge;
+    using m1core::KeyEdge;
+    REQUIRE(TrackKeyEdge(keys,VK_F11,true)==KeyEdge::Press);
+    REQUIRE(TrackKeyEdge(keys,VK_F11,true)==KeyEdge::None); // WM_INPUT duplicate
+    REQUIRE(TrackKeyEdge(keys,VK_F11,false)==KeyEdge::Release);
+    REQUIRE(TrackKeyEdge(keys,VK_F11,false)==KeyEdge::None); // WM_KEYUP duplicate
+    REQUIRE(TrackKeyEdge(keys,999,true)==KeyEdge::None);
     std::cout<<"Native input ownership/OS shutdown policy passed\n";
 }

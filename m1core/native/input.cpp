@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <optional>
 #include <string>
 
 namespace m1core {
@@ -25,22 +26,19 @@ bool IsMouseMessage(UINT message) noexcept
 {
     return message>=WM_MOUSEFIRST && message<=WM_MOUSELAST;
 }
-bool IsRawAltF4(LPARAM data) noexcept
+std::optional<RAWKEYBOARD> ReadRawKeyboard(LPARAM data) noexcept
 {
-    UINT size=0;
-    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(data),RID_INPUT,
-                         nullptr,&size,sizeof(RAWINPUTHEADER)) != 0)
-        return false;
-    if (size==0 || size>4096) return false;
+    UINT size = 0;
+    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(data), RID_INPUT,
+                        nullptr, &size, sizeof(RAWINPUTHEADER)) != 0 ||
+        size < sizeof(RAWINPUTHEADER) || size > 4096) return std::nullopt;
     alignas(RAWINPUT) BYTE buffer[4096]{};
-    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(data),RID_INPUT,
-                        buffer,&size,sizeof(RAWINPUTHEADER)) == static_cast<UINT>(-1))
-        return false;
-    const auto* input=reinterpret_cast<const RAWINPUT*>(buffer);
-    return input->header.dwType==RIM_TYPEKEYBOARD &&
-           input->data.keyboard.VKey==VK_F4 &&
-           !(input->data.keyboard.Flags&RI_KEY_BREAK) &&
-           (GetKeyState(VK_MENU)&0x8000)!=0;
+    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(data), RID_INPUT,
+                        buffer, &size, sizeof(RAWINPUTHEADER)) == static_cast<UINT>(-1))
+        return std::nullopt;
+    const auto* raw = reinterpret_cast<const RAWINPUT*>(buffer);
+    if (raw->header.dwType != RIM_TYPEKEYBOARD) return std::nullopt;
+    return raw->data.keyboard;
 }
 
 std::string KeyName(int key)
@@ -103,6 +101,7 @@ bool InputRouter::Install(HWND hwnd) noexcept
     }
     window_=hwnd;
     firstRunArmed_.store(false);
+    keysDown_.fill(false);
     focused_.store(GetForegroundWindow()==hwnd);
     ReloadKeyFromDisk();
     visible_.store(false);
@@ -118,6 +117,7 @@ void InputRouter::Uninstall() noexcept
     setup_.store(false);
     recording_.store(false);
     focused_.store(false);
+    keysDown_.fill(false);
     if (IsWindow(window_) && engineCursorHeld_) {
         const DWORD ownerThread = GetWindowThreadProcessId(window_,nullptr);
         if (ownerThread == GetCurrentThreadId()) {
@@ -173,6 +173,37 @@ void InputRouter::BeginKeyCapture() noexcept
     recording_.store(true);
     if (!visible_.load()) setup_.store(true);
     RequestCursorSync();
+}
+
+bool InputRouter::HandleKeyTransition(int key,bool down) noexcept
+{
+    if (key < 0 || key >= 256) return false;
+    const KeyEdge edge = TrackKeyEdge(keysDown_,static_cast<unsigned>(key),down);
+    // Consume the assigned toggle down/up even on duplicate message paths.
+    const bool plain = (GetKeyState(VK_MENU)&0x8000)==0 &&
+                       (GetKeyState(VK_CONTROL)&0x8000)==0 &&
+                       (GetKeyState(VK_SHIFT)&0x8000)==0;
+    if (recording_.load()) {
+        if (edge==KeyEdge::Release) {
+            if (key==VK_ESCAPE) {
+                recording_.store(false);
+            } else if (IsValidShortcut(key) && SetMenuKey(key)) {
+                recording_.store(false);
+                setup_.store(false);
+                visible_.store(false);
+                RequestCursorSync();
+            }
+        }
+        return true;
+    }
+    if (hotkey_.load()!=0 && key==hotkey_.load() && plain) {
+        if (edge==KeyEdge::Release) {
+            visible_.store(!visible_.load());
+            RequestCursorSync();
+        }
+        return true;
+    }
+    return false;
 }
 
 void InputRouter::ArmFirstRun() noexcept
@@ -240,6 +271,7 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
         (message==WM_ACTIVATEAPP && !wp)) {
         focused_.store(false);
         recording_.store(false); // Never bind keys typed after returning from Alt+Tab.
+        keysDown_.fill(false);
         ApplyEngineCursor(hwnd);
         Renderer::Get().CancelInput();
         return next();
@@ -264,48 +296,30 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
     const bool foreground=focused_.load() && GetForegroundWindow()==hwnd;
     if (!foreground) return next();
 
-    if (message==WM_INPUT && (visible_.load() || setup_.load()) &&
-        IsRawAltF4(lp)) {
-        Close();
-        PostMessageW(hwnd,WM_CLOSE,0,0);
-        return next();
-    }
-
-    // The player-chosen toggle must not accidentally trigger a vanilla
-    // game action on keydown while we consume the matching keyup.
-    if (message==WM_KEYDOWN || message==WM_SYSKEYDOWN) {
-        if (!recording_.load() && hotkey_.load()!=0 &&
-            static_cast<int>(wp)==hotkey_.load() &&
-            (GetKeyState(VK_MENU)&0x8000)==0 &&
-            (GetKeyState(VK_CONTROL)&0x8000)==0 &&
-            (GetKeyState(VK_SHIFT)&0x8000)==0)
-            return 1;
-    }
-
-    if (message==WM_KEYUP || message==WM_SYSKEYUP) {
-        const int key=static_cast<int>(wp);
-        if (recording_.load()) {
-            if (key==VK_ESCAPE) {
-                recording_.store(false);
-                return 1;
+    // CET likewise detects gameplay hotkeys via WM_INPUT. Modern games
+    // may send both raw and translated key messages; TrackKeyEdge
+    // guarantees one activation per physical release.
+    if (message==WM_INPUT) {
+        if (const auto raw=ReadRawKeyboard(lp)) {
+            const bool down=(raw->Flags & RI_KEY_BREAK)==0;
+            if (raw->VKey==VK_F4 && down &&
+                (GetKeyState(VK_MENU)&0x8000)!=0 &&
+                (visible_.load() || setup_.load())) {
+                Close();
+                PostMessageW(hwnd,WM_CLOSE,0,0);
+                return next();
             }
-            if (IsValidShortcut(key) && SetMenuKey(key)) {
-                recording_.store(false);
-                setup_.store(false);
-                visible_.store(false);
-                RequestCursorSync();
+            if (HandleKeyTransition(static_cast<int>(raw->VKey),down)) {
+                // Cleanup for consumed RIM_INPUT messages is mandatory.
+                return DefWindowProcW(hwnd,message,wp,lp);
             }
-            return 1;
         }
-        const int assigned=hotkey_.load();
-        if (assigned!=0 && key==assigned &&
-            (GetKeyState(VK_MENU)&0x8000)==0 &&
-            (GetKeyState(VK_CONTROL)&0x8000)==0 &&
-            (GetKeyState(VK_SHIFT)&0x8000)==0) {
-            visible_.store(!visible_.load());
-            RequestCursorSync();
+    }
+    if (message==WM_KEYDOWN || message==WM_SYSKEYDOWN ||
+        message==WM_KEYUP || message==WM_SYSKEYUP) {
+        const bool down=message==WM_KEYDOWN || message==WM_SYSKEYDOWN;
+        if (HandleKeyTransition(static_cast<int>(wp),down))
             return 1;
-        }
     }
 
     if (CanCaptureInput(visible_.load() || setup_.load(),foreground,

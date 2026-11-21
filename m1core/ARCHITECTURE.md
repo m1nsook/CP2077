@@ -72,8 +72,9 @@ does not require a hand-drawn fullscreen darkening layer.
 
 M1CORE now passively initializes on a valid Present without swallowing
 startup keys, explicitly arms first-run setup after backend initialization,
-retains its ImGui context across resize, and drops input ownership when GPU
-frames stall. These are independently written RED4ext/ImGui integrations,
+retains its ImGui context across resize, derives key-down/up edges from
+raw keyboard input with duplicate Win32-event suppression, and drops input
+ownership when GPU frames stall. These are independently written RED4ext/ImGui integrations,
 not CET code or a CET runtime requirement. M1CORE's render-thread UI is
 still a difference from CET's main-thread UI preparation plus draw-buffer
 staging and needs in-game compatibility evaluation.

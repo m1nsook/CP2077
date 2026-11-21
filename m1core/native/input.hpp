@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Windows.h>
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <string>
@@ -35,6 +36,15 @@ constexpr UINT kCursorSyncMessage = WM_APP + 0x4B3;
     return OwnsInput(visible, foreground) && rendererReady;
 }
 
+enum class KeyEdge { None, Press, Release };
+[[nodiscard]] inline KeyEdge TrackKeyEdge(std::array<bool,256>& keys,
+                                          unsigned key,bool pressed) noexcept
+{
+    if (key >= keys.size() || keys[key] == pressed) return KeyEdge::None;
+    keys[key] = pressed;
+    return pressed ? KeyEdge::Press : KeyEdge::Release;
+}
+
 class InputRouter {
 public:
     static InputRouter& Get() noexcept;
@@ -56,6 +66,8 @@ private:
     LRESULT Dispatch(HWND window,UINT message,WPARAM wparam,LPARAM lparam) noexcept;
     void ApplyEngineCursor(HWND window) noexcept;
     bool SetMenuKey(int key) noexcept;
+    // Process raw and translated Win32 keyboard messages exactly once.
+    [[nodiscard]] bool HandleKeyTransition(int key,bool pressed) noexcept;
     void ReloadKeyFromDisk() noexcept;
     [[nodiscard]] bool IsValidShortcut(int key) const noexcept;
 
@@ -67,6 +79,7 @@ private:
     std::atomic_bool recording_{false};
     std::atomic<int> hotkey_{0};
     bool engineCursorHeld_ = false;
+    std::array<bool,256> keysDown_{};
     std::atomic_bool firstRunArmed_{false};
 };
 } // namespace m1core
