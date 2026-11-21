@@ -132,6 +132,18 @@ jobs:
           Write-Host "LuaJIT test fixture: $fixture"
           xmake run -y m1core_script_runtime_tests "$fixture"
           if ($LASTEXITCODE -ne 0) { throw "LuaJIT integration tests failed" }
+      - name: Test real m1core Lua registry consumer and compile weight limit bytecode
+        working-directory: m1core/core
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          xmake build -y -vD m1core_weight_limit_tests
+          if ($LASTEXITCODE -ne 0) { throw "Weight limit test executable failed to compile" }
+          $source = (Resolve-Path -LiteralPath '../examples/weight-limit/init.m1s').Path
+          $compiled = Join-Path (Get-Location) 'weight-limit-build/init.m1c'
+          New-Item -ItemType Directory -Path (Split-Path $compiled) -Force | Out-Null
+          xmake run -y m1core_weight_limit_tests "$source" "$compiled"
+          if ($LASTEXITCODE -ne 0) { throw "Source and compiled weight limit / registry bridge tests failed" }
       - name: Package one game-root artifact — exclude CET icons/fonts
         shell: pwsh
         run: |
@@ -152,6 +164,44 @@ jobs:
           if ($source[0].Length -lt 4096) { throw "Compiled CET-derived DLL unexpectedly small" }
           Get-FileHash -LiteralPath "$dir/m1core.dll" -Algorithm SHA256 | Format-List
           Write-Host 'This is a native compile artifact, NOT proof of game runtime compatibility'
+      - name: Package two standalone weight limit sample variants
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $src = 'm1core/examples/weight-limit/init.m1s'
+          $compiled = 'm1core/core/weight-limit-build/init.m1c'
+          if (!(Test-Path $src) -or !(Test-Path $compiled)) { throw "Missing sample source or real compiled bytecode" }
+          $raw = [System.IO.File]::ReadAllBytes((Resolve-Path $compiled).Path)
+          if ($raw.Length -lt 4 -or $raw[0] -ne 27 -or $raw[1] -ne 76 -or $raw[2] -ne 74) {
+            throw "init.m1c must contain authentic LuaJIT bytecode"
+          }
+          $sourceDir = 'm1core/core/sample-source/red4ext/plugins/m1core/mods/weight-limit-sample'
+          $byteDir = 'm1core/core/sample-bytecode/red4ext/plugins/m1core/mods/weight-limit-sample'
+          New-Item -ItemType Directory -Path $sourceDir,$byteDir -Force | Out-Null
+          Copy-Item -LiteralPath $src -Destination "$sourceDir/init.m1s"
+          Copy-Item -LiteralPath $compiled -Destination "$byteDir/init.m1c"
+          Copy-Item -LiteralPath 'm1core/LICENSE' -Destination "$sourceDir/LICENSE"
+          Copy-Item -LiteralPath 'm1core/LICENSE' -Destination "$byteDir/LICENSE"
+          if ((@(Get-ChildItem 'm1core/core/sample-source' -Recurse -File)).Count -ne 2 -or
+              (@(Get-ChildItem 'm1core/core/sample-bytecode' -Recurse -File)).Count -ne 2) {
+            throw "Each game-root variant needs exactly the entrypoint and MIT license"
+          }
+          Get-FileHash "$sourceDir/init.m1s" -Algorithm SHA256 | Format-List
+          Get-FileHash "$byteDir/init.m1c" -Algorithm SHA256 | Format-List
+      - name: Upload weight limit .m1s source variant
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1core-weight-limit-source
+          path: m1core/core/sample-source/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload weight limit .m1c bytecode variant
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1core-weight-limit-bytecode
+          path: m1core/core/sample-bytecode/
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload single game-root package
         uses: actions/upload-artifact@v4
         with:

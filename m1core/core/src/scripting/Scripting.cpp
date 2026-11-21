@@ -1,6 +1,7 @@
 #include <stdafx.h>
 
 #include "Scripting.h"
+#include "M1CoreLuaAPI.hpp"
 
 #include "config/M1CoreVersion.h"
 
@@ -152,6 +153,10 @@ void Scripting::Initialize()
 
         return false;
     };
+
+    // Data-only m1core settings API is available to .m1s/.lua/.m1c mods
+    // while entry scripts load, independent of REDscript RTTI/Game timing.
+    m1core::BindLuaRegistryAPI(luaVm, globals);
 
     // load mods
     m_store.LoadAll();

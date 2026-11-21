@@ -137,3 +137,13 @@ target("m1core_script_runtime_tests")
     add_files("../tests/script_runtime_tests.cpp")
     add_includedirs("src", "../tests")
     add_packages("sol2", "openrestry-luajit")
+
+-- Real native registry bridge + sample carry-capacity Lua integration.
+-- The test also generates an authentic .m1c from init.m1s.
+target("m1core_weight_limit_tests")
+    set_kind("binary")
+    add_defines("NOMINMAX", "WIN32_LEAN_AND_MEAN")
+    add_files("../tests/weight_limit_tests.cpp", "src/scripting/M1CoreLuaAPI.cpp",
+              "../native/registry.cpp", "../native/state.cpp")
+    add_includedirs("src", "../native", "../tests")
+    add_packages("sol2", "openrestry-luajit", "nlohmann_json")
