@@ -371,7 +371,9 @@ void DrawNativeRegistryUI()
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.95f, 0.96f, 0.98f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.83f, 0.86f, 0.90f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.75f, 0.79f, 0.83f, 1.0f));
-            ImGui::AlignTextToFramePadding();
+            // The child header is 29px high; do not apply the theme's 9px
+            // FramePadding text baseline here or the caption gets clipped.
+            ImGui::SetCursorPosY(6.0f);
             ImGui::TextUnformatted("M1CORE - MOD SETTINGS");
             ImGui::SameLine();
             ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 31.0f);
