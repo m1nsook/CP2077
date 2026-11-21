@@ -188,14 +188,6 @@ void D3D12::ReloadFonts()
     }
     io.FontDefault = mainFont;
 
-    // Optional text-only Karla weights. Missing files fall back gracefully
-    // to Regular for older installs. Their pointers are atlas-owned and are
-    // reset above before any font reload.
-    m1core::SetKarlaWeights(
-        load(L"Karla-Medium.ttf", size),
-        load(L"Karla-SemiBold.ttf", size),
-        load(L"Karla-Bold.ttf", size));
-
     // Merge only the needed Phosphor regular icons into Karla, keeping
     // fonts in a single normal ImGui atlas and without custom DrawList UI.
     // Codepoints come from phosphor-icons/web src/regular/style.css.
@@ -238,6 +230,16 @@ void D3D12::ReloadFonts()
     {
         Log::Warn("Phosphor icon font not found: using plain-text tab labels");
     }
+
+    // Important: add the standalone Karla weights AFTER Phosphor's
+    // MergeMode pass. Dear ImGui merges glyphs into the last added font;
+    // putting Medium/SemiBold/Bold first would merge icons into Bold
+    // instead of io.FontDefault (Karla Regular), breaking all icon tabs.
+    // Missing weights remain optional for backward-compatible installs.
+    m1core::SetKarlaWeights(
+        load(L"Karla-Medium.ttf", size),
+        load(L"Karla-SemiBold.ttf", size),
+        load(L"Karla-Bold.ttf", size));
 
     ImFont* mono = load(L"JetBrainsMono-Regular.ttf", std::max(12.0f, size * 0.84f));
     if (mono)
