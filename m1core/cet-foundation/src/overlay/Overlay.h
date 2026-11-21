@@ -26,7 +26,6 @@ struct Overlay
     void Update();
 
 private:
-    void DrawToolbar();
 
     Console m_console;
     Bindings m_bindings;

@@ -17,7 +17,7 @@ using RED4ext::IScriptable;
 void Version(IScriptable*,CStackFrame* frame,CString* output,std::int64_t)
 {
     frame->code++;
-    if (output) *output=CString("1.0.0-cet-dev.1");
+    if (output) *output=CString("1.0.0-dev.4");
 }
 void Register(IScriptable*,CStackFrame* frame,bool* output,std::int64_t)
 {

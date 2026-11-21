@@ -8,7 +8,7 @@
 namespace
 {
 VKBind s_overlayToggleBind{
-    "overlay_key", "Overlay Key", "Use this hotkey to toggle overlay on and off.",
+    "overlay_key", "m1core menu shortcut", "Open or close m1core.",
     []
     {
         if (!CET::Get().GetBindings().IsRecordingBind())
@@ -24,7 +24,7 @@ bool VKBindInfo::operator==(const std::string& id) const
 }
 
 Bindings::Bindings(VKBindings& aBindings, LuaVM& aVm)
-    : Widget("Bindings")
+    : Widget("m1core Keybindings")
     , m_bindings(aBindings)
     , m_vm(aVm)
 {
@@ -439,7 +439,7 @@ void Bindings::UpdateAndDrawModBindings(const std::string& acModName, TiltedPhoq
         return;
 
     // transform mod name to nicer format until modinfo is in
-    std::string activeModName = acModName == s_overlayToggleModBind.ModName ? "Cyber Engine Tweaks" : acModName;
+    std::string activeModName = acModName == s_overlayToggleModBind.ModName ? "m1core" : acModName;
     bool capitalize = true;
     std::ranges::transform(
         std::as_const(activeModName), activeModName.begin(),
