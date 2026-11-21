@@ -4,6 +4,11 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## API repository separation
+
+- **Canonical scripting API home:** [m1script](https://github.com/m1nsook/m1script), foundation [PR #10](https://github.com/m1nsook/m1script/pull/10) (m1script CI passed; Pages pending merge). Do not expand the duplicated developer API docs in this repository.
+- **Runtime:** m1core is still the independent RED4ext DLL; no CET or extra m1script runtime dependency.
+
 ## Quick links
 
 - **Source repo:** https://github.com/m1nsook/CP2077
@@ -159,13 +164,12 @@ Only work on the m1core development branch and draft PR unless explicitly author
 - `core/src/common/ImGuiNotify.h` now supports an opt-in **per-toast** position. Bottom-right remains the default for other notifications, including other Lua mods or separately installed CET; the left/right toast stacks are independent. No changes to the Win32 input hooks or D3D12 rendering backend.
 - The Phosphor glyph falls back to the existing ASCII icon if the font is absent. Native CI compilation is required; the visual placement is **not yet in-game verified**. The user does not need to repeat prior game input/hotkey tests.
 
-## M5 continuation — named callback diagnostics / LuaJIT failure isolation (2026-11-21)
+## m1script repository split and M5 runtime CI correction (2026-11-21)
 
-- **New source commit:** `0bd0ff38feef750609dce82f6129e25bdab34a97`, pushed to the existing draft PR #41. **Windows CI:** [run #44953301662](https://github.com/m1nsook/CP2077/actions/runs/44953301662) was still running at the time of this entry; do not report this commit as validated until completion.
-- **Actual ScriptContext shared dispatcher:** moved error containment to `core/src/scripting/LuaCallback.hpp` and reused that code from `ScriptContext.cpp` and the real `m1core_script_runtime_tests`. Failed Lua events are logged with their event name; missing/unregistered events do not produce an error.
-- **LuaJIT regression:** test a missing callback, a failing Lua callback, a succeeding later update/shutdown callback and a corrected callback after replacement. Confirm a failure report does not stop the next callback. This tests the real callback-invocation helper, not the full Cyberpunk ScriptContext/game hooks.
-- **Scan diagnostics:** log loaded/failed/skipped mod directory counts from `ScriptStore::LoadAll`, while preserving existing error messages, traversal protection, binding and mod lifecycle handling. No UI, input, toast, game-script pass-through or packaging changes.
-- **Next M5:** validate CI, then inspect sandbox import error handling and process working-directory safety; native REDscript callback registration is still a separate milestone.
+- **User decision:** maintain public scripting API contracts, developer documentation, examples and editor support in **https://github.com/m1nsook/m1script**. Created [m1script PR #10](https://github.com/m1nsook/m1script/pull/10) with the migrated API reference, VitePress guide, `api/contract.json`, LuaLS types and `.m1s` examples. [m1script CI #44954056328](https://github.com/m1nsook/m1script/actions/runs/44954056328) **passed** its contract and VitePress build checks. m1script main is protected; changes are awaiting PR merge/deploy.
+- **Runtime remains m1core:** embedded LuaJIT, RED4ext DLL, native RTTI, settings registry, input, overlay, persistence and game-root package stay here, MIT-licensed. No GPL runtime code is copied from m1script into m1core, and no new DLL/CET requirement is introduced.
+- **Regression and restoration:** [m1core CI #44953301662](https://github.com/m1nsook/CP2077/actions/runs/44953301662) compiled the DLL but **failed** during the newly added callback-isolation LuaJIT test. The experimental `LuaCallback.hpp` integration, its new test and scan-count changes are **reverted** to the previous validated source. The last green full runtime build is [#44952396412](https://github.com/m1nsook/CP2077/actions/runs/44952396412), source `fbec37989b29ffd132a60cb69137eb767ea85a5b`. A fresh CI run for this restoration must complete before calling the latest branch green.
+- **Next:** finish m1script public API documentation and contract validation; keep any necessary native runtime corrections separate. Preserve approved UI and input. **Do not merge m1core PR #41 without approval.**
 
 ## M5 continuation — Lua developer API parity and reload regression (2026-11-21)
 

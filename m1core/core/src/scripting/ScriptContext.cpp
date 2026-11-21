@@ -2,7 +2,6 @@
 
 #include "ScriptContext.h"
 #include "ScriptFormats.hpp"
-#include "LuaCallback.hpp"
 
 #include <M1CoreRuntime.h>
 #include <Utils.h>
@@ -10,16 +9,34 @@
 
 namespace
 {
-// The shared dispatcher is also verified by the real LuaJIT tests.
-// Include the event name in diagnostics for the failing mod.
-template <typename... Args>
-void TryLuaFunction(const std::shared_ptr<spdlog::logger>& logger, const char* event,
-                    const sol::function& callback, Args... args)
+// Individual mod callbacks must not unwind into the host's update/draw loop.
+// sol may return a failed protected result or throw before a result exists.
+template <typename... Args> void TryLuaFunction(const std::shared_ptr<spdlog::logger>& logger, const sol::function& callback, Args... args)
 {
-    m1core::scripts::InvokeLuaCallback(callback, [logger, event](const std::string& message)
+    if (!callback)
+        return;
+
+    try
     {
-        logger->error("{} callback failed: {}", event, message);
-    }, args...);
+        const sol::protected_function_result result = callback(args...);
+        if (!result.valid())
+        {
+            const sol::error error = result;
+            logger->error("Lua callback failed: {}", error.what());
+        }
+    }
+    catch (const std::exception& error)
+    {
+        logger->error("Lua callback raised an exception: {}", error.what());
+    }
+    catch (const char* error)
+    {
+        logger->error("Lua callback failed: {}", error ? error : "(null)");
+    }
+    catch (...)
+    {
+        logger->error("Lua callback raised an unknown exception");
+    }
 }
 
 } // namespace
@@ -66,7 +83,7 @@ ScriptContext::ScriptContext(LuaSandbox& aLuaSandbox, const std::filesystem::pat
             {
                 auto lockedState = aLuaSandbox.GetLockedState();
 
-                TryLuaFunction(loggerRef, "hotkey", aCallback);
+                TryLuaFunction(loggerRef, aCallback);
             };
         }
 
@@ -74,7 +91,7 @@ ScriptContext::ScriptContext(LuaSandbox& aLuaSandbox, const std::filesystem::pat
         {
             auto lockedState = aLuaSandbox.GetLockedState();
 
-            TryLuaFunction(loggerRef, "input", aCallback, isDown);
+            TryLuaFunction(loggerRef, aCallback, isDown);
         };
     };
 
@@ -97,7 +114,7 @@ ScriptContext::ScriptContext(LuaSandbox& aLuaSandbox, const std::filesystem::pat
                         aLuaSandbox.SetImGuiAvailable(false);
                     });
 
-                    TryLuaFunction(loggerRef, "tooltip", callback);
+                    TryLuaFunction(loggerRef, callback);
                 };
             }
             loggerRef->warn("Tried to register empty tooltip for handler!]");
@@ -237,28 +254,28 @@ void ScriptContext::TriggerOnHook() const
 {
     auto lockedState = m_sandbox.GetLockedState();
 
-    TryLuaFunction(m_logger, "onHook", m_onHook);
+    TryLuaFunction(m_logger, m_onHook);
 }
 
 void ScriptContext::TriggerOnTweak() const
 {
     auto lockedState = m_sandbox.GetLockedState();
 
-    TryLuaFunction(m_logger, "onTweak", m_onTweak);
+    TryLuaFunction(m_logger, m_onTweak);
 }
 
 void ScriptContext::TriggerOnInit() const
 {
     auto lockedState = m_sandbox.GetLockedState();
 
-    TryLuaFunction(m_logger, "onInit", m_onInit);
+    TryLuaFunction(m_logger, m_onInit);
 }
 
 void ScriptContext::TriggerOnUpdate(float aDeltaTime) const
 {
     auto lockedState = m_sandbox.GetLockedState();
 
-    TryLuaFunction(m_logger, "onUpdate", m_onUpdate, aDeltaTime);
+    TryLuaFunction(m_logger, m_onUpdate, aDeltaTime);
 }
 
 void ScriptContext::TriggerOnDraw() const
@@ -272,21 +289,21 @@ void ScriptContext::TriggerOnDraw() const
         m_sandbox.SetImGuiAvailable(false);
     });
 
-    TryLuaFunction(m_logger, "onDraw", m_onDraw);
+    TryLuaFunction(m_logger, m_onDraw);
 }
 
 void ScriptContext::TriggerOnOverlayOpen() const
 {
     auto lockedState = m_sandbox.GetLockedState();
 
-    TryLuaFunction(m_logger, "onOverlayOpen", m_onOverlayOpen);
+    TryLuaFunction(m_logger, m_onOverlayOpen);
 }
 
 void ScriptContext::TriggerOnOverlayClose() const
 {
     auto lockedState = m_sandbox.GetLockedState();
 
-    TryLuaFunction(m_logger, "onOverlayClose", m_onOverlayClose);
+    TryLuaFunction(m_logger, m_onOverlayClose);
 }
 
 sol::object ScriptContext::GetRootObject() const
@@ -298,5 +315,5 @@ void ScriptContext::TriggerOnShutdown() const
 {
     auto lockedState = m_sandbox.GetLockedState();
 
-    TryLuaFunction(m_logger, "onShutdown", m_onShutdown);
+    TryLuaFunction(m_logger, m_onShutdown);
 }
