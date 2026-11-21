@@ -87,13 +87,13 @@ void DrawLogsPage()
 {
     const char* sources[] = {"m1core.log", "scripting.log"};
     ImGui::SetNextItemWidth(190.0f);
-    if (ImGui::Combo("Log", &logSource, sources, IM_ARRAYSIZE(sources)))
+    if (ImGui::Combo("##log-file", &logSource, sources, IM_ARRAYSIZE(sources)))
         logLoaded = false;
     ImGui::SameLine();
     if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_REFRESH " Refresh" : "Refresh"))
         logLoaded = false;
     ImGui::SameLine();
-    if (ImGui::Button("Reload scripts"))
+    if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_REFRESH " Reload Scripts" : "Reload Scripts"))
     {
         // Defer to LuaVM::Update rather than unloading script contexts
         // during the current ImGui frame.
@@ -112,10 +112,11 @@ void DrawLogsPage()
     const auto error = Settings().LastError();
     if (!error.empty())
         ImGui::TextWrapped("Settings: %s", error.c_str());
-    ImGui::Separator();
-
-    if (ImGui::BeginChild("##m1core-log-output", ImVec2(0, 0),
-                          ImGuiChildFlags_Borders,
+    MoveDown(10);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(10,10,12));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(16,16));
+    if (ImGui::BeginChild("##m1core-log-output",ImVec2(0,0),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_HorizontalScrollbar))
     {
         if (ImFont* font = m1core::LogFont())
@@ -125,6 +126,8 @@ void DrawLogsPage()
             ImGui::PopFont();
     }
     ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
 }
 
 // Settings changes are durable immediately. Report filesystem failures at
@@ -393,11 +396,14 @@ void DrawKeybindsPage()
     const auto& bindings = runtime.GetBindings();
     const auto& registered = runtime.GetVM().GetAllBinds();
 
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(12,10));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,1.0f);
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::InputTextWithHint("##keybind-search",
         m1core::HasIcons() ? M1CORE_ICON_SEARCH "  Search mods or keybinds..." :
                              "Search mods or keybinds...", keybindSearch, sizeof(keybindSearch));
-    ImGui::Spacing();
+    ImGui::PopStyleVar(2);
+    MoveDown(12);
 
     std::vector<std::string> visibleMods;
     if (ContainsIgnoreCase("m1core", keybindSearch) ||
@@ -418,14 +424,17 @@ void DrawKeybindsPage()
                                                 selectedKeybindMod) == visibleMods.end())
         selectedKeybindMod = visibleMods.empty() ? "" : visibleMods.front();
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, Color(30,31,35));
-    if (ImGui::BeginChild("##keybind-mod-list", ImVec2(panelWidth,0),
-                          ImGuiChildFlags_Borders))
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(16,14));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(30,31,35));
+    if (ImGui::BeginChild("##keybind-mod-list",ImVec2(panelWidth,0),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding))
     {
-        if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
-        ImGui::TextDisabled("REGISTERED MODS (%zu)", visibleMods.size());
-        if (m1core::KarlaSemiBold()) ImGui::PopFont();
+        PushLayoutFont(m1core::KarlaCaption());
+        ImGui::TextColored(Color(100,116,139),"REGISTERED MODS (%zu)",visibleMods.size());
+        PopLayoutFont(m1core::KarlaCaption());
+        MoveDown(7);
         ImGui::Separator();
+        MoveDown(7);
         for (const auto& modId : visibleMods)
         {
             if (ImGui::Selectable(modId == "m1core" ? "M1CORE" : modId.c_str(),
@@ -436,11 +445,13 @@ void DrawKeybindsPage()
     }
     ImGui::EndChild();
     ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
 
-    ImGui::SameLine(0,12);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, Color(30,31,35));
-    if (ImGui::BeginChild("##keybind-detail", ImVec2(0,0),
-                          ImGuiChildFlags_Borders))
+    ImGui::SameLine(0,20);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(24,20));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(30,31,35));
+    if (ImGui::BeginChild("##keybind-detail",ImVec2(0,0),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding))
     {
         if (selectedKeybindMod.empty())
             ImGui::TextDisabled("No keybinds match your search.");
@@ -508,14 +519,14 @@ void DrawKeybindsPage()
     }
     ImGui::EndChild();
     ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
 }
 
 
 void DrawProfilesPage()
 {
-    if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
-    ImGui::TextUnformatted("Profiles");
-    if (m1core::KarlaSemiBold()) ImGui::PopFont();
+    // PageHeader already supplies the title; keep this area for actions.
+    MoveDown(6);
     ImGui::SetNextItemWidth(240);
     ImGui::InputTextWithHint("##profile", "Profile name",
                              profileName, sizeof(profileName));
@@ -528,14 +539,18 @@ void DrawProfilesPage()
     }
     ImGui::Spacing();
     ImGui::PushStyleColor(ImGuiCol_ChildBg, Color(30,31,35));
-    if (ImGui::BeginChild("##profile-list", ImVec2(0,220),ImGuiChildFlags_Borders)) {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(12,10));
+    if (ImGui::BeginChild("##profile-list", ImVec2(0,220),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding)) {
         for (const auto& name : Settings().Profiles()) {
             if (ImGui::Selectable(name.c_str(), selectedProfile == name))
                 selectedProfile = name;
         }
     }
     ImGui::EndChild();
+    ImGui::PopStyleVar();
     ImGui::PopStyleColor();
+    MoveDown(14);
     if (!selectedProfile.empty()) {
         if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_REFRESH " Load selected" : "Load selected")) {
             if (Settings().LoadProfile(selectedProfile)) {
