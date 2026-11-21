@@ -1,5 +1,7 @@
 # m1core
 
+**Project handoff / persistent development status:** [`PROJECT_STATUS.md`](PROJECT_STATUS.md). This is the canonical link to use when resuming work in a new chat; update it alongside code and CI changes.
+
 **Native Cyberpunk 2077 mod settings framework — development build**
 
 m1core is a standalone Windows x64 DLL loaded by **RED4ext**. It is being built directly on the MIT-only Cyber Engine Tweaks 1.38.1 source archive supplied by yamashi for this project. It does **not** require a separate Cyber Engine Tweaks installation.

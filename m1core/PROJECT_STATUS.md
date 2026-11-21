@@ -12,8 +12,9 @@
 - **This document (stable handoff URL):** https://github.com/m1nsook/CP2077/blob/dev/m1core-cet-foundation/m1core/PROJECT_STATUS.md
 - **Developer API:** [`m1core/DEVELOPERS.md`](DEVELOPERS.md)
 - **Build and licenses:** [`m1core/core/BUILD.md`](core/BUILD.md)
-- **Latest game-tested Windows CI:** [#44907145458](https://github.com/m1nsook/CP2077/actions/runs/44907145458); source commit `153451235f4deccf11b5631deacf50f0287e0e4d`.
-- **Working native ZIP**: GitHub Actions artifact `m1core-native-x64-dev` from the CI run above; artifacts can expire. Do not invent a new download URL or confuse it with an older DLL.
+- **Latest USER-confirmed in-game Windows CI:** [#44907145458](https://github.com/m1nsook/CP2077/actions/runs/44907145458); source commit `153451235f4deccf11b5631deacf50f0287e0e4d`.
+- **Latest CI-verified build (native profile tests):** [#44914222641](https://github.com/m1nsook/CP2077/actions/runs/44914222641); source commit `6cbd24fac3721b68241de0c60bfcb5a3145950d4`.
+- **Current ZIP**: `m1core-native-x64-dev` (GitHub artifact ID `14711440432`, CI #44914222641). Actions artifacts can expire; do not invent a link or confuse it with older DLLs.
 
 ## Goal and nonnegotiable choices
 
@@ -37,8 +38,8 @@ Only work on the m1core development branch and draft PR unless explicitly author
 
 ## Open work (not yet validated)
 
-- **Registry + profiles:** profile-load merging of unloaded mods, preservation of newer settings, and atomic rejection of invalid profiles has been implemented in source with new native tests. **CI and in-game persistence verification are pending at this commit**; do not claim this work is confirmed working in Cyberpunk.
-- **Native automated tests:** the active xmake/Windows workflow now builds and runs registry and state tests against the same native sources as the DLL. [CI #44913706268](https://github.com/m1nsook/CP2077/actions/runs/44913706268) successfully compiled the full core but failed compiling standalone test targets because `Windows.h` defined `max` without `NOMINMAX`. The compile flags are corrected in the subsequent commit; rerun CI before claiming tests passed.
+- **Registry + profiles (native CI VERIFIED; game verification pending):** loading profiles now restores values for offline/unregistered mods, preserves newer fields, and rejects malformed/invalid registered values without partial changes. New tests cover save/load, late registration, restart, invalid profiles, and persistence. Source commits [`8329e52`](https://github.com/m1nsook/CP2077/commit/8329e525cf70174f4689e197bae433dd57fe3130) and [`6cbd24f`](https://github.com/m1nsook/CP2077/commit/6cbd24fac3721b68241de0c60bfcb5a3145950d4).
+- **Windows CI PASS:** [#44914222641](https://github.com/m1nsook/CP2077/actions/runs/44914222641) passed the full native DLL compile, **both registry and state test targets**, license/asset checks, and single game-root ZIP packaging. GitHub Actions artifact ID `14711440432`, artifact name `m1core-native-x64-dev`, ZIP SHA256 `7f438bbbeb3e5ed9f959ce668fd81ff08361f3bb88599add626a406cbf95c5c6`. The verified ZIP includes only `red4ext/plugins/m1core/m1core.dll` (SHA256 `55f6b76f9b1f7e15e1fec92c1ef56089482e3981f2a8c1320b8da864e79c75e0`) and the three required licenses/notices. **No new in-game profile test yet.** The previous CI #44913706268 failed only because the standalone test targets lacked `NOMINMAX`; that build-target issue is corrected and superseded by this successful run.
 - **Developer integration:** provide a small, real consuming mod/fixture that registers settings through native RTTI/REDscript and verifies registration, UI changes and reloads. At present the UI can show zero mods because no consumers are installed; this alone is not a bug.
 - **Lifecycle and compatibility:** test persistence and profile restore in-game after restart. Avoid touching the game-tested input/draw/hotkey and cloud script pass-through except to fix a reproduced regression.
 - **Release:** do not publish or merge until user approves; retain MIT/third-party licenses and no restricted assets. This project is still in development.
