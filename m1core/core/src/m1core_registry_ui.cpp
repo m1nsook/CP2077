@@ -8,6 +8,7 @@
 #include <overlay/widgets/Bindings.h>
 #include <overlay/FontPalette.h>
 #include <overlay/PhosphorIcons.h>
+#include <scripting/LuaVM.h>
 
 #include <filesystem>
 #include <fstream>
@@ -66,6 +67,17 @@ void DrawLogsPage()
     ImGui::SameLine();
     if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_REFRESH " Refresh" : "Refresh"))
         logLoaded = false;
+    ImGui::SameLine();
+    if (ImGui::Button("Reload scripts"))
+    {
+        // Defer to LuaVM::Update rather than unloading script contexts
+        // during the current ImGui frame.
+        M1CoreRuntime::Get().GetVM().ReloadAllMods();
+        notice = "Script reload queued.";
+        logLoaded = false;
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+        ImGui::SetTooltip("Unload all Lua mods (onShutdown), then reload scripts (onInit).");
     if (!logLoaded)
     {
         logSnapshot = ReadLogTail(M1CoreRuntime::Get().GetPaths().CoreRoot() /

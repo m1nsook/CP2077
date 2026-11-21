@@ -1,4 +1,5 @@
 #include "../core/src/scripting/ScriptFormats.hpp"
+#include "../core/src/scripting/ScopedWorkingDirectory.hpp"
 #include <sol/sol.hpp>
 #include <filesystem>
 #include <fstream>
@@ -46,6 +47,31 @@ int main(int argc, char** argv)
     REQUIRE(argc == 2);
     const fs::path fixture{argv[1]};
     REQUIRE(fs::is_directory(fixture));
+
+    // Exercise the exact scoped-path guard used by the Lua sandbox:
+    // normal return, nested scopes, and an exception during script work.
+    const fs::path originalDirectory = fs::current_path();
+    const fs::path parentDirectory = fixture.parent_path();
+    bool threwFromInsideScope = false;
+    try
+    {
+        m1core::scripts::ScopedWorkingDirectory outer(fixture);
+        REQUIRE(fs::equivalent(fs::current_path(), fixture));
+        {
+            m1core::scripts::ScopedWorkingDirectory inner(parentDirectory);
+            REQUIRE(fs::equivalent(fs::current_path(), parentDirectory));
+        }
+        REQUIRE(fs::equivalent(fs::current_path(), fixture));
+        threwFromInsideScope = true;
+        throw std::logic_error("expected-scoped-path-failure");
+    }
+    catch (const std::logic_error& error)
+    {
+        REQUIRE(std::string(error.what()) == "expected-scoped-path-failure");
+    }
+    REQUIRE(threwFromInsideScope);
+    REQUIRE(fs::equivalent(fs::current_path(), originalDirectory));
+    std::cout << "m1core sandbox working-directory exception/nesting regression passed\n";
 
     sol::state vm;
     vm.open_libraries(sol::lib::base, sol::lib::string, sol::lib::table);

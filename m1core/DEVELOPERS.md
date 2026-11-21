@@ -115,6 +115,29 @@ registry** and **actual pinned LuaJIT** for both scripts. Game stats, game
 initialization and the Cyberpunk `ScriptContext` lifecycle are not exercised
 by this mock-based CI test, and still require a real game check.
 
+### Reloading Lua mods safely
+
+In **m1core → Logs**, select **Reload scripts**. The action queues
+`LuaVM::ReloadAllMods()`; the operation runs on the next normal native
+update, not inside the ImGui render pass. m1core calls registered
+`onShutdown` callbacks, discards per-mod sandboxes/module caches and DB
+handles, discovers entrypoints again, and invokes the new `onInit`
+callbacks. This avoids having to restart the game during script development.
+
+A mod that changes game state should use
+`registerForEvent("onShutdown", function() ... end)` to undo **its own**
+temporary modifications. m1core cannot automatically revert arbitrary
+game-side changes made by scripts. The Weight Limit sample already includes
+an `onShutdown` cleanup.
+
+Sandbox file operations use a scoped guard to restore the process working
+directory even if Lua/C++ code throws; failed `require` executions clear the
+module-cache loading sentinel, allowing a later retry after a file is fixed.
+
+The Windows LuaJIT regression test verifies the actual working-directory
+guard on nested and exceptional exits. Reload behavior with third-party mods
+still requires in-game verification before a stable release.
+
 ### LuaJIT integration fixture
 
 The standalone developer fixture is at
