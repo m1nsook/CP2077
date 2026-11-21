@@ -1,4 +1,8 @@
+// The DLL target uses its established precompiled header. The isolated
+// native test target needs only Win32 and must not pull in the full runtime.
+#ifndef M1CORE_MOUSE_CLICK_STANDALONE_TEST
 #include <stdafx.h>
+#endif
 
 #include "MouseClick.hpp"
 

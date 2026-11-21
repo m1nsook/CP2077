@@ -152,7 +152,7 @@ target("m1core_weight_limit_tests")
 -- they NEVER send real input or move the test runner's cursor.
 target("m1core_mouse_click_tests")
     set_kind("binary")
-    add_defines("NOMINMAX", "WIN32_LEAN_AND_MEAN")
+    add_defines("NOMINMAX", "WIN32_LEAN_AND_MEAN", "M1CORE_MOUSE_CLICK_STANDALONE_TEST")
     add_files("src/input/MouseClick.cpp", "../tests/mouse_click_tests.cpp")
     add_includedirs("src", "../tests")
     add_syslinks("User32")
