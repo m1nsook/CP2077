@@ -229,8 +229,12 @@ void* RenderBridge::OnResize(std::uint32_t width,std::uint32_t height,
                              std::int32_t* deviceIndex)
 {
     auto& bridge = Get();
-    InputRouter::Get().Close(); // Never capture while swapchain is unavailable.
+    // The MIT CET 1.38.1 CRenderGlobal::Resize hook resets its graphics
+    // backends, NOT its overlay enable/toggle state. Fullscreen Alt+Tab,
+    // borderless minimize and windowed resize all hit this callback.
+    // Releasing render readiness before cursor sync prevents stranded input.
     Renderer::Get().Reset();
+    InputRouter::Get().SuspendForGraphicsReset();
     return bridge.originalResize_ ?
         bridge.originalResize_(width,height,other,mode,deviceIndex) : nullptr;
 }

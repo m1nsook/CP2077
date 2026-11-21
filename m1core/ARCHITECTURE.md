@@ -57,6 +57,29 @@ replace the CET-dependent prototype, not augment it:
 - \`native/plugin.cpp\`: new native RED4ext RTTI access to register, read,
   write and reset settings. **No CET Lua files or CET installation.**
 
+### Fullscreen / windowed / borderless resize and Alt+Tab recovery
+
+**Observed regression**: in-game first-run and main menus display correctly,
+but an Alt+Tab or display-mode transition can hide m1core and leave game
+input blocked. The donated CET 1.38.1 `D3D12_Hooks.cpp` resets
+render resources on game resize *without closing the overlay*. m1core
+previously called `InputRouter::Close()` directly from its resize hook.
+This is removed: graphics reset now drops renderer input readiness,
+requests game cursor release on the HWND thread, and retains the open
+overlay/first-run modal so it reappears when the game returns to focus.
+If the game replaces its viewport HWND, native listener reattachment
+also carries forward the visible/setup state.
+
+The keybind allowlist previously accepted only function keys, A-Z,
+0-9 and a few special cases. It now accepts normal non-modifier
+keyboard virtual keys (including numpad, space, punctuation and arrows).
+The first-time bind is recorded on physical press, not release, and
+the paired release is consumed to avoid immediately toggling the menu.
+Esc continues to cancel setup, and OS/Alt+F4 is passed through.
+
+**Verification still required in-game** across fullscreen, windowed and
+borderless modes; native CI tests cannot prove cursor ownership.
+
 ### Source-provenance and focus correction (November 21)
 
 After receiving the user's `cet_m1nsook.zip` from the CET author,

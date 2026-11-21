@@ -61,6 +61,26 @@ constexpr UINT kCursorSyncMessage = WM_APP + 0x4B3;
     return CanCaptureInput(active, foreground, rendererReady) && cursorHeld;
 }
 
+// Single-key bind selection follows the donated CET VKBindings approach:
+// retain physical keyboard VKs, not just the function-key subset. Reject
+// mouse buttons, OS modifiers and Windows-reserved virtual keys.
+[[nodiscard]] inline bool IsBindableKeyboardKey(int key) noexcept
+{
+    if (key < VK_BACK || key >= VK_PACKET) return false;
+    switch (key) {
+    case VK_ESCAPE:
+    case VK_SHIFT: case VK_CONTROL: case VK_MENU:
+    case VK_LSHIFT: case VK_RSHIFT:
+    case VK_LCONTROL: case VK_RCONTROL:
+    case VK_LMENU: case VK_RMENU:
+    case VK_LWIN: case VK_RWIN:
+    case VK_SLEEP: case VK_PROCESSKEY:
+        return false;
+    default:
+        return true;
+    }
+}
+
 enum class KeyEdge { None, Press, Release };
 [[nodiscard]] inline KeyEdge TrackKeyEdge(std::array<bool,256>& keys,
                                           unsigned key,bool pressed) noexcept
@@ -90,6 +110,9 @@ public:
     // Called only on the game render callback while a native UI is wanted.
     void RetryCursorSync() noexcept;
     void ReconcileWindowFocus() noexcept;
+    // Preserve an open ImGui session during DX12 resize, fullscreen changes,
+    // minimize and Alt+Tab. Only the render backend/cursor are suspended.
+    void SuspendForGraphicsReset() noexcept;
     void BeginKeyCapture() noexcept;
     // Called after ImGui/DX12 backends initialize, not from a startup key.
     void ArmFirstRun() noexcept;
@@ -119,5 +142,8 @@ private:
     std::array<bool,256> keysDown_{};
     std::atomic_bool firstRunArmed_{false};
     std::atomic_bool popupDismiss_{false};
+    // When first-run commits on key-down, swallow its matching key-up
+    // instead of reopening the overlay immediately on that release edge.
+    int freshlyBoundKey_ = 0;
 };
 } // namespace m1core

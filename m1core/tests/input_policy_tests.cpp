@@ -51,5 +51,27 @@ int main()
     REQUIRE(TrackKeyEdge(keys,VK_F11,false)==KeyEdge::Release);
     REQUIRE(TrackKeyEdge(keys,VK_F11,false)==KeyEdge::None); // WM_KEYUP duplicate
     REQUIRE(TrackKeyEdge(keys,999,true)==KeyEdge::None);
+    using m1core::IsBindableKeyboardKey;
+    // Not only F1-F24: all ordinary physical keys are valid, including
+    // keys that RIDEV_NOLEGACY may not deliver as translated WM_KEYUP.
+    REQUIRE(IsBindableKeyboardKey(VK_F11));
+    REQUIRE(IsBindableKeyboardKey('A'));
+    REQUIRE(IsBindableKeyboardKey('Z'));
+    REQUIRE(IsBindableKeyboardKey('1'));
+    REQUIRE(IsBindableKeyboardKey(VK_SPACE));
+    REQUIRE(IsBindableKeyboardKey(VK_TAB));
+    REQUIRE(IsBindableKeyboardKey(VK_RETURN));
+    REQUIRE(IsBindableKeyboardKey(VK_LEFT));
+    REQUIRE(IsBindableKeyboardKey(VK_NUMPAD7));
+    REQUIRE(IsBindableKeyboardKey(VK_ADD));
+    REQUIRE(IsBindableKeyboardKey(VK_OEM_3));
+    REQUIRE(IsBindableKeyboardKey(VK_OEM_4));
+    REQUIRE(IsBindableKeyboardKey(VK_OEM_7));
+    REQUIRE(!IsBindableKeyboardKey(VK_ESCAPE));
+    REQUIRE(!IsBindableKeyboardKey(VK_LSHIFT));
+    REQUIRE(!IsBindableKeyboardKey(VK_CONTROL));
+    REQUIRE(!IsBindableKeyboardKey(VK_LWIN));
+    REQUIRE(!IsBindableKeyboardKey(VK_LBUTTON));
+    REQUIRE(!IsBindableKeyboardKey(VK_PACKET));
     std::cout<<"Native input ownership/OS shutdown policy passed\n";
 }

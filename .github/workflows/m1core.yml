@@ -36,6 +36,15 @@ jobs:
       - name: Verify DLL is standalone and no CET Lua frontend is included
         shell: pwsh
         run: |
+          # Regression: CET resets DX12 on fullscreen/windowed resize without
+          # dismissing its overlay. Never close m1core in the resize hook.
+          $bridge = Get-Content -LiteralPath "m1core/native/render_bridge.cpp" -Raw
+          $resize = ($bridge -split 'void\* RenderBridge::OnResize', 2)[1]
+          if (!$resize) { throw "Missing game resize handler" }
+          $resize = ($resize -split 'void\* RenderBridge::OnShutdown', 2)[0]
+          if ($resize -match 'InputRouter::Get\(\)\.Close\(') {
+            throw "Resize handler must preserve the overlay session across Alt+Tab"
+          }
           $dll = "m1core/build/Release/m1core.dll"
           if (!(Test-Path -LiteralPath $dll -PathType Leaf)) {
             throw "Native m1core.dll was not compiled"

@@ -91,6 +91,13 @@ void InputRouter::ReloadKeyFromDisk() noexcept
 bool InputRouter::Install(HWND hwnd) noexcept
 {
     if (window_==hwnd && previous_) return true;
+    // CET retains the overlay state when rendering/viewport changes. A
+    // fullscreen swapchain may provide a new HWND; rebind the listener
+    // without dismissing the visible window or the first-run modal.
+    const bool rebinding = window_ != nullptr;
+    const bool reopen = visible_.load(std::memory_order_acquire);
+    const bool firstRun = setup_.load(std::memory_order_acquire);
+    const bool wasRecording = recording_.load(std::memory_order_acquire);
     if (window_) Uninstall();
     // A missing/late ForceCursor symbol must never prevent mounting
     // the keyboard-only first-run binder or native ImGui renderer.
@@ -114,11 +121,16 @@ bool InputRouter::Install(HWND hwnd) noexcept
     lastCursorRetry_.store(0);
     loggedCursorUnavailable_ = false;
     keysDown_.fill(false);
+    freshlyBoundKey_ = 0;
     focused_.store(GetForegroundWindow()==hwnd);
     ReloadKeyFromDisk();
-    visible_.store(false);
-    setup_.store(false);
-    recording_.store(false);
+    visible_.store(rebinding && reopen);
+    setup_.store(rebinding && firstRun && !KeyAssigned());
+    recording_.store(rebinding && wasRecording &&
+                     (reopen || (firstRun && !KeyAssigned())));
+    if (rebinding && (reopen || firstRun))
+        RenderBridge::Get().LogInfo(
+            "m1core: viewport reattached; overlay session preserved");
     return true;
 }
 
@@ -180,10 +192,7 @@ void InputRouter::ReconcileWindowFocus() noexcept
 
 bool InputRouter::IsValidShortcut(int key) const noexcept
 {
-    return (key>=VK_F1 && key<=VK_F24) ||
-           (key>='0' && key<='9') || (key>='A' && key<='Z') ||
-           key==VK_INSERT || key==VK_HOME || key==VK_END ||
-           key==VK_PAUSE || key==VK_OEM_3;
+    return IsBindableKeyboardKey(key);
 }
 
 bool InputRouter::SetMenuKey(int key) noexcept
@@ -225,10 +234,14 @@ bool InputRouter::HandleKeyTransition(int key,bool down) noexcept
             focused_.load() && GetForegroundWindow()==window_,
             Renderer::Get().AcceptingInput()))
             return false;
-        if (edge==KeyEdge::Release) {
+        if (edge==KeyEdge::Press) {
             if (key==VK_ESCAPE) {
                 recording_.store(false);
             } else if (plain && IsValidShortcut(key) && SetMenuKey(key)) {
+                // RAWINPUT/NOLEGACY can omit the translated WM_KEYUP for
+                // regular letter, OEM and numpad keys. Record the physical
+                // key-down rather than requiring a release to be delivered.
+                freshlyBoundKey_ = key;
                 RenderBridge::Get().LogInfo("m1core: overlay hotkey bound successfully");
                 recording_.store(false);
                 setup_.store(false);
@@ -236,6 +249,10 @@ bool InputRouter::HandleKeyTransition(int key,bool down) noexcept
                 RequestCursorSync();
             }
         }
+        return true;
+    }
+    if (freshlyBoundKey_ == key) {
+        if (edge == KeyEdge::Release) freshlyBoundKey_ = 0;
         return true;
     }
     if (hotkey_.load()!=0 && key==hotkey_.load() && plain) {
@@ -264,9 +281,18 @@ void InputRouter::ArmFirstRun() noexcept
 void InputRouter::Close() noexcept
 {
     if (!KeyAssigned()) firstRunArmed_.store(false);
+    freshlyBoundKey_ = 0;
     if (visible_.exchange(false) || setup_.exchange(false))
         popupDismiss_.store(true,std::memory_order_release);
     recording_.store(false);
+    RequestCursorSync();
+}
+
+void InputRouter::SuspendForGraphicsReset() noexcept
+{
+    // Do NOT call Close(): CET's CRenderGlobal::Resize resets D3D12 but
+    // preserves the overlay's toggled state and first-time binding.
+    // The renderer has already marked inputReady=false before this runs.
     RequestCursorSync();
 }
 
@@ -342,7 +368,8 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
     if (message==WM_KILLFOCUS ||
         (message==WM_ACTIVATEAPP && !wp)) {
         focused_.store(false);
-        recording_.store(false); // Never bind keys typed after returning from Alt+Tab.
+        recording_.store(false); // Suspend key capture during Alt+Tab.
+        freshlyBoundKey_ = 0;
         keysDown_.fill(false);
         ApplyEngineCursor(hwnd);
         Renderer::Get().CancelInput();
@@ -352,6 +379,7 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
         (message==WM_ACTIVATEAPP && wp)) {
         focused_.store(true);
         keysDown_.fill(false);
+        freshlyBoundKey_ = 0;
         if (setup_.load() && !KeyAssigned())
             recording_.store(true); // Resume first-run capture after Alt+Tab.
         Renderer::Get().ResumeInput();
