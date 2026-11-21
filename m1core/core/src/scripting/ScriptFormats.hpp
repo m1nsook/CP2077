@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
+#include <system_error>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -41,6 +42,52 @@ inline std::filesystem::path FindEntrypoint(const std::filesystem::path& root)
             return candidate;
     }
     return {};
+}
+
+// Discover in a stable order for predictable top-level mod initialization.
+// A missing/inaccessible mods directory must not terminate the host game;
+// per-mod path validation is still performed by ScriptStore.
+struct ModDiscovery
+{
+    std::vector<std::filesystem::path> directories{};
+    std::error_code error{};
+};
+
+inline ModDiscovery DiscoverModDirectories(const std::filesystem::path& root)
+{
+    ModDiscovery found;
+    std::error_code error;
+    std::filesystem::directory_iterator it(root, error);
+    const std::filesystem::directory_iterator end;
+    if (error)
+    {
+        found.error = error;
+        return found;
+    }
+
+    while (it != end)
+    {
+        std::error_code entryError;
+        // Preserve directory symlinks (used by some mod managers), while
+        // leaving path-containment checks to ScriptStore.
+        if (it->is_directory(entryError) || it->is_symlink(entryError))
+            found.directories.push_back(it->path());
+        if (entryError && !found.error)
+            found.error = entryError;
+
+        it.increment(error);
+        if (error)
+        {
+            found.error = error;
+            break;
+        }
+    }
+
+    std::sort(found.directories.begin(), found.directories.end(),
+              [](const auto& a, const auto& b) {
+                  return a.filename().native() < b.filename().native();
+              });
+    return found;
 }
 
 // Only known extensions count as an explicit format. An extensionless
