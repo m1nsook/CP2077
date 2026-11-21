@@ -28,6 +28,9 @@ void ScriptStore::LoadAll()
 
     const auto consoleLogger = spdlog::get("scripting");
 
+    std::size_t failedMods = 0;
+    std::size_t skippedMods = 0;
+
     const auto& cModsRoot = m_paths.ModsRoot();
     const auto discovery = m1core::scripts::DiscoverModDirectories(cModsRoot);
     if (discovery.error)
@@ -42,6 +45,7 @@ void ScriptStore::LoadAll()
         if (name == "cet")
         {
             consoleLogger->warn("Ignoring mod using reserved name! ('{}')", pathStr);
+            ++skippedMods;
             continue;
         }
 
@@ -53,15 +57,20 @@ void ScriptStore::LoadAll()
             if (path.empty())
             {
                 consoleLogger->error("Tried to access invalid directory! ('{}')", pathStr);
+                ++failedMods;
                 continue;
             }
 
             if (!is_directory(path))
+            {
+                ++skippedMods;
                 continue; // Could be a symlink to a file.
+            }
 
             if (m1core::scripts::FindEntrypoint(path).empty())
             {
                 consoleLogger->warn("Ignoring mod without init.m1s, init.lua or init.m1c! ('{}')", pathStr);
+                ++skippedMods;
                 continue;
             }
 
@@ -72,10 +81,14 @@ void ScriptStore::LoadAll()
                 consoleLogger->info("Mod {} loaded! ('{}')", name, pathStr);
             }
             else
+            {
+                ++failedMods;
                 consoleLogger->error("Mod {} failed to load! ('{}')", name, pathStr);
+            }
         }
         catch (const std::exception& error)
         {
+            ++failedMods;
             consoleLogger->error("Mod {} could not be loaded: {} ('{}')", name, error.what(), pathStr);
         }
     }
@@ -84,6 +97,8 @@ void ScriptStore::LoadAll()
         m_vkBinds.insert({contextIt.first, contextIt.second.GetBinds()});
 
     m_bindings.InitializeMods(m_vkBinds);
+    consoleLogger->info("m1core Lua mod scan: {} loaded, {} failed, {} skipped",
+                        m_contexts.size(), failedMods, skippedMods);
 }
 
 const VKBind* ScriptStore::GetBind(const VKModBind& acModBind) const

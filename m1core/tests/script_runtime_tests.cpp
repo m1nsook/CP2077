@@ -1,4 +1,5 @@
 #include "../core/src/scripting/ScriptFormats.hpp"
+#include "../core/src/scripting/LuaCallback.hpp"
 #include "../core/src/scripting/ScopedWorkingDirectory.hpp"
 #include <sol/sol.hpp>
 #include <filesystem>
@@ -129,6 +130,38 @@ int main(int argc, char** argv)
     REQUIRE(!vm.load("return 10", "@notbytecode.m1c", sol::load_mode::binary).valid());
     REQUIRE(!vm.load(compiled, "@masked.m1s", sol::load_mode::text).valid());
     fs::remove(temporary);
+    // This is the actual dispatcher called by ScriptContext, not a mock.
+    // One broken mod's event must not abort later callbacks.
+    std::cerr << "LuaJIT STEP 7: failed callback isolation and recovery" << std::endl;
+    int callbackErrors = 0;
+    std::string lastError;
+    const auto report = [&](const std::string& diagnostic) {
+        ++callbackErrors;
+        lastError = diagnostic;
+    };
+    vm.script(R"lua(
+        callback_count = 0
+        function m1core_good_update(dt) callback_count = callback_count + dt end
+        function m1core_bad_update() error("expected Lua mod callback error") end
+        function m1core_good_shutdown() callback_count = callback_count + 10 end
+    )lua");
+    sol::function goodUpdate = vm["m1core_good_update"];
+    sol::function badUpdate = vm["m1core_bad_update"];
+    sol::function goodShutdown = vm["m1core_good_shutdown"];
+    sol::function missingCallback;
+    REQUIRE(m1core::scripts::InvokeLuaCallback(missingCallback, report));
+    REQUIRE(callbackErrors == 0);
+    REQUIRE(!m1core::scripts::InvokeLuaCallback(badUpdate, report));
+    REQUIRE(callbackErrors == 1);
+    REQUIRE(lastError.find("expected Lua mod callback error") != std::string::npos);
+    REQUIRE(m1core::scripts::InvokeLuaCallback(goodUpdate, report, 2));
+    REQUIRE(m1core::scripts::InvokeLuaCallback(goodShutdown, report));
+    REQUIRE(vm["callback_count"].get<int>() == 12);
+    vm.script("function m1core_bad_update() callback_count = callback_count + 1 end");
+    sol::function recoveredUpdate = vm["m1core_bad_update"];
+    REQUIRE(m1core::scripts::InvokeLuaCallback(recoveredUpdate, report));
+    REQUIRE(vm["callback_count"].get<int>() == 13);
+    REQUIRE(callbackErrors == 1);
     std::cout << "m1core LuaJIT source, bytecode and module integration passed\n";
     return 0;
     }
