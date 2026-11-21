@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "Scripting.h"
 #include "reverse/BasicTypes.h"
 
@@ -97,7 +99,8 @@ private:
 
     bool m_initialized{false};
     bool m_drawBlocked{false};
-    bool m_reload{false};
+    // ImGui requests reload from a different thread than the native update.
+    std::atomic_bool m_reload{false};
 
     D3D12& m_d3d12;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastframe{std::chrono::high_resolution_clock::now()};
