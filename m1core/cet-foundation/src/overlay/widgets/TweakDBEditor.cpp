@@ -2,7 +2,7 @@
 
 #include "TweakDBEditor.h"
 
-#include <CET.h>
+#include <M1CoreRuntime.h>
 #include <Utils.h>
 
 #include <reverse/TweakDB/ResourcesList.h>
@@ -533,7 +533,7 @@ std::string TweakDBEditor::GetTweakDBIDStringRecord(RED4ext::TweakDBID aDBID)
 
 bool TweakDBEditor::GetTweakDBIDStringRecord(RED4ext::TweakDBID aDBID, std::string& aString)
 {
-    aString = CET::Get().GetVM().GetTDBIDString(aDBID);
+    aString = M1CoreRuntime::Get().GetVM().GetTDBIDString(aDBID);
     return !aString.starts_with('<') || !aString.ends_with('>');
 }
 
@@ -546,7 +546,7 @@ std::string TweakDBEditor::GetTweakDBIDStringFlat(RED4ext::TweakDBID aDBID)
 
 bool TweakDBEditor::GetTweakDBIDStringFlat(RED4ext::TweakDBID aDBID, std::string& aString)
 {
-    aString = CET::Get().GetVM().GetTDBIDString(aDBID);
+    aString = M1CoreRuntime::Get().GetVM().GetTDBIDString(aDBID);
     return !aString.starts_with('<') || !aString.ends_with('>');
 }
 
@@ -559,7 +559,7 @@ std::string TweakDBEditor::GetTweakDBIDStringQuery(RED4ext::TweakDBID aDBID)
 
 bool TweakDBEditor::GetTweakDBIDStringQuery(RED4ext::TweakDBID aDBID, std::string& aString)
 {
-    aString = CET::Get().GetVM().GetTDBIDString(aDBID);
+    aString = M1CoreRuntime::Get().GetVM().GetTDBIDString(aDBID);
     return aString[0] != '<' || aString[aString.size() - 1] != '>';
 }
 
@@ -1765,7 +1765,7 @@ void TweakDBEditor::CachedRecord::InitializeFlats()
         return;
 
     TiltedPhoques::Vector<uint64_t> recordFlats;
-    CET::Get().GetVM().GetTDBIDDerivedFrom(m_dbid.value, recordFlats);
+    M1CoreRuntime::Get().GetVM().GetTDBIDDerivedFrom(m_dbid.value, recordFlats);
     if (!recordFlats.empty())
     {
         m_flats.reserve(recordFlats.size());

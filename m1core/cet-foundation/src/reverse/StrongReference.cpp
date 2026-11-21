@@ -3,7 +3,7 @@
 #include "StrongReference.h"
 #include "RTTILocator.h"
 
-#include "CET.h"
+#include "M1CoreRuntime.h"
 
 static RTTILocator s_sIScriptableType{RED4ext::FNV1a64("IScriptable")};
 
@@ -35,7 +35,7 @@ StrongReference::StrongReference(
 StrongReference::~StrongReference()
 {
     // Nasty hack so that the Lua VM doesn't try to release game memory on shutdown
-    if (!CET::IsRunning())
+    if (!M1CoreRuntime::IsRunning())
     {
         m_strongHandle.instance = nullptr;
         m_strongHandle.refCount = nullptr;

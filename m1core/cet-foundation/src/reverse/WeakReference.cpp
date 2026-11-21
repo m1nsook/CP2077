@@ -3,7 +3,7 @@
 #include "WeakReference.h"
 #include "RTTILocator.h"
 
-#include "CET.h"
+#include "M1CoreRuntime.h"
 
 static RTTILocator s_sIScriptableType{RED4ext::FNV1a64("IScriptable")};
 
@@ -38,7 +38,7 @@ WeakReference::WeakReference(
 WeakReference::~WeakReference()
 {
     // Nasty hack so that the Lua VM doesn't try to release game memory on shutdown
-    if (!CET::IsRunning())
+    if (!M1CoreRuntime::IsRunning())
     {
         m_weakHandle.instance = nullptr;
         m_weakHandle.refCount = nullptr;

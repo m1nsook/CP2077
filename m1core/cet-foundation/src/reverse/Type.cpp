@@ -2,7 +2,7 @@
 
 #include "Type.h"
 #include "RTTIHelper.h"
-#include "CET.h"
+#include "M1CoreRuntime.h"
 
 #include <spdlog/fmt/fmt.h>
 
@@ -295,7 +295,7 @@ UnknownType::UnknownType(UnknownType&& aOther) noexcept
 
 UnknownType::~UnknownType()
 {
-    if (m_pInstance && CET::IsRunning())
+    if (m_pInstance && M1CoreRuntime::IsRunning())
     {
         m_pType->Destruct(m_pInstance);
         m_pType->GetAllocator()->Free(m_pInstance);

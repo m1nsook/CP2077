@@ -2,7 +2,7 @@
 
 #include "TweakDB.h"
 
-#include <CET.h>
+#include <M1CoreRuntime.h>
 #include <reverse/WeakReference.h>
 #include <reverse/StrongReference.h>
 #include <reverse/RTTIMapper.h>
@@ -159,7 +159,7 @@ bool TweakDB::SetFlatByNameAutoUpdate(const std::string& acFlatName, sol::option
     const TweakDBID dbid(acFlatName);
     if (SetOrCreateFlat(dbid, aObject.value_or(sol::nil), acFlatName, "", logger))
     {
-        const uint64_t recordDBID = CET::Get().GetVM().GetTDBIDBase(dbid.value);
+        const uint64_t recordDBID = M1CoreRuntime::Get().GetVM().GetTDBIDBase(dbid.value);
         if (recordDBID != 0)
             UpdateRecordByID(recordDBID);
 
@@ -176,7 +176,7 @@ bool TweakDB::SetFlatAutoUpdate(TweakDBID aDBID, sol::optional<sol::object> aObj
 
     if (SetOrCreateFlat(aDBID, aObject.value_or(sol::nil), "", "", logger))
     {
-        const uint64_t recordDBID = CET::Get().GetVM().GetTDBIDBase(aDBID.value);
+        const uint64_t recordDBID = M1CoreRuntime::Get().GetVM().GetTDBIDBase(aDBID.value);
         if (recordDBID != 0)
             UpdateRecordByID(recordDBID);
 
@@ -344,7 +344,7 @@ bool TweakDB::SetOrCreateFlat(
     }
 
     if (!acFlatName.empty())
-        CET::Get().GetVM().RegisterTDBIDString(aDBID.value, 0, acFlatName);
+        M1CoreRuntime::Get().GetVM().RegisterTDBIDString(aDBID.value, 0, acFlatName);
 
     return true;
 }
@@ -568,7 +568,7 @@ bool TweakDB::InternalCloneRecord(
         return false;
     }
 
-    auto& vm = CET::Get().GetVM();
+    auto& vm = M1CoreRuntime::Get().GetVM();
     vm.RegisterTDBIDString(recordDBID, 0, acRecordName);
 
     return InternalCloneFlats(recordDBID, acClonedRecord, cloneValues, acpLogger);
@@ -593,7 +593,7 @@ bool TweakDB::InternalCloneRecord(TweakDBID aDBID, const RED4ext::gamedataTweakD
 bool TweakDB::InternalCloneFlats(RED4ext::TweakDBID aDBID, const RED4ext::gamedataTweakDBRecord* acClonedRecord, bool cloneValues, const std::shared_ptr<spdlog::logger>& acpLogger)
 {
     auto* pTDB = RED4ext::TweakDB::Get();
-    auto& vm = CET::Get().GetVM();
+    auto& vm = M1CoreRuntime::Get().GetVM();
 
     // List of flats the game tried to read for our record
     TiltedPhoques::Vector<uint64_t> recordFlatIDs;
@@ -672,7 +672,7 @@ bool TweakDB::InternalDeleteRecord(RED4ext::TweakDBID aDBID, const std::shared_p
         return false; // shouldn't happen
     }
 
-    auto& vm = CET::Get().GetVM();
+    auto& vm = M1CoreRuntime::Get().GetVM();
     TiltedPhoques::Vector<uint64_t> recordFlats;
     vm.GetTDBIDDerivedFrom(aDBID, recordFlats);
     for (const auto& flatID : recordFlats)
@@ -701,5 +701,5 @@ bool TweakDB::IsACreatedRecord(RED4ext::TweakDBID aDBID)
 
 std::string TweakDB::GetTDBIDString(uint64_t aDBID)
 {
-    return CET::Get().GetVM().GetTDBIDString(aDBID);
+    return M1CoreRuntime::Get().GetVM().GetTDBIDString(aDBID);
 }

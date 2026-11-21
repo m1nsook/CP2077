@@ -1,6 +1,6 @@
 #include <stdafx.h>
 
-#include <CET.h>
+#include <M1CoreRuntime.h>
 #include <scripting/GameOptions.h>
 
 using TGameOptionInit = void*(void*);
@@ -9,7 +9,7 @@ TGameOptionInit* RealGameOptionInit = nullptr;
 void* HookGameOptionInit(GameOption* apThis)
 {
     auto& gameOptions = GameOptions::GetList();
-    auto& options = CET::Get().GetOptions();
+    auto& options = M1CoreRuntime::Get().GetOptions();
 
     if (std::ranges::find(gameOptions, apThis) == gameOptions.end())
     {
