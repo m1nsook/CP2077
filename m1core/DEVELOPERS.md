@@ -167,6 +167,8 @@ update, not inside the ImGui render pass. m1core calls registered
 handles, discovers entrypoints again, and invokes the new `onInit`
 callbacks. This avoids having to restart the game during script development.
 
+Lua lifecycle callbacks are fault-isolated: a callback that raises a Lua or C++ exception is logged without aborting other scripts' update/draw events. The ImGui style and the framework's ImGui-permission flag are restored after each mod's draw/tooltip callback, including exceptional exits. This does not undo game-side effects; use `onShutdown` as described below.
+
 A mod that changes game state should use
 `registerForEvent("onShutdown", function() ... end)` to undo **its own**
 temporary modifications. m1core cannot automatically revert arbitrary
