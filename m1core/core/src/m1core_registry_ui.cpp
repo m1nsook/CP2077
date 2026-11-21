@@ -840,15 +840,29 @@ void DrawNativeRegistryUI()
         // the missing margins seen in the first user screenshot.
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(12,16));
         ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(24,25,28));
-        if (ImGui::BeginChild("##app-sidebar",ImVec2(kNavWidth,0),
-            ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
-            ImGuiWindowFlags_NoScrollbar))
+        // AFTER.html: the sidebar is one square, flush panel, NOT a
+        // rounded bordered card. Override rounding only for BeginChild;
+        // immediately restore it so the nav selection and profile card
+        // keep their own intended rounded corners.
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding,0.0f);
+        const bool sidebarVisible = ImGui::BeginChild("##app-sidebar",ImVec2(kNavWidth,0),
+            ImGuiChildFlags_AlwaysUseWindowPadding,ImGuiWindowFlags_NoScrollbar);
+        ImGui::PopStyleVar();
+        if (sidebarVisible)
         {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(4,4));
             DrawSidebar();
             ImGui::PopStyleVar();
         }
         ImGui::EndChild();
+        // A single straight divider matches the mockup and avoids the
+        // partial rounded border segments in the in-game screenshots.
+        const ImVec2 sidebarMin = ImGui::GetItemRectMin();
+        const ImVec2 sidebarMax = ImGui::GetItemRectMax();
+        const float dividerX = sidebarMax.x - 0.5f;
+        ImGui::GetWindowDrawList()->AddLine(
+            ImVec2(dividerX,sidebarMin.y),ImVec2(dividerX,sidebarMax.y),
+            IM_COL32(42,44,49,255),1.0f);
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
         ImGui::SameLine(0,0);

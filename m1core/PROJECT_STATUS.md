@@ -106,6 +106,13 @@ Only work on the m1core development branch and draft PR unless explicitly author
 - **Automated integration (CI PASS):** `m1core_weight_limit_tests` compiled genuine LuaJIT bytecode and executed both Lua variants against the native settings registry with a **mocked** game player/StatsSystem, checking registration, default value, live changes, disable, no stacking and cleanup. [CI #44923777522](https://github.com/m1nsook/CP2077/actions/runs/44923777522) logs confirm both variants passed. **User confirmed the sample mod works in Cyberpunk**, without specifying whether the installed variant was source or bytecode. Only the *other format if untested* and deeper script reload/lifecycle cases remain to verify.
 - **Gameplay acceptance (user-confirmed):** Weight Limit **registers, applies and updates live in-game**. The user explicitly reported immediate capacity changes after adjusting settings; no restart or reload is needed. These core Weight Limit behaviors are complete and **must not be tested again**. The exact loaded script format was not specified, so separate in-game `.m1c` coverage and script reload/reset edge cases remain unverified. No merge without approval.
 
+## AFTER.html square sidebar border correction — 2026-11-21
+
+- User confirmed the screenshot correction broadly but flagged that the **sidebar panel itself is rounded**, unlike `AFTER.html`. The sidebar should be flat, square and flush beneath the titlebar; **selected navigation entries and the bottom Active Profile card remain rounded**.
+- Cause: the root renderer applies `ImGuiStyleVar_ChildRounding = 8` globally and creates `##app-sidebar` using `ImGuiChildFlags_Borders`. This made the entire sidebar a rounded bordered card and left unwanted border fragments near its top/right.
+- Fix: set child rounding to **0 only while entering the sidebar child**, remove the child Border flag while preserving `ImGuiChildFlags_AlwaysUseWindowPadding`, restore rounding immediately after `BeginChild` for nested elements, and draw **one straight 1px separator on the right edge** instead of the full rounded border. No new controls or input/renderer changes, no CSS/shadows.
+- The correction needs native Windows CI and a targeted in-game visual look. Do not retest already confirmed settings/keybindings/logs/navigation behavior. PR #41 stays draft and unmerged.
+
 ## AFTER.html in-game screenshot fidelity correction — 2026-11-21
 
 - User supplied **two new screenshots**: current in-game M1CORE versus `AFTER.html`; explicitly rejected the first native translation because the overall appearance was not close. **Do not treat the first native build as visually accepted** just because it compiled.
