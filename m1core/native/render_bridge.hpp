@@ -4,6 +4,7 @@
 #include <RED4ext/Api/v1/Sdk.hpp>
 
 #include <Windows.h>
+#include <atomic>
 #include <cstdint>
 
 struct IDXGISwapChain4;
@@ -31,6 +32,8 @@ public:
                  const RED4ext::v1::Sdk* sdk) noexcept;
     void Uninstall() noexcept;
     [[nodiscard]] bool Installed() const noexcept { return presentAddress_ != nullptr; }
+    void LogInfo(const char* message) const noexcept;
+    void LogWarn(const char* message) const noexcept;
     static RenderBridge& Get() noexcept;
 private:
     using PresentFn = void* (*)(std::int32_t*,std::uint8_t,UINT);
@@ -48,5 +51,7 @@ private:
     PresentFn originalPresent_ = nullptr;
     ResizeFn originalResize_ = nullptr;
     ShutdownFn originalShutdown_ = nullptr;
+    std::atomic_bool sawValidFrame_{false};
+    std::atomic_bool warnedNoFrame_{false};
 };
 } // namespace m1core

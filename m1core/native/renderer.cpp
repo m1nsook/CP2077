@@ -133,6 +133,7 @@ bool Renderer::Initialize(const GameFrame& source) noexcept
         return false;
     }
     initialized_ = true;
+    RenderBridge::Get().LogInfo("m1core: ImGui Win32/DX12 backends initialized");
     return true;
 }
 
@@ -207,8 +208,11 @@ void Renderer::Present(const GameFrame& source) noexcept
         lastSubmittedAt_ = GetTickCount64();
         // First successful submitted frame enables HWND capture and the
         // REDengine cursor. The notification is delivered on its own thread.
-        if (!inputReady_.exchange(true, std::memory_order_acq_rel))
+        if (!inputReady_.exchange(true, std::memory_order_acq_rel)) {
+            RenderBridge::Get().LogInfo("m1core: first ImGui frame submitted");
             InputRouter::Get().RequestCursorSync();
+        }
+        InputRouter::Get().RetryCursorSync();
     } else {
         // A failed GPU submission must not strand keyboard or mouse input.
         inputReady_.store(false, std::memory_order_release);

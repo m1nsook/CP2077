@@ -79,6 +79,22 @@ not CET code or a CET runtime requirement. M1CORE's render-thread UI is
 still a difference from CET's main-thread UI preparation plus draw-buffer
 staging and needs in-game compatibility evaluation.
 
+### First-run input recovery (November 21)
+
+User confirmed game startup still worked but the first-run menu appeared
+only after repeated focus changes, and keyboard input was not usable.
+The old implementation required clicking a **Bind menu key** button
+before recording, and also permanently closed setup if REDengine's
+ForceCursor was temporarily unavailable during initialization.
+
+The revised setup records the first valid key directly, automatically
+resumes recording after focus restoration, retries acquiring the native
+cursor on subsequent valid Present frames, and never captures game input
+without owning the cursor and an initialized ImGui renderer. RED4ext logs
+explicit milestones for render hook installation, discovery of
+swapchain/queue/HWND, ImGui backend initialization, first draw submission,
+and cursor acquire/release. No startup key guessing or CET runtime.
+
 The game symbol hashes and render-layout offsets must be verified against
 the target Cyberpunk build. Unknown symbols must leave the plugin inert
 rather than terminating Cyberpunk. Native compilation and unit tests are

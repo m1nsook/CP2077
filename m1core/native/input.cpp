@@ -101,6 +101,9 @@ bool InputRouter::Install(HWND hwnd) noexcept
     }
     window_=hwnd;
     firstRunArmed_.store(false);
+    engineCursorHeld_.store(false);
+    lastCursorRetry_.store(0);
+    loggedCursorUnavailable_ = false;
     keysDown_.fill(false);
     focused_.store(GetForegroundWindow()==hwnd);
     ReloadKeyFromDisk();
@@ -118,7 +121,7 @@ void InputRouter::Uninstall() noexcept
     recording_.store(false);
     focused_.store(false);
     keysDown_.fill(false);
-    if (IsWindow(window_) && engineCursorHeld_) {
+    if (IsWindow(window_) && CursorHeld()) {
         const DWORD ownerThread = GetWindowThreadProcessId(window_,nullptr);
         if (ownerThread == GetCurrentThreadId()) {
             ApplyEngineCursor(window_);
@@ -184,6 +187,11 @@ bool InputRouter::HandleKeyTransition(int key,bool down) noexcept
                        (GetKeyState(VK_CONTROL)&0x8000)==0 &&
                        (GetKeyState(VK_SHIFT)&0x8000)==0;
     if (recording_.load()) {
+        // Never eat first-run keys while the native cursor is unavailable.
+        if (!CanCaptureInput(visible_.load() || setup_.load(),
+            focused_.load() && GetForegroundWindow()==window_,
+            Renderer::Get().AcceptingInput()) || !CursorHeld())
+            return false;
         if (edge==KeyEdge::Release) {
             if (key==VK_ESCAPE) {
                 recording_.store(false);
@@ -212,6 +220,8 @@ void InputRouter::ArmFirstRun() noexcept
     // Match CET's post-initialization first-run behavior without ever
     // hijacking the game's Enter/Space/Tab startup keys.
     setup_.store(true);
+    recording_.store(true); // Keyboard works immediately; no mouse click required.
+    RenderBridge::Get().LogInfo("m1core: first-run setup armed for direct key capture");
     RequestCursorSync();
 }
 
@@ -229,24 +239,44 @@ void InputRouter::RequestCursorSync() noexcept
         PostMessageW(window_,kCursorSyncMessage,0,0);
 }
 
+void InputRouter::RetryCursorSync() noexcept
+{
+    if (!ShouldDraw() || CursorHeld() ||
+        !Renderer::Get().AcceptingInput()) return;
+    const auto now = GetTickCount64();
+    auto previous = lastCursorRetry_.load();
+    if (now - previous < 350 ||
+        !lastCursorRetry_.compare_exchange_strong(previous,now))
+        return;
+    RequestCursorSync();
+}
+
 void InputRouter::ApplyEngineCursor(HWND hwnd) noexcept
 {
     const bool desired=CanCaptureInput(visible_.load() || setup_.load(),
          focused_.load() && GetForegroundWindow()==hwnd,
          Renderer::Get().AcceptingInput());
-    if (desired==engineCursorHeld_) return;
+    if (desired==CursorHeld()) return;
     const auto address=ResolveGameSymbol(kGameForceCursor);
     auto* engine=RED4ext::CGameEngine::Get();
     if (!address || !engine || !engine->unkD0) {
-        // A broken/unavailable engine cursor must never trap keyboard input.
-        visible_.store(false);
-        setup_.store(false);
-        recording_.store(false);
+        // During early initialization the game engine may not yet have a
+        // cursor system. Do not permanently dismiss first-run setup:
+        // the next valid Present will retry without consuming game input.
+        if (!loggedCursorUnavailable_) {
+            RenderBridge::Get().LogWarn(
+                "m1core: game cursor not ready; waiting without capturing input");
+            loggedCursorUnavailable_ = true;
+        }
         return;
     }
     const auto cursor=reinterpret_cast<CursorFn>(address);
     cursor(engine->unkD0,kCursorReason,desired);
-    engineCursorHeld_=desired;
+    engineCursorHeld_.store(desired);
+    loggedCursorUnavailable_ = false;
+    RenderBridge::Get().LogInfo(desired ?
+        "m1core: native cursor acquired; input capture enabled" :
+        "m1core: native cursor released");
 }
 
 LRESULT CALLBACK InputRouter::WindowProc(HWND hwnd,UINT message,
@@ -279,6 +309,9 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
     if (message==WM_SETFOCUS ||
         (message==WM_ACTIVATEAPP && wp)) {
         focused_.store(true);
+        keysDown_.fill(false);
+        if (setup_.load() && !KeyAssigned())
+            recording_.store(true); // Resume first-run capture after Alt+Tab.
         Renderer::Get().ResumeInput();
         RequestCursorSync();
         return next();
@@ -323,7 +356,7 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
     }
 
     if (CanCaptureInput(visible_.load() || setup_.load(),foreground,
-                        Renderer::Get().AcceptingInput()) &&
+                        Renderer::Get().AcceptingInput()) && CursorHeld() &&
         (IsKeyboardMessage(message) || IsMouseMessage(message) ||
          message==WM_INPUT)) {
         Renderer::Get().ForwardInput(hwnd,message,wp,lp);

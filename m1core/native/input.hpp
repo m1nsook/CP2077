@@ -55,6 +55,9 @@ public:
     [[nodiscard]] bool KeyAssigned() const noexcept { return hotkey_.load() != 0; }
     [[nodiscard]] std::string KeyDescription() const;
     [[nodiscard]] bool Recording() const noexcept { return recording_.load(); }
+    [[nodiscard]] bool CursorHeld() const noexcept { return engineCursorHeld_.load(); }
+    // Called only on the game render callback while a native UI is wanted.
+    void RetryCursorSync() noexcept;
     void BeginKeyCapture() noexcept;
     // Called after ImGui/DX12 backends initialize, not from a startup key.
     void ArmFirstRun() noexcept;
@@ -78,7 +81,9 @@ private:
     std::atomic_bool setup_{false};
     std::atomic_bool recording_{false};
     std::atomic<int> hotkey_{0};
-    bool engineCursorHeld_ = false;
+    std::atomic_bool engineCursorHeld_{false};
+    std::atomic<std::uint64_t> lastCursorRetry_{0};
+    bool loggedCursorUnavailable_ = false;
     std::array<bool,256> keysDown_{};
     std::atomic_bool firstRunArmed_{false};
 };

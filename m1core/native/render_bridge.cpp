@@ -119,6 +119,17 @@ RenderBridge& RenderBridge::Get() noexcept
     return instance;
 }
 
+void RenderBridge::LogInfo(const char* message) const noexcept
+{
+    if (sdk_ && sdk_->logger && sdk_->logger->Info)
+        sdk_->logger->Info(handle_,message);
+}
+void RenderBridge::LogWarn(const char* message) const noexcept
+{
+    if (sdk_ && sdk_->logger && sdk_->logger->Warn)
+        sdk_->logger->Warn(handle_,message);
+}
+
 bool RenderBridge::Install(RED4ext::v1::PluginHandle handle,
                            const RED4ext::v1::Sdk* sdk) noexcept
 {
@@ -128,7 +139,12 @@ bool RenderBridge::Install(RED4ext::v1::PluginHandle handle,
     const auto present = ResolveGameSymbol(kGpuPresent);
     const auto resize = ResolveGameSymbol(kGpuResize);
     const auto shutdown = ResolveGameSymbol(kGpuShutdown);
-    if (!present || !resize || !shutdown) return false;
+    if (!present || !resize || !shutdown) {
+        // Keep diagnostics available even if game symbols changed.
+        handle_ = handle; sdk_ = sdk;
+        LogWarn("m1core: missing RED4ext render symbol; overlay not installed");
+        return false;
+    }
 
     handle_ = handle;
     sdk_ = sdk;
@@ -151,6 +167,7 @@ bool RenderBridge::Install(RED4ext::v1::PluginHandle handle,
         Uninstall();
         return false;
     }
+    LogInfo("m1core: RED4ext Present/Resize/Shutdown hooks installed");
     return true;
 }
 
@@ -173,6 +190,8 @@ void RenderBridge::Uninstall() noexcept
     resizeAddress_ = nullptr;
     shutdownAddress_ = nullptr;
     sdk_ = nullptr;
+    sawValidFrame_.store(false);
+    warnedNoFrame_.store(false);
 }
 
 void* RenderBridge::OnPresent(std::int32_t* deviceIndex,
@@ -182,11 +201,15 @@ void* RenderBridge::OnPresent(std::int32_t* deviceIndex,
     if (deviceIndex && bridge.originalPresent_) {
         const auto frame = DiscoverGameFrame(*deviceIndex);
         if (frame.window) {
+            if (!bridge.sawValidFrame_.exchange(true))
+                bridge.LogInfo("m1core: game swapchain/queue/HWND discovered");
             // A passive HWND listener doesn't create an ImGui context,
             // allocate a GPU resource, or capture any startup input.
             if (InputRouter::Get().Install(frame.window) &&
                 GetForegroundWindow() == frame.window)
                 Renderer::Get().Present(frame);
+        } else if (!bridge.warnedNoFrame_.exchange(true)) {
+            bridge.LogWarn("m1core: Present hook active but game frame not discovered");
         }
     }
     return bridge.originalPresent_ ?
