@@ -15,6 +15,7 @@ namespace m1core {
 namespace {
 constexpr UINT kShaderDescriptors = 32;
 constexpr DWORD kGpuResetTimeoutMs = 1000;
+constexpr DWORD kInputStallTimeoutMs = 2000;
 
 void AllocateDescriptor(ImGui_ImplDX12_InitInfo* info,
                         D3D12_CPU_DESCRIPTOR_HANDLE* cpu,
@@ -101,14 +102,16 @@ bool Renderer::Initialize(const GameFrame& source) noexcept
     fenceEvent_ = CreateEventW(nullptr,FALSE,FALSE,nullptr);
     if (!fenceEvent_) { Release(); return false; }
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ownsContext_ = true;
-    ImGui::StyleColorsDark();
-    // Use standard Dear ImGui dark styling; only cursor ownership remains
-    // explicitly configured because Cyberpunk supplies the physical cursor.
-    ImGui::GetIO().MouseDrawCursor = false; // Always one: engine's real cursor
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+    // Retain UI window state across ordinary swapchain resize, as CET does.
+    // The context is destroyed only on actual plugin/game shutdown.
+    if (!ownsContext_) {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ownsContext_ = true;
+        ImGui::StyleColorsDark();
+        ImGui::GetIO().MouseDrawCursor = false;
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+    }
 
     if (!ImGui_ImplWin32_Init(gameWindow_)) { Release(); return false; }
     imguiWin32_ = true;
@@ -147,16 +150,29 @@ void Renderer::Present(const GameFrame& source) noexcept
     std::lock_guard lock(mutex_);
     if (!IsWindow(source.window) || GetForegroundWindow() != source.window)
         return;
+    // Initialize on the game's Present callback even with the menu hidden,
+    // but never trap input just because a graphics context exists.
     if (!initialized_ && !Initialize(source)) return;
+    InputRouter::Get().ArmFirstRun();
     if (source.swapchain != swapchain_.Get() || source.queue != queue_.Get() ||
         source.window != gameWindow_) {
         Reset();
         return;
     }
+    if (!InputRouter::Get().ShouldDraw()) return;
     const UINT index = swapchain_->GetCurrentBackBufferIndex();
     if (index >= buffers_.size()) return;
     auto& frame = buffers_[index];
-    if (!FrameReady(frame)) return;
+    if (!FrameReady(frame)) {
+        if (inputReady_.load(std::memory_order_acquire) &&
+            lastSubmittedAt_ && GetTickCount64() - lastSubmittedAt_ >
+                                  kInputStallTimeoutMs) {
+            // Stalled GPU must never permanently trap game controls.
+            inputReady_.store(false, std::memory_order_release);
+            InputRouter::Get().Close();
+        }
+        return;
+    }
 
     // Both backend NewFrame calls and all ImGui UI drawing stay on the
     // renderer thread; Win32 messages are forwarded through the same mutex.
@@ -188,6 +204,7 @@ void Renderer::Present(const GameFrame& source) noexcept
     queue_->ExecuteCommandLists(1,commands);
     if (SUCCEEDED(queue_->Signal(fence_.Get(),++nextFence_))) {
         frame.submittedFence = nextFence_;
+        lastSubmittedAt_ = GetTickCount64();
         // First successful submitted frame enables HWND capture and the
         // REDengine cursor. The notification is delivered on its own thread.
         if (!inputReady_.exchange(true, std::memory_order_acq_rel))
@@ -232,11 +249,11 @@ bool Renderer::FlushGpu() noexcept
     return WaitForSingleObject(fenceEvent_,kGpuResetTimeoutMs) == WAIT_OBJECT_0;
 }
 
-void Renderer::Release() noexcept
+void Renderer::Release(bool destroyContext) noexcept
 {
     // Fail open immediately, even if GPU teardown must wait.
-    inputReady_.store(false, std::memory_order_release);
-    InputRouter::Get().RequestCursorSync();
+    if (inputReady_.exchange(false, std::memory_order_acq_rel))
+        InputRouter::Get().RequestCursorSync();
     // The passive input listener survives a resize, allowing user hotkeys
     // to work after device reinitialization without hooking the HWND again.
     // The bridge uninstalls it on actual game/plugin shutdown.
@@ -250,7 +267,10 @@ void Renderer::Release() noexcept
     }
     if (imguiDx12_) { ImGui_ImplDX12_Shutdown(); imguiDx12_ = false; }
     if (imguiWin32_) { ImGui_ImplWin32_Shutdown(); imguiWin32_ = false; }
-    if (ownsContext_) { ImGui::DestroyContext(); ownsContext_ = false; }
+    if (ownsContext_ && destroyContext) {
+        ImGui::DestroyContext();
+        ownsContext_ = false;
+    }
     buffers_.clear();
     commandList_.Reset();
     renderTargets_.Reset();
@@ -263,6 +283,7 @@ void Renderer::Release() noexcept
     descriptorIncrement_ = 0;
     resourceIncrement_ = 0;
     nextFence_ = 0;
+    lastSubmittedAt_ = 0;
     gameWindow_ = nullptr;
     initialized_ = false;
 }
@@ -275,6 +296,7 @@ void Renderer::Reset() noexcept
 
 void Renderer::Shutdown() noexcept
 {
-    Reset();
+    std::lock_guard lock(mutex_);
+    Release(true);
 }
 } // namespace m1core

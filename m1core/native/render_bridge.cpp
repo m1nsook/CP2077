@@ -185,8 +185,7 @@ void* RenderBridge::OnPresent(std::int32_t* deviceIndex,
             // A passive HWND listener doesn't create an ImGui context,
             // allocate a GPU resource, or capture any startup input.
             if (InputRouter::Get().Install(frame.window) &&
-                GetForegroundWindow() == frame.window &&
-                InputRouter::Get().ShouldDraw())
+                GetForegroundWindow() == frame.window)
                 Renderer::Get().Present(frame);
         }
     }

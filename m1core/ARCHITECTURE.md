@@ -57,6 +57,27 @@ replace the CET-dependent prototype, not augment it:
 - \`native/plugin.cpp\`: new native RED4ext RTTI access to register, read,
   write and reset settings. **No CET Lua files or CET installation.**
 
+### CET source audit (November 21, 2026)
+
+Compared independently against `maximegmd/CyberEngineTweaks` master:
+`src/window/window.cpp`, `src/d3d12/D3D12.cpp`,
+`src/d3d12/D3D12_Hooks.cpp`, `D3D12_Functions.cpp`,
+`src/VKBindings.cpp`, `src/overlay/Overlay.cpp`, and
+`src/reverse/RenderContext.h`. CET constructs its ImGui backend from the
+render Present lifecycle, enables gameplay input trapping only when the
+overlay is active, and starts first-time binding after initialization.
+On resize, CET resets backends without destroying the ImGui context.
+Its overlay uses ordinary ImGui windows and a passthrough dockspace; it
+does not require a hand-drawn fullscreen darkening layer.
+
+M1CORE now passively initializes on a valid Present without swallowing
+startup keys, explicitly arms first-run setup after backend initialization,
+retains its ImGui context across resize, and drops input ownership when GPU
+frames stall. These are independently written RED4ext/ImGui integrations,
+not CET code or a CET runtime requirement. M1CORE's render-thread UI is
+still a difference from CET's main-thread UI preparation plus draw-buffer
+staging and needs in-game compatibility evaluation.
+
 The game symbol hashes and render-layout offsets must be verified against
 the target Cyberpunk build. Unknown symbols must leave the plugin inert
 rather than terminating Cyberpunk. Native compilation and unit tests are

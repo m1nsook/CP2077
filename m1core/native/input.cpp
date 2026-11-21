@@ -16,7 +16,6 @@ namespace {
 constexpr std::uint32_t kGameForceCursor = 2130646213u;
 using CursorFn = void (*)(RED4ext::CBaseEngine::UnkD0*,RED4ext::CName,bool);
 constexpr RED4ext::CName kCursorReason("m1core_UI");
-constexpr DWORD kBootstrapAfterMs = 12000;
 
 bool IsKeyboardMessage(UINT message) noexcept
 {
@@ -103,8 +102,7 @@ bool InputRouter::Install(HWND hwnd) noexcept
         return false;
     }
     window_=hwnd;
-    mountedAt_=GetTickCount64();
-    sawStartupKey_=false;
+    firstRunArmed_.store(false);
     focused_.store(GetForegroundWindow()==hwnd);
     ReloadKeyFromDisk();
     visible_.store(false);
@@ -174,6 +172,15 @@ void InputRouter::BeginKeyCapture() noexcept
 {
     recording_.store(true);
     if (!visible_.load()) setup_.store(true);
+    RequestCursorSync();
+}
+
+void InputRouter::ArmFirstRun() noexcept
+{
+    if (KeyAssigned() || firstRunArmed_.exchange(true)) return;
+    // Match CET's post-initialization first-run behavior without ever
+    // hijacking the game's Enter/Space/Tab startup keys.
+    setup_.store(true);
     RequestCursorSync();
 }
 
@@ -298,16 +305,6 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
             visible_.store(!visible_.load());
             RequestCursorSync();
             return 1;
-        }
-        // Bootstrap only AFTER game input has already been passed through.
-        // Never steal the "Press any key to start" input during startup.
-        if (!assigned && !setup_.load() &&
-            GetTickCount64()-mountedAt_ >= kBootstrapAfterMs &&
-            (key==VK_RETURN || key==VK_SPACE || key==VK_TAB)) {
-            setup_.store(true);
-            sawStartupKey_=true;
-            RequestCursorSync();
-            return next();
         }
     }
 

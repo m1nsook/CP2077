@@ -38,12 +38,13 @@ private:
         std::uint64_t submittedFence = 0;
     };
     bool Initialize(const GameFrame& frame) noexcept;
-    void Release() noexcept;
+    void Release(bool destroyContext = false) noexcept;
     [[nodiscard]] bool FrameReady(FrameBuffer& frame) noexcept;
     [[nodiscard]] bool FlushGpu() noexcept;
 
     std::recursive_mutex mutex_;
     std::atomic_bool inputReady_{false};
+    std::uint64_t lastSubmittedAt_ = 0;
     HWND gameWindow_ = nullptr;
     Microsoft::WRL::ComPtr<IDXGISwapChain4> swapchain_;
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> queue_;

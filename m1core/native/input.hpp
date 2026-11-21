@@ -46,6 +46,8 @@ public:
     [[nodiscard]] std::string KeyDescription() const;
     [[nodiscard]] bool Recording() const noexcept { return recording_.load(); }
     void BeginKeyCapture() noexcept;
+    // Called after ImGui/DX12 backends initialize, not from a startup key.
+    void ArmFirstRun() noexcept;
     void Close() noexcept;
     void RequestCursorSync() noexcept;
 private:
@@ -65,7 +67,6 @@ private:
     std::atomic_bool recording_{false};
     std::atomic<int> hotkey_{0};
     bool engineCursorHeld_ = false;
-    std::uint64_t mountedAt_ = 0;
-    bool sawStartupKey_ = false;
+    std::atomic_bool firstRunArmed_{false};
 };
 } // namespace m1core
