@@ -39,6 +39,47 @@ Profiles contain the saved values for **all mods**, including mods that are curr
 
 The native settings store is **separate** from the runtime's own `config.json`, `bindings.json`, and `persistent.json`. Do not replace or delete those files to configure another mod.
 
+## Lua mod hotkeys and inputs
+
+**Already implemented in m1core's Lua scripting runtime** (not merely a
+planned API): every Lua script mod can register its own hotkeys and key-down /
+key-up inputs at load time, using the existing m1core Win32 input capture
+system. In `init.m1s` or `init.m1c`:
+
+```lua
+registerHotkey("toggle_feature", "Toggle feature", "Press to toggle the feature", function()
+    print("My mod hotkey pressed")
+end)
+
+registerInput("hold_feature", "Hold feature", "Runs on key down and key up", function(isDown)
+    print("Held:", isDown)
+end)
+```
+
+`registerHotkey(id, displayName, description, callback)` fires on a
+completed key combination (up to four keys).
+`registerInput(id, displayName, description, callback)` reports
+key press/release as a boolean. The three-argument forms
+`(id, displayName, callback)` are also accepted. Register these at
+**top level during the mod's entrypoint**: registration functions are
+intentionally unavailable once the entry script has loaded.
+
+The framework namespaces binds by the mod's directory name and
+the callback's unique `id`, and stores the user's assignments in
+`red4ext/plugins/m1core/bindings.json`. Each mod's name and actions
+are displayed in **Keybinds → Registered mod keybinds**; select
+**Configure keybinds** to open the existing full key capture editor with
+Save and Reset Changes. Mods should **not** hook Windows key events or
+replace m1core's raw input/backend themselves.
+
+**Scope:** this registration API currently exists for Lua `.m1s`,
+`.m1c` and `.lua` mods via `ScriptContext`. The native REDscript/RTTI
+`M1Core_*` interface currently registers **settings only**; it does
+**not yet** provide a native callback-registration ABI for arbitrary
+REDscript/C++ mods' hotkeys. Do not claim that it does. The new in-tab
+listing/launcher uses the already-existing Lua binding engine; actual
+user gameplay verification of third-party keybinds is still pending.
+
 ## Development / compatibility
 
 The m1core native input, graphics and hotkey runtime is intentionally separate from the JSON settings registry. Mod settings must never hook or capture Windows input themselves. The project is not released; function registration and gameplay interaction still require validation with a consuming mod before other developers rely on this ABI. The existing internal hotkey persistence key keeps its historical value for backward compatibility even though the visible UI is called m1core.

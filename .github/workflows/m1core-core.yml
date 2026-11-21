@@ -95,6 +95,21 @@ jobs:
               $uiColors -notmatch '0.65f, 0.20f') {
             throw "m1core title/amber warning style regression"
           }
+          # UI and typography regression: Karla's four official weights are
+          # loaded separately; the existing Lua keybind editor remains in
+          # charge of capture, conflicts and persistence.
+          $fontSource = Get-Content "$root/src/d3d12/D3D12_Functions.cpp" -Raw
+          $keybindSource = Get-Content "$root/src/scripting/ScriptContext.cpp" -Raw
+          $keybindUi = Get-Content "$root/src/m1core_registry_ui.cpp" -Raw
+          if ($fontSource -notmatch 'Karla-SemiBold.ttf' -or
+              $fontSource -notmatch 'Karla-Bold.ttf' -or
+              $fontSource -notmatch 'Karla-Medium.ttf' -or
+              $keybindSource -notmatch 'env\["registerHotkey"\]' -or
+              $keybindSource -notmatch 'env\["registerInput"\]' -or
+              $keybindUi -notmatch 'GetAllBinds\(' -or
+              $keybindUi -notmatch 'Configure keybinds') {
+            throw "Karla weights and mod-specific keybind management must remain available"
+          }
           # UI sizing regression: all settings actions must use the
           # same normal-height Dear ImGui Button as the Logs controls.
           # The former fake title child caused window layout regressions.
@@ -192,6 +207,9 @@ jobs:
           # accompanies the file. No original CET font/icon assets included.
           $assets = @(
             @{ Name='Karla-Regular.ttf'; Uri='https://raw.githubusercontent.com/googlefonts/karla/69b25f663101efb4113dd7ed416c120dd2dce56a/fonts/ttf/Karla-Regular.ttf' },
+            @{ Name='Karla-Medium.ttf'; Uri='https://raw.githubusercontent.com/googlefonts/karla/69b25f663101efb4113dd7ed416c120dd2dce56a/fonts/ttf/Karla-Medium.ttf' },
+            @{ Name='Karla-SemiBold.ttf'; Uri='https://raw.githubusercontent.com/googlefonts/karla/69b25f663101efb4113dd7ed416c120dd2dce56a/fonts/ttf/Karla-SemiBold.ttf' },
+            @{ Name='Karla-Bold.ttf'; Uri='https://raw.githubusercontent.com/googlefonts/karla/69b25f663101efb4113dd7ed416c120dd2dce56a/fonts/ttf/Karla-Bold.ttf' },
             @{ Name='JetBrainsMono-Regular.ttf'; Uri='https://raw.githubusercontent.com/JetBrains/JetBrainsMono/19371302b95d218af43299bce79ddbddd0bc364d/fonts/ttf/JetBrainsMono-Regular.ttf' },
             @{ Name='Phosphor-Regular.ttf'; Uri='https://raw.githubusercontent.com/phosphor-icons/web/3d40a3eaa73b25d20d263f0e1e55c9fed3e66809/src/regular/Phosphor.ttf' },
             @{ Name='OFL-KARLA.txt'; Uri='https://raw.githubusercontent.com/googlefonts/karla/69b25f663101efb4113dd7ed416c120dd2dce56a/OFL.txt' },
@@ -204,7 +222,7 @@ jobs:
               throw "Unexpected missing/truncated licensed font asset: $($asset.Name)"
             }
           }
-          foreach ($name in @('Karla-Regular.ttf','JetBrainsMono-Regular.ttf','Phosphor-Regular.ttf')) {
+          foreach ($name in @('Karla-Regular.ttf','Karla-Medium.ttf','Karla-SemiBold.ttf','Karla-Bold.ttf','JetBrainsMono-Regular.ttf','Phosphor-Regular.ttf')) {
             $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path "$dest/$name").Path)
             $signature = [BitConverter]::ToString($bytes, 0, 4)
             if ($signature -notin @('00-01-00-00', '4F-54-54-4F')) {
@@ -232,7 +250,7 @@ jobs:
           New-Item -ItemType Directory -Path $fontDir -Force | Out-Null
           Copy-Item -Path 'm1core/core/font-assets/*' -Destination $fontDir
           $files = @(Get-ChildItem -LiteralPath 'm1core/core/game-package' -File -Recurse)
-          if ($files.Count -ne 9) { throw "Unexpected standalone game package file count: $($files.Count)" }
+          if ($files.Count -ne 12) { throw "Unexpected standalone game package file count: $($files.Count)" }
           if (Test-Path "$dir/LICENSE-YAMASHI-MIT") {
             throw "A donor-specific license was re-added to m1core's standalone package"
           }
@@ -243,7 +261,7 @@ jobs:
           if (!(Test-Path "$dir/THIRD_PARTY_LICENSES")) {
             throw "Required independent third-party library notices are missing"
           }
-          $allowedFonts = @('JetBrainsMono-Regular.ttf','Karla-Regular.ttf','Phosphor-Regular.ttf')
+          $allowedFonts = @('JetBrainsMono-Regular.ttf','Karla-Regular.ttf','Karla-Medium.ttf','Karla-SemiBold.ttf','Karla-Bold.ttf','Phosphor-Regular.ttf')
           $actualFonts = @((Get-ChildItem -LiteralPath $fontDir -File -Filter '*.ttf').Name)
           if (@(Compare-Object -ReferenceObject $allowedFonts -DifferenceObject $actualFonts).Count -ne 0) {
             throw 'Game artifact contains an unexpected font'

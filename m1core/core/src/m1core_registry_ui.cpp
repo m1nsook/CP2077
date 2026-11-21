@@ -145,7 +145,9 @@ void DrawSetting(const ModView& mod, const SettingView& setting)
     ImGui::TableNextRow();
     ImGui::TableSetColumnIndex(0);
     ImGui::AlignTextToFramePadding();
+    if (auto* font = m1core::KarlaMedium()) ImGui::PushFont(font);
     ImGui::TextUnformatted(setting.label.c_str());
+    if (m1core::KarlaMedium()) ImGui::PopFont();
     if (!setting.description.empty() &&
         ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
         ImGui::SetTooltip("%s", setting.description.c_str());
@@ -214,7 +216,9 @@ void DrawSettingsFor(const ModView& mod)
                               ImGui::GetStyle().FramePadding.x * 2.0f;
     const float rightEdge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
     ImGui::AlignTextToFramePadding();
+    if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
     ImGui::Text("%s (%zu settings)", mod.title.c_str(), mod.settings.size());
+    if (m1core::KarlaSemiBold()) ImGui::PopFont();
     ImGui::SameLine();
     ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightEdge - actionWidth));
     if (ImGui::Button(resetLabel, ImVec2(actionWidth, 0.0f))) {
@@ -285,7 +289,9 @@ void DrawSettingsPage()
                                std::max(140.0f, available * 0.30f);
     if (ImGui::BeginChild("Registered mods", ImVec2(sidebarWidth, 0),
                           ImGuiChildFlags_Borders)) {
+        if (auto* font = m1core::KarlaMedium()) ImGui::PushFont(font);
         ImGui::TextDisabled("Registered mods (%zu)", mods.size());
+        if (m1core::KarlaMedium()) ImGui::PopFont();
         ImGui::Separator();
         for (const auto& mod : mods) {
             if (!Matches(mod, search)) continue;
@@ -310,23 +316,83 @@ void DrawSettingsPage()
 
 void DrawKeybindsPage()
 {
-    ImGui::TextUnformatted("m1core menu shortcut");
-    const auto& bindings = M1CoreRuntime::Get().GetBindings();
+    auto& runtime = M1CoreRuntime::Get();
+    const auto& bindings = runtime.GetBindings();
+
+    if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
+    ImGui::TextUnformatted("M1CORE SHORTCUT");
+    if (m1core::KarlaSemiBold()) ImGui::PopFont();
     const auto key = bindings.GetBindString(Bindings::GetOverlayToggleModBind());
-    ImGui::Text("Current: %s", key.empty() ? "Not assigned" : key.c_str());
-    if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_EDIT " Change shortcut" : "Change shortcut")) {
-        // Use the donated key capture engine instead of introducing another
-        // raw/WM_KEYDOWN listener that can regress game input.
-        M1CoreRuntime::Get().GetOverlay().GetBindings().Toggle();
+    ImGui::Text("Toggle overlay: %s", key.empty() ? "Not assigned" : key.c_str());
+    if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_EDIT " Configure keybinds" : "Configure keybinds"))
+    {
+        // Reuse the proven mod-aware binding editor and raw input recorder;
+        // it handles all ScriptContext registeredHotkey/registerInput
+        // entries, collision checks and persisted bindings.json.
+        runtime.GetOverlay().GetBindings().Toggle();
     }
-    ImGui::Separator();
-    ImGui::TextWrapped("The same shortcut opens and closes m1core. "
-                       "All input capture is handled by the native game window backend.");
+    ImGui::SameLine();
+    ImGui::TextDisabled("Edit m1core and mod shortcuts");
+
+    ImGui::SeparatorText("REGISTERED MOD KEYBINDS");
+    const auto& modBinds = runtime.GetVM().GetAllBinds();
+    size_t modCount = 0;
+    size_t bindingCount = 0;
+    for (const auto& [name, binds] : modBinds)
+    {
+        if (!binds.get().empty())
+        {
+            ++modCount;
+            bindingCount += binds.get().size();
+        }
+    }
+    if (bindingCount == 0)
+    {
+        ImGui::TextDisabled("No installed Lua mods have registered hotkeys or inputs.");
+        ImGui::TextWrapped("Mods can register their own actions with registerHotkey() or registerInput().");
+        return;
+    }
+
+    ImGui::TextDisabled("%zu mod(s), %zu registered binding(s)", modCount, bindingCount);
+    const ImGuiTableFlags flags =
+        ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg |
+        ImGuiTableFlags_SizingStretchProp;
+    if (ImGui::BeginTable("##mod-keybindings", 3, flags))
+    {
+        ImGui::TableSetupColumn("Mod / action", ImGuiTableColumnFlags_WidthStretch, 0.48f);
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+        ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthStretch, 0.34f);
+        ImGui::TableHeadersRow();
+        for (const auto& [modId, binds] : modBinds)
+        {
+            for (const auto& bind : binds.get())
+            {
+                ImGui::PushID(modId.c_str());
+                ImGui::PushID(bind.ID.c_str());
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                if (auto* font = m1core::KarlaMedium()) ImGui::PushFont(font);
+                ImGui::TextUnformatted(bind.DisplayName.c_str());
+                if (m1core::KarlaMedium()) ImGui::PopFont();
+                ImGui::TextDisabled("%s", modId.c_str());
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted(bind.IsHotkey() ? "Hotkey" : "Input");
+                ImGui::TableSetColumnIndex(2);
+                const auto shortcut = bindings.GetBindString({modId, bind.ID});
+                ImGui::TextUnformatted(shortcut.c_str());
+                ImGui::PopID();
+                ImGui::PopID();
+            }
+        }
+        ImGui::EndTable();
+    }
 }
 
 void DrawProfilesPage()
 {
+    if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
     ImGui::TextUnformatted("Profiles");
+    if (m1core::KarlaSemiBold()) ImGui::PopFont();
     ImGui::SetNextItemWidth(240);
     ImGui::InputTextWithHint("##profile", "Profile name",
                              profileName, sizeof(profileName));
@@ -360,7 +426,9 @@ void DrawProfilesPage()
 
 void DrawAboutPage()
 {
+    if (auto* font = m1core::KarlaBold()) ImGui::PushFont(font);
     ImGui::TextUnformatted("m1core");
+    if (m1core::KarlaBold()) ImGui::PopFont();
     ImGui::Separator();
     ImGui::TextWrapped("Native RED4ext mod settings framework.");
     ImGui::TextWrapped("Settings, keybindings and profiles with Dear ImGui.");

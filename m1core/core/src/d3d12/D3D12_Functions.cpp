@@ -151,6 +151,7 @@ void D3D12::ReloadFonts()
     // Font references belong to this atlas; never retain dangling pointers.
     io.FontDefault = nullptr;
     m1core::SetLogFont(nullptr);
+    m1core::SetKarlaWeights(nullptr, nullptr, nullptr);
     m1core::SetIconsAvailable(false);
     io.Fonts->Clear();
 
@@ -186,6 +187,14 @@ void D3D12::ReloadFonts()
         Log::Warn("Using Dear ImGui fallback font because Karla was unavailable");
     }
     io.FontDefault = mainFont;
+
+    // Optional text-only Karla weights. Missing files fall back gracefully
+    // to Regular for older installs. Their pointers are atlas-owned and are
+    // reset above before any font reload.
+    m1core::SetKarlaWeights(
+        load(L"Karla-Medium.ttf", size),
+        load(L"Karla-SemiBold.ttf", size),
+        load(L"Karla-Bold.ttf", size));
 
     // Merge only the needed Phosphor regular icons into Karla, keeping
     // fonts in a single normal ImGui atlas and without custom DrawList UI.

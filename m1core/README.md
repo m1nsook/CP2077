@@ -21,7 +21,7 @@ libraries and font assets remain in the distributed package.
 - Mouse/keyboard/game input, the startup input lifecycle and Profiles UI
   were confirmed in-game.
 - The **Weight Limit** sample mod registers its own settings and works in-game.
-- **Karla** is the main UI font, **JetBrains Mono** is the logs font and
+- **Karla Regular, Medium, SemiBold and Bold** provide a readable UI hierarchy, **JetBrains Mono** is the logs font and
   **Phosphor Icons** appear throughout the interface. Their appearance was
   confirmed in-game.
 - `.m1s` readable Lua source and `.m1c` actual LuaJIT bytecode are both
