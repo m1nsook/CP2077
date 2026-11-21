@@ -18,7 +18,7 @@ BEGIN
             VALUE "CompanyName",        "${CET_GROUP_NAME}"
             VALUE "FileDescription",    "${CET_PRODUCT_NAME}"
             VALUE "FileVersion",        "${CET_VERSION_SIMPLE}"
-            VALUE "LegalCopyright",     "Â© 2020-${CET_CURRENT_YEAR} ${CET_GROUP_NAME}. All Rights Reserved"
+            VALUE "LegalCopyright",     "© 2020-${CET_CURRENT_YEAR} ${CET_GROUP_NAME}. All Rights Reserved"
             VALUE "OriginalFilename",   "${CET_FILE_NAME}"
             VALUE "ProductName",        "${CET_PRODUCT_NAME}"
             VALUE "ProductVersion",     "${CET_VERSION_FULL}"
