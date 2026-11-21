@@ -205,8 +205,7 @@ void* RenderBridge::OnPresent(std::int32_t* deviceIndex,
                 bridge.LogInfo("m1core: game swapchain/queue/HWND discovered");
             // A passive HWND listener doesn't create an ImGui context,
             // allocate a GPU resource, or capture any startup input.
-            if (InputRouter::Get().Install(frame.window) &&
-                GetForegroundWindow() == frame.window)
+            if (InputRouter::Get().Install(frame.window))
                 Renderer::Get().Present(frame);
         } else if (!bridge.warnedNoFrame_.exchange(true)) {
             bridge.LogWarn("m1core: Present hook active but game frame not discovered");

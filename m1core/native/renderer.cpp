@@ -1,6 +1,8 @@
 #include "renderer.hpp"
 #include "ui.hpp"
 #include "input.hpp"
+#include "game_lifecycle.hpp"
+#include "ImGuiCustomTheme.h"
 
 #include <imgui.h>
 #include <backends/imgui_impl_dx12.h>
@@ -109,6 +111,7 @@ bool Renderer::Initialize(const GameFrame& source) noexcept
         ImGui::CreateContext();
         ownsContext_ = true;
         ImGui::StyleColorsDark();
+        m1CoreTheme(ImGui::GetStyle()); // User-supplied ImGui style, no custom controls.
         ImGui::GetIO().MouseDrawCursor = false;
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
     }
@@ -149,12 +152,15 @@ bool Renderer::FrameReady(FrameBuffer& frame) noexcept
 void Renderer::Present(const GameFrame& source) noexcept
 {
     std::lock_guard lock(mutex_);
-    if (!IsWindow(source.window) || GetForegroundWindow() != source.window)
+    if (!IsWindow(source.window))
         return;
+    // Initialize graphics on Present independently of window focus; only
+    // drawing and input ownership need the foreground game HWND.
     // Initialize on the game's Present callback even with the menu hidden,
     // but never trap input just because a graphics context exists.
     if (!initialized_ && !Initialize(source)) return;
-    InputRouter::Get().ArmFirstRun();
+    if (GameBaseInitialized())
+        InputRouter::Get().ArmFirstRun();
     if (source.swapchain != swapchain_.Get() || source.queue != queue_.Get() ||
         source.window != gameWindow_) {
         Reset();

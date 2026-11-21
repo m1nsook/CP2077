@@ -28,6 +28,11 @@ int main()
     REQUIRE(!CanCaptureInput(false,true,true));
     REQUIRE(!CanCaptureInput(true,false,true)); // game lost foreground
     REQUIRE(CanCaptureInput(true,true,true));
+    using m1core::CanRecordKey;
+    REQUIRE(CanRecordKey(true,true,true)); // No native cursor needed
+    REQUIRE(!CanRecordKey(true,true,false));
+    REQUIRE(!CanRecordKey(true,false,true));
+    REQUIRE(!CanRecordKey(false,true,true));
     std::array<bool,256> keys{};
     using m1core::TrackKeyEdge;
     using m1core::KeyEdge;

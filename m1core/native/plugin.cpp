@@ -3,13 +3,32 @@
 #include "registry.hpp"
 #include "render_bridge.hpp"
 #include "state.hpp"
+#include "game_lifecycle.hpp"
+
+#include <RED4ext/Api/v1/GameState.hpp>
+#include <RED4ext/GameStates.hpp>
 
 #include <RED4ext/RED4ext.hpp>
 #include <Windows.h>
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <string>
+
+namespace m1core {
+namespace {
+std::atomic_bool initializedBase{false};
+}
+bool GameBaseInitialized() noexcept
+{
+    return initializedBase.load(std::memory_order_acquire);
+}
+void SetGameBaseInitialized() noexcept
+{
+    initializedBase.store(true, std::memory_order_release);
+}
+}
 
 namespace {
 using RED4ext::CString;
@@ -98,6 +117,18 @@ void DeleteProfile(IScriptable*,CStackFrame* frame,bool* output,std::int64_t)
     if (output) *output=m1core::Settings().DeleteProfile(name.c_str());
 }
 
+bool GameStateContinue(RED4ext::CGameApplication*) { return true; }
+bool BaseInitializationFinished(RED4ext::CGameApplication*)
+{
+    m1core::SetGameBaseInitialized();
+    m1core::RenderBridge::Get().LogInfo(
+        "m1core: base initialization finished; initial setup may open");
+    return true;
+}
+RED4ext::v1::GameState baseGameCallbacks{
+    &GameStateContinue, &GameStateContinue, &BaseInitializationFinished
+};
+
 void RegisterTypes() {}
 void PostRegisterTypes()
 {
@@ -163,6 +194,16 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(
     if (!rtti) return false;
     rtti->AddRegisterCallback(RegisterTypes);
     rtti->AddPostRegisterCallback(PostRegisterTypes);
+
+    // CET opens first-time bindings only after game base initialization.
+    // Use RED4ext's public game-state lifecycle callback, independently.
+    if (!sdk || !sdk->gameStates || !sdk->gameStates->Add ||
+        !sdk->gameStates->Add(handle, RED4ext::EGameStateType::BaseInitialization,
+                             &baseGameCallbacks)) {
+        if (sdk && sdk->logger && sdk->logger->Warn)
+            sdk->logger->Warn(handle,
+                "m1core: base initialization callback unavailable; first-run setup deferred");
+    }
 
     if (!m1core::RenderBridge::Get().Install(handle,sdk)) {
         // A missing or version-incompatible graphics symbol must never

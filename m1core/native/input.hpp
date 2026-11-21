@@ -36,6 +36,14 @@ constexpr UINT kCursorSyncMessage = WM_APP + 0x4B3;
     return OwnsInput(visible, foreground) && rendererReady;
 }
 
+// First-run keyboard binding does not require ForceCursor to be ready.
+// Only the full mouse/ImGui interaction needs native cursor ownership.
+[[nodiscard]] inline bool CanRecordKey(bool setup, bool foreground,
+                                      bool rendererReady) noexcept
+{
+    return CanCaptureInput(setup, foreground, rendererReady);
+}
+
 enum class KeyEdge { None, Press, Release };
 [[nodiscard]] inline KeyEdge TrackKeyEdge(std::array<bool,256>& keys,
                                           unsigned key,bool pressed) noexcept

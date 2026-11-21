@@ -79,6 +79,25 @@ not CET code or a CET runtime requirement. M1CORE's render-thread UI is
 still a difference from CET's main-thread UI preparation plus draw-buffer
 staging and needs in-game compatibility evaluation.
 
+### RED4ext lifecycle, first-run keyboard, and user theme (November 21)
+
+m1core now initializes native graphics on a valid Present regardless of
+foreground focus, but draws/captures only for the foreground game HWND.
+RED4ext's BaseInitialization game-state callback gates automatic first-run
+setup. This mirrors CET's post-initialization first-time-bind behavior,
+without depending on CET or guessing startup Enter/Space input.
+
+Keyboard-only first-run recording no longer requires the engine mouse
+cursor. After the first successfully submitted native ImGui frame,
+the user-chosen binding is captured on a physical key-release edge.
+General ImGui keyboard/mouse input continues to require the owned
+REDengine cursor, and focus/shutdown protection remains in place.
+
+The user-supplied `ImGuiCustomTheme.h` is applied to normal Dear ImGui
+style colors and spacing when the context is first created. This is
+an **ImGui style**, not hand-drawn controls or custom UI widgets.
+The theme does not change the renderer or input ownership design.
+
 ### First-run input recovery (November 21)
 
 User confirmed game startup still worked but the first-run menu appeared

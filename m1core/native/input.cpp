@@ -187,10 +187,12 @@ bool InputRouter::HandleKeyTransition(int key,bool down) noexcept
                        (GetKeyState(VK_CONTROL)&0x8000)==0 &&
                        (GetKeyState(VK_SHIFT)&0x8000)==0;
     if (recording_.load()) {
-        // Never eat first-run keys while the native cursor is unavailable.
-        if (!CanCaptureInput(visible_.load() || setup_.load(),
+        // Do not make first-run KEY binding depend on mouse cursor startup.
+        // Only accept input after an ImGui frame is submitted and this HWND
+        // is foreground; the game launch prompt is never captured early.
+        if (!CanRecordKey(visible_.load() || setup_.load(),
             focused_.load() && GetForegroundWindow()==window_,
-            Renderer::Get().AcceptingInput()) || !CursorHeld())
+            Renderer::Get().AcceptingInput()))
             return false;
         if (edge==KeyEdge::Release) {
             if (key==VK_ESCAPE) {
@@ -227,6 +229,7 @@ void InputRouter::ArmFirstRun() noexcept
 
 void InputRouter::Close() noexcept
 {
+    if (!KeyAssigned()) firstRunArmed_.store(false);
     visible_.store(false);
     setup_.store(false);
     recording_.store(false);
