@@ -7,6 +7,7 @@
 #define M1CORE_ICON_PROFILES "\xEE\x93\x84" // U+E4C4
 #define M1CORE_ICON_LOGS "\xEE\x88\xBA" // U+E23A
 #define M1CORE_ICON_ABOUT "\xEE\x8B\x8E" // U+E2CE
+#define M1CORE_ICON_RESET "\xEE\x80\xB8" // U+E038 arrow-counter-clockwise
 #define M1CORE_ICON_REFRESH "\xEE\x82\x94" // U+E094
 #define M1CORE_ICON_SAVE "\xEE\x89\x88" // U+E248
 #define M1CORE_ICON_DELETE "\xEE\x92\xA6" // U+E4A6

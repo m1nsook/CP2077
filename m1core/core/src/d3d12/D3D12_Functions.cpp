@@ -152,6 +152,7 @@ void D3D12::ReloadFonts()
     io.FontDefault = nullptr;
     m1core::SetLogFont(nullptr);
     m1core::SetKarlaWeights(nullptr, nullptr, nullptr);
+    m1core::SetKarlaLayoutFonts(nullptr, nullptr, nullptr);
     m1core::SetIconsAvailable(false);
     io.Fonts->Clear();
 
@@ -192,6 +193,7 @@ void D3D12::ReloadFonts()
     // fonts in a single normal ImGui atlas and without custom DrawList UI.
     // Codepoints come from phosphor-icons/web src/regular/style.css.
     static const ImWchar phosphorRanges[] = {
+        0xE038, 0xE038, // arrow-counter-clockwise (reset buttons)
         0xE094, 0xE094, // arrows-clockwise
         0xE136, 0xE136, // caret-down
         0xE184, 0xE184, // check-circle
@@ -247,6 +249,13 @@ void D3D12::ReloadFonts()
         load(L"Karla-Medium.ttf", size),
         load(L"Karla-SemiBold.ttf", size),
         load(L"Karla-Bold.ttf", size));
+
+    // Use the existing Karla files at the actual sizes from AFTER.html;
+    // loading more sizes into the same atlas does not add external assets.
+    m1core::SetKarlaLayoutFonts(
+        load(L"Karla-Bold.ttf", std::max(19.0f, size * 1.34f)),
+        load(L"Karla-SemiBold.ttf", std::max(15.5f, size * 1.08f)),
+        load(L"Karla-SemiBold.ttf", std::max(11.0f, size * 0.76f)));
 
     ImFont* mono = load(L"JetBrainsMono-Regular.ttf", std::max(12.0f, size * 0.84f));
     if (mono)
