@@ -235,6 +235,7 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
     if (message==WM_KILLFOCUS ||
         (message==WM_ACTIVATEAPP && !wp)) {
         focused_.store(false);
+        recording_.store(false); // Never bind keys typed after returning from Alt+Tab.
         ApplyEngineCursor(hwnd);
         Renderer::Get().CancelInput();
         return next();
@@ -242,6 +243,7 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
     if (message==WM_SETFOCUS ||
         (message==WM_ACTIVATEAPP && wp)) {
         focused_.store(true);
+        Renderer::Get().ResumeInput();
         RequestCursorSync();
         return next();
     }

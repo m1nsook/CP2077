@@ -211,6 +211,14 @@ void Renderer::CancelInput() noexcept
         ImGui::GetIO().AddFocusEvent(false);
 }
 
+void Renderer::ResumeInput() noexcept
+{
+    std::lock_guard lock(mutex_);
+    if (initialized_ && ImGui::GetCurrentContext() &&
+        gameWindow_ && GetForegroundWindow()==gameWindow_)
+        ImGui::GetIO().AddFocusEvent(true);
+}
+
 bool Renderer::FlushGpu() noexcept
 {
     if (!queue_ || !fence_ || !fenceEvent_) return true;

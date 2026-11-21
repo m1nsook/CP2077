@@ -22,6 +22,7 @@ public:
     [[nodiscard]] LRESULT ForwardInput(HWND window,UINT message,
                                        WPARAM wparam,LPARAM lparam) noexcept;
     void CancelInput() noexcept;
+    void ResumeInput() noexcept;
 private:
     using ComPtrFence = Microsoft::WRL::ComPtr<ID3D12Fence>;
     struct FrameBuffer {
