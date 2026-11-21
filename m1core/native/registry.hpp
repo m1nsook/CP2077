@@ -2,6 +2,7 @@
 
 #include "state.hpp"
 
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -52,6 +53,8 @@ private:
     [[nodiscard]] static bool ValidId(std::string_view value);
     [[nodiscard]] static std::optional<nlohmann::json>
         Normalize(const SettingView& setting, const nlohmann::json& incoming);
+    // Must be called under mutex_. Reports errors for every persistence path.
+    [[nodiscard]] bool Persist(const std::function<void(nlohmann::json&)>& update);
     [[nodiscard]] bool Commit(std::string_view mod, std::string_view key,
                               const nlohmann::json& next);
     StateStore& store_;

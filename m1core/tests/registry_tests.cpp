@@ -86,10 +86,27 @@ int main()
     REQUIRE(lateRegistration.Register("offline-mod","Offline Mod",offlineSchema));
     REQUIRE(lateRegistration.Get("offline-mod","enabled").value()==false);
 
+    // A profile may contain a formerly valid value outside the CURRENT
+    // schema bounds. Disk and live settings must both use the clamped value.
+    auto outOfRange = json::parse(store.Snapshot());
+    outOfRange["profiles"]["old_schema"] = {
+        {"example", {{"capacity", 9999}, {"active", false}}}
+    };
+    REQUIRE(store.Replace(outOfRange.dump()));
+    REQUIRE(registry.LoadProfile("old_schema"));
+    REQUIRE(registry.Get("example","capacity").value() == 250);
+    REQUIRE(registry.LastError().empty());
+    const auto normalizedDisk = json::parse(store.Snapshot());
+    REQUIRE(normalizedDisk["values"]["example"]["capacity"] == 250);
+    REQUIRE(json::parse(std::ifstream(path))["values"]["example"]["capacity"] == 250);
+    REQUIRE(registry.DeleteProfile("old_schema"));
+
     // Missing/malformed profile loads must not mutate any values or
     // advance the persisted revision.
     REQUIRE(!registry.LoadProfile("missing"));
+    REQUIRE(registry.LastError() == "Profile not found or malformed");
     REQUIRE(!registry.LoadProfile("../unsafe"));
+    REQUIRE(registry.LastError() == "Invalid profile name");
     edited = json::parse(store.Snapshot());
     edited["profiles"]["invalid_known"] = {{"example",{{"active","not-a-bool"}}}};
     edited["profiles"]["invalid_unknown"] = {{"offline-mod","not-an-object"}};
@@ -98,6 +115,7 @@ int main()
     const auto revisionBeforeInvalid = store.Revision();
     REQUIRE(!registry.LoadProfile("invalid_known"));
     REQUIRE(!registry.LoadProfile("invalid_unknown"));
+    REQUIRE(!registry.LastError().empty());
     REQUIRE(store.Snapshot() == beforeInvalid);
     REQUIRE(store.Revision() == revisionBeforeInvalid);
     REQUIRE(registry.Get("example","active").value()==false);
@@ -133,6 +151,40 @@ int main()
     REQUIRE(!registry.Register("broken","Broken",invalid));
     REQUIRE(registry.Snapshot().size()==1);
     REQUIRE(!registry.Register("../evil","Evil",schema));
+
+    // Corrupt settings state must be read-only: profile/reset operations
+    // must return useful errors and never pretend to persist live changes.
+    const auto brokenPath = path.parent_path() / "broken.json";
+    {
+        std::ofstream broken(brokenPath, std::ios::binary | std::ios::trunc);
+        broken << "{not-valid-json";
+    }
+    m1core::StateStore frozenStore;
+    frozenStore.Configure(brokenPath);
+    REQUIRE(!frozenStore.Ready());
+    m1core::Registry frozenRegistry(frozenStore);
+    REQUIRE(frozenRegistry.Register("frozen","Frozen",schema));
+    REQUIRE(!frozenRegistry.Set("frozen","capacity",150));
+    REQUIRE(!frozenRegistry.LastError().empty());
+    REQUIRE(frozenRegistry.Get("frozen","capacity").value() == 50);
+    REQUIRE(!frozenRegistry.ResetMod("frozen"));
+    REQUIRE(!frozenRegistry.LastError().empty());
+    REQUIRE(!frozenRegistry.SaveProfile("backup"));
+    REQUIRE(!frozenRegistry.LastError().empty());
+    REQUIRE(!frozenRegistry.LoadProfile("backup"));
+    REQUIRE(!frozenRegistry.LastError().empty());
+    REQUIRE(!frozenRegistry.DeleteProfile("backup"));
+    REQUIRE(!frozenRegistry.LastError().empty());
+    REQUIRE(std::ifstream(brokenPath).good());
+
+    // Successful operations clear stale diagnostics; missing profiles are
+    // reported without modifying the stored values.
+    REQUIRE(!registry.DeleteProfile("nonexistent"));
+    REQUIRE(registry.LastError() == "Profile not found");
+    REQUIRE(registry.SaveProfile("temporary"));
+    REQUIRE(registry.LastError().empty());
+    REQUIRE(registry.DeleteProfile("temporary"));
+    REQUIRE(registry.LastError().empty());
 
     fs::remove_all(path.parent_path(),ec);
     std::cout << "Native typed-settings registry tests passed\n";

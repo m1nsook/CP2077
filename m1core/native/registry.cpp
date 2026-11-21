@@ -174,16 +174,9 @@ std::optional<nlohmann::json> Registry::Get(
     return found->value;
 }
 
-bool Registry::Commit(std::string_view mod, std::string_view key, const json& next)
+bool Registry::Persist(const std::function<void(json&)>& update)
 {
-    const auto modId = std::string(mod);
-    const auto settingId = std::string(key);
-    if (!store_.Update([&](json& data) {
-        auto& values = data["values"];
-        if (!values.contains(modId) || !values[modId].is_object())
-            values[modId] = json::object();
-        values[modId][settingId] = next;
-    })) {
+    if (!store_.Update(update)) {
         error_ = store_.LastError();
         if (error_.empty()) error_ = "Failed to persist settings";
         return false;
@@ -192,17 +185,41 @@ bool Registry::Commit(std::string_view mod, std::string_view key, const json& ne
     return true;
 }
 
+bool Registry::Commit(std::string_view mod, std::string_view key, const json& next)
+{
+    const auto modId = std::string(mod);
+    const auto settingId = std::string(key);
+    return Persist([&](json& data) {
+        auto& values = data["values"];
+        if (!values.contains(modId) || !values[modId].is_object())
+            values[modId] = json::object();
+        values[modId][settingId] = next;
+    });
+}
+
 bool Registry::Set(std::string_view mod, std::string_view key, const json& input)
 {
     std::lock_guard guard(mutex_);
     const auto it = mods_.find(std::string(mod));
-    if (it == mods_.end()) return false;
+    if (it == mods_.end()) {
+        error_ = "Unknown mod";
+        return false;
+    }
     auto found = std::find_if(it->second.settings.begin(), it->second.settings.end(),
         [&](const SettingView& s) { return s.id == key; });
-    if (found == it->second.settings.end()) return false;
+    if (found == it->second.settings.end()) {
+        error_ = "Unknown setting";
+        return false;
+    }
     const auto next = Normalize(*found, input);
-    if (!next) return false;
-    if (*next == found->value) return true;
+    if (!next) {
+        error_ = "Invalid setting value";
+        return false;
+    }
+    if (*next == found->value) {
+        error_.clear();
+        return true;
+    }
     if (!Commit(mod, key, *next)) return false;
     found->value = *next;
     return true;
@@ -214,6 +231,8 @@ bool Registry::Reset(std::string_view mod, std::string_view key)
     for (const auto& candidate : snapshot) if (candidate.id == mod)
         for (const auto& setting : candidate.settings) if (setting.id == key)
             return Set(mod, key, setting.defaultValue);
+    std::lock_guard guard(mutex_);
+    error_ = "Unknown mod or setting";
     return false;
 }
 
@@ -221,8 +240,11 @@ bool Registry::ResetMod(std::string_view mod)
 {
     std::lock_guard guard(mutex_);
     const auto it = mods_.find(std::string(mod));
-    if (it == mods_.end()) return false;
-    if (!store_.Update([&](json& document) {
+    if (it == mods_.end()) {
+        error_ = "Unknown mod";
+        return false;
+    }
+    if (!Persist([&](json& document) {
         auto& values = document["values"];
         values[it->first] = json::object();
         for (const auto& setting : it->second.settings)
@@ -234,10 +256,13 @@ bool Registry::ResetMod(std::string_view mod)
 
 bool Registry::SaveProfile(std::string name)
 {
-    if (!ValidId(name)) return false;
     std::lock_guard guard(mutex_);
-    return store_.Update([&](json& document) {
-        // Preserve entries for currently unloaded/unregistered mods.
+    if (!ValidId(name)) {
+        error_ = "Invalid profile name";
+        return false;
+    }
+    return Persist([&](json& document) {
+        // Preserve values for mods that are not currently registered.
         auto profile = document["values"];
         for (const auto& [id, mod] : mods_) {
             if (!profile.contains(id) || !profile[id].is_object())
@@ -251,40 +276,49 @@ bool Registry::SaveProfile(std::string name)
 
 bool Registry::LoadProfile(std::string_view name)
 {
-    if (!ValidId(name)) return false;
     std::lock_guard guard(mutex_);
+    if (!ValidId(name)) {
+        error_ = "Invalid profile name";
+        return false;
+    }
     struct Change { std::string mod, key; json value; };
     std::vector<Change> updates;
     bool valid = true;
-    const bool saved = store_.Update([&](json& document) {
+    std::string invalidReason;
+    const bool saved = Persist([&](json& document) {
         const auto profileIt = document["profiles"].find(std::string(name));
         if (profileIt == document["profiles"].end() || !profileIt->is_object()) {
             valid = false;
+            invalidReason = "Profile not found or malformed";
             return;
         }
 
-        // A profile contains ALL saved mods, not only mods registered right
-        // now. Validate known settings before changing any document values.
-        // Unregistered mods have no schema yet; preserve their JSON values
-        // until they register after this load or after a game restart.
+        // Validate every registered setting BEFORE touching the document.
+        // Unregistered mods are preserved for registration after a reload.
         const json profile = *profileIt;
         for (auto it = profile.begin(); it != profile.end(); ++it) {
             const auto& modId = it.key();
             const auto& record = it.value();
-            if (!record.is_object()) { valid = false; return; }
+            if (!record.is_object()) {
+                valid = false;
+                invalidReason = "Malformed profile mod record";
+                return;
+            }
             const auto registered = mods_.find(modId);
             if (registered == mods_.end()) continue;
             for (const auto& setting : registered->second.settings) {
                 if (!record.contains(setting.id)) continue;
                 const auto next = Normalize(setting, record[setting.id]);
-                if (!next) { valid = false; return; }
+                if (!next) {
+                    valid = false;
+                    invalidReason = "Invalid profile setting value";
+                    return;
+                }
                 updates.push_back({modId, setting.id, *next});
             }
         }
 
-        // Merge saved settings into current values. Do not wipe settings
-        // added after the profile was created; unknown/unloaded mods must
-        // restore as well. The StateStore commits this whole operation once.
+        // Preserve newly introduced settings and offline-mod values.
         for (auto it = profile.begin(); it != profile.end(); ++it) {
             const auto& modId = it.key();
             if (!document["values"].contains(modId) ||
@@ -293,9 +327,16 @@ bool Registry::LoadProfile(std::string_view name)
             for (auto setting = it.value().begin(); setting != it.value().end(); ++setting)
                 document["values"][modId][setting.key()] = setting.value();
         }
+        // Apply the SAME normalized values to disk as to the live registry:
+        // otherwise an out-of-range profile could leave JSON and UI divergent.
+        for (const auto& change : updates)
+            document["values"][change.mod][change.key] = change.value;
     });
-    if (!saved || !valid) return false;
-    // Mirror the already-persisted, validated values in the live registry.
+    if (!saved) return false;
+    if (!valid) {
+        error_ = std::move(invalidReason);
+        return false;
+    }
     for (const auto& change : updates)
         for (auto& setting : mods_.at(change.mod).settings)
             if (setting.id == change.key) setting.value = change.value;
@@ -304,13 +345,21 @@ bool Registry::LoadProfile(std::string_view name)
 
 bool Registry::DeleteProfile(std::string_view name)
 {
-    if (!ValidId(name)) return false;
     std::lock_guard guard(mutex_);
+    if (!ValidId(name)) {
+        error_ = "Invalid profile name";
+        return false;
+    }
     bool found = false;
-    const bool saved = store_.Update([&](json& document) {
+    const bool saved = Persist([&](json& document) {
         found = document["profiles"].erase(std::string(name)) != 0;
     });
-    return saved && found;
+    if (!saved) return false;
+    if (!found) {
+        error_ = "Profile not found";
+        return false;
+    }
+    return true;
 }
 
 std::vector<std::string> Registry::Profiles() const

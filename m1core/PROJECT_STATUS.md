@@ -165,6 +165,14 @@ Only work on the m1core development branch and draft PR unless explicitly author
 - `core/src/common/ImGuiNotify.h` now supports an opt-in **per-toast** position. Bottom-right remains the default for other notifications, including other Lua mods or separately installed CET; the left/right toast stacks are independent. No changes to the Win32 input hooks or D3D12 rendering backend.
 - The Phosphor glyph falls back to the existing ASCII icon if the font is absent. Native CI compilation is required; the visual placement is **not yet in-game verified**. The user does not need to repeat prior game input/hotkey tests.
 
+## M6 — Registry durability and profile diagnostics (2026-11-21)
+
+- **In-progress native source/testing change; new Windows CI required:** m1core's private-use runtime continues on the public development branch for now, with the eventual plan to distribute the DLL publicly while keeping future source private. The owner explicitly intends **m1core for their own mods**, not as a public SDK. No GitHub visibility/license changes are being made in this patch.
+- Fixed a persisted-profile mismatch: loading an older profile with a numeric value outside the current schema previously clamped live UI values but saved the raw, out-of-range value back to `settings.json`. The registry now commits normalized values to both live and persisted state.
+- Centralized native registry persistence errors for setting updates, mod resets and profile save/load/delete, and cleared stale errors after success. The Logs UI and existing `m1core.lastError()` now have actionable failures for these operations.
+- Added native regression tests for out-of-range profile normalization on disk, malformed/frozen state refusing writes, nonmutating failures and clearing of diagnostic errors after successful changes.
+- Scoped to registry/tests/status only; preserve accepted ImGui, Win32/DX12/input hooks, cloud-sync game script pass-through and Weight Limit consumer. m1script remains the public format transparency/docs site. Release date and full in-game validation remain open.
+
 ## m1script repository split and M5 runtime CI correction (2026-11-21)
 
 - **User decision:** maintain public scripting API contracts, developer documentation, examples and editor support in **https://github.com/m1nsook/m1script**. Merged [m1script PR #10](https://github.com/m1nsook/m1script/pull/10) with the migrated API reference, VitePress guide, `api/contract.json`, LuaLS types and `.m1s` examples. [m1script CI #44954056328](https://github.com/m1nsook/m1script/actions/runs/44954056328) **passed** its contract and VitePress build checks. m1script protected main was updated through PR #10, and [Pages deployment #44954205630](https://github.com/m1nsook/m1script/actions/runs/44954205630) **succeeded**. Live docs: https://m1nsook.github.io/m1script/.
