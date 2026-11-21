@@ -40,6 +40,9 @@ static sol::object Execute(sol::state& vm, const fs::path& file)
 
 int main(int argc, char** argv)
 {
+    std::cerr << "LuaJIT test process started; argc=" << argc << std::endl;
+    try
+    {
     REQUIRE(argc == 2);
     const fs::path fixture{argv[1]};
     REQUIRE(fs::is_directory(fixture));
@@ -102,4 +105,10 @@ int main(int argc, char** argv)
     fs::remove(temporary);
     std::cout << "m1core LuaJIT source, bytecode and module integration passed\n";
     return 0;
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "LuaJIT integration failure: " << error.what() << std::endl;
+        return 1;
+    }
 }

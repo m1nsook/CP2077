@@ -128,7 +128,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Script extension tests failed" }
           xmake build -y -vD m1core_script_runtime_tests
           if ($LASTEXITCODE -ne 0) { throw "LuaJIT integration tests did not compile" }
-          xmake run -y m1core_script_runtime_tests ../examples/lua-smoke
+          $fixture = (Resolve-Path -LiteralPath '../examples/lua-smoke').Path
+          Write-Host "LuaJIT test fixture: $fixture"
+          xmake run -y m1core_script_runtime_tests "$fixture"
           if ($LASTEXITCODE -ne 0) { throw "LuaJIT integration tests failed" }
       - name: Package one game-root artifact — exclude CET icons/fonts
         shell: pwsh
