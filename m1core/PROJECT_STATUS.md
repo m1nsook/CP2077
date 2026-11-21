@@ -13,8 +13,8 @@
 - **Developer API:** [`m1core/DEVELOPERS.md`](DEVELOPERS.md)
 - **Build and licenses:** [`m1core/core/BUILD.md`](core/BUILD.md)
 - **Latest USER-confirmed in-game Windows CI:** [#44907145458](https://github.com/m1nsook/CP2077/actions/runs/44907145458); source commit `153451235f4deccf11b5631deacf50f0287e0e4d`.
-- **Latest CI-verified build (actual LuaJIT integration):** [#44919804951](https://github.com/m1nsook/CP2077/actions/runs/44919804951); source commit `de66c2a6b648647d6a279fcf8b6617a64de40dee`. Native DLL, all previous tests and new LuaJIT VM integration test passed.
-- **Current ZIP**: `m1core-native-x64-dev` (GitHub artifact ID `14712849337`, CI #44919804951, SHA256 `1adff66819863000549f45ccb6df1cc69961a7e5213f04baef0b713b0ca833b3`). DLL `red4ext/plugins/m1core/m1core.dll` is 7,831,040 bytes, SHA256 `57be29d3f5c1f57ddfd806f7646e06d1cdb0a8ad67294444ca6c5222bd656273`. No Lua fixtures, icons, fonts, or ASI loader packaged. Actions artifacts may expire.
+- **Latest Windows CI (native DLL, registry/state, LuaJIT and package PASS):** [#44920676537](https://github.com/m1nsook/CP2077/actions/runs/44920676537); source commit `93f4648ef88a573ac1a481ccf5125c612dc324dd`. The actual CET-derived `m1core.dll` linked successfully; native typed-settings, persistence, script formats, all six LuaJIT runtime phases and restricted-asset/game-root packaging checks passed.
+- **Current ZIP:** `m1core-native-x64-dev` (GitHub artifact ID `14712599761`, CI #44920676537, artifact SHA256 `9f3a4e5b5e348f8360a5bacaccc6a04030249a30dfc75851a375c78dbe56374e`). DLL `red4ext/plugins/m1core/m1core.dll` SHA256 `cc6267ccb2df99dc8fa69a29ed8247e7841d7ef2518e10cbfb630e98f5bab75e` (from Windows job log). CI verified the 4-file game-root structure: DLL plus project MIT, yamashi MIT and third-party notices; no Lua fixtures, icons, fonts or ASI loader packaged. Actions artifacts may expire.
 
 ## Goal and nonnegotiable choices
 
@@ -41,7 +41,7 @@ Only work on the m1core development branch and draft PR unless explicitly author
 
 - [Commit `7afc1d6`](https://github.com/m1nsook/CP2077/commit/7afc1d618db2cbc4f305335b3189877cec74061f) fixes `LuaSandbox::ResetState()`: it must discard old per-mod sandboxes even when a mod never called `require()`. Previously, the empty module cache caused an early return and stale sandboxes/database handles could remain across reload.
 - [Commit `93f4648`](https://github.com/m1nsook/CP2077/commit/93f4648ef88a573ac1a481ccf5125c612dc324dd) uses the existing source foundation's `ScopeGuard` to restore the process working directory if an `init.m1s`, `init.lua` or `init.m1c` script errors during load. This is independent of Win32 input, ImGui, DX12 and native script pass-through.
-- [Windows CI #44920676537](https://github.com/m1nsook/CP2077/actions/runs/44920676537) was **in progress** when these changes were recorded. The two fixes are **not in-game verified**. No reason to repeat already confirmed mouse, keyboard, overlay or Profiles UI tests. Preserve the earlier passed Windows build as the latest CI-verified artifact until this workflow completes.
+- **Windows CI [#44920676537](https://github.com/m1nsook/CP2077/actions/runs/44920676537) PASS** at source commit `93f4648`: CET-derived native DLL compiled, typed registry/state and script-format tests passed, six real LuaJIT VM phases passed, and one 4-file game-root artifact was uploaded. This confirms compilation and existing automated fixtures; these two reload/exception fixes and actual in-game `LuaSandbox` execution are **not yet game-verified**. Do not repeat previously confirmed mouse/keyboard/overlay/Profiles tests.
 
 ## Open work (not yet validated)
 
