@@ -78,7 +78,7 @@ int main(int argc, char** argv)
     auto* state = vm.lua_state();
     REQUIRE(luaL_loadstring(state, "return 21 * 2") == 0);
     std::string compiled;
-    REQUIRE(lua_dump(state, CaptureBytecode, &compiled) == 0);
+    REQUIRE(lua_dump(state, CaptureBytecode, &compiled, 0) == 0);
     lua_pop(state, 1);
     REQUIRE(m1core::scripts::IsLuaJitBytecode(compiled));
     const auto temporary = fs::temp_directory_path() / "m1core-luajit-integration.m1c";
