@@ -9,13 +9,23 @@
 - **Canonical scripting API home:** [m1script](https://github.com/m1nsook/m1script), foundation [PR #10](https://github.com/m1nsook/m1script/pull/10) (merged; m1script CI and Pages deployed successfully). Do not expand the duplicated developer API docs in this repository.
 - **Runtime:** m1core is still the independent RED4ext DLL; no CET or extra m1script runtime dependency.
 
+## M7 Windows CI verified — native per-mod lifecycle isolation (2026-11-21)
+
+- **Windows CI PASS:** [run #44958962778](https://github.com/m1nsook/CP2077/actions/runs/44958962778) at source commit `7161a41944c305c9a07fbee1c0005e8d8624ea3f`. Standalone RED4ext `m1core.dll` compiled; **new native per-mod dispatch isolation test** passed alongside typed registry/profile persistence, internal mouse-click mock test, LuaJIT formats/runtime, and Weight Limit source/bytecode lifecycle fixtures.
+- **Packaged framework:** single game-root artifact `m1core-native-x64-dev`, artifact ID **14728847252**. Optional Weight Limit test artifacts: source **14729270593**, bytecode **14729041158** (not needed to validate existing user-confirmed live updates).
+- **Limits:** isolated C++ exceptions, not SEH/process memory faults or guaranteed fault-free LuaJIT. The boundary has **not** been exercised in-game under a failing mod. No modifications to the approved interface, native game input/renderer, or other mods. Keep PR #41 draft and unmerged.
+
 ## M7 — Isolated per-mod lifecycle dispatch (2026-11-21)
 
-- **In progress / requires new CI:** add a pure C++ per-mod dispatch guard for every lifecycle broadcast (`onHook`, `onTweak`, `onInit`, `onUpdate`, `onDraw`, `onOverlayOpen`, `onOverlayClose`) in `ScriptStore.cpp`. If a mod throws an unexpected native C++ exception outside its already-protected Lua callback, log the mod name and lifecycle event and keep running subsequent mods. Protect the failure reporter so a logger exception does not halt the loop.
+- **Implemented and Windows CI passed:** added a pure C++ per-mod dispatch guard for every lifecycle broadcast (`onHook`, `onTweak`, `onInit`, `onUpdate`, `onDraw`, `onOverlayOpen`, `onOverlayClose`) in `ScriptStore.cpp`. If a mod throws an unexpected native C++ exception outside its already-protected Lua callback, log the mod name and lifecycle event and keep running subsequent mods. Protect the failure reporter so a logger exception does not halt the loop.
 - **Source/tests:** `core/src/scripting/ModDispatch.hpp` and `tests/mod_dispatch_tests.cpp` (independent Windows test using a failing native callback, an unknown C++ exception, a throwing logger, and a healthy following mod). `ScriptContext` Lua callback implementation and `script_runtime_tests.cpp` are intentionally unchanged: the previous experimental protected Lua callback failure test caused an opaque Windows process termination and was reverted.
 - **Script loading:** catch an unknown native C++ exception during a single mod's discovery/load so later mod directories can continue.
 - **Guarantee scope:** this addresses C++ exceptions thrown from per-mod lifecycle functions. It does **not** promise recovery from process access violations, game hook errors, hard LuaJIT failures, or all possible crashes. No UI/input changes and no existing user mods modified. m1core PR #41 stays draft.
-- **Verification:** new Windows native CI pending, and in-game failure simulation not yet performed.
+- **Verification:** Windows CI #44958962778 passed; in-game failure simulation not performed.
+
+## Current M7 test verdict
+
+- **Native Windows CI PASS at source `7161a41`:** [#44958962778](https://github.com/m1nsook/CP2077/actions/runs/44958962778). Game-root `m1core-native-x64-dev` artifact **14728847252**. This supersedes the M6 CI baseline for compiled/tested code. Game compatibility for newly added M7 exception handling remains unverified.
 
 ## Most recent verified build
 
