@@ -5,6 +5,7 @@
 
 #include <M1CoreRuntime.h>
 #include <Utils.h>
+#include <common/ScopeGuard.h>
 
 namespace
 {
@@ -169,6 +170,13 @@ ScriptContext::ScriptContext(LuaSandbox& aLuaSandbox, const std::filesystem::pat
     {
         const auto previousCurrentPath = std::filesystem::current_path();
         current_path(sb.GetRootPath());
+        // A malformed init.m1s/init.m1c can throw before script_file
+        // returns. Restore the process-wide working directory even then.
+        const ScopeGuard restorePath([&previousCurrentPath]
+        {
+            std::error_code error;
+            std::filesystem::current_path(previousCurrentPath, error);
+        });
 
         const auto entry = m1core::scripts::FindEntrypoint(acPath);
         if (entry.empty())
@@ -178,8 +186,6 @@ ScriptContext::ScriptContext(LuaSandbox& aLuaSandbox, const std::filesystem::pat
             throw std::runtime_error("Invalid mod entry path");
 
         const auto result = sb.ExecuteFile(UTF16ToUTF8(path.native()));
-
-        current_path(previousCurrentPath);
 
         if (result.valid())
         {
