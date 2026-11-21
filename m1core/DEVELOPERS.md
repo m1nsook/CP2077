@@ -191,8 +191,11 @@ directory even if Lua/C++ code throws; failed `require` executions clear the
 module-cache loading sentinel, allowing a later retry after a file is fixed.
 
 The Windows LuaJIT regression test verifies the actual working-directory
-guard on nested and exceptional exits. Reload behavior with third-party mods
-still requires in-game verification before a stable release.
+guard on nested and exceptional exits. Windows [CI #44952396412](https://github.com/m1nsook/CP2077/actions/runs/44952396412)
+also passed the expanded source/bytecode Weight Limit shutdown/reload mock lifecycle
+and Lua-executed profile/reset/persistence API tests. These remain mock/VM
+integration tests rather than real Cyberpunk game-hook tests. Reload behavior
+with third-party mods still requires in-game verification before a stable release.
 
 ### LuaJIT integration fixture
 
