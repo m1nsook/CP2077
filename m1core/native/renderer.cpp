@@ -9,6 +9,8 @@
 #include <backends/imgui_impl_win32.h>
 
 #include <algorithm>
+#include <cfloat>
+#include <cstring>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
     HWND window,UINT message,WPARAM wparam,LPARAM lparam);
@@ -18,6 +20,21 @@ namespace {
 constexpr UINT kShaderDescriptors = 32;
 constexpr DWORD kGpuResetTimeoutMs = 1000;
 constexpr DWORD kInputStallTimeoutMs = 2000;
+constexpr std::size_t kMaxQueuedInput = 1024;
+
+bool LegacyKeyboard(UINT message) noexcept
+{
+    return message >= WM_KEYFIRST && message <= WM_KEYLAST;
+}
+bool LegacyButton(UINT message) noexcept
+{
+    return message >= WM_LBUTTONDOWN && message <= WM_XBUTTONDBLCLK;
+}
+bool LegacyWheel(UINT message) noexcept
+{
+    return message == WM_MOUSEWHEEL || message == WM_MOUSEHWHEEL;
+}
+
 
 void AllocateDescriptor(ImGui_ImplDX12_InitInfo* info,
                         D3D12_CPU_DESCRIPTOR_HANDLE* cpu,
@@ -113,7 +130,9 @@ bool Renderer::Initialize(const GameFrame& source) noexcept
         ImGui::StyleColorsDark();
         m1CoreTheme(ImGui::GetStyle()); // User-supplied ImGui style, no custom controls.
         ImGui::GetIO().MouseDrawCursor = false;
-        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+        ImGui::GetIO().IniFilename = nullptr;
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange |
+                                     ImGuiConfigFlags_NavEnableKeyboard;
     }
 
     if (!ImGui_ImplWin32_Init(gameWindow_)) { Release(); return false; }
@@ -186,6 +205,30 @@ void Renderer::Present(const GameFrame& source) noexcept
     // renderer thread; Win32 messages are forwarded through the same mutex.
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
+
+    // The game's render target can differ from the HWND's physical size.
+    // Match the actual D3D12 backbuffer before ImGui builds click targets.
+    const auto resource = frame.backbuffer->GetDesc();
+    auto& io = ImGui::GetIO();
+    if (resource.Width && resource.Height && resource.Width <= 16384 &&
+        resource.Height <= 16384 &&
+        io.DisplaySize.x > 0 && io.DisplaySize.y > 0 &&
+        (io.DisplaySize.x != static_cast<float>(resource.Width) ||
+         io.DisplaySize.y != static_cast<float>(resource.Height))) {
+        POINT cursor{};
+        if (GetCursorPos(&cursor) && ScreenToClient(gameWindow_,&cursor)) {
+            io.AddMousePosEvent(
+                static_cast<float>(cursor.x) * static_cast<float>(resource.Width) / io.DisplaySize.x,
+                static_cast<float>(cursor.y) * static_cast<float>(resource.Height) / io.DisplaySize.y);
+        } else {
+            io.AddMousePosEvent(-FLT_MAX,-FLT_MAX);
+        }
+        io.DisplaySize = ImVec2(static_cast<float>(resource.Width),
+                                 static_cast<float>(resource.Height));
+    }
+    // Never call ImGui from WndProc: process queued raw + legacy messages on
+    // the same render thread used by ImGui::NewFrame().
+    DrainInput();
     ImGui::NewFrame();
     DrawNativeSettingsUI();
     ImGui::Render();
@@ -230,25 +273,132 @@ void Renderer::Present(const GameFrame& source) noexcept
 LRESULT Renderer::ForwardInput(HWND window,UINT message,
                                WPARAM wparam,LPARAM lparam) noexcept
 {
-    std::lock_guard lock(mutex_);
     if (!initialized_ || window != gameWindow_ ||
         GetForegroundWindow() != gameWindow_) return 0;
-    return ImGui_ImplWin32_WndProcHandler(window,message,wparam,lparam);
+    std::lock_guard lock(inputMutex_);
+    if (inputPackets_.size() >= kMaxQueuedInput) inputPackets_.clear();
+    InputPacket packet{};
+    packet.window = window;
+    packet.message = message;
+    packet.wparam = wparam;
+    packet.lparam = lparam;
+    inputPackets_.push_back(packet);
+    return 1;
+}
+
+void Renderer::ForwardRawInput(HWND window,const RAWINPUT& raw) noexcept
+{
+    if (!initialized_ || window != gameWindow_ ||
+        GetForegroundWindow() != gameWindow_) return;
+    if (raw.header.dwType != RIM_TYPEKEYBOARD &&
+        raw.header.dwType != RIM_TYPEMOUSE) return;
+
+    InputPacket packet{};
+    packet.window = window;
+    packet.raw = true;
+    packet.rawType = raw.header.dwType;
+    if (packet.rawType == RIM_TYPEKEYBOARD) {
+        packet.keyboard = raw.data.keyboard;
+        // Cyberpunk may register RIDEV_NOLEGACY and never send WM_CHAR.
+        // Translate text on the real HWND thread before keyboard state moves.
+        const auto& kb = packet.keyboard;
+        if ((kb.Flags & RI_KEY_BREAK) == 0 &&
+            kb.VKey >= VK_SPACE && kb.VKey < 255 &&
+            !(GetKeyState(VK_CONTROL) & 0x8000) &&
+            !(GetKeyState(VK_MENU) & 0x8000)) {
+            BYTE state[256]{};
+            if (GetKeyboardState(state)) {
+                state[kb.VKey] = 0x80;
+                const auto thread = GetWindowThreadProcessId(window,nullptr);
+                const int chars = ToUnicodeEx(kb.VKey,kb.MakeCode,state,
+                    packet.text,8,4,GetKeyboardLayout(thread));
+                if (chars > 0)
+                    packet.textLength = static_cast<unsigned>(std::min(chars,8));
+            }
+        }
+    } else {
+        packet.mouse = raw.data.mouse;
+    }
+    std::lock_guard lock(inputMutex_);
+    if (inputPackets_.size() >= kMaxQueuedInput) inputPackets_.clear();
+    inputPackets_.push_back(packet);
+}
+
+void Renderer::DrainInput() noexcept
+{
+    std::vector<InputPacket> pending;
+    {
+        std::lock_guard lock(inputMutex_);
+        pending.swap(inputPackets_);
+    }
+    auto& io = ImGui::GetIO();
+    const int focus = pendingFocus_.exchange(0,std::memory_order_acq_rel);
+    if (focus != 0) io.AddFocusEvent(focus > 0);
+    if (pending.empty()) return;
+
+    // The game may emit BOTH WM_INPUT and legacy messages for one click.
+    // Prefer legacy when present and synthesize only the missing raw events.
+    bool legacyKeys = false,legacyButtons = false,legacyWheel = false;
+    for (const auto& e : pending) {
+        if (e.raw) continue;
+        legacyKeys |= LegacyKeyboard(e.message);
+        legacyButtons |= LegacyButton(e.message);
+        legacyWheel |= LegacyWheel(e.message);
+        ImGui_ImplWin32_WndProcHandler(e.window,e.message,e.wparam,e.lparam);
+    }
+
+    for (const auto& e : pending) {
+        if (!e.raw) continue;
+        if (e.rawType == RIM_TYPEKEYBOARD && !legacyKeys) {
+            const auto& kb = e.keyboard;
+            if (kb.VKey == 0 || kb.VKey >= 255) continue;
+            const bool released = (kb.Flags & RI_KEY_BREAK) != 0;
+            LPARAM data = static_cast<LPARAM>(kb.MakeCode) << 16;
+            if (kb.Flags & RI_KEY_E0) data |= static_cast<LPARAM>(1) << 24;
+            if (released) data |= static_cast<LPARAM>(1) << 31;
+            ImGui_ImplWin32_WndProcHandler(e.window,
+                released ? WM_KEYUP : WM_KEYDOWN,kb.VKey,data);
+            if (!released)
+                for (unsigned i=0;i<e.textLength;++i)
+                    io.AddInputCharacterUTF16(e.text[i]);
+        } else if (e.rawType == RIM_TYPEMOUSE) {
+            const auto& m = e.mouse;
+            if (!legacyButtons) {
+                constexpr struct {USHORT down,up;int button;} mapping[]={
+                    {RI_MOUSE_LEFT_BUTTON_DOWN,RI_MOUSE_LEFT_BUTTON_UP,0},
+                    {RI_MOUSE_RIGHT_BUTTON_DOWN,RI_MOUSE_RIGHT_BUTTON_UP,1},
+                    {RI_MOUSE_MIDDLE_BUTTON_DOWN,RI_MOUSE_MIDDLE_BUTTON_UP,2},
+                    {RI_MOUSE_BUTTON_4_DOWN,RI_MOUSE_BUTTON_4_UP,3},
+                    {RI_MOUSE_BUTTON_5_DOWN,RI_MOUSE_BUTTON_5_UP,4}
+                };
+                for (const auto& b:mapping) {
+                    if (m.usButtonFlags & b.down) io.AddMouseButtonEvent(b.button,true);
+                    if (m.usButtonFlags & b.up) io.AddMouseButtonEvent(b.button,false);
+                }
+            }
+            if (!legacyWheel) {
+                if (m.usButtonFlags & RI_MOUSE_WHEEL)
+                    io.AddMouseWheelEvent(0.0f,
+                        static_cast<float>(static_cast<SHORT>(m.usButtonData)) / WHEEL_DELTA);
+                if (m.usButtonFlags & RI_MOUSE_HWHEEL)
+                    io.AddMouseWheelEvent(
+                        static_cast<float>(static_cast<SHORT>(m.usButtonData)) / WHEEL_DELTA,0.0f);
+            }
+        }
+    }
 }
 
 void Renderer::CancelInput() noexcept
 {
-    std::lock_guard lock(mutex_);
-    if (initialized_ && ImGui::GetCurrentContext())
-        ImGui::GetIO().AddFocusEvent(false);
+    // Never mutate ImGui IO from the HWND thread.
+    pendingFocus_.store(-1,std::memory_order_release);
+    std::lock_guard lock(inputMutex_);
+    inputPackets_.clear();
 }
 
 void Renderer::ResumeInput() noexcept
 {
-    std::lock_guard lock(mutex_);
-    if (initialized_ && ImGui::GetCurrentContext() &&
-        gameWindow_ && GetForegroundWindow()==gameWindow_)
-        ImGui::GetIO().AddFocusEvent(true);
+    pendingFocus_.store(1,std::memory_order_release);
 }
 
 bool Renderer::FlushGpu() noexcept
@@ -262,6 +412,7 @@ bool Renderer::FlushGpu() noexcept
 
 void Renderer::Release(bool destroyContext) noexcept
 {
+    CancelInput();
     // Fail open immediately, even if GPU teardown must wait.
     if (inputReady_.exchange(false, std::memory_order_acq_rel))
         InputRouter::Get().RequestCursorSync();

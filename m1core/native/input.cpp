@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <optional>
 #include <string>
 
@@ -26,19 +27,24 @@ bool IsMouseMessage(UINT message) noexcept
 {
     return message>=WM_MOUSEFIRST && message<=WM_MOUSELAST;
 }
-std::optional<RAWKEYBOARD> ReadRawKeyboard(LPARAM data) noexcept
+std::optional<RAWINPUT> ReadRawInput(LPARAM data) noexcept
 {
     UINT size = 0;
-    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(data), RID_INPUT,
-                        nullptr, &size, sizeof(RAWINPUTHEADER)) != 0 ||
-        size < sizeof(RAWINPUTHEADER) || size > 4096) return std::nullopt;
-    alignas(RAWINPUT) BYTE buffer[4096]{};
-    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(data), RID_INPUT,
-                        buffer, &size, sizeof(RAWINPUTHEADER)) == static_cast<UINT>(-1))
+    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(data),RID_INPUT,
+                        nullptr,&size,sizeof(RAWINPUTHEADER)) != 0 ||
+        size < sizeof(RAWINPUTHEADER) || size > 4096)
         return std::nullopt;
-    const auto* raw = reinterpret_cast<const RAWINPUT*>(buffer);
-    if (raw->header.dwType != RIM_TYPEKEYBOARD) return std::nullopt;
-    return raw->data.keyboard;
+    alignas(RAWINPUT) BYTE buffer[4096]{};
+    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(data),RID_INPUT,
+                        buffer,&size,sizeof(RAWINPUTHEADER)) == static_cast<UINT>(-1))
+        return std::nullopt;
+    RAWINPUT sample{};
+    std::memcpy(&sample,buffer,std::min(static_cast<std::size_t>(size),sizeof(sample)));
+    if (sample.header.dwType == RIM_TYPEKEYBOARD &&
+        size < sizeof(RAWINPUTHEADER) + sizeof(RAWKEYBOARD)) return std::nullopt;
+    if (sample.header.dwType == RIM_TYPEMOUSE &&
+        size < sizeof(RAWINPUTHEADER) + sizeof(RAWMOUSE)) return std::nullopt;
+    return sample;
 }
 
 std::string KeyName(int key)
@@ -307,6 +313,11 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
         ApplyEngineCursor(hwnd);
         return 0;
     }
+    // Do not activate a gameplay control underneath an open menu when
+    // returning from another app or monitor.
+    if (message==WM_MOUSEACTIVATE &&
+        (setup_.load() || visible_.load()))
+        return MA_ACTIVATEANDEAT;
     if (message==WM_KILLFOCUS ||
         (message==WM_ACTIVATEAPP && !wp)) {
         focused_.store(false);
@@ -342,22 +353,24 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
     // CET likewise detects gameplay hotkeys via WM_INPUT. Modern games
     // may send both raw and translated key messages; TrackKeyEdge
     // guarantees one activation per physical release.
+    std::optional<RAWINPUT> raw;
     if (message==WM_INPUT) {
-        if (const auto raw=ReadRawKeyboard(lp)) {
-            const bool down=(raw->Flags & RI_KEY_BREAK)==0;
-            if (raw->VKey==VK_F4 && down &&
+        raw=ReadRawInput(lp);
+        if (raw && raw->header.dwType==RIM_TYPEKEYBOARD) {
+            const auto& kb=raw->data.keyboard;
+            const bool down=(kb.Flags & RI_KEY_BREAK)==0;
+            if (kb.VKey==VK_F4 && down &&
                 (GetKeyState(VK_MENU)&0x8000)!=0 &&
                 (visible_.load() || setup_.load())) {
                 Close();
                 PostMessageW(hwnd,WM_CLOSE,0,0);
                 return next();
             }
-            if (HandleKeyTransition(static_cast<int>(raw->VKey),down)) {
-                // Cleanup for consumed RIM_INPUT messages is mandatory.
+            if (HandleKeyTransition(static_cast<int>(kb.VKey),down))
                 return DefWindowProcW(hwnd,message,wp,lp);
-            }
         }
     }
+
     if (message==WM_KEYDOWN || message==WM_SYSKEYDOWN ||
         message==WM_KEYUP || message==WM_SYSKEYUP) {
         const bool down=message==WM_KEYDOWN || message==WM_SYSKEYDOWN;
@@ -366,11 +379,27 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
     }
 
     if (CanRouteImGuiInput(visible_.load() || setup_.load(),foreground,
-                           Renderer::Get().AcceptingInput(),CursorHeld()) &&
-        (IsKeyboardMessage(message) || IsMouseMessage(message) ||
-         message==WM_INPUT)) {
-        Renderer::Get().ForwardInput(hwnd,message,wp,lp);
-        return 1;
+                           Renderer::Get().AcceptingInput(),CursorHeld())) {
+        if (message==WM_INPUT && raw) {
+            // HRAWINPUT dies when this WndProc returns. Copy it now so
+            // the Present thread receives real buttons and keyboard data.
+            Renderer::Get().ForwardRawInput(hwnd,*raw);
+            // Let go of inputs already held by the game before menu opened.
+            if (raw->header.dwType==RIM_TYPEKEYBOARD &&
+                (raw->data.keyboard.Flags & RI_KEY_BREAK))
+                return next();
+            // Required Windows raw-input cleanup for swallowed RIM_INPUT.
+            return DefWindowProcW(hwnd,message,wp,lp);
+        }
+        if (IsKeyboardMessage(message) || IsMouseMessage(message)) {
+            Renderer::Get().ForwardInput(hwnd,message,wp,lp);
+            // Prevent stuck gameplay keys/buttons when closing the overlay.
+            if (message==WM_KEYUP || message==WM_SYSKEYUP ||
+                message==WM_LBUTTONUP || message==WM_RBUTTONUP ||
+                message==WM_MBUTTONUP || message==WM_XBUTTONUP)
+                return next();
+            return 1;
+        }
     }
     return next();
 }

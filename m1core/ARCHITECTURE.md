@@ -57,6 +57,29 @@ replace the CET-dependent prototype, not augment it:
 - \`native/plugin.cpp\`: new native RED4ext RTTI access to register, read,
   write and reset settings. **No CET Lua files or CET installation.**
 
+### Real Win32/RAWINPUT -> ImGui input bridge (November 21)
+
+In the user's 2026-11-21 screenshot first-run setup was visibly rendered,
+but without the dimmed background or keyboard/mouse control, and after
+repeated Alt+Tab. The previous code passed only traditional Win32 events
+directly to ImGui from WndProc. Cyberpunk registers RAWINPUT with
+NOLEGACY behavior, which can suppress the WM_KEYDOWN, WM_LBUTTONDOWN,
+WM_CHAR and mouse-wheel traffic Dear ImGui expects.
+
+The archived `m1core/src/raw_input.cpp` already addressed this through
+queued raw/legacy inputs and mapped cursor position. The native replacement
+now restores this architecture independently: WndProc reads/copies raw input
+immediately, buffers it under a short dedicated mutex, and the render
+thread feeds the standard ImGui Win32 handler, synthetic raw keyboard
+fallback, mouse buttons and wheel. Legacy input takes precedence when
+both paths are present to avoid double presses. Printable raw keys use
+Windows keyboard-layout translation. DPI/backbuffer input coordinates
+are mapped to the real swapchain size. Focus events are delivered only on
+the render thread, and focus-loss input queues are discarded.
+
+This code is still subject to runtime confirmation. No CET GPL source
+is copied, and no custom ImGui widgets are introduced.
+
 ### Standard ImGui modal focus and dimming (November 21)
 
 CET first-time setup uses `ImGui::OpenPopup` and

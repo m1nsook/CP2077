@@ -299,8 +299,9 @@ void DrawWindow()
     ImGui::SetNextWindowSize(ImVec2(940, 600), ImGuiCond_FirstUseEver);
     bool open = true;
     ImGui::OpenPopup(kSettingsModal);
-    if (ImGui::BeginPopupModal(kSettingsModal, &open,
-                              ImGuiWindowFlags_NoSavedSettings)) {
+    const bool showing = ImGui::BeginPopupModal(kSettingsModal, &open,
+                                               ImGuiWindowFlags_NoSavedSettings);
+    if (showing) {
         if (!notice.empty()) ImGui::TextDisabled("%s", notice.c_str());
         if (ImGui::BeginTabBar("M1CORE tabs")) {
             if (ImGui::BeginTabItem("Settings")) {
@@ -329,7 +330,7 @@ void DrawWindow()
             ImGui::EndTabBar();
         }
     }
-    ImGui::EndPopup();
+    if (showing) ImGui::EndPopup();
     if (!open) input.Close();
 }
 } // namespace

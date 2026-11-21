@@ -22,6 +22,7 @@ public:
     // Called from the game window's WndProc on the HWND thread.
     [[nodiscard]] LRESULT ForwardInput(HWND window,UINT message,
                                        WPARAM wparam,LPARAM lparam) noexcept;
+    void ForwardRawInput(HWND window,const RAWINPUT& sample) noexcept;
     void CancelInput() noexcept;
     void ResumeInput() noexcept;
     // True only after a complete overlay command list was submitted and
@@ -39,10 +40,27 @@ private:
     };
     bool Initialize(const GameFrame& frame) noexcept;
     void Release(bool destroyContext = false) noexcept;
+    void DrainInput() noexcept;
+    struct InputPacket {
+        HWND window = nullptr;
+        UINT message = 0;
+        WPARAM wparam = 0;
+        LPARAM lparam = 0;
+        bool raw = false;
+        DWORD rawType = 0;
+        RAWKEYBOARD keyboard{};
+        RAWMOUSE mouse{};
+        wchar_t text[8]{};
+        unsigned textLength = 0;
+    };
     [[nodiscard]] bool FrameReady(FrameBuffer& frame) noexcept;
     [[nodiscard]] bool FlushGpu() noexcept;
 
     std::recursive_mutex mutex_;
+    // WndProc owns this short queue; only the Present thread calls Dear ImGui.
+    std::mutex inputMutex_;
+    std::vector<InputPacket> inputPackets_;
+    std::atomic<int> pendingFocus_{0};
     std::atomic_bool inputReady_{false};
     std::uint64_t lastSubmittedAt_ = 0;
     HWND gameWindow_ = nullptr;
