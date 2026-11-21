@@ -197,8 +197,9 @@ void InputRouter::RequestCursorSync() noexcept
 
 void InputRouter::ApplyEngineCursor(HWND hwnd) noexcept
 {
-    const bool desired=OwnsInput(visible_.load() || setup_.load(),
-         focused_.load() && GetForegroundWindow()==hwnd);
+    const bool desired=CanCaptureInput(visible_.load() || setup_.load(),
+         focused_.load() && GetForegroundWindow()==hwnd,
+         Renderer::Get().AcceptingInput());
     if (desired==engineCursorHeld_) return;
     const auto address=ResolveGameSymbol(kGameForceCursor);
     auto* engine=RED4ext::CGameEngine::Get();
@@ -314,7 +315,8 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
         }
     }
 
-    if (OwnsInput(visible_.load() || setup_.load(),foreground) &&
+    if (CanCaptureInput(visible_.load() || setup_.load(),foreground,
+                        Renderer::Get().AcceptingInput()) &&
         (IsKeyboardMessage(message) || IsMouseMessage(message) ||
          message==WM_INPUT)) {
         Renderer::Get().ForwardInput(hwnd,message,wp,lp);

@@ -239,9 +239,12 @@ bool Registry::SaveProfile(std::string name)
     std::lock_guard guard(mutex_);
     auto document = ReadSaved(store_);
     if (!document.contains("profiles") || !document["profiles"].is_object()) return false;
-    auto profile = json::object();
+    // Preserve settings from mods which are not currently registered.
+    // A user switching load orders must not lose those profile entries.
+    auto profile = document["values"];
     for (const auto& [id, mod] : mods_) {
-        profile[id] = json::object();
+        if (!profile.contains(id) || !profile[id].is_object())
+            profile[id] = json::object();
         for (const auto& setting : mod.settings)
             profile[id][setting.id] = setting.value;
     }

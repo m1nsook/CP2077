@@ -27,6 +27,14 @@ constexpr UINT kCursorSyncMessage = WM_APP + 0x4B3;
     return visible && foreground;
 }
 
+// Rendering can be requested before the DX12/ImGui backend is usable,
+// but game input must remain untouched until a frame actually submitted.
+[[nodiscard]] inline bool CanCaptureInput(bool visible, bool foreground,
+                                          bool rendererReady) noexcept
+{
+    return OwnsInput(visible, foreground) && rendererReady;
+}
+
 class InputRouter {
 public:
     static InputRouter& Get() noexcept;

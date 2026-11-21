@@ -186,8 +186,17 @@ void Renderer::Present(const GameFrame& source) noexcept
     if (FAILED(commandList_->Close())) return;
     ID3D12CommandList* commands[] = {commandList_.Get()};
     queue_->ExecuteCommandLists(1,commands);
-    if (SUCCEEDED(queue_->Signal(fence_.Get(),++nextFence_)))
+    if (SUCCEEDED(queue_->Signal(fence_.Get(),++nextFence_))) {
         frame.submittedFence = nextFence_;
+        // First successful submitted frame enables HWND capture and the
+        // REDengine cursor. The notification is delivered on its own thread.
+        if (!inputReady_.exchange(true, std::memory_order_acq_rel))
+            InputRouter::Get().RequestCursorSync();
+    } else {
+        // A failed GPU submission must not strand keyboard or mouse input.
+        inputReady_.store(false, std::memory_order_release);
+        InputRouter::Get().Close();
+    }
 }
 
 LRESULT Renderer::ForwardInput(HWND window,UINT message,
@@ -225,6 +234,9 @@ bool Renderer::FlushGpu() noexcept
 
 void Renderer::Release() noexcept
 {
+    // Fail open immediately, even if GPU teardown must wait.
+    inputReady_.store(false, std::memory_order_release);
+    InputRouter::Get().RequestCursorSync();
     // The passive input listener survives a resize, allowing user hotkeys
     // to work after device reinitialization without hooking the HWND again.
     // The bridge uninstalls it on actual game/plugin shutdown.

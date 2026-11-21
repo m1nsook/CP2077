@@ -7,6 +7,7 @@
 #include <dxgi1_5.h>
 #include <wrl/client.h>
 
+#include <atomic>
 #include <cstdint>
 #include <mutex>
 #include <vector>
@@ -23,6 +24,11 @@ public:
                                        WPARAM wparam,LPARAM lparam) noexcept;
     void CancelInput() noexcept;
     void ResumeInput() noexcept;
+    // True only after a complete overlay command list was submitted and
+    // signalled. The HWND router must never swallow input before this.
+    [[nodiscard]] bool AcceptingInput() const noexcept {
+        return inputReady_.load(std::memory_order_acquire);
+    }
 private:
     using ComPtrFence = Microsoft::WRL::ComPtr<ID3D12Fence>;
     struct FrameBuffer {
@@ -37,6 +43,7 @@ private:
     [[nodiscard]] bool FlushGpu() noexcept;
 
     std::recursive_mutex mutex_;
+    std::atomic_bool inputReady_{false};
     HWND gameWindow_ = nullptr;
     Microsoft::WRL::ComPtr<IDXGISwapChain4> swapchain_;
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> queue_;

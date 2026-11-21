@@ -6,8 +6,8 @@
 #include <nlohmann/json.hpp>
 
 namespace m1core {
-// DLL-owned durable settings state. The CET-facing UI is deliberately a
-// separate Lua frontend so CET (not this plugin) owns ImGui and input.
+// DLL-owned durable settings state for the standalone RED4ext plugin.
+// No external scripting frontend is required.
 class StateStore {
 public:
     StateStore() = default;

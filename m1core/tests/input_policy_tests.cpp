@@ -1,27 +1,32 @@
 #include "../native/input.hpp"
-#include <cassert>
+#include "check.hpp"
 #include <iostream>
 
 int main()
 {
     using m1core::MustPassThroughWindows;
     using m1core::OwnsInput;
-    assert(MustPassThroughWindows(WM_CLOSE,0,0));
-    assert(MustPassThroughWindows(WM_DESTROY,0,0));
-    assert(MustPassThroughWindows(WM_NCDESTROY,0,0));
-    assert(MustPassThroughWindows(WM_SYSCOMMAND,SC_CLOSE,0));
-    assert(MustPassThroughWindows(WM_SYSCOMMAND,SC_CLOSE|1,0));
-    assert(!MustPassThroughWindows(WM_SYSCOMMAND,SC_MINIMIZE,0));
-    assert(MustPassThroughWindows(WM_SYSKEYDOWN,VK_F4,
+    REQUIRE(MustPassThroughWindows(WM_CLOSE,0,0));
+    REQUIRE(MustPassThroughWindows(WM_DESTROY,0,0));
+    REQUIRE(MustPassThroughWindows(WM_NCDESTROY,0,0));
+    REQUIRE(MustPassThroughWindows(WM_SYSCOMMAND,SC_CLOSE,0));
+    REQUIRE(MustPassThroughWindows(WM_SYSCOMMAND,SC_CLOSE|1,0));
+    REQUIRE(!MustPassThroughWindows(WM_SYSCOMMAND,SC_MINIMIZE,0));
+    REQUIRE(MustPassThroughWindows(WM_SYSKEYDOWN,VK_F4,
                                    static_cast<LPARAM>(1ull<<29)));
-    assert(!MustPassThroughWindows(WM_KEYDOWN,VK_F4,
+    REQUIRE(!MustPassThroughWindows(WM_KEYDOWN,VK_F4,
                                     static_cast<LPARAM>(1ull<<29)));
-    assert(!MustPassThroughWindows(WM_SYSKEYDOWN,VK_F4,0));
-    assert(!MustPassThroughWindows(WM_SYSKEYDOWN,VK_F3,
+    REQUIRE(!MustPassThroughWindows(WM_SYSKEYDOWN,VK_F4,0));
+    REQUIRE(!MustPassThroughWindows(WM_SYSKEYDOWN,VK_F3,
                                     static_cast<LPARAM>(1ull<<29)));
-    assert(!OwnsInput(false,false));
-    assert(!OwnsInput(false,true));
-    assert(!OwnsInput(true,false));
-    assert(OwnsInput(true,true));
+    REQUIRE(!OwnsInput(false,false));
+    REQUIRE(!OwnsInput(false,true));
+    REQUIRE(!OwnsInput(true,false));
+    REQUIRE(OwnsInput(true,true));
+    using m1core::CanCaptureInput;
+    REQUIRE(!CanCaptureInput(true,true,false)); // GPU backend unavailable
+    REQUIRE(!CanCaptureInput(false,true,true));
+    REQUIRE(!CanCaptureInput(true,false,true)); // game lost foreground
+    REQUIRE(CanCaptureInput(true,true,true));
     std::cout<<"Native input ownership/OS shutdown policy passed\n";
 }
