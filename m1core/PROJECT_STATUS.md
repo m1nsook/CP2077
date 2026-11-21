@@ -38,7 +38,7 @@ Only work on the m1core development branch and draft PR unless explicitly author
 ## Open work (not yet validated)
 
 - **Registry + profiles:** profile-load merging of unloaded mods, preservation of newer settings, and atomic rejection of invalid profiles has been implemented in source with new native tests. **CI and in-game persistence verification are pending at this commit**; do not claim this work is confirmed working in Cyberpunk.
-- **Native automated tests:** the active xmake/Windows workflow now builds and runs registry and state tests directly against the same native sources as the DLL. Verify Windows CI and update this section with the result.
+- **Native automated tests:** the active xmake/Windows workflow now builds and runs registry and state tests against the same native sources as the DLL. [CI #44913706268](https://github.com/m1nsook/CP2077/actions/runs/44913706268) successfully compiled the full core but failed compiling standalone test targets because `Windows.h` defined `max` without `NOMINMAX`. The compile flags are corrected in the subsequent commit; rerun CI before claiming tests passed.
 - **Developer integration:** provide a small, real consuming mod/fixture that registers settings through native RTTI/REDscript and verifies registration, UI changes and reloads. At present the UI can show zero mods because no consumers are installed; this alone is not a bug.
 - **Lifecycle and compatibility:** test persistence and profile restore in-game after restart. Avoid touching the game-tested input/draw/hotkey and cloud script pass-through except to fix a reproduced regression.
 - **Release:** do not publish or merge until user approves; retain MIT/third-party licenses and no restricted assets. This project is still in development.
