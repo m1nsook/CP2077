@@ -70,6 +70,14 @@ overlay/first-run modal so it reappears when the game returns to focus.
 If the game replaces its viewport HWND, native listener reattachment
 also carries forward the visible/setup state.
 
+The cursor synchronization path additionally retries *release*, not just
+acquisition, whenever overlay input is disallowed (renderer uninitialized,
+lost foreground, hidden UI). This prevents a stale REDengine ForceCursor
+reason from trapping gameplay controls after display mode changes. A
+viewport HWND rebind preserves potential outstanding cursor ownership
+and replays release on the new HWND. Missed focus events request a
+keyboard-edge reset on the correct HWND thread.
+
 The keybind allowlist previously accepted only function keys, A-Z,
 0-9 and a few special cases. It now accepts normal non-modifier
 keyboard virtual keys (including numpad, space, punctuation and arrows).

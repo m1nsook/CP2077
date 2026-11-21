@@ -43,6 +43,13 @@ int main()
     REQUIRE(!CanRouteImGuiInput(true,true,false,true)); // GPU not ready
     REQUIRE(!CanRouteImGuiInput(true,false,true,true)); // Alt+Tab
     REQUIRE(CanRouteImGuiInput(true,true,true,true));
+    using m1core::NeedsEngineCursorSync;
+    REQUIRE(!NeedsEngineCursorSync(true,true,true,true)); // already captured
+    REQUIRE(NeedsEngineCursorSync(true,true,true,false)); // open and ready
+    REQUIRE(NeedsEngineCursorSync(true,false,true,true)); // lost focus -> release
+    REQUIRE(NeedsEngineCursorSync(true,true,false,true)); // resize -> release
+    REQUIRE(NeedsEngineCursorSync(false,true,true,true)); // closed -> release
+    REQUIRE(!NeedsEngineCursorSync(true,true,false,false)); // no capture needed
     std::array<bool,256> keys{};
     using m1core::TrackKeyEdge;
     using m1core::KeyEdge;

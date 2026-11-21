@@ -61,6 +61,15 @@ constexpr UINT kCursorSyncMessage = WM_APP + 0x4B3;
     return CanCaptureInput(active, foreground, rendererReady) && cursorHeld;
 }
 
+// The engine cursor must be released whenever rendering, focus or UI state
+// disallows capture; otherwise fullscreen Alt+Tab can strand gameplay input.
+[[nodiscard]] inline bool NeedsEngineCursorSync(bool active, bool foreground,
+                                                bool rendererReady,
+                                                bool cursorHeld) noexcept
+{
+    return CanCaptureInput(active,foreground,rendererReady) != cursorHeld;
+}
+
 // Single-key bind selection follows the donated CET VKBindings approach:
 // retain physical keyboard VKs, not just the function-key subset. Reject
 // mouse buttons, OS modifiers and Windows-reserved virtual keys.
@@ -142,6 +151,7 @@ private:
     std::array<bool,256> keysDown_{};
     std::atomic_bool firstRunArmed_{false};
     std::atomic_bool popupDismiss_{false};
+    std::atomic_bool resetKeyEdgesOnWindowThread_{false};
     // When first-run commits on key-down, swallow its matching key-up
     // instead of reopening the overlay immediately on that release edge.
     int freshlyBoundKey_ = 0;

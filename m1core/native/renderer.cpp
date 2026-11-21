@@ -178,7 +178,10 @@ void Renderer::Present(const GameFrame& source) noexcept
     // drawing and input ownership need the foreground game HWND.
     // Initialize on the game's Present callback even with the menu hidden,
     // but never trap input just because a graphics context exists.
-    if (!initialized_ && !Initialize(source)) return;
+    if (!initialized_ && !Initialize(source)) {
+        InputRouter::Get().RetryCursorSync();
+        return;
+    }
     if (source.swapchain != swapchain_.Get() || source.queue != queue_.Get() ||
         source.window != gameWindow_) {
         Reset();
@@ -187,6 +190,7 @@ void Renderer::Present(const GameFrame& source) noexcept
     InputRouter::Get().ReconcileWindowFocus();
     if (GameBaseInitialized())
         InputRouter::Get().ArmFirstRun();
+    InputRouter::Get().RetryCursorSync();
     if (!InputRouter::Get().ShouldDraw() &&
         !InputRouter::Get().NeedsPopupDismiss()) return;
     const UINT index = swapchain_->GetCurrentBackBufferIndex();

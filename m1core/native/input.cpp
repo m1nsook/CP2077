@@ -98,6 +98,11 @@ bool InputRouter::Install(HWND hwnd) noexcept
     const bool reopen = visible_.load(std::memory_order_acquire);
     const bool firstRun = setup_.load(std::memory_order_acquire);
     const bool wasRecording = recording_.load(std::memory_order_acquire);
+    // A viewport destroyed during exclusive fullscreen switching may not
+    // process its last cursor-release message. Preserve the possibility that
+    // the engine still holds our reason and explicitly release on the new HWND.
+    const bool oldCursorMayBeHeld = CursorHeld();
+    if (!IsWindow(hwnd)) return false;
     if (window_) Uninstall();
     // A missing/late ForceCursor symbol must never prevent mounting
     // the keyboard-only first-run binder or native ImGui renderer.
@@ -117,7 +122,7 @@ bool InputRouter::Install(HWND hwnd) noexcept
     window_=hwnd;
     firstRunArmed_.store(false);
     popupDismiss_.store(false);
-    engineCursorHeld_.store(false);
+    engineCursorHeld_.store(rebinding && oldCursorMayBeHeld);
     lastCursorRetry_.store(0);
     loggedCursorUnavailable_ = false;
     keysDown_.fill(false);
@@ -131,6 +136,8 @@ bool InputRouter::Install(HWND hwnd) noexcept
     if (rebinding && (reopen || firstRun))
         RenderBridge::Get().LogInfo(
             "m1core: viewport reattached; overlay session preserved");
+    if (rebinding && oldCursorMayBeHeld)
+        RequestCursorSync();
     return true;
 }
 
@@ -175,6 +182,9 @@ void InputRouter::ReconcileWindowFocus() noexcept
     const bool nowFocused = GetForegroundWindow()==window_;
     const bool wasFocused = focused_.exchange(nowFocused,std::memory_order_acq_rel);
     if (!NeedsFocusReconciliation(wasFocused,nowFocused)) return;
+    // Key edges belong to the game WndProc thread: request a reset instead
+    // of mutating that array on the Present thread.
+    resetKeyEdgesOnWindowThread_.store(true,std::memory_order_release);
 
     // The Present thread may be the first observer of focus after hooking:
     // no Alt+Tab is necessary to make first-run setup available.
@@ -304,8 +314,13 @@ void InputRouter::RequestCursorSync() noexcept
 
 void InputRouter::RetryCursorSync() noexcept
 {
-    if (!ShouldDraw() || CursorHeld() ||
-        !Renderer::Get().AcceptingInput()) return;
+    if (!window_ || !IsWindow(window_)) return;
+    // CET's cursor toggle belongs to actual overlay input ownership.
+    // IMPORTANT: retry RELEASE as well as acquisition. A temporarily
+    // unavailable renderer must never leave Cyberpunk input trapped.
+    if (!NeedsEngineCursorSync(visible_.load() || setup_.load(),
+        focused_.load() && GetForegroundWindow()==window_,
+        Renderer::Get().AcceptingInput(),CursorHeld())) return;
     const auto now = GetTickCount64();
     auto previous = lastCursorRetry_.load();
     if (now - previous < 350 ||
@@ -355,6 +370,10 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
     if (!previous) return DefWindowProcW(hwnd,message,wp,lp);
     const auto next=[&] { return CallWindowProcW(previous,hwnd,message,wp,lp); };
     if (hwnd!=window_) return next();
+    if (resetKeyEdgesOnWindowThread_.exchange(false,std::memory_order_acq_rel)) {
+        keysDown_.fill(false);
+        freshlyBoundKey_ = 0;
+    }
 
     if (message==kCursorSyncMessage) {
         ApplyEngineCursor(hwnd);
