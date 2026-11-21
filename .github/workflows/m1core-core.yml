@@ -53,10 +53,10 @@ jobs:
           $root = 'm1core/core'
           foreach ($file in @('src/red4ext_plugin.cpp','src/d3d12/D3D12_Hooks.cpp',
                                'src/window/window.cpp','src/VKBindings.cpp',
-                               'src/overlay/Overlay.cpp','LICENSE-MIT',
+                               'src/overlay/Overlay.cpp',
                                'ThirdParty_LICENSES','xmake.lua')) {
             if (!(Test-Path -LiteralPath (Join-Path $root $file))) {
-              throw "CET foundation source missing: $file"
+              throw "m1core native source missing: $file"
             }
           }
           if (Test-Path -LiteralPath "$root/src/common/FontMaterialDesignIcons.h") {
@@ -111,14 +111,14 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           xmake f -p windows -a x64 -m release -y -vD
-          if ($LASTEXITCODE -ne 0) { throw "CET-derived xmake configuration failed" }
-      - name: Compile m1core.dll from CET source
+          if ($LASTEXITCODE -ne 0) { throw "m1core xmake configuration failed" }
+      - name: Compile standalone RED4ext m1core.dll
         working-directory: m1core/core
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           xmake build -y -vD m1core
-          if ($LASTEXITCODE -ne 0) { throw "CET-derived DLL compilation failed" }
+          if ($LASTEXITCODE -ne 0) { throw "m1core.dll native compilation failed" }
       - name: Test native registry, persistence, and profiles
         working-directory: m1core/core
         shell: pwsh
@@ -189,23 +189,32 @@ jobs:
               !(Select-String -Path "$dest/LICENSE-PHOSPHOR-MIT.txt" -Pattern 'MIT License' -Quiet)) {
             throw 'Third-party font license files are missing or incorrect'
           }
-      - name: Package one game-root artifact — exclude CET icons/fonts
+      - name: Package standalone m1core game-root artifact
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $source = @(Get-ChildItem -LiteralPath 'm1core/core/build' -Filter 'm1core.dll' -Recurse -File)
-          if ($source.Count -ne 1) { throw "Expected exactly one CET-derived m1core.dll, got $($source.Count)" }
+          if ($source.Count -ne 1) { throw "Expected exactly one native m1core.dll, got $($source.Count)" }
           $dir = 'm1core/core/game-package/red4ext/plugins/m1core'
           New-Item -ItemType Directory -Path $dir -Force | Out-Null
           Copy-Item -LiteralPath $source[0].FullName -Destination "$dir/m1core.dll"
           Copy-Item -LiteralPath 'm1core/LICENSE' -Destination "$dir/LICENSE"
-          Copy-Item -LiteralPath 'm1core/core/LICENSE-MIT' -Destination "$dir/LICENSE-YAMASHI-MIT"
           Copy-Item -LiteralPath 'm1core/core/ThirdParty_LICENSES' -Destination "$dir/THIRD_PARTY_LICENSES"
           $fontDir = "$dir/fonts"
           New-Item -ItemType Directory -Path $fontDir -Force | Out-Null
           Copy-Item -Path 'm1core/core/font-assets/*' -Destination $fontDir
           $files = @(Get-ChildItem -LiteralPath 'm1core/core/game-package' -File -Recurse)
-          if ($files.Count -ne 10) { throw "Unexpected game package file count: $($files.Count)" }
+          if ($files.Count -ne 9) { throw "Unexpected standalone game package file count: $($files.Count)" }
+          if (Test-Path "$dir/LICENSE-YAMASHI-MIT") {
+            throw "A donor-specific license was re-added to m1core's standalone package"
+          }
+          $projectLicense = Get-Content -LiteralPath "$dir/LICENSE" -Raw
+          if ($projectLicense -notmatch 'Copyright \(c\) 2026' -or $projectLicense -notmatch 'MISO') {
+            throw "m1core's own project MIT license is missing from the release"
+          }
+          if (!(Test-Path "$dir/THIRD_PARTY_LICENSES")) {
+            throw "Required independent third-party library notices are missing"
+          }
           $allowedFonts = @('JetBrainsMono-Regular.ttf','Karla-Regular.ttf','Phosphor-Regular.ttf')
           $actualFonts = @((Get-ChildItem -LiteralPath $fontDir -File -Filter '*.ttf').Name)
           if (@(Compare-Object -ReferenceObject $allowedFonts -DifferenceObject $actualFonts).Count -ne 0) {

@@ -1,10 +1,19 @@
-# m1core — CET-derived RED4ext DLL build
+# m1core — standalone RED4ext DLL build
 
-This branch is a **source port**, based on yamashi's specifically supplied MIT-only CET 1.38.1 archive (original source snapshot in Git history). It is **not** the independent `m1core/native` renderer. The original source tree, including donated changes, was verified byte-for-byte before port modifications.
+**m1core is an independent project**: it is built as a native RED4ext
+`m1core.dll`, not an ASI module, and neither the build nor players need a
+separate CET installation. Its connected game window, Win32/DX12 backend,
+ImGui, raw keyboard/mouse integration and LuaJIT engine incorporate
+code directly donated and authorized for use in m1core. The original
+technical source snapshot remains in Git history for developers, but
+m1core does not adopt its branding, UI, releases or package identity.
 
-The build uses CET's original xmake dependency graph, D3D12/Win32 backend, overlay, VKBindings, GameMainThread hooks and Lua scripting subsystem, now initialized from `RED4ext::v1::Main`. Its standalone target is `m1core.dll`, not `.asi`. RED4ext.SDK headers must be provided at `vendor/RED4ext.SDK/include` (the donated ZIP included the empty directory). Windows CI provides the pinned SDK, then runs xmake.
-
-Restricted donor CET font/icon assets and the ASI loader are explicitly excluded. The supplied ImGui style at `m1core/native/ImGuiCustomTheme.h` is preserved, while the **independently licensed** Karla, JetBrains Mono and Phosphor fonts are loaded through ImGui's normal font atlas. Paths are isolated under `red4ext/plugins/m1core`, not any existing CET installation.
+The Windows build uses xmake, with RED4ext.SDK headers at
+`vendor/RED4ext.SDK/include` supplied by a pinned CI checkout.
+The independently licensed Karla, JetBrains Mono and Phosphor fonts are
+loaded by Dear ImGui. Restricted original-project icons/fonts and its
+ASI loader are not packaged. Installation remains under
+`red4ext/plugins/m1core/`.
 
 The donated source archive omitted the original CET Lua bootstrap scripts (`json/json`, `IconGlyphs/icons`), so references to those missing scripts are disabled. The embedded Lua VM remains part of the foundation; mod-specific Lua scripts are not bundled.
 
@@ -24,17 +33,21 @@ presentation-only change should distinguish that startup notice, while reusing
 the proven native input, window hooks and D3D12 backend. Preserve third-party
 toast API behavior as needed.
 
-According to the user-provided message from yamashi, no additional public
-name mention is necessary, but a shout-out on a future Nexus Mods listing is
-welcome. This does **not override MIT license conditions**: required upstream
-copyright/license notices are retained unmodified in the source and archives.
-There is no visible “powered by CET” text, CET fonts, CET icons or CET logos.
+**The author of the donated code expressly authorized the maintainer to use
+that contribution as part of her own independent project** without requiring
+his name or the old project's name in m1core's public credits or project
+license. His requested acknowledgment is a **Nexus Mods shout-out when m1core
+is released**, which the maintainer will handle. Accordingly the release ZIP
+contains the `m1core/LICENSE` project MIT license, not a separate
+author-specific license/branding copy. This understanding is specific to the
+donor's own contribution; it does **not** waive requirements for independently
+copyrighted third-party libraries or fonts. Their notices remain packaged.
 
 ### m1core application UI
 
-The CET-derived runtime now hosts the original m1core native registry and REDscript settings API. The main UI is a **single Dear ImGui settings window**, with tabs for Settings, Keybinds, Profiles, Logs and About; controls use stock ImGui widgets and the supplied ImGui theme. CET-only developer panels (Console/TweakDB Editor/Game Log/ImGui Debug/Reload All Mods) are no longer presented in the main interface. Keybinding still uses the original donor widget and raw input implementation; its internal persisted `cet` binding namespace remains temporarily unchanged to avoid deleting existing users' shortcuts. This is internal compatibility, not user-visible branding. The old independent D3D12 renderer is not compiled or used.
+The native m1core runtime hosts the m1core settings registry and REDscript API. The main UI is a **single Dear ImGui settings window**, with tabs for Settings, Keybinds, Profiles, Logs and About; controls use stock ImGui widgets and the supplied ImGui theme. CET-only developer panels (Console/TweakDB Editor/Game Log/ImGui Debug/Reload All Mods) are no longer presented in the main interface. Keybinding still uses the original donor widget and raw input implementation; its internal persisted `cet` binding namespace remains temporarily unchanged to avoid deleting existing users' shortcuts. This is internal compatibility, not user-visible branding. The old independent D3D12 renderer is not compiled or used.
 
-The active runtime source is now under `m1core/core` (formerly `m1core/cet-foundation`). It uses an m1core-named runtime class, M1CoreVersion configuration header, and stable RED4ext `Main` entry. The original gifted source and its hash-verified 131-file snapshot remain in the earlier commits on this branch. No restricted CET fonts/icons, ASI loader, or unrelated mods are shipped. The new separately licensed Karla/JetBrains Mono/Phosphor fonts are explicitly permitted and documented below.
+The active runtime source is now under `m1core/core` (formerly `m1core/cet-foundation`). It uses an m1core-named runtime class, M1CoreVersion configuration header, and stable RED4ext `Main` entry. The source-donation snapshot remains in the Git history for internal development reference. No restricted donor fonts/icons, ASI loader, or unrelated mods are shipped. The new separately licensed Karla/JetBrains Mono/Phosphor fonts are explicitly permitted and documented below.
 
 ### Windows CI dependencies
 
@@ -43,11 +56,11 @@ Windows CI caches the local xmake package/build cache between runs. It compiles 
 
 ### Cyberpunk 2.50 menu/cloud-sync investigation
 
-The last in-game build displayed the m1core window but, with the DLL loaded, the game's "Cloud sync in progress" notice never completed and gameplay input remained blocked. Removing the DLL immediately removed the problem (reported by the user). The earlier CET-derived Console displayed repeated `Function appears to be hooked but isn't?` messages.
+During an earlier development build the game displayed "Cloud sync in progress" indefinitely when m1core.dll was loaded. This bug was subsequently resolved and confirmed by the user. Removing the DLL immediately removed the problem (reported by the user). The earlier CET-derived Console displayed repeated `Function appears to be hooked but isn't?` messages.
 
 Found a concrete defect in the gifted runtime's `FunctionOverride::HookRunPureScriptFunction`: it treated *every* game script function with `isNative` set as if it belonged to the m1core override table and, if absent, returned `false`. The global hook was therefore aborting ordinary game script calls that m1core never registered. We now unlock and forward unregistered calls to `RealRunPureScriptFunction`, leaving registered Lua overrides and the original CET input/DirectX systems unchanged. The Windows CI includes a fail-closed source guard for this case.
 
-**Root cause attribution:** the early script-abort behavior is directly confirmed by source. Whether it alone explains the cloud-sync loop still requires validation in Cyberpunk. Steam cloud settings and the user's saves are not modified.
+**Verification:** the user confirmed that the original script-function passthrough patch resolved the cloud-sync hang. Steam cloud settings and user saves were not modified.
 
 
 ## Bundled UI typography and icon font

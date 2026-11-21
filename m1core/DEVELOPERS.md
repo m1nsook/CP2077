@@ -41,7 +41,7 @@ The native settings store is **separate** from the runtime's own `config.json`, 
 
 ## Development / compatibility
 
-The CET-derived input, graphics and hotkey runtime is intentionally separate from the native JSON registry. Mod settings must never hook or capture Windows input themselves. The project is not released; function registration and gameplay interaction still require validation with a consuming mod before other developers rely on this ABI. The existing internal hotkey persistence key keeps its historical value for backward compatibility even though the visible UI is called m1core.
+The m1core native input, graphics and hotkey runtime is intentionally separate from the JSON settings registry. Mod settings must never hook or capture Windows input themselves. The project is not released; function registration and gameplay interaction still require validation with a consuming mod before other developers rely on this ABI. The existing internal hotkey persistence key keeps its historical value for backward compatibility even though the visible UI is called m1core.
 
 
 ## Script file extensions

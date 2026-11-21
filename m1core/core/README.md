@@ -1,7 +1,17 @@
-# m1core — CET 1.38.1 foundation
+# m1core — active native runtime
 
-This is the connected CET source foundation for the new m1core runtime, not a collection of pasted input snippets. The maintainer supplied a specially authorized MIT-only CET 1.38.1 source archive from yamashi (archive SHA-256 `83a4488038e9c085e508d00b2bce8bf62c80baadcbfe92470aa25fa52469acc1`). Most source files were verified byte-for-byte identical to the corresponding CET 1.38.1 tag; the few donor-specific differences must be preserved when imported. The donor's MIT notice is retained at `LICENSE-MIT`.
+This directory builds **m1core.dll**, a standalone Cyberpunk 2077 RED4ext
+framework. It contains the integrated game-window/DX12/ImGui input lifecycle,
+native settings registry and LuaJIT scripting runtime.
 
-No CET icon/font assets or ASI loader will be imported or distributed. The target is a standalone m1core RED4ext DLL using the maintainer's ImGui style. The previous independent DLL remains in `../native/` until the donated-source port compiles and runs; this foundation directory is not yet a playable release.
+The current implementation includes directly authorized donated source code,
+but it is maintained, named, packaged and released as **m1core**, with its
+independent public API and visual design. It does **not** require any separate
+CET installation. Historical donor-source analysis and earlier prototypes
+remain available in Git history and the project's development notes.
 
-The active runtime source is now under `m1core/core` (formerly `m1core/cet-foundation`). It uses an m1core-named runtime class, M1CoreVersion configuration header, and stable RED4ext `Main` entry. The original gifted source and its hash-verified 131-file snapshot remain in the earlier commits on this branch. No restricted fonts/icons, ASI loader, or unrelated mods are shipped.
+- Build instructions and independent third-party licenses: [BUILD.md](BUILD.md)
+- API documentation: [../DEVELOPERS.md](../DEVELOPERS.md)
+- Current verification: [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
+
+Source/bytecode sample consumers live under `../examples/`.
