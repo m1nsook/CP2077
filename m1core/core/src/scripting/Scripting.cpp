@@ -628,8 +628,11 @@ void Scripting::UnloadAllMods()
 
 void Scripting::ReloadAllMods()
 {
-    UnloadAllMods();
-
+    // LoadAll() already performs DiscardAll(). Calling UnloadAllMods()
+    // here first discarded contexts/sandboxes and loaded bindings twice.
+    // Re-register native overrides before the single store teardown.
+    m_override.Clear();
+    RegisterOverrides();
     m_store.LoadAll();
 
     TriggerOnHook();

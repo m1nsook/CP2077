@@ -222,10 +222,38 @@ ScriptContext::ScriptContext(ScriptContext&& other) noexcept
 
 ScriptContext::~ScriptContext()
 {
-    if (m_initialized)
-        TriggerOnShutdown();
+    // Destructors are noexcept. Never let a failed shutdown callback or
+    // logger flush terminate Cyberpunk while unloading a script context.
+    try
+    {
+        if (m_initialized)
+            TriggerOnShutdown();
+    }
+    catch (const std::exception& error)
+    {
+        try
+        {
+            if (m_logger)
+                m_logger->error("Mod '{}' onShutdown cleanup failed: {}", m_name, error.what());
+        }
+        catch (...) {}
+    }
+    catch (...)
+    {
+        try
+        {
+            if (m_logger)
+                m_logger->error("Mod '{}' onShutdown cleanup raised an unknown exception", m_name);
+        }
+        catch (...) {}
+    }
 
-    m_logger->flush();
+    try
+    {
+        if (m_logger)
+            m_logger->flush();
+    }
+    catch (...) {}
 }
 
 bool ScriptContext::IsValid() const

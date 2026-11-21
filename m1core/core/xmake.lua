@@ -162,3 +162,10 @@ target("m1core_mod_dispatch_tests")
     set_kind("binary")
     add_files("../tests/mod_dispatch_tests.cpp")
     add_includedirs("src", "../tests")
+
+-- M7 reload teardown: per-sandbox cleanup remains independent of
+-- sol2, the game, and the native UI. No real SQLite/file data is touched.
+target("m1core_sandbox_cleanup_tests")
+    set_kind("binary")
+    add_files("../tests/sandbox_cleanup_tests.cpp")
+    add_includedirs("src", "../tests")

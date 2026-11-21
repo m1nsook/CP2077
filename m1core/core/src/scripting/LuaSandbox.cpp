@@ -3,6 +3,7 @@
 #include "LuaSandbox.h"
 #include "ScriptFormats.hpp"
 #include "ScopedWorkingDirectory.hpp"
+#include "SandboxCleanup.hpp"
 #include <common/ScopeGuard.h>
 
 #include "Texture.h"
@@ -210,8 +211,14 @@ void LuaSandbox::ResetState()
     auto lockedState = m_pScripting->GetLockedState();
     auto& luaState = lockedState.Get();
 
-    for (size_t i = 1; i < m_sandboxes.size(); ++i)
-        CloseDBForSandbox(m_sandboxes[i]);
+    // Each mod's database cleanup is independent: a broken db:close()
+    // must not prevent other mods from closing before the reset.
+    m1core::scripts::ForEachSandboxSafely(m_sandboxes.size(),
+        [&](std::size_t id) { CloseDBForSandbox(m_sandboxes[id]); },
+        [](std::size_t id, const char* reason) {
+            if (const auto logger = spdlog::get("scripting"))
+                logger->error("m1core: sandbox {} database cleanup failed: {}", id, reason);
+        });
 
     m_modules.clear();
 
@@ -665,11 +672,18 @@ void LuaSandbox::InitializeLoggerForSandbox(Sandbox& aSandbox, const sol::state&
 
 void LuaSandbox::CloseDBForSandbox(const Sandbox& aSandbox) const
 {
-    aSandbox.ExecuteString(R"(
+    const auto result = aSandbox.ExecuteString(R"(
         if type(db) == 'userdata' and tostring(db):find('^sqlite database') then
             db:close()
         end
     )");
+    // A failed protected Lua result does not throw automatically. Surface
+    // it to the per-sandbox cleanup boundary so later mods still close.
+    if (!result.valid())
+    {
+        const sol::error error = result;
+        throw std::runtime_error(error.what());
+    }
 }
 
 std::filesystem::path LuaSandbox::GetLuaPath(const std::string& acFilePath, const std::filesystem::path& acRootPath, const bool acAllowNonExisting) const

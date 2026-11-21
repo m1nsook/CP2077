@@ -213,6 +213,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "M7 native callback isolation tests did not compile" }
           xmake run -y m1core_mod_dispatch_tests
           if ($LASTEXITCODE -ne 0) { throw "M7 native callback isolation tests failed" }
+          xmake build -y -vD m1core_sandbox_cleanup_tests
+          if ($LASTEXITCODE -ne 0) { throw "M7 sandbox cleanup tests did not compile" }
+          xmake run -y m1core_sandbox_cleanup_tests
+          if ($LASTEXITCODE -ne 0) { throw "M7 sandbox cleanup tests failed" }
           xmake build -y -vD m1core_script_runtime_tests
           if ($LASTEXITCODE -ne 0) { throw "LuaJIT integration tests did not compile" }
           $fixture = (Resolve-Path -LiteralPath '../examples/lua-smoke').Path
