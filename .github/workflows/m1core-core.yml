@@ -91,6 +91,7 @@ jobs:
               $widgetUi -notmatch 'ui::TitleText' -or
               $gui -notmatch 'M1CORE - MOD SETTINGS' -or
               $uiFonts -notmatch '0xE4E0' -or
+              $uiFonts -notmatch 'iconConfig.GlyphOffset = ImVec2\(0.0f, size \* 0.125f\)' -or
               $uiColors -notmatch '0.65f, 0.20f') {
             throw "m1core title/amber warning style regression"
           }

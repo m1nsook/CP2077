@@ -212,6 +212,11 @@ void D3D12::ReloadFonts()
         ImFontConfig iconConfig{};
         iconConfig.MergeMode = true;
         iconConfig.GlyphMinAdvanceX = size * 0.86f;
+        // Phosphor's glyph outlines sit above Karla's text baseline.
+        // Correct the alignment once for every merged icon (including
+        // all five tab labels), instead of drawing/offsetting each tab.
+        // Positive ImGui GlyphOffset.y moves only these icons down.
+        iconConfig.GlyphOffset = ImVec2(0.0f, size * 0.125f);
         iconConfig.OversampleH = 2;
         iconConfig.OversampleV = 1;
         if (io.Fonts->AddFontFromFileTTF(

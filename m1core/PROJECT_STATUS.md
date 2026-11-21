@@ -43,6 +43,13 @@ Only work on the m1core development branch and draft PR unless explicitly author
 - Replace red/orange-yellow hardcoded unbound/modified-keybind foregrounds with one **amber/orange** palette, using the genuine **Phosphor warning triangle** glyph U+E4E0 (merged into the existing ImGui font atlas) beside unbound binding labels and the Unbound button. No custom draw, new font or new runtime dependency. The glyph has a plain-text fallback when no icon font is present.
 - **Verification:** source/workflow changed; requires new Windows native CI compile and (only if user wants) targeted in-game visual inspection. Previously confirmed key capture, cursor, profiles and Weight Limit live updates are not to be retested.
 
+## Phosphor/Karla tab icon baseline alignment — 2026-11-21
+
+- The user explicitly identified that the icons in **Settings, Keybinds, Profiles, Logs and About** sit a few pixels **higher than their label text**. This was a separate issue from the Reset button height; don't conflate them.
+- Cause: `D3D12::ReloadFonts()` merged **Phosphor Regular** glyphs into **Karla Regular** without setting `ImFontConfig::GlyphOffset`. They have different native visual baselines; standard `BeginTabItem` displays the uncorrected mixed-font alignment.
+- Fix: configure the merged icon font with `GlyphOffset = ImVec2(0.0f, size * 0.125f)` to move Phosphor glyphs down ~2px at normal font size. This corrects all five tabs **without manual per-tab positioning, modifying the user's theme, or using custom DrawList UI**. The fallback when icons are unavailable remains text-only.
+- Windows native CI compile is required. Precise visual centering is **not yet user-verified in-game**; adjust the single merge-font offset if the user still sees a discrepancy. Do not rework previously confirmed keyboard, script, or Weight Limit behavior.
+
 ## Settings UI consistency correction — 2026-11-21 (after user screenshots)
 
 - **User found mismatched ImGui control sizing**: Logs used normal `ImGui::Button`; per-setting Reset used `ImGui::SmallButton` (intentionally removes vertical padding); tabs used standard `BeginTabItem`; Reset mod used a normal button squeezed immediately after the title. These are code/layout inconsistencies, **not limitations of Dear ImGui**. Screenshot evidence is user-confirmed, don't ignore it.
