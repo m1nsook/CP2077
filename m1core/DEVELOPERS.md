@@ -158,6 +158,8 @@ by this mock-based CI test, and still require a real game check.
 
 ### Reloading Lua mods safely
 
+m1core scans `red4ext/plugins/m1core/mods/` in a stable name order when loading entrypoints. A missing/unreadable mods folder is reported in `scripting.log` rather than stopping the game, and a broken mod directory or failing entrypoint does not prevent later mod directories from being considered. Script load order is deterministic, but **event callback order between mods is not a dependency contract**; mods must not rely on another mod's initialization order. Mod paths still receive the framework's containment checks (including symlinks).
+
 In **m1core → Logs**, select **Reload scripts**. The action queues
 `LuaVM::ReloadAllMods()`; the operation runs on the next normal native
 update, not inside the ImGui render pass. m1core calls registered
