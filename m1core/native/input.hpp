@@ -28,6 +28,14 @@ constexpr UINT kCursorSyncMessage = WM_APP + 0x4B3;
     return visible && foreground;
 }
 
+// The HWND may already be foreground before we subclass it: Windows does not
+// guarantee a subsequent WM_SETFOCUS/WM_ACTIVATEAPP. Reconcile with the live
+// desktop foreground on Present, just as the donated CET window bridge does.
+[[nodiscard]] inline bool NeedsFocusReconciliation(bool cached, bool current) noexcept
+{
+    return cached != current;
+}
+
 // Rendering can be requested before the DX12/ImGui backend is usable,
 // but game input must remain untouched until a frame actually submitted.
 [[nodiscard]] inline bool CanCaptureInput(bool visible, bool foreground,
@@ -81,6 +89,7 @@ public:
     [[nodiscard]] bool CursorHeld() const noexcept { return engineCursorHeld_.load(); }
     // Called only on the game render callback while a native UI is wanted.
     void RetryCursorSync() noexcept;
+    void ReconcileWindowFocus() noexcept;
     void BeginKeyCapture() noexcept;
     // Called after ImGui/DX12 backends initialize, not from a startup key.
     void ArmFirstRun() noexcept;

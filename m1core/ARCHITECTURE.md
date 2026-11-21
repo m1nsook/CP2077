@@ -57,6 +57,26 @@ replace the CET-dependent prototype, not augment it:
 - \`native/plugin.cpp\`: new native RED4ext RTTI access to register, read,
   write and reset settings. **No CET Lua files or CET installation.**
 
+### Source-provenance and focus correction (November 21)
+
+After receiving the user's `cet_m1nsook.zip` from the CET author,
+we inspected the bundled window, D3D12, ImGui Win32 backend and
+first-run binding files in their original ZIP. The exact mapping and
+checksum are recorded in `m1core/CET_DONATED_SOURCE.md`.
+
+A real game screenshot showed first-run setup only after repeated
+Alt+Tab. Cached `focused_` was initialized when the HWND was
+subclassed and relied on future WM_SETFOCUS/WM_ACTIVATEAPP, which
+Windows need not send if the game was already active. Present now
+reconciles the HWND with GetForegroundWindow before deciding to draw,
+while actual input takeover remains deferred until an ImGui frame
+has been submitted and ForceCursor can be owned.
+
+The Win32 input backend in the supplied ZIP also handles viewport
+scaling; m1core now scales queued WM_MOUSEMOVE locations by the actual
+client-to-DX12-display ratio rather than overwriting a correct
+mouse position with unscaled legacy coordinates.
+
 ### Real Win32/RAWINPUT -> ImGui input bridge (November 21)
 
 In the user's 2026-11-21 screenshot first-run setup was visibly rendered,

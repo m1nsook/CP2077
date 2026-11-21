@@ -23,6 +23,11 @@ int main()
     REQUIRE(!OwnsInput(false,true));
     REQUIRE(!OwnsInput(true,false));
     REQUIRE(OwnsInput(true,true));
+    using m1core::NeedsFocusReconciliation;
+    REQUIRE(NeedsFocusReconciliation(false,true)); // HWND installed before focus
+    REQUIRE(NeedsFocusReconciliation(true,false)); // missed deactivate event
+    REQUIRE(!NeedsFocusReconciliation(true,true));
+    REQUIRE(!NeedsFocusReconciliation(false,false));
     using m1core::CanCaptureInput;
     REQUIRE(!CanCaptureInput(true,true,false)); // GPU backend unavailable
     REQUIRE(!CanCaptureInput(false,true,true));

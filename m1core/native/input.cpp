@@ -157,6 +157,27 @@ bool InputRouter::ShouldDraw() const noexcept
                               focused_.load() && GetForegroundWindow()==window_);
 }
 
+void InputRouter::ReconcileWindowFocus() noexcept
+{
+    if (!window_ || !IsWindow(window_)) return;
+    const bool nowFocused = GetForegroundWindow()==window_;
+    const bool wasFocused = focused_.exchange(nowFocused,std::memory_order_acq_rel);
+    if (!NeedsFocusReconciliation(wasFocused,nowFocused)) return;
+
+    // The Present thread may be the first observer of focus after hooking:
+    // no Alt+Tab is necessary to make first-run setup available.
+    if (nowFocused) {
+        if (setup_.load() && !KeyAssigned()) recording_.store(true);
+        Renderer::Get().ResumeInput();
+        RenderBridge::Get().LogInfo("m1core: game foreground restored by Present");
+    } else {
+        recording_.store(false);
+        Renderer::Get().CancelInput();
+        RenderBridge::Get().LogInfo("m1core: game lost foreground; capture suspended");
+    }
+    RequestCursorSync(); // Apply/release ForceCursor on the HWND owner thread.
+}
+
 bool InputRouter::IsValidShortcut(int key) const noexcept
 {
     return (key>=VK_F1 && key<=VK_F24) ||

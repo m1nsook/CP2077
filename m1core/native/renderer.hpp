@@ -62,6 +62,7 @@ private:
     std::vector<InputPacket> inputPackets_;
     std::atomic<int> pendingFocus_{0};
     std::atomic_bool inputReady_{false};
+    std::atomic<HWND> inputWindow_{nullptr};
     std::uint64_t lastSubmittedAt_ = 0;
     HWND gameWindow_ = nullptr;
     Microsoft::WRL::ComPtr<IDXGISwapChain4> swapchain_;

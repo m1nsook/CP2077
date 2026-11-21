@@ -155,6 +155,7 @@ bool Renderer::Initialize(const GameFrame& source) noexcept
         return false;
     }
     initialized_ = true;
+    inputWindow_.store(gameWindow_,std::memory_order_release);
     RenderBridge::Get().LogInfo("m1core: ImGui Win32/DX12 backends initialized");
     return true;
 }
@@ -178,13 +179,14 @@ void Renderer::Present(const GameFrame& source) noexcept
     // Initialize on the game's Present callback even with the menu hidden,
     // but never trap input just because a graphics context exists.
     if (!initialized_ && !Initialize(source)) return;
-    if (GameBaseInitialized())
-        InputRouter::Get().ArmFirstRun();
     if (source.swapchain != swapchain_.Get() || source.queue != queue_.Get() ||
         source.window != gameWindow_) {
         Reset();
         return;
     }
+    InputRouter::Get().ReconcileWindowFocus();
+    if (GameBaseInitialized())
+        InputRouter::Get().ArmFirstRun();
     if (!InputRouter::Get().ShouldDraw() &&
         !InputRouter::Get().NeedsPopupDismiss()) return;
     const UINT index = swapchain_->GetCurrentBackBufferIndex();
@@ -273,8 +275,11 @@ void Renderer::Present(const GameFrame& source) noexcept
 LRESULT Renderer::ForwardInput(HWND window,UINT message,
                                WPARAM wparam,LPARAM lparam) noexcept
 {
-    if (!initialized_ || window != gameWindow_ ||
-        GetForegroundWindow() != gameWindow_) return 0;
+    // HWND and Present run on different threads. Observe only atomics here:
+    // reading initialized_/gameWindow_ directly was an undefined data race.
+    if (!AcceptingInput() ||
+        window != inputWindow_.load(std::memory_order_acquire) ||
+        GetForegroundWindow() != window) return 0;
     std::lock_guard lock(inputMutex_);
     if (inputPackets_.size() >= kMaxQueuedInput) inputPackets_.clear();
     InputPacket packet{};
@@ -288,8 +293,9 @@ LRESULT Renderer::ForwardInput(HWND window,UINT message,
 
 void Renderer::ForwardRawInput(HWND window,const RAWINPUT& raw) noexcept
 {
-    if (!initialized_ || window != gameWindow_ ||
-        GetForegroundWindow() != gameWindow_) return;
+    if (!AcceptingInput() ||
+        window != inputWindow_.load(std::memory_order_acquire) ||
+        GetForegroundWindow() != window) return;
     if (raw.header.dwType != RIM_TYPEKEYBOARD &&
         raw.header.dwType != RIM_TYPEMOUSE) return;
 
@@ -344,6 +350,23 @@ void Renderer::DrainInput() noexcept
         legacyKeys |= LegacyKeyboard(e.message);
         legacyButtons |= LegacyButton(e.message);
         legacyWheel |= LegacyWheel(e.message);
+        if (e.message==WM_MOUSEMOVE) {
+            // CET's donated Win32 backend accounts for the client-to-DX12
+            // render scale. Keep the stock backend, but pass correctly
+            // scaled mouse positions to Dear ImGui on this render thread.
+            RECT client{};
+            if (GetClientRect(e.window,&client)) {
+                const int w=client.right-client.left;
+                const int h=client.bottom-client.top;
+                if (w>0 && h>0 && io.DisplaySize.x>0 && io.DisplaySize.y>0) {
+                    const int x=static_cast<SHORT>(LOWORD(e.lparam));
+                    const int y=static_cast<SHORT>(HIWORD(e.lparam));
+                    io.AddMousePosEvent(static_cast<float>(x)*io.DisplaySize.x/w,
+                                        static_cast<float>(y)*io.DisplaySize.y/h);
+                    continue;
+                }
+            }
+        }
         ImGui_ImplWin32_WndProcHandler(e.window,e.message,e.wparam,e.lparam);
     }
 
@@ -414,6 +437,7 @@ void Renderer::Release(bool destroyContext) noexcept
 {
     CancelInput();
     // Fail open immediately, even if GPU teardown must wait.
+    inputWindow_.store(nullptr,std::memory_order_release);
     if (inputReady_.exchange(false, std::memory_order_acq_rel))
         InputRouter::Get().RequestCursorSync();
     // The passive input listener survives a resize, allowing user hotkeys
