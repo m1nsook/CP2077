@@ -176,14 +176,14 @@ std::optional<nlohmann::json> Registry::Get(
 
 bool Registry::Commit(std::string_view mod, std::string_view key, const json& next)
 {
-    auto data = ReadSaved(store_);
-    if (!data.contains("values") || !data["values"].is_object()) return false;
-    auto& values = data["values"];
     const auto modId = std::string(mod);
-    if (!values.contains(modId) || !values[modId].is_object())
-        values[modId] = json::object();
-    values[modId][std::string(key)] = next;
-    if (!store_.Replace(data.dump())) {
+    const auto settingId = std::string(key);
+    if (!store_.Update([&](json& data) {
+        auto& values = data["values"];
+        if (!values.contains(modId) || !values[modId].is_object())
+            values[modId] = json::object();
+        values[modId][settingId] = next;
+    })) {
         error_ = store_.LastError();
         if (error_.empty()) error_ = "Failed to persist settings";
         return false;
@@ -222,13 +222,12 @@ bool Registry::ResetMod(std::string_view mod)
     std::lock_guard guard(mutex_);
     const auto it = mods_.find(std::string(mod));
     if (it == mods_.end()) return false;
-    auto document = ReadSaved(store_);
-    if (!document.contains("values") || !document["values"].is_object()) return false;
-    auto& values = document["values"];
-    values[it->first] = json::object();
-    for (const auto& setting : it->second.settings)
-        values[it->first][setting.id] = setting.defaultValue;
-    if (!store_.Replace(document.dump())) return false;
+    if (!store_.Update([&](json& document) {
+        auto& values = document["values"];
+        values[it->first] = json::object();
+        for (const auto& setting : it->second.settings)
+            values[it->first][setting.id] = setting.defaultValue;
+    })) return false;
     for (auto& setting : it->second.settings) setting.value = setting.defaultValue;
     return true;
 }
@@ -237,49 +236,51 @@ bool Registry::SaveProfile(std::string name)
 {
     if (!ValidId(name)) return false;
     std::lock_guard guard(mutex_);
-    auto document = ReadSaved(store_);
-    if (!document.contains("profiles") || !document["profiles"].is_object()) return false;
-    // Preserve settings from mods which are not currently registered.
-    // A user switching load orders must not lose those profile entries.
-    auto profile = document["values"];
-    for (const auto& [id, mod] : mods_) {
-        if (!profile.contains(id) || !profile[id].is_object())
-            profile[id] = json::object();
-        for (const auto& setting : mod.settings)
-            profile[id][setting.id] = setting.value;
-    }
-    document["profiles"][name] = std::move(profile);
-    return store_.Replace(document.dump());
+    return store_.Update([&](json& document) {
+        // Preserve entries for currently unloaded/unregistered mods.
+        auto profile = document["values"];
+        for (const auto& [id, mod] : mods_) {
+            if (!profile.contains(id) || !profile[id].is_object())
+                profile[id] = json::object();
+            for (const auto& setting : mod.settings)
+                profile[id][setting.id] = setting.value;
+        }
+        document["profiles"][name] = std::move(profile);
+    });
 }
 
 bool Registry::LoadProfile(std::string_view name)
 {
     std::lock_guard guard(mutex_);
-    auto document = ReadSaved(store_);
-    if (!document.contains("profiles") || !document["profiles"].is_object()) return false;
-    const auto profileIt = document["profiles"].find(std::string(name));
-    if (profileIt == document["profiles"].end() || !profileIt->is_object())
-        return false;
     struct Change { std::string mod, key; json value; };
     std::vector<Change> updates;
-    for (const auto& [modId, mod] : mods_) {
-        if (!profileIt->contains(modId)) continue;
-        const auto& record = (*profileIt)[modId];
-        if (!record.is_object()) return false;
-        for (const auto& setting : mod.settings) {
-            if (!record.contains(setting.id)) continue;
-            const auto next = Normalize(setting, record[setting.id]);
-            if (!next) return false;
-            updates.push_back({modId, setting.id, *next});
+    bool valid = true;
+    const bool saved = store_.Update([&](json& document) {
+        const auto profileIt = document["profiles"].find(std::string(name));
+        if (profileIt == document["profiles"].end() || !profileIt->is_object()) {
+            valid = false;
+            return;
         }
-    }
-    for (const auto& change : updates) {
-        if (!document["values"].contains(change.mod) ||
-            !document["values"][change.mod].is_object())
-            document["values"][change.mod] = json::object();
-        document["values"][change.mod][change.key] = change.value;
-    }
-    if (!store_.Replace(document.dump())) return false;
+        // Validate all changes before mutating the document.
+        for (const auto& [modId, mod] : mods_) {
+            if (!profileIt->contains(modId)) continue;
+            const auto& record = (*profileIt)[modId];
+            if (!record.is_object()) { valid = false; return; }
+            for (const auto& setting : mod.settings) {
+                if (!record.contains(setting.id)) continue;
+                const auto next = Normalize(setting, record[setting.id]);
+                if (!next) { valid = false; return; }
+                updates.push_back({modId, setting.id, *next});
+            }
+        }
+        for (const auto& change : updates) {
+            if (!document["values"].contains(change.mod) ||
+                !document["values"][change.mod].is_object())
+                document["values"][change.mod] = json::object();
+            document["values"][change.mod][change.key] = change.value;
+        }
+    });
+    if (!saved || !valid) return false;
     for (const auto& change : updates)
         for (auto& setting : mods_.at(change.mod).settings)
             if (setting.id == change.key) setting.value = change.value;
@@ -289,10 +290,11 @@ bool Registry::LoadProfile(std::string_view name)
 bool Registry::DeleteProfile(std::string_view name)
 {
     std::lock_guard guard(mutex_);
-    auto document = ReadSaved(store_);
-    if (!document["profiles"].contains(std::string(name))) return false;
-    document["profiles"].erase(std::string(name));
-    return store_.Replace(document.dump());
+    bool found = false;
+    const bool saved = store_.Update([&](json& document) {
+        found = document["profiles"].erase(std::string(name)) != 0;
+    });
+    return saved && found;
 }
 
 std::vector<std::string> Registry::Profiles() const

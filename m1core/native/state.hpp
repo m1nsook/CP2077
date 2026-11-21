@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <nlohmann/json.hpp>
@@ -14,6 +15,9 @@ public:
     void Configure(std::filesystem::path configPath);
     [[nodiscard]] std::string Snapshot() const;
     [[nodiscard]] bool Replace(const std::string& document);
+    // Transactional read-modify-write across all native callers. The updater
+    // runs under the store mutex; failures never alter the on-disk state.
+    [[nodiscard]] bool Update(const std::function<void(nlohmann::json&)>& updater);
     [[nodiscard]] std::int32_t Revision() const;
     [[nodiscard]] bool Ready() const;
     [[nodiscard]] std::string LastError() const;

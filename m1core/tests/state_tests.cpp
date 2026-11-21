@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <thread>
 
 int main()
 {
@@ -27,6 +28,30 @@ int main()
     REQUIRE(store.Revision() == 1);
     REQUIRE(!store.Replace(R"({"schema":2,"values":{},"profiles":{}})"));
     REQUIRE(store.Revision() == 1);
+
+    // Independent writers must merge, not overwrite, another field.
+    std::thread a([&] {
+        for (int i = 0; i < 8; ++i)
+            REQUIRE(store.Update([i](nlohmann::json& d) {
+                d["values"]["writer_a"]["count"] = i;
+            }));
+    });
+    std::thread b([&] {
+        for (int i = 0; i < 8; ++i)
+            REQUIRE(store.Update([i](nlohmann::json& d) {
+                d["values"]["writer_b"]["count"] = i;
+            }));
+    });
+    a.join();
+    b.join();
+    const auto merged = nlohmann::json::parse(store.Snapshot());
+    REQUIRE(merged["values"]["writer_a"]["count"] == 7);
+    REQUIRE(merged["values"]["writer_b"]["count"] == 7);
+    const auto revisionBeforeInvalid = store.Revision();
+    REQUIRE(!store.Update([](nlohmann::json& d) {
+        d["schema"] = 99;
+    }));
+    REQUIRE(store.Revision() == revisionBeforeInvalid);
 
     m1core::StateStore restart;
     restart.Configure(path);

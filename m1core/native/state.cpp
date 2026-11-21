@@ -114,6 +114,38 @@ bool StateStore::Replace(const std::string& document)
     return true;
 }
 
+bool StateStore::Update(const std::function<void(nlohmann::json&)>& updater)
+{
+    std::lock_guard lock(mutex_);
+    if (!ready_ || frozen_) return false;
+    nlohmann::json next = data_;
+    try {
+        updater(next);
+        if (!Valid(next)) {
+            lastError_ = "Settings update violated schema";
+            return false;
+        }
+        if (next.dump().size() > 1024 * 1024) {
+            lastError_ = "Settings update exceeds 1 MiB";
+            return false;
+        }
+    } catch (const std::exception& ex) {
+        lastError_ = ex.what();
+        return false;
+    } catch (...) {
+        lastError_ = "Settings updater failed";
+        return false;
+    }
+    if (next == data_) return true;
+    if (!PersistLocked(next)) return false;
+    data_ = std::move(next);
+    if (revision_ == std::numeric_limits<std::int32_t>::max())
+        revision_ = 1;
+    else
+        ++revision_;
+    return true;
+}
+
 std::int32_t StateStore::Revision() const
 {
     std::lock_guard lock(mutex_);

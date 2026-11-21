@@ -158,15 +158,11 @@ bool InputRouter::IsValidShortcut(int key) const noexcept
 bool InputRouter::SetMenuKey(int key) noexcept
 {
     if (!IsValidShortcut(key)) return false;
-    try {
-        auto state=nlohmann::json::parse(Store().Snapshot());
-        state["overlay"]=nlohmann::json::object({{"hotkey",key}});
-        if (!Store().Replace(state.dump())) return false;
-        hotkey_.store(key);
-        return true;
-    } catch (...) {
-        return false;
-    }
+    if (!Store().Update([key](nlohmann::json& state) {
+            state["overlay"]=nlohmann::json::object({{"hotkey",key}});
+        })) return false;
+    hotkey_.store(key);
+    return true;
 }
 
 std::string InputRouter::KeyDescription() const
