@@ -11,6 +11,25 @@ The donated source archive omitted the original CET Lua bootstrap scripts (`json
 A clean compile **does not** prove gameplay input, focus, all display modes, or runtime compatibility with Cyberpunk 2.50. Do not merge or ship a release until those are confirmed.
 
 
+### Public visual identity boundary (confirmed with yamashi, November 2026)
+
+The license-compatible technical foundation does **not** imply any permission or
+intent to reproduce the appearance of CET: **m1core must not look like CET or
+retain CET-associated visual elements**. Keep m1core's own ImGui-first Settings /
+Keybinds / Profiles / Logs / About interface, Karla, JetBrains Mono, Phosphor
+icons and independent theme. In particular, **the inherited ImGuiNotify toast
+styling is not a finished m1core-branded startup notice** even though its
+shortcut message moved to the left and no longer says CET. An upcoming small
+presentation-only change should distinguish that startup notice, while reusing
+the proven native input, window hooks and D3D12 backend. Preserve third-party
+toast API behavior as needed.
+
+According to the user-provided message from yamashi, no additional public
+name mention is necessary, but a shout-out on a future Nexus Mods listing is
+welcome. This does **not override MIT license conditions**: required upstream
+copyright/license notices are retained unmodified in the source and archives.
+There is no visible “powered by CET” text, CET fonts, CET icons or CET logos.
+
 ### m1core application UI
 
 The CET-derived runtime now hosts the original m1core native registry and REDscript settings API. The main UI is a **single Dear ImGui settings window**, with tabs for Settings, Keybinds, Profiles, Logs and About; controls use stock ImGui widgets and the supplied ImGui theme. CET-only developer panels (Console/TweakDB Editor/Game Log/ImGui Debug/Reload All Mods) are no longer presented in the main interface. Keybinding still uses the original donor widget and raw input implementation; its internal persisted `cet` binding namespace remains temporarily unchanged to avoid deleting existing users' shortcuts. This is internal compatibility, not user-visible branding. The old independent D3D12 renderer is not compiled or used.
