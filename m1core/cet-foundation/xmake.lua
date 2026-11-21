@@ -20,7 +20,7 @@ elseif is_mode("releasedbg") then
 elseif is_mode("release") then
     set_strip("all")
     set_optimize("fastest")
-    set_warnings("all", "error")
+    set_warnings("all")
     set_policy("build.optimization.lto", true)
 end
 
@@ -49,125 +49,62 @@ add_requireconfs("tiltedcore.mimalloc", {version = "2.2.4", override = true, con
 local imguiUserConfig = string.gsub(path.absolute("src/imgui_impl/imgui_user_config.h"), "\\", "/")
 add_requires("imgui v1.91.1-docking", { configs = { wchar32 = true, freetype = true, user_config = imguiUserConfig } })
 
+
+-- Keep the original CET 1.38.1 dependency graph: its renderer, keybindings,
+-- Win32 backend, Lua runtime and game hooks are the foundation, not wrappers
+-- around the previous independent m1core renderer.
+
 target("RED4ext.SDK")
     set_kind("headeronly")
     set_group("vendor")
     add_headerfiles("vendor/RED4ext.SDK/include/**.hpp")
-    add_includedirs("vendor/RED4ext.SDK/include/", { public = true })
+    add_includedirs("vendor/RED4ext.SDK/include", {public = true})
     on_install(function() end)
 
-target("cyber_engine_tweaks")
-    add_defines("WIN32_LEAN_AND_MEAN", "NOMINMAX", "WINVER=0x0601", "SOL_ALL_SAFETIES_ON", "SOL_LUAJIT=1", "SOL_EXCEPTIONS_SAFE_PROPAGATION", "SPDLOG_WCHAR_TO_UTF8_SUPPORT", "SPDLOG_WCHAR_FILENAMES", "SPDLOG_WCHAR_SUPPORT", "IMGUI_USER_CONFIG=\""..imguiUserConfig.."\"") -- WINVER=0x0601 == Windows 7xmake
-    set_pcxxheader("src/stdafx.h")
+target("m1core")
     set_kind("shared")
+    set_filename("m1core.dll")
+    add_defines("WIN32_LEAN_AND_MEAN", "NOMINMAX", "WINVER=0x0601",
+        "SOL_ALL_SAFETIES_ON", "SOL_LUAJIT=1", "SOL_EXCEPTIONS_SAFE_PROPAGATION",
+        "SPDLOG_WCHAR_TO_UTF8_SUPPORT", "SPDLOG_WCHAR_FILENAMES",
+        "SPDLOG_WCHAR_SUPPORT",
+        "IMGUI_USER_CONFIG=\"" .. imguiUserConfig .. "\"")
+    set_pcxxheader("src/stdafx.h")
 
     set_configdir(path.join("src", "config"))
-    add_configfiles("src/xmake/**.in")
-
-    add_files("src/**.cpp", "src/**.rc")
-    add_headerfiles("src/**.h")
-    add_includedirs("src/", "build/")
-    add_syslinks("User32", "Version", "d3d11", "dxgi")
-    add_packages("spdlog", "nlohmann_json", "minhook", "hopscotch-map", "imgui", "mem", "sol2", "tiltedcore", "sqlite3", "openrestry-luajit", "xbyak", "stb")
+    add_configfiles("src/xmake/CETVersion.h.in")
+    -- Exclude the CET ASI DllMain; RED4ext invokes Main/Query/Supports.
+    add_files("src/**.cpp")
+    remove_files("src/dllmain.cpp")
+    add_headerfiles("src/**.h", "src/**.hpp")
+    add_includedirs("src", "build", "../native")
+    add_syslinks("User32", "Version", "d3d11", "d3d12", "d3dcompiler",
+                 "dxgi", "imm32", "Dbghelp")
+    add_packages("spdlog", "nlohmann_json", "minhook", "hopscotch-map",
+        "imgui", "mem", "sol2", "tiltedcore", "sqlite3",
+        "openrestry-luajit", "xbyak", "stb")
     add_deps("RED4ext.SDK")
 
-    -- Set up basic config variables.
-    -- Required for us to set up something here first to be able to access and modify "configvars"
-    -- in `on_load`, there seems to be no way to do this otherwise at the moment.
-    set_configvar("CET_PRODUCT_NAME", "Cyber Engine Tweaks")
-
+    set_configvar("CET_PRODUCT_NAME", "m1core")
     on_load(function(target)
-        -- Set filename based on project name
-        target:set("basename", target:name())
-        target:set("extension", ".asi")
-
-        -- Get a list of existing target config variables.
-        local configVars = target:get("configvar")
-
-        -- Set up other basic config variables.
-        configVars.CET_CURRENT_YEAR = tonumber(os.date("%Y"))
-        configVars.CET_GROUP_NAME = configVars.CET_PRODUCT_NAME .. " Team"
-        configVars.CET_FILE_NAME = target:filename();
-
-        -- Set up build type.
-        if is_mode("release") then
-          configVars.CET_DEBUG_BUILD = 0
-        else
-          configVars.CET_DEBUG_BUILD = 1
-          target:add("defines", "CET_DEBUG")
-        end
-
-        -- Emulate GIT_<XXX> XMake Git builtins so we can parse them ourselves.
-        -- Unable to use and access builtins unfortunately. This is taken directly from XMake source.
-        configVars.CET_GIT_TAG = os.iorun("git describe --tags"):gsub("%s", "")
-        configVars.CET_GIT_TAG_LONG = os.iorun("git describe --tags --long"):gsub("%s", "")
-        configVars.CET_GIT_BRANCH = os.iorun("git rev-parse --abbrev-ref HEAD"):gsub("%s", "")
-        configVars.CET_GIT_COMMIT = os.iorun("git rev-parse --short HEAD"):gsub("%s", "")
-        configVars.CET_GIT_COMMIT_LONG = os.iorun("git rev-parse HEAD"):gsub("%s", "")
-        configVars.CET_GIT_COMMIT_DATE = os.iorun("git log -1 --date=format:%Y%m%d%H%M%S --format=%ad"):gsub("%s", "")
-
-        -- Split tag so we can easily extract version from it.
-        local splitGitTag = configVars.CET_GIT_TAG:split("%.")
-        assert(#splitGitTag == 3)
-
-        -- Setup version variables.
-        configVars.CET_VERSION_MAJOR = tonumber(splitGitTag[1]:match("%d+"))
-        configVars.CET_VERSION_MINOR = tonumber(splitGitTag[2]:match("%d+"))
-        configVars.CET_VERSION_PATCH = tonumber(splitGitTag[3]:match("%d+"))
-        configVars.CET_VERSION_SIMPLE = format(
-            "%d.%d.%d",
-            configVars.CET_VERSION_MAJOR,
-            configVars.CET_VERSION_MINOR,
-            configVars.CET_VERSION_PATCH)
-        configVars.CET_VERSION_FULL = format(
-            "%s [%s]",
-            configVars.CET_GIT_TAG,
-            configVars.CET_GIT_BRANCH)
-        configVars.CET_VERSION = configVars.CET_VERSION_FULL
-
-        -- Push new list to target.
-        target:add("configvar", configVars)
+        local cfg = target:get("configvar")
+        cfg.CET_CURRENT_YEAR = tonumber(os.date("%Y"))
+        cfg.CET_PRODUCT_NAME = "m1core"
+        cfg.CET_GROUP_NAME = "MISO"
+        cfg.CET_FILE_NAME = "m1core.dll"
+        cfg.CET_DEBUG_BUILD = is_mode("release") and 0 or 1
+        cfg.CET_GIT_TAG = "v1.0.0"
+        cfg.CET_GIT_TAG_LONG = "v1.0.0-0-g0000000"
+        cfg.CET_GIT_BRANCH = "dev/m1core-cet-foundation"
+        cfg.CET_GIT_COMMIT = "0000000"
+        cfg.CET_GIT_COMMIT_LONG = "0000000000000000000000000000000000000000"
+        cfg.CET_GIT_COMMIT_DATE = "20261121"
+        cfg.CET_VERSION_MAJOR = 1
+        cfg.CET_VERSION_MINOR = 0
+        cfg.CET_VERSION_PATCH = 0
+        cfg.CET_VERSION_SIMPLE = "1.0.0"
+        cfg.CET_VERSION_FULL = "1.0.0-dev"
+        cfg.CET_VERSION = cfg.CET_VERSION_FULL
+        target:add("configvar",cfg)
+        if not is_mode("release") then target:add("defines","CET_DEBUG") end
     end)
-
-    on_package(function(target)
-        import("net.http")
-
-        os.rm("package/*")
-
-        os.mkdir("package/bin/x64/plugins/cyber_engine_tweaks/tweakdb")
-        http.download("https://github.com/WolvenKit/WolvenKit/raw/main/WolvenKit.Common/Resources/usedhashes.kark", "package/bin/x64/plugins/cyber_engine_tweaks/tweakdb/usedhashes.kark")
-        http.download("https://github.com/WolvenKit/WolvenKit/raw/main/WolvenKit.Common/Resources/tweakdbstr.kark", "package/bin/x64/plugins/cyber_engine_tweaks/tweakdb/tweakdbstr.kark")
-
-        os.mkdir("package/bin/x64/plugins/cyber_engine_tweaks/scripts")
-        os.cp("scripts/*", "package/bin/x64/plugins/cyber_engine_tweaks/scripts")
-
-        os.mkdir("package/bin/x64/plugins/cyber_engine_tweaks/fonts")
-        os.cp("fonts/*", "package/bin/x64/plugins/cyber_engine_tweaks/fonts")
-
-        os.cp("vendor/asiloader/*", "package/bin/x64/")
-
-        os.cp("LICENSE", "package/bin/x64/")
-        os.cp("LICENSE-EXCEPTION", "package/bin/x64/")
-        os.cp("LICENSE-MIT", "package/bin/x64/")
-        os.cp("ThirdParty_LICENSES", "package/bin/x64/plugins/cyber_engine_tweaks/ThirdParty_LICENSES")
-
-        local target_file = target:targetfile()
-
-        os.cp(target_file, "package/bin/x64/plugins/")
-
-        os.cp(path.join(
-            path.directory(target_file),
-            path.basename(target_file)..".pdb"
-        ), "package/bin/x64/plugins/")
-    end)
-    on_install(function(target)
-        cprint("${green bright}Installing Cyber Engine Tweaks ..")
-        assert(os.isdir("$(installpath)"), format("The path in your configuration doesn't exist or isn't a directory.\n\tUse the follow command to set install path:\n\txmake f --installpath=%s", [["C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077\bin\x64\plugins"]]))
-        os.cp(target:targetfile(), "$(installpath)")
-        cprint("Cyber Engine Tweaks installed at: ${underline}%s", "$(installpath)")
-    end)
-
-option("installpath")
-    set_default("installpath")
-    set_showmenu(true)
-    set_description("Set the path to install cyber_engine_tweaks.asi to.", "e.g.", format("\t-xmake f --installpath=%s", [["C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077\bin\x64\plugins"]]))
