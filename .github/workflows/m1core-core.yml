@@ -122,6 +122,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Native persistence tests did not compile" }
           xmake run -y m1core_state_tests
           if ($LASTEXITCODE -ne 0) { throw "Native persistence tests failed" }
+          xmake build -y -vD m1core_script_formats_tests
+          if ($LASTEXITCODE -ne 0) { throw "Script extension tests did not compile" }
+          xmake run -y m1core_script_formats_tests
+          if ($LASTEXITCODE -ne 0) { throw "Script extension tests failed" }
       - name: Package one game-root artifact — exclude CET icons/fonts
         shell: pwsh
         run: |

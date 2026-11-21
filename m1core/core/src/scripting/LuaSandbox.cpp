@@ -1,6 +1,7 @@
 #include <stdafx.h>
 
 #include "LuaSandbox.h"
+#include "ScriptFormats.hpp"
 
 #include "Texture.h"
 
@@ -353,48 +354,66 @@ void LuaSandbox::InitializeIOForSandbox(Sandbox& aSandbox, const sol::state& acp
     const auto cSBEnv = sbEnv;
     sol::state_view stateView = acpState;
 
-    const auto cLoadString = [stateView, cSBEnv](const std::string& acStr, const std::string& acChunkName) -> std::tuple<sol::object, sol::object>
+    // Preserve CET's loadstring sandbox restriction. Binary chunks can
+    // only be executed from explicit .m1c files loaded through our path
+    // validator, never from arbitrary strings or disguised .lua/.m1s.
+    const auto cLoadChunk = [stateView, cSBEnv](
+        const std::string& acStr, const std::string& acChunkName,
+        bool allowBytecode) -> std::tuple<sol::object, sol::object>
     {
-        if (!acStr.empty() && acStr[0] == LUA_SIGNATURE[0])
-            return std::make_tuple(sol::nil, make_object(stateView, "Bytecode prohibited!"));
+        if (allowBytecode && !m1core::scripts::IsLuaJitBytecode(acStr))
+            return std::make_tuple(sol::nil, make_object(stateView, "Invalid .m1c: expected LuaJIT bytecode"));
+        if (!allowBytecode && !acStr.empty() && acStr[0] == LUA_SIGNATURE[0])
+            return std::make_tuple(sol::nil, make_object(stateView, "Bytecode requires a .m1c file"));
 
         sol::state_view luaView = stateView;
-        const auto& acKey = acChunkName.empty() ? acStr : acChunkName;
-        const auto cResult = luaView.load(acStr, acKey, sol::load_mode::text);
-        if (cResult.valid())
+        const auto& key = acChunkName.empty() ? acStr : acChunkName;
+        const auto result = luaView.load(acStr, key,
+            allowBytecode ? sol::load_mode::binary : sol::load_mode::text);
+        if (result.valid())
         {
-            const auto cFunc = cResult.get<sol::function>();
-            cSBEnv.set_on(cFunc);
-            return std::make_tuple(cFunc, sol::nil);
+            const auto fn = result.get<sol::function>();
+            cSBEnv.set_on(fn);
+            return std::make_tuple(fn, sol::nil);
         }
-
-        return std::make_tuple(sol::nil, make_object(stateView, cResult.get<sol::error>().what()));
+        return std::make_tuple(sol::nil, make_object(stateView, result.get<sol::error>().what()));
+    };
+    const auto cLoadString = [cLoadChunk](
+        const std::string& source, const std::string& name) {
+        return cLoadChunk(source, name, false);
     };
     sbEnv["loadstring"] = cLoadString;
 
-    const auto cLoadFile = [this, cSBRootPath, cLoadString, stateView](const std::string& acPath) -> std::tuple<sol::object, sol::object>
+    const auto cResolveScript = [this, cSBRootPath](
+        const std::string& requested, bool module) -> std::filesystem::path
+    {
+        for (const auto& candidate : m1core::scripts::Candidates(requested, module))
+        {
+            auto path = GetLuaPath(candidate, cSBRootPath, false);
+            if (!path.empty() && is_regular_file(path))
+                return path;
+        }
+        return {};
+    };
+    const auto cLoadFile = [cSBRootPath, cResolveScript, cLoadChunk, stateView](
+        const std::string& acPath) -> std::tuple<sol::object, sol::object>
     {
         const auto previousCurrentPath = std::filesystem::current_path();
         current_path(cSBRootPath);
-
-        auto path = GetLuaPath(acPath, cSBRootPath, false);
-
-        if (path.empty() || !is_regular_file(path))
-            path = GetLuaPath(acPath + ".lua", cSBRootPath, false);
-
-        if (path.empty() || !is_regular_file(path))
+        const auto path = cResolveScript(acPath, false);
+        if (path.empty())
         {
             current_path(previousCurrentPath);
-
-            return std::make_tuple(sol::nil, make_object(stateView, "Tried to access invalid path '" + acPath + "'!"));
+            return std::make_tuple(sol::nil, make_object(stateView,
+                "Tried to access invalid script path '" + acPath + "'!"));
         }
 
-        std::ifstream ifs(path);
-        const std::string cScriptString((std::istreambuf_iterator(ifs)), std::istreambuf_iterator<char>());
-        auto result = cLoadString(cScriptString, "@" + UTF16ToUTF8(path.native()));
-
+        std::ifstream ifs(path, std::ios::binary);
+        const std::string bytes((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+        const bool isBinary = m1core::scripts::Classify(path) ==
+                              m1core::scripts::Format::LuaJitBytecode;
+        auto result = cLoadChunk(bytes, "@" + UTF16ToUTF8(path.native()), isBinary);
         current_path(previousCurrentPath);
-
         return result;
     };
     sbEnv["loadfile"] = cLoadFile;
@@ -411,20 +430,14 @@ void LuaSandbox::InitializeIOForSandbox(Sandbox& aSandbox, const sol::state& acp
 
     // TODO - add _LOADED table and fill in when module loads some value, react in these functions when the key is
     // sol::nil
-    sbEnv["require"] = [this, cLoadString, cSBRootPath, stateView, cSBEnv](const std::string& acPath) -> std::tuple<sol::object, sol::object>
+    sbEnv["require"] = [this, cResolveScript, cLoadChunk, cSBRootPath, stateView, cSBEnv](const std::string& acPath) -> std::tuple<sol::object, sol::object>
     {
         const auto previousCurrentPath = std::filesystem::current_path();
         current_path(cSBRootPath);
 
-        auto path = GetLuaPath(acPath, cSBRootPath, false);
+        const auto path = cResolveScript(acPath, true);
 
-        if (path.empty() || !is_regular_file(path))
-            path = GetLuaPath(acPath + ".lua", cSBRootPath, false);
-
-        if (path.empty() || !is_regular_file(path))
-            path = GetLuaPath(acPath + "\\init.lua", cSBRootPath, false);
-
-        if (path.empty() || !is_regular_file(path))
+        if (path.empty())
         {
             current_path(previousCurrentPath);
 
@@ -440,9 +453,10 @@ void LuaSandbox::InitializeIOForSandbox(Sandbox& aSandbox, const sol::state& acp
             return std::make_tuple(cExistingModule->second, sol::nil);
         }
 
-        std::ifstream ifs(path);
-        const std::string cScriptString((std::istreambuf_iterator(ifs)), std::istreambuf_iterator<char>());
-        auto res = cLoadString(cScriptString, "@" + cKey);
+        std::ifstream ifs(path, std::ios::binary);
+        const std::string bytes((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+        auto res = cLoadChunk(bytes, "@" + cKey,
+            m1core::scripts::Classify(path) == m1core::scripts::Format::LuaJitBytecode);
         auto obj = std::get<0>(res);
         if (obj == sol::nil)
         {

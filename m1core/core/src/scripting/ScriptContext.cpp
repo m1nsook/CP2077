@@ -1,6 +1,7 @@
 #include <stdafx.h>
 
 #include "ScriptContext.h"
+#include "ScriptFormats.hpp"
 
 #include <M1CoreRuntime.h>
 #include <Utils.h>
@@ -169,7 +170,12 @@ ScriptContext::ScriptContext(LuaSandbox& aLuaSandbox, const std::filesystem::pat
         const auto previousCurrentPath = std::filesystem::current_path();
         current_path(sb.GetRootPath());
 
-        const auto path = m_sandbox.GetLuaPath(L"init.lua", acPath, false);
+        const auto entry = m1core::scripts::FindEntrypoint(acPath);
+        if (entry.empty())
+            throw std::runtime_error("Missing init.m1s, init.lua or init.m1c");
+        const auto path = m_sandbox.GetLuaPath(entry.filename(), acPath, false);
+        if (path.empty())
+            throw std::runtime_error("Invalid mod entry path");
 
         const auto result = sb.ExecuteFile(UTF16ToUTF8(path.native()));
 

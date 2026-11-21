@@ -123,3 +123,8 @@ target("m1core_state_tests")
     add_files("../native/state.cpp", "../tests/state_tests.cpp")
     add_includedirs("../native", "../tests")
     add_packages("nlohmann_json")
+
+target("m1core_script_formats_tests")
+    set_kind("binary")
+    add_files("../tests/script_formats_tests.cpp")
+    add_includedirs("src", "../tests")

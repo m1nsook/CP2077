@@ -1,6 +1,7 @@
 #include <stdafx.h>
 
 #include "ScriptStore.h"
+#include "ScriptFormats.hpp"
 
 #include <M1CoreRuntime.h>
 
@@ -55,9 +56,9 @@ void ScriptStore::LoadAll()
             continue;
         }
 
-        if (!exists(path / L"init.lua"))
+        if (m1core::scripts::FindEntrypoint(path).empty())
         {
-            consoleLogger->warn("Ignoring mod which does not contain init.lua! ('{}')", pathStr);
+            consoleLogger->warn("Ignoring mod without init.m1s, init.lua or init.m1c! ('{}')", pathStr);
             continue;
         }
 

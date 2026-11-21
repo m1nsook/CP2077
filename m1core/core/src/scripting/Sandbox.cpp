@@ -2,6 +2,7 @@
 
 #include "Sandbox.h"
 #include "Scripting.h"
+#include "ScriptFormats.hpp"
 
 Sandbox::Sandbox(uint64_t aId, Scripting* apScripting, sol::table aBaseEnvironment, const std::filesystem::path& acRootPath)
     : m_id(aId)
@@ -13,7 +14,24 @@ Sandbox::Sandbox(uint64_t aId, Scripting* apScripting, sol::table aBaseEnvironme
 
 sol::protected_function_result Sandbox::ExecuteFile(const std::string& acPath) const
 {
-    return m_pScripting->GetLockedState().Get().script_file(acPath, m_env, sol::load_mode::text);
+    const auto kind = m1core::scripts::Classify(acPath);
+    if (kind == m1core::scripts::Format::LuaJitBytecode)
+    {
+        // Only an explicitly named .m1c file can enable binary loading.
+        // LuaJIT bytecode is version-specific and untrusted bytecode may
+        // bypass Lua sandbox guarantees. Mod packages are executable code.
+        std::ifstream input(acPath, std::ios::binary);
+        char signature[4]{};
+        input.read(signature, sizeof(signature));
+        if (!m1core::scripts::IsLuaJitBytecode(
+                std::string_view(signature, static_cast<size_t>(input.gcount()))))
+            throw std::runtime_error("Invalid .m1c: expected LuaJIT bytecode");
+    }
+
+    return m_pScripting->GetLockedState().Get().script_file(
+        acPath, m_env,
+        kind == m1core::scripts::Format::LuaJitBytecode
+            ? sol::load_mode::binary : sol::load_mode::text);
 }
 
 sol::protected_function_result Sandbox::ExecuteString(const std::string& acString) const

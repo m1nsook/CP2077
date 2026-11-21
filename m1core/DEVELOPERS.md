@@ -42,3 +42,41 @@ The native settings store is **separate** from the runtime's own `config.json`, 
 ## Development / compatibility
 
 The CET-derived input, graphics and hotkey runtime is intentionally separate from the native JSON registry. Mod settings must never hook or capture Windows input themselves. The project is not released; function registration and gameplay interaction still require validation with a consuming mod before other developers rely on this ABI. The existing internal hotkey persistence key keeps its historical value for backward compatibility even though the visible UI is called m1core.
+
+
+## Script file extensions
+
+m1core supports three Lua script extensions while retaining CET-style
+\`registerForEvent\`, \`registerHotkey\` and ImGui APIs:
+
+| Extension | Meaning |
+| --- | --- |
+| \`.m1s\` | m1core-readable Lua source (new default) |
+| \`.m1c\` | LuaJIT binary bytecode (optional, LuaJIT version-specific) |
+| \`.lua\` | Existing Lua source compatibility |
+
+Put mods under \`red4ext/plugins/m1core/mods/<mod-id>/\`. A mod must have
+one of \`init.m1s\`, \`init.lua\`, \`init.m1c\`; **source wins** in that order.
+Normal \`loadfile()\`, \`dofile()\`, and sandbox \`require()\` resolve
+extensionless scripts via \`.m1s\`, \`.lua\`, then \`.m1c\`, and modules may
+also use \`folder/init.m1s\`, \`folder/init.lua\` or \`folder/init.m1c\`.
+Explicit filenames such as \`loadfile("module.m1c")\` are supported.
+
+\`.m1s\` does not define a new language: it is ordinary LuaJIT-compatible
+Lua source. \`.m1c\` must contain **actual LuaJIT bytecode**, not renamed
+text or standard Lua bytecode; the embedded VM rejects incompatible
+versions. Source modes reject embedded binary bytecode, and
+\`loadstring()\` still refuses bytecode. Do not accept bytecode from
+untrusted sources: LuaJIT bytecode may bypass sandbox assumptions and
+it is **not encryption or intellectual-property protection**.
+
+Example \`init.m1s\`:
+
+\`\`\`lua
+registerForEvent("onInit", function()
+    print("m1core script started")
+end)
+\`\`\`
+
+The scripting loader and its extension tests compile under Windows CI;
+real in-game extension loading is a separate verification step.
