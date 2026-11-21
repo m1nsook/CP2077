@@ -51,6 +51,23 @@ int main()
         REQUIRE(FindEntrypoint(root).filename() == "init.lua");
         { std::ofstream file(root / "init.m1s"); file << "return true"; }
         REQUIRE(FindEntrypoint(root).filename() == "init.m1s");
+        // M5: a missing mods root is recoverable, and discovery ignores
+        // unrelated files while loading valid mod folders in stable order.
+        const auto missing = DiscoverModDirectories(root / "missing");
+        REQUIRE(missing.directories.empty());
+        REQUIRE(static_cast<bool>(missing.error));
+
+        const auto mods = root / "mods";
+        fs::create_directories(mods / "zeta");
+        fs::create_directories(mods / "alpha");
+        { std::ofstream file(mods / "README.txt"); file << "not a mod"; }
+        const auto discovered = DiscoverModDirectories(mods);
+        REQUIRE(!discovered.error);
+        REQUIRE(discovered.directories.size() == 2);
+        REQUIRE(discovered.directories[0].filename() == "alpha");
+        REQUIRE(discovered.directories[1].filename() == "zeta");
+        // An empty folder is a valid scan, even though there are no mods.
+        REQUIRE(!DiscoverModDirectories(root / "mods" / "alpha").error);
         cleanup();
     }
     catch (...)
