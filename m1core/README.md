@@ -1,70 +1,42 @@
-# M1CORE — native RED4ext replacement for Cyber Engine Tweaks
+# m1core
 
-**Status: unreleased development. Native Windows DLL build artifacts are now available from GitHub Actions; in-game behavior has not been verified.**
+**Project handoff / persistent development status:** [`PROJECT_STATUS.md`](PROJECT_STATUS.md). This is the canonical link to use when resuming work in a new chat; update it alongside code and CI changes.
 
-This project is a **standalone native Windows x64 DLL loaded by RED4ext**.
-It must work on Cyberpunk 2077 without Cyber Engine Tweaks installed.
-The previously published development artifact that required CET was a
-mistake, has been invalidated, and is no longer the product design.
+**Native Cyberpunk 2077 mod settings framework — development build**
 
-## Non-negotiable requirements
+m1core is a standalone Windows x64 DLL loaded by **RED4ext**. It is being built directly on the MIT-only Cyber Engine Tweaks 1.38.1 source archive supplied by yamashi for this project. It does **not** require a separate Cyber Engine Tweaks installation.
 
-- \`red4ext/plugins/m1core/m1core.dll\` is the framework.
-- CET **must not** be a runtime requirement, UI host, keybind provider,
-  scripting host, cursor manager, or bundled component.
-- Native Dear ImGui for the settings UI and user-selected hotkeys only;
-  no hard-coded F-key.
-- One game-ready ZIP when complete, with \`red4ext/\` at the root.
-- Keep all other mods and the repository under MIT. M1CORE is MIT too.
-- No process-global \`SetCursorPos\`, \`ClipCursor\`, \`ShowCursor\` detours,
-  no raw-input mouse-speed multiplier, and no software cursor if Windows'
-  engine-controlled cursor is present.
-- Alt+F4, Alt+Tab, game shutdown, and second-monitor input ownership
-  must be validated before a playable artifact is provided.
-
-## Engineering foundation
-
-Use the **proven architecture** of the source supplied for CET:
-a game render-present hook, the actual D3D12 swapchain/command queue,
-Dear ImGui with Win32/DX12 backends, and the REDengine ForceCursor API.
-
-The native code must be independently implemented. CET is GPLv3 with
-an exception for independent mods that use its public scripting interface;
-that exception **does not** relicense copies of CET's C++ core. No CET
-core code is copied into this MIT source.
-
-The RED4ext SDK exposes \`sdk->hooking->Attach/Detach\` for game
-functions. Use this instead of adding unnecessary hook libraries.
-A missing game symbol should fail safely, leaving game input usable.
+The native game-window, DirectX 12, keyboard/mouse, input capture, overlay lifecycle and embedded scripting components are derived from that connected source, not independently re-created substitutes. The original MIT notices and third-party notices remain with the project. CET's proprietary/restricted fonts and icons and its ASI loader are not included.
 
 ## Development status
 
-- Old native overlay and CET-dependent Lua UI have been removed.
-- Native DLL state persistence and RED4ext plugin entrypoint are present,
-  with automated tests for atomic saves and corrupt-file protection.
-- Renderer lifecycle, native UI, cursor ownership and hotkeys are **not
-  complete**. The DLL is not a usable CET replacement yet.
-- CI compiles/tests the native DLL and publishes a **single development
-  ZIP** named `m1core-standalone-x64-dev`. Its only root folder is
-  `red4ext/`, with `red4ext/plugins/m1core/m1core.dll` inside.
-  It does not contain CET or require CET to build.
-- **This downloadable build is not a gameplay-tested release.** DLL compilation
-  and unit tests cannot establish startup, input, focus, cursor or rendering
-  correctness inside Cyberpunk.
+The author-supplied runtime **loads and responds to mouse and keyboard in Cyberpunk 2077 2.5**, confirmed in-game on November 21, 2026. The user-supplied Dear ImGui theme renders correctly. A subsequent build adds the **m1core application interface** with Settings, Keybinds, Profiles, Logs and About, and ports the earlier native REDscript mod-settings registry onto the same runtime. The user confirmed the native m1core interface and Profiles UI work in-game; the cloud-sync loop was also fixed and user-confirmed. The subsequent `.m1s` / `.m1c` loader build passed Windows CI, but **real mod script execution is not yet confirmed in-game**. Passing CI is not proof of all in-game behavior.
 
-The old unreleased implementation remains in Git history and the
-\`archive/m1core-before-cet-reset-20261120\` branch. Since m1core was
-never released, no migration layer or compatibility bridge is required.
+The project is unreleased. Support for fullscreen, windowed and borderless display modes, Alt+Tab, closure, and compatibility with other mods must remain reliable before release.
 
-No changes are made to any other mod.
+## Lua scripting extensions
 
-## Current UI contract (November 21, 2026)
+m1core loads `init.m1s` as readable Lua source, `init.m1c` as LuaJIT bytecode, and traditional `init.lua` for compatibility. Scripts live under `red4ext/plugins/m1core/mods/<mod-id>/`. `.m1s` is the preferred source extension, `.m1c` is optional, and the loader supports module imports through the same formats.
 
-The user has explicitly selected a **standard Dear ImGui interface** with the supplied `imgui.zip` ImGuiStyle theme. The UI is a normal movable/resizable window with stock tabs, mod selector, checkboxes, sliders, combo boxes, buttons and settings tables. The user's `ImGuiCustomTheme.h` sets only standard color and spacing values. There are no custom-drawn controls, fonts, overlay chrome or hand-placed click areas. The native RED4ext plugin, cursor/input code and persistence framework remain independent of CET. Runtime appearance remains unverified; this is a development build.
+A matching LuaJIT compiler can produce bytecode using `luajit -b init.m1s init.m1c`; the m1core runtime requires compatible LuaJIT bytecode, not ordinary Lua bytecode. Only install bytecode from trusted sources. See [DEVELOPERS.md](DEVELOPERS.md) for module-loading details and safety limits.
 
+## Source layout
 
-### Author-supplied CET 1.38.1 MIT source foundation
+- [`core/`](core/) — active CET-derived runtime, RED4ext DLL entry point, Dear ImGui UI, native registry, keybindings, game hooks and scripting.
+- [`native/`](native/) — preserved earlier independent native implementation, including its registry/state classes and supplied `ImGuiCustomTheme.h`. This is **not** the renderer used by the new DLL.
+- [`DEVELOPERS.md`](DEVELOPERS.md) — native JSON settings API, schema, persistence and profiles.
+- [`core/BUILD.md`](core/BUILD.md) — Windows build system and source attribution.
 
-The developer received a 155-entry MIT-only CET 1.38.1 source archive directly from yamashi. Unlike the ordinary upstream CET distribution, this package was supplied specifically for m1core and includes an MIT license notice. The original MIT notice is retained in `LICENSE-YAMASHI-MIT` and distributed alongside m1core's own MIT license. This does not extend permission to third-party icons, fonts or independently licensed dependencies: **none of those assets are included**.
+The active build uses the CET-derived project's xmake dependency graph and produces `m1core.dll`; no `.asi` loader is shipped. The ZIP is installed at the **game root**, with `red4ext/plugins/m1core/m1core.dll` inside. The original donated-source snapshot is retained in Git history.
 
-The native `window_discovery.cpp` is an explicitly attributed adaptation of `src/window/window.cpp` from the supplied package. It locates Cyberpunk's `W2ViewportClass` HWND by owning process ID and attaches the passive input listener independently of DX12 frame discovery. The remainder of the rendering/input bridge is being adapted to m1core's RED4ext DLL environment; no ASI loader, CET runtime or third-party font/icon is required. The user will handle their own Nexus Mods release and personal shout-out when ready.
+## Interface
+
+m1core uses standard **Dear ImGui** windows, tabs, tables, checkboxes, sliders, dropdowns and buttons. Its appearance comes from the user-provided ImGui style, with no custom-rendered controls and no bundled CET icon or font assets. The donor engine still owns cursor, keyboard and mouse capture; no duplicate input backend is installed by the settings registry.
+
+Registered mods appear in the Settings tab. Each can expose boolean, integer, float and choice settings, grouped by name. The Profiles tab stores/restores native settings. The Keybinds tab delegates to the runtime's original physical keyboard binding engine. CET-only developer panels are no longer part of the main m1core UI.
+
+## Licensing and credits
+
+m1core's own code is MIT. The CET-derived runtime uses the special **MIT-only source package provided directly by yamashi**; preserve `core/LICENSE-MIT` and third-party notices. Do not copy third-party fonts, icons, unauthorized binaries, or the ASI loader. The m1core developer will personally handle Nexus Mods release credits when the mod is published.
+
+**Branch:** `dev/m1core-cet-foundation`. No main-branch merge until the runtime, settings and input lifecycle are validated in game. The old `dev/m1core` implementation remains intact while the new foundation is tested.

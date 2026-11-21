@@ -251,6 +251,7 @@ bool Registry::SaveProfile(std::string name)
 
 bool Registry::LoadProfile(std::string_view name)
 {
+    if (!ValidId(name)) return false;
     std::lock_guard guard(mutex_);
     struct Change { std::string mod, key; json value; };
     std::vector<Change> updates;
@@ -261,26 +262,40 @@ bool Registry::LoadProfile(std::string_view name)
             valid = false;
             return;
         }
-        // Validate all changes before mutating the document.
-        for (const auto& [modId, mod] : mods_) {
-            if (!profileIt->contains(modId)) continue;
-            const auto& record = (*profileIt)[modId];
+
+        // A profile contains ALL saved mods, not only mods registered right
+        // now. Validate known settings before changing any document values.
+        // Unregistered mods have no schema yet; preserve their JSON values
+        // until they register after this load or after a game restart.
+        const json profile = *profileIt;
+        for (auto it = profile.begin(); it != profile.end(); ++it) {
+            const auto& modId = it.key();
+            const auto& record = it.value();
             if (!record.is_object()) { valid = false; return; }
-            for (const auto& setting : mod.settings) {
+            const auto registered = mods_.find(modId);
+            if (registered == mods_.end()) continue;
+            for (const auto& setting : registered->second.settings) {
                 if (!record.contains(setting.id)) continue;
                 const auto next = Normalize(setting, record[setting.id]);
                 if (!next) { valid = false; return; }
                 updates.push_back({modId, setting.id, *next});
             }
         }
-        for (const auto& change : updates) {
-            if (!document["values"].contains(change.mod) ||
-                !document["values"][change.mod].is_object())
-                document["values"][change.mod] = json::object();
-            document["values"][change.mod][change.key] = change.value;
+
+        // Merge saved settings into current values. Do not wipe settings
+        // added after the profile was created; unknown/unloaded mods must
+        // restore as well. The StateStore commits this whole operation once.
+        for (auto it = profile.begin(); it != profile.end(); ++it) {
+            const auto& modId = it.key();
+            if (!document["values"].contains(modId) ||
+                !document["values"][modId].is_object())
+                document["values"][modId] = json::object();
+            for (auto setting = it.value().begin(); setting != it.value().end(); ++setting)
+                document["values"][modId][setting.key()] = setting.value();
         }
     });
     if (!saved || !valid) return false;
+    // Mirror the already-persisted, validated values in the live registry.
     for (const auto& change : updates)
         for (auto& setting : mods_.at(change.mod).settings)
             if (setting.id == change.key) setting.value = change.value;
@@ -289,6 +304,7 @@ bool Registry::LoadProfile(std::string_view name)
 
 bool Registry::DeleteProfile(std::string_view name)
 {
+    if (!ValidId(name)) return false;
     std::lock_guard guard(mutex_);
     bool found = false;
     const bool saved = store_.Update([&](json& document) {

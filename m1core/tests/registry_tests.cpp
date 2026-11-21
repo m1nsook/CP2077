@@ -45,9 +45,44 @@ int main()
     REQUIRE(profileSaved["profiles"]["stealth"]["offline-mod"]["enabled"] == false);
     REQUIRE(profileSaved["profiles"]["stealth"]["example"]["active"] == false);
     REQUIRE(registry.Set("example","active",true));
+    // Unregistered/offline mods must also restore when loading the profile.
+    auto edited = json::parse(store.Snapshot());
+    edited["values"]["offline-mod"]["enabled"] = true;
+    edited["values"]["offline-mod"]["newer_setting"] = 42;
+    REQUIRE(store.Replace(edited.dump()));
     REQUIRE(registry.LoadProfile("stealth"));
     REQUIRE(registry.Get("example","active").value()==false);
     REQUIRE(registry.Get("example","mode").value()=="manual");
+    const auto restored = json::parse(store.Snapshot());
+    REQUIRE(restored["values"]["offline-mod"]["enabled"] == false);
+    REQUIRE(restored["values"]["offline-mod"]["newer_setting"] == 42);
+    // A mod registering after profile load must read its restored value.
+    m1core::Registry lateRegistration(store);
+    const auto offlineSchema = json::array({
+        {{"id","enabled"},{"kind","boolean"},{"default",true}}
+    });
+    REQUIRE(lateRegistration.Register("offline-mod","Offline Mod",offlineSchema));
+    REQUIRE(lateRegistration.Get("offline-mod","enabled").value()==false);
+
+    // Missing/malformed profile loads must not mutate any values or
+    // advance the persisted revision.
+    REQUIRE(!registry.LoadProfile("missing"));
+    REQUIRE(!registry.LoadProfile("../unsafe"));
+    edited = json::parse(store.Snapshot());
+    edited["profiles"]["invalid_known"] = {{"example",{{"active","not-a-bool"}}}};
+    edited["profiles"]["invalid_unknown"] = {{"offline-mod","not-an-object"}};
+    REQUIRE(store.Replace(edited.dump()));
+    const auto beforeInvalid = store.Snapshot();
+    const auto revisionBeforeInvalid = store.Revision();
+    REQUIRE(!registry.LoadProfile("invalid_known"));
+    REQUIRE(!registry.LoadProfile("invalid_unknown"));
+    REQUIRE(store.Snapshot() == beforeInvalid);
+    REQUIRE(store.Revision() == revisionBeforeInvalid);
+    REQUIRE(registry.Get("example","active").value()==false);
+    REQUIRE(registry.DeleteProfile("invalid_known"));
+    REQUIRE(registry.DeleteProfile("invalid_unknown"));
+    REQUIRE(!registry.DeleteProfile("../unsafe"));
+    REQUIRE(!registry.DeleteProfile("missing"));
     REQUIRE(registry.DeleteProfile("stealth"));
     REQUIRE(registry.Profiles().empty());
     REQUIRE(registry.Reset("example","capacity"));
@@ -63,6 +98,9 @@ int main()
     REQUIRE(reopened.Register("example","Demo Settings",schema));
     REQUIRE(reopened.Get("example","active").value()==true);
     REQUIRE(reopened.Get("example","capacity").value()==50);
+    m1core::Registry offlineRestart(reopenStore);
+    REQUIRE(offlineRestart.Register("offline-mod","Offline Mod",offlineSchema));
+    REQUIRE(offlineRestart.Get("offline-mod","enabled").value()==false);
 
     // Atomic descriptor rejection: any broken item rejects the whole mod.
     const auto invalid=json::array({
