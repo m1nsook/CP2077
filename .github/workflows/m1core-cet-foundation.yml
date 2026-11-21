@@ -1,0 +1,104 @@
+name: m1core — CET 1.38.1 RED4ext foundation
+
+on:
+  push:
+    branches:
+      - dev/m1core-cet-foundation
+    paths:
+      - "m1core/cet-foundation/**"
+      - "m1core/native/ImGuiCustomTheme.h"
+      - ".github/workflows/m1core-cet-foundation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m1core-cet-foundation
+  cancel-in-progress: true
+
+jobs:
+  windows-native:
+    runs-on: windows-2022
+    timeout-minutes: 55
+    name: Compile original CET runtime as m1core.dll
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install RED4ext SDK pinned to native framework
+        uses: actions/checkout@v4
+        with:
+          repository: wopss/RED4ext.SDK
+          ref: a34f0ad0a9e4f37cbe1fe001e4ff68c2949d0665
+          path: m1core/cet-foundation/vendor/RED4ext.SDK
+      - name: Install xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: '3.1.2'
+      - name: Inspect native CET target and enforce license/asset restrictions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'm1core/cet-foundation'
+          foreach ($file in @('src/red4ext_plugin.cpp','src/d3d12/D3D12_Hooks.cpp',
+                               'src/window/window.cpp','src/VKBindings.cpp',
+                               'src/overlay/Overlay.cpp','LICENSE-MIT',
+                               'ThirdParty_LICENSES','xmake.lua')) {
+            if (!(Test-Path -LiteralPath (Join-Path $root $file))) {
+              throw "CET foundation source missing: $file"
+            }
+          }
+          if (Test-Path -LiteralPath "$root/src/common/FontMaterialDesignIcons.h") {
+            throw "Restricted CET icon header was committed"
+          }
+          if (Test-Path -LiteralPath "$root/vendor/asiloader/version.dll") {
+            throw "Restricted CET ASI loader was committed"
+          }
+          $build = Get-Content "$root/xmake.lua" -Raw
+          if ($build -notmatch 'target\("m1core"\)' -or
+              $build -notmatch 'remove_files\("src/dllmain.cpp"\)') {
+            throw "m1core must compile as RED4ext DLL, not CET ASI"
+          }
+          if (!(Test-Path "$root/vendor/RED4ext.SDK/include/RED4ext/RED4ext.hpp")) {
+            throw "Pinned RED4ext SDK checkout failed"
+          }
+      - name: Configure gifted CET runtime dependencies
+        working-directory: m1core/cet-foundation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          xmake f -p windows -a x64 -m release -y -vD
+          if ($LASTEXITCODE -ne 0) { throw "CET-derived xmake configuration failed" }
+      - name: Compile m1core.dll from CET source
+        working-directory: m1core/cet-foundation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          xmake build -y -vD m1core
+          if ($LASTEXITCODE -ne 0) { throw "CET-derived DLL compilation failed" }
+      - name: Package one game-root artifact — exclude CET icons/fonts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = @(Get-ChildItem -LiteralPath 'm1core/cet-foundation/build' -Filter 'm1core.dll' -Recurse -File)
+          if ($source.Count -ne 1) { throw "Expected exactly one CET-derived m1core.dll, got $($source.Count)" }
+          $dir = 'm1core/cet-foundation/game-package/red4ext/plugins/m1core'
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          Copy-Item -LiteralPath $source[0].FullName -Destination "$dir/m1core.dll"
+          Copy-Item -LiteralPath 'm1core/LICENSE' -Destination "$dir/LICENSE"
+          Copy-Item -LiteralPath 'm1core/cet-foundation/LICENSE-MIT' -Destination "$dir/LICENSE-YAMASHI-MIT"
+          Copy-Item -LiteralPath 'm1core/cet-foundation/ThirdParty_LICENSES' -Destination "$dir/THIRD_PARTY_LICENSES"
+          $files = @(Get-ChildItem -LiteralPath 'm1core/cet-foundation/game-package' -File -Recurse)
+          if ($files.Count -ne 4) { throw "Unexpected game package file count: $($files.Count)" }
+          if ($files | Where-Object { $_.Extension -match '(?i)^\.(ttf|otf|woff|woff2|png|svg|ico|asi|lua)$' }) {
+            throw "Unauthorized CET font, icon, loader or script entered the package"
+          }
+          if ($source[0].Length -lt 4096) { throw "Compiled CET-derived DLL unexpectedly small" }
+          Get-FileHash -LiteralPath "$dir/m1core.dll" -Algorithm SHA256 | Format-List
+          Write-Host 'This is a native compile artifact, NOT proof of game runtime compatibility'
+      - name: Upload single game-root package
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1core-cet-foundation-x64-dev
+          path: m1core/cet-foundation/game-package/
+          if-no-files-found: error
+          retention-days: 14
