@@ -1,6 +1,7 @@
 #include "render_bridge.hpp"
 #include "renderer.hpp"
 #include "input.hpp"
+#include "window_discovery.hpp"
 
 #include <d3d12.h>
 #include <dxgi1_5.h>
@@ -199,6 +200,14 @@ void* RenderBridge::OnPresent(std::int32_t* deviceIndex,
 {
     auto& bridge = Get();
     if (deviceIndex && bridge.originalPresent_) {
+        // Ported from the author's MIT-only CET window discovery method:
+        // attach the native HWND handler independently of the game's DX12
+        // frame-layout availability. The listener remains passive until UI
+        // rendering succeeds, so startup controls are never swallowed.
+        if (!InputRouter::Get().Ready()) {
+            if (HWND hwnd=FindCyberpunkViewport())
+                InputRouter::Get().Install(hwnd);
+        }
         const auto frame = DiscoverGameFrame(*deviceIndex);
         if (frame.window) {
             if (!bridge.sawValidFrame_.exchange(true))

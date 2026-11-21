@@ -61,3 +61,10 @@ No changes are made to any other mod.
 ## Current UI contract (November 21, 2026)
 
 The user has explicitly selected a **standard Dear ImGui interface** with the supplied `imgui.zip` ImGuiStyle theme. The UI is a normal movable/resizable window with stock tabs, mod selector, checkboxes, sliders, combo boxes, buttons and settings tables. The user's `ImGuiCustomTheme.h` sets only standard color and spacing values. There are no custom-drawn controls, fonts, overlay chrome or hand-placed click areas. The native RED4ext plugin, cursor/input code and persistence framework remain independent of CET. Runtime appearance remains unverified; this is a development build.
+
+
+### Author-supplied CET 1.38.1 MIT source foundation
+
+The developer received a 155-entry MIT-only CET 1.38.1 source archive directly from yamashi. Unlike the ordinary upstream CET distribution, this package was supplied specifically for m1core and includes an MIT license notice. The original MIT notice is retained in `LICENSE-YAMASHI-MIT` and distributed alongside m1core's own MIT license. This does not extend permission to third-party icons, fonts or independently licensed dependencies: **none of those assets are included**.
+
+The native `window_discovery.cpp` is an explicitly attributed adaptation of `src/window/window.cpp` from the supplied package. It locates Cyberpunk's `W2ViewportClass` HWND by owning process ID and attaches the passive input listener independently of DX12 frame discovery. The remainder of the rendering/input bridge is being adapted to m1core's RED4ext DLL environment; no ASI loader, CET runtime or third-party font/icon is required. The user will handle their own Nexus Mods release and personal shout-out when ready.

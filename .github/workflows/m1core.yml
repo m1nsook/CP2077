@@ -58,8 +58,17 @@ jobs:
           New-Item -ItemType Directory -Force -Path $target | Out-Null
           Copy-Item -LiteralPath $dll -Destination (Join-Path $target "m1core.dll")
           Copy-Item -LiteralPath "m1core/LICENSE" -Destination (Join-Path $target "LICENSE")
+          # Preserve the original author's MIT notice for source derived
+          # from the explicitly supplied MIT-only CET 1.38.1 package.
+          Copy-Item -LiteralPath "m1core/LICENSE-YAMASHI-MIT" -Destination (Join-Path $target "LICENSE-YAMASHI-MIT")
           $files = @(Get-ChildItem -LiteralPath $root -Recurse -File)
-          if ($files.Count -ne 2) { throw "Unexpected file count in game-root package" }
+          if ($files.Count -ne 3) { throw "Unexpected file count in game-root package" }
+          if (!(Test-Path -LiteralPath (Join-Path $target "LICENSE-YAMASHI-MIT"))) {
+            throw "Required original-author MIT copyright notice missing"
+          }
+          if (Get-ChildItem $root -Recurse -File | Where-Object { $_.Extension -in @('.ttf','.otf','.woff','.png','.svg','.ico') }) {
+            throw "Third-party icons/fonts must never be bundled"
+          }
           $top = @(Get-ChildItem -LiteralPath $root -Directory | ForEach-Object Name)
           if (($top -join ',') -ne 'red4ext') { throw "Archive must have only red4ext/ at root" }
           if (!(Test-Path -LiteralPath (Join-Path $target 'm1core.dll'))) { throw "Missing native DLL" }
@@ -95,6 +104,9 @@ jobs:
           }
           if (!$ok) { throw "Could not download uploaded artifact" }
           $expected = Join-Path $verify "red4ext/plugins/m1core/m1core.dll"
+          if (!(Test-Path -LiteralPath (Join-Path $verify "red4ext/plugins/m1core/LICENSE-YAMASHI-MIT"))) {
+            throw "Uploaded artifact is missing yamashi's original MIT license"
+          }
           if (!(Test-Path -LiteralPath $expected -PathType Leaf)) { throw "Downloaded artifact missing native DLL" }
           $actualTop = @(Get-ChildItem -LiteralPath $verify -Directory | ForEach-Object Name)
           if (($actualTop -join ',') -ne 'red4ext') { throw "Artifact is nested or has unexpected root folders" }

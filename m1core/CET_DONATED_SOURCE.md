@@ -29,3 +29,10 @@ relicense any independently copyrighted third-party component.
 
 Current limitation: CI checks code and packaging, not Cyberpunk's live
 focus/mouse behavior. Keep PR #40 in draft until real runtime confirmation.
+
+
+### Donated source used directly in a compiled module
+
+`native/window_discovery.cpp` now ports the original `src/window/window.cpp` foreground game-window discovery behavior: `EnumWindows`, process ID matching and exact `W2ViewportClass` detection. The search is invoked by the RED4ext render bridge before the graphics-frame discovery stage, to avoid coupling early HWND binding to an already functioning DX12 renderer. Unlike the old detached-thread CET bootstrapping, this runs inside the existing RED4ext Present callback and leaves gameplay input passive until successful overlay capture. The original author copyright statement is retained in the MIT license file packaged with the DLL.
+
+The source archive also contains bundled assets and an ASI loader (`src/common/FontMaterialDesignIcons.h`, `vendor/asiloader/version.dll`), as well as separate third-party licenses. Those files are **excluded**, and this project does not copy unrelated CET implementation files or fonts/icons. Asset reuse is not authorized merely by the base MIT notice.

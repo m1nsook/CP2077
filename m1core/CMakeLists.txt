@@ -53,6 +53,7 @@ if(WIN32)
         native/render_bridge.cpp
         native/renderer.cpp
         native/input.cpp
+        native/window_discovery.cpp
         native/ui.cpp
     )
     target_link_libraries(m1core PRIVATE
