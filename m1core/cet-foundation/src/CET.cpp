@@ -1,73 +1,73 @@
 #include <stdafx.h>
 
-#include "CET.h"
+#include "M1CoreRuntime.h"
 #include "Options.h"
 
 using namespace std::chrono_literals;
 
-static std::unique_ptr<CET> s_pInstance{nullptr};
+static std::unique_ptr<M1CoreRuntime> s_pInstance{nullptr};
 static bool s_isRunning{true};
 
-void CET::Initialize()
+void M1CoreRuntime::Initialize()
 {
-    s_pInstance.reset(new CET);
+    s_pInstance.reset(new M1CoreRuntime);
 
     s_pInstance->GetVM().Prepare();
 }
 
-void CET::Shutdown()
+void M1CoreRuntime::Shutdown()
 {
     s_pInstance.reset(nullptr);
 }
 
-CET& CET::Get()
+M1CoreRuntime& M1CoreRuntime::Get()
 {
     // we should always call this after initialization, never before!
     assert(s_pInstance);
     return *s_pInstance;
 }
 
-const Paths& CET::GetPaths() const noexcept
+const Paths& M1CoreRuntime::GetPaths() const noexcept
 {
     return m_paths;
 }
 
-const Options& CET::GetOptions() const noexcept
+const Options& M1CoreRuntime::GetOptions() const noexcept
 {
     return m_options;
 }
 
-const PersistentState& CET::GetPersistentState() const noexcept
+const PersistentState& M1CoreRuntime::GetPersistentState() const noexcept
 {
     return m_persistentState;
 }
 
-D3D12& CET::GetD3D12() noexcept
+D3D12& M1CoreRuntime::GetD3D12() noexcept
 {
     return m_d3d12;
 }
 
-VKBindings& CET::GetBindings() noexcept
+VKBindings& M1CoreRuntime::GetBindings() noexcept
 {
     return m_bindings;
 }
 
-Overlay& CET::GetOverlay() noexcept
+Overlay& M1CoreRuntime::GetOverlay() noexcept
 {
     return m_overlay;
 }
 
-LuaVM& CET::GetVM() noexcept
+LuaVM& M1CoreRuntime::GetVM() noexcept
 {
     return m_vm;
 }
 
-bool CET::IsRunning() noexcept
+bool M1CoreRuntime::IsRunning() noexcept
 {
     return s_isRunning;
 }
 
-CET::CET()
+M1CoreRuntime::M1CoreRuntime()
     : m_options(m_paths)
     , m_persistentState(m_paths, m_options)
     , m_bindings(m_paths, m_options)
@@ -78,7 +78,7 @@ CET::CET()
 {
 }
 
-CET::~CET()
+M1CoreRuntime::~M1CoreRuntime()
 {
     s_isRunning = false;
 }

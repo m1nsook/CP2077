@@ -77,8 +77,8 @@
 
 #include <stdafx.h>
 
-// CET Headers
-#include "CET.h"
+// M1CoreRuntime Headers
+#include "M1CoreRuntime.h"
 #include "Utils.h"
 static std::string g_LayoutPath = "";
 
@@ -180,10 +180,10 @@ static bool ImGui_ImplWin32_InitEx(void* hwnd, bool platform_has_own_dc)
     io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;    // We can create multi-viewports on the Platform side (optional)
     io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport; // We can call io.AddMouseViewportEvent() with correct data (optional)
 
-    // CET specific
+    // M1CoreRuntime specific
     // Enable Keyboard Nav and setup INI path
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    g_LayoutPath = UTF16ToUTF8(GetAbsolutePath(L"layout.ini", CET::Get().GetPaths().CETRoot(), true).native()).c_str();
+    g_LayoutPath = UTF16ToUTF8(GetAbsolutePath(L"layout.ini", M1CoreRuntime::Get().GetPaths().CETRoot(), true).native()).c_str();
     io.IniFilename = g_LayoutPath.c_str();
 
     bd->hWnd = (HWND)hwnd;
@@ -325,7 +325,7 @@ static void ImGui_ImplWin32_UpdateKeyModifiers()
     io.AddKeyEvent(ImGuiMod_Super, IsVkDown(VK_LWIN) || IsVkDown(VK_RWIN));
 }
 
-// CET: Scale to make sure coords are correct (fixes issues in fullscreen).
+// M1CoreRuntime: Scale to make sure coords are correct (fixes issues in fullscreen).
 static ImVec2 CET_GetScaleFactor()
 {
     ImGui_ImplWin32_Data* bd = ImGui_ImplWin32_GetBackendData();
@@ -351,7 +351,7 @@ static void ImGui_ImplWin32_UpdateMouseData()
     POINT mouse_screen_pos;
     bool has_mouse_screen_pos = ::GetCursorPos(&mouse_screen_pos) != 0;
     
-    // CET: Get and verify scale factor. If any scalar in the scale factor is <= 0, apply -FLT_MAX as mouse position event. Otherwise, process normally.
+    // M1CoreRuntime: Get and verify scale factor. If any scalar in the scale factor is <= 0, apply -FLT_MAX as mouse position event. Otherwise, process normally.
     const auto scale = CET_GetScaleFactor();
     if (scale.x <= 0.0f || scale.y <= 0.0f)
     {
@@ -507,7 +507,7 @@ void ImGui_ImplWin32_NewFrame(SIZE aOutSize)
     ImGuiIO& io = ImGui::GetIO();
 
     // Setup display size (every frame to accommodate for window resizing)
-    // CET: Use size provided by the game to match DLSS and similar.
+    // M1CoreRuntime: Use size provided by the game to match DLSS and similar.
     io.DisplaySize = ImVec2(static_cast<float>(aOutSize.cx), static_cast<float>(aOutSize.cy));
     if (bd->WantUpdateMonitors)
         ImGui_ImplWin32_UpdateMonitors();
@@ -714,7 +714,7 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARA
     case WM_MOUSEMOVE:
     case WM_NCMOUSEMOVE:
     {
-        // CET: Get and verify scale factor. If any scalar in the scale factor is <= 0, apply -FLT_MAX as mouse position event. Otherwise, process normally.
+        // M1CoreRuntime: Get and verify scale factor. If any scalar in the scale factor is <= 0, apply -FLT_MAX as mouse position event. Otherwise, process normally.
         const auto scale = CET_GetScaleFactor();
         if (scale.x <= 0.0f || scale.y <= 0.0f)
         {

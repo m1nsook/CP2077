@@ -2,7 +2,7 @@
 
 #include "Overlay.h"
 
-#include <CET.h>
+#include <M1CoreRuntime.h>
 
 #include <d3d12/D3D12.h>
 #include <scripting/LuaVM.h>
@@ -17,12 +17,12 @@ void Overlay::PostInitialize()
         {
             Toggle();
 
-            auto& d3d12 = CET::Get().GetD3D12();
+            auto& d3d12 = M1CoreRuntime::Get().GetD3D12();
             d3d12.DelayedSetTrapInputInImGui(true);
         }
         else
         {
-            const auto cOverlayBindCode = CET::Get().GetBindings().GetBindCodeForModBind(Bindings::GetOverlayToggleModBind());
+            const auto cOverlayBindCode = M1CoreRuntime::Get().GetBindings().GetBindCodeForModBind(Bindings::GetOverlayToggleModBind());
             ImGui::InsertNotification({ToastType::Info, NOTIFY_DEFAULT_DISMISS, "m1core Overlay Bind: %s", VKBindings::GetBindString(cOverlayBindCode).c_str()});
         }
 
@@ -61,7 +61,7 @@ void Overlay::Update()
 {
     if (!m_initialized) return;
 
-    // Keep the proven CET 1.38.1 bind/setup, overlay toggle and cursor gate.
+    // Keep the proven M1CoreRuntime 1.38.1 bind/setup, overlay toggle and cursor gate.
     // Replace only its user-facing toolbar/console/editor/debug panels.
     if (m_toggled) {
         if (m_bindings.FirstTimeSetup())
@@ -69,7 +69,7 @@ void Overlay::Update()
         if (m_enabled) m_vm.OnOverlayClose();
         else m_vm.OnOverlayOpen();
         m_enabled = !m_enabled;
-        CET::Get().GetD3D12().DelayedSetTrapInputInImGui(m_enabled);
+        M1CoreRuntime::Get().GetD3D12().DelayedSetTrapInputInImGui(m_enabled);
         m_toggled = false;
     }
 

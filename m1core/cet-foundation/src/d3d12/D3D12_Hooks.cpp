@@ -1,4 +1,4 @@
-#include "CET.h"
+#include "M1CoreRuntime.h"
 
 #include <stdafx.h>
 
@@ -10,7 +10,7 @@
 
 void* D3D12::CRenderNode_Present_InternalPresent(int32_t* apDeviceIndex, uint8_t aSomeSync, UINT aSyncInterval)
 {
-    auto& d3d12 = CET::Get().GetD3D12();
+    auto& d3d12 = M1CoreRuntime::Get().GetD3D12();
 
     const auto* pContext = RenderContext::GetInstance();
     auto* pSwapChain = pContext->devices[*apDeviceIndex - 1].pSwapChain;
@@ -38,7 +38,7 @@ void* D3D12::CRenderNode_Present_InternalPresent(int32_t* apDeviceIndex, uint8_t
 
 void* D3D12::CRenderGlobal_Resize(uint32_t aWidth, uint32_t aHeight, uint32_t a3, uint8_t a4, int* apDeviceIndex)
 {
-    auto& d3d12 = CET::Get().GetD3D12();
+    auto& d3d12 = M1CoreRuntime::Get().GetD3D12();
 
     // TODO - ideally find a way to not call this on each minimize/maximize/etc. which causes this to be called
     //        it can get called multiple times even when there was no resolution change or swapchain invalidation
@@ -54,7 +54,7 @@ void* D3D12::CRenderGlobal_Resize(uint32_t aWidth, uint32_t aHeight, uint32_t a3
 // NOTE - this is called 32 times, as it seems to be called for each device object in RendererContext
 void* D3D12::CRenderGlobal_Shutdown(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4)
 {
-    auto& d3d12 = CET::Get().GetD3D12();
+    auto& d3d12 = M1CoreRuntime::Get().GetD3D12();
 
     d3d12.ResetState(true);
 

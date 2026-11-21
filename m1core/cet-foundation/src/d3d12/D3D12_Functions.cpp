@@ -5,7 +5,7 @@
 #include "Options.h"
 #include "Utils.h"
 
-#include <CET.h>
+#include <M1CoreRuntime.h>
 #include <imgui_impl/dx12.h>
 #include <imgui_impl/win32.h>
 #include <window/window.h>
@@ -145,7 +145,7 @@ bool D3D12::Initialize()
 void D3D12::ReloadFonts()
 {
     std::lock_guard _(m_imguiLock);
-    // Do not load or distribute CET's NotoSans assets from another license.
+    // Do not load or distribute M1CoreRuntime's NotoSans assets from another license.
     auto& io = ImGui::GetIO();
     io.Fonts->Clear();
     io.Fonts->AddFontDefault();
@@ -213,9 +213,9 @@ void D3D12::PrepareUpdate()
     ImGui_ImplWin32_NewFrame(m_outSize);
     ImGui::NewFrame();
 
-    CET::Get().GetOverlay().Update();
+    M1CoreRuntime::Get().GetOverlay().Update();
 
-    CET::Get().GetVM().Draw();
+    M1CoreRuntime::Get().GetVM().Draw();
 
     ImGui::Render();
 

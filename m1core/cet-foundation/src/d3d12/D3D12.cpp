@@ -1,7 +1,7 @@
 #include <stdafx.h>
 
 #include "D3D12.h"
-#include "CET.h"
+#include "M1CoreRuntime.h"
 
 #include <imgui_impl/dx12.h>
 #include <imgui_impl/win32.h>
@@ -26,7 +26,7 @@ void D3D12::DelayedSetTrapInputInImGui(const bool acEnabled)
 
 LRESULT D3D12::OnWndProc(HWND ahWnd, UINT auMsg, WPARAM awParam, LPARAM alParam) const
 {
-    auto& d3d12 = CET::Get().GetD3D12();
+    auto& d3d12 = M1CoreRuntime::Get().GetD3D12();
 
     if (d3d12.IsInitialized())
     {

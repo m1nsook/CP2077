@@ -172,16 +172,16 @@ Options::Options(Paths& aPaths)
 
     set_default_logger(CreateLogger(GetAbsolutePath(L"cyber_engine_tweaks.log", m_paths.CETRoot(), true), "main", nullptr, "[%Y-%m-%d %H:%M:%S UTC%z] [%l] [%!] [%t] %v"));
 
-    Log::Info("Cyber Engine Tweaks is starting...");
+    Log::Info("m1core is starting...");
 
     GameImage.Initialize();
 
     if (GameImage.FileVersion.major != 0)
     {
-        Log::Info("CET version {}", CET_VERSION_FULL);
+        Log::Info("M1CoreRuntime version {}", CET_VERSION_FULL);
         Log::Info("Game version {}.{}.{}.{}", GameImage.FileVersion.major, GameImage.FileVersion.minor, GameImage.FileVersion.build, GameImage.FileVersion.revision);
         Log::Info("Root path: \"{}\"", UTF16ToUTF8(aPaths.GameRoot().native()));
-        Log::Info("Cyber Engine Tweaks path: \"{}\"", UTF16ToUTF8(aPaths.CETRoot().native()));
+        Log::Info("m1core path: \"{}\"", UTF16ToUTF8(aPaths.CETRoot().native()));
         Log::Info("Lua scripts search path: \"{}\"", UTF16ToUTF8(aPaths.ModsRoot().native()));
 
         if (GameImage.FileVersion != RED4EXT_V1_RUNTIME_VERSION_LATEST)

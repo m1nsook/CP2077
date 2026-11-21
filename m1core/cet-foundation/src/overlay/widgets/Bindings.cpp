@@ -2,7 +2,7 @@
 
 #include "Bindings.h"
 
-#include <CET.h>
+#include <M1CoreRuntime.h>
 #include <Utils.h>
 
 namespace
@@ -11,8 +11,8 @@ VKBind s_overlayToggleBind{
     "overlay_key", "m1core menu shortcut", "Open or close m1core.",
     []
     {
-        if (!CET::Get().GetBindings().IsRecordingBind())
-            CET::Get().GetOverlay().Toggle();
+        if (!M1CoreRuntime::Get().GetBindings().IsRecordingBind())
+            M1CoreRuntime::Get().GetOverlay().Toggle();
     }};
 VKBindInfo s_overlayToggleBindInfo{s_overlayToggleBind, 0, 0, false};
 VKModBind s_overlayToggleModBind{"cet", s_overlayToggleBind.ID};
@@ -149,7 +149,7 @@ bool Bindings::IsFirstTimeSetup()
 {
     if (s_overlayToggleBindInfo.SavedCodeBind == 0)
     {
-        s_overlayToggleBindInfo.CodeBind = CET::Get().GetBindings().GetBindCodeForModBind(s_overlayToggleModBind);
+        s_overlayToggleBindInfo.CodeBind = M1CoreRuntime::Get().GetBindings().GetBindCodeForModBind(s_overlayToggleModBind);
         s_overlayToggleBindInfo.SavedCodeBind = s_overlayToggleBindInfo.CodeBind;
     }
     return s_overlayToggleBindInfo.SavedCodeBind == 0;
@@ -232,7 +232,7 @@ void Bindings::Initialize()
         m_vkBindInfos.clear();
     }
 
-    // emplace CET internal settings
+    // emplace M1CoreRuntime internal settings
     {
         auto& [vkBindInfos, hotkeyCount] = m_vkBindInfos[s_overlayToggleModBind.ModName];
         vkBindInfos.emplace_back(s_overlayToggleBindInfo);

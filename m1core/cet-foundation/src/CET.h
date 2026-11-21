@@ -8,13 +8,13 @@
 #include "overlay/Overlay.h"
 #include "scripting/LuaVM.h"
 
-struct CET
+struct M1CoreRuntime
 {
-    ~CET();
+    ~M1CoreRuntime();
 
     static void Initialize();
     static void Shutdown();
-    static CET& Get();
+    static M1CoreRuntime& Get();
 
     const Paths& GetPaths() const noexcept;
     const Options& GetOptions() const noexcept;
@@ -27,7 +27,7 @@ struct CET
     static bool IsRunning() noexcept;
 
 private:
-    CET();
+    M1CoreRuntime();
 
     Paths m_paths;
     Options m_options;

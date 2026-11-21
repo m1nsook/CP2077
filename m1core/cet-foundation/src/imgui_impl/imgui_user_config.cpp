@@ -11,7 +11,7 @@ bool g_ImGuiAssertionsEnabled{false};
 extern "C" _ACRTIMP void __cdecl _wassert(wchar_t const* _Message, wchar_t const* _File, unsigned _Line);
 #endif
 
-// runtime assertions which can be enabled/disabled inside CET options, always logged into main log file when they
+// runtime assertions which can be enabled/disabled inside M1CoreRuntime options, always logged into main log file when they
 // happen
 void ImGuiAssert(wchar_t const* acpMessage, wchar_t const* acpFile, unsigned aLine)
 {

@@ -5,7 +5,7 @@ extern bool g_ImGuiAssertionsEnabled;
 
 #define IMGUI_IMPL_WIN32_DISABLE_GAMEPAD
 
-// runtime assertions which can be enabled/disabled inside CET options
+// runtime assertions which can be enabled/disabled inside M1CoreRuntime options
 void ImGuiAssert(wchar_t const* acpMessage, wchar_t const* acpFile, unsigned aLine);
 
 // custom assertion function macro for ImGui
