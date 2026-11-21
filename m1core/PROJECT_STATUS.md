@@ -4,19 +4,29 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## Latest native CI
+
+- **M7 safe-reload Windows CI PASS:** [#44960718074](https://github.com/m1nsook/CP2077/actions/runs/44960718074), head `580fd750`, game-root `m1core-native-x64-dev` artifact **14729806951**. Compiled/tests passed; real in-game recovery from a failing DB close remains unverified. Draft PR #41 is not merged.
+
 ## API repository separation
 
 - **Canonical scripting API home:** [m1script](https://github.com/m1nsook/m1script), foundation [PR #10](https://github.com/m1nsook/m1script/pull/10) (merged; m1script CI and Pages deployed successfully). Do not expand the duplicated developer API docs in this repository.
 - **Runtime:** m1core is still the independent RED4ext DLL; no CET or extra m1script runtime dependency.
 
+## M7 reload teardown — Windows CI PASS (2026-11-22)
+
+- **Verified build:** [Windows CI #44960718074](https://github.com/m1nsook/CP2077/actions/runs/44960718074) **PASS**, source `580fd75015d0ffa048653a06c283ee1af4e2702d`. Standalone RED4ext `m1core.dll` compiled and all regression targets passed, including the new sandbox DB cleanup exception isolation test, native registry/profiles, callback dispatch, mouse click simulation, LuaJIT, and Weight Limit source/bytecode lifecycle.
+- **Installable development artifact:** `m1core-native-x64-dev` GitHub artifact **14729806951**, one game-root package. Optional Weight Limit tests: source **14729493284**, bytecode **14729632737**. No need to reinstall the samples if their already-confirmed behavior is unchanged.
+- **Game verification:** owner confirmed the previous M7 build; this new failure-path teardown code has not been tested in-game. No existing mods or accepted UI/input were modified.
+
 ## M7 continuation — safe script teardown and reload (2026-11-22)
 
 - **Owner reports tested:** the preceding M7 mod callback isolation build was tested in game; no regression was reported. Continue without retesting accepted ImGui, input or Weight Limit live updates.
-- **Change awaiting Windows CI:** the reload path in `Scripting::ReloadAllMods()` performed `UnloadAllMods()` followed by `ScriptStore::LoadAll()`, which itself performs `DiscardAll()`. Remove the redundant first teardown while preserving native override reset, so contexts, bindings, and Lua sandboxes are discarded exactly once per reload.
+- **Implemented, Windows CI verified:** the reload path in `Scripting::ReloadAllMods()` performed `UnloadAllMods()` followed by `ScriptStore::LoadAll()`, which itself performs `DiscardAll()`. Remove the redundant first teardown while preserving native override reset, so contexts, bindings, and Lua sandboxes are discarded exactly once per reload.
 - **Sandbox cleanup isolation:** `LuaSandbox::ResetState()` now uses `scripts::ForEachSandboxSafely` to attempt closing every mod's database. Failed protected `db:close()` results are converted into diagnostic C++ exceptions that are caught per sandbox, so one failure does not prevent the remaining database handles from being closed; module cache and sandbox state are still cleared.
 - **Shutdown guard:** `ScriptContext` destructor catches unexpected onShutdown native exceptions and logger flush exceptions to avoid `std::terminate` during teardown. This does not recover OS-level access violations.
 - **Regression:** new isolated `m1core_sandbox_cleanup_tests` covers failed DB cleanup, unknown native exception, throwing log sink, later-mod cleanup and empty state; existing real LuaJIT + Weight Limit reload tests stay unchanged.
-- **Scope:** no public API, overlay, input, RED4ext game hook or published mod changes. PR #41 remains draft and unmerged. Full in-game failure-case reload still unverified; Windows CI pending.
+- **Scope:** no public API, overlay, input, RED4ext game hook or published mod changes. PR #41 remains draft and unmerged. Full in-game failure-case reload still unverified; Windows CI #44960718074 passed.
 
 ## M7 Windows CI verified — native per-mod lifecycle isolation (2026-11-21)
 
