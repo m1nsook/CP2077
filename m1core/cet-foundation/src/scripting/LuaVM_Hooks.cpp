@@ -349,7 +349,7 @@ void LuaVM::Hook()
     s_vm = this;
 
     {
-        const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::CScript_Log);
+        const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::CScript_Log);
         uint8_t* pLocation = func.GetAddr();
 
         if (pLocation)
@@ -362,7 +362,7 @@ void LuaVM::Hook()
     }
 
     {
-        const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::CScript_LogError);
+        const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::CScript_LogError);
         uint8_t* pLocation = func.GetAddr();
 
         if (pLocation)
@@ -375,7 +375,7 @@ void LuaVM::Hook()
     }
 
     {
-        const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::CScript_LogWarning);
+        const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::CScript_LogWarning);
         uint8_t* pLocation = func.GetAddr();
 
         if (pLocation)
@@ -388,7 +388,7 @@ void LuaVM::Hook()
     }
 
     {
-        const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::CScript_LogChannel);
+        const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::CScript_LogChannel);
         uint8_t* pLocation = func.GetAddr();
 
         if (pLocation)
@@ -401,7 +401,7 @@ void LuaVM::Hook()
     }
 
     {
-        const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::CScript_LogChannelWarning);
+        const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::CScript_LogChannelWarning);
         uint8_t* pLocation = func.GetAddr();
 
         if (pLocation)
@@ -414,7 +414,7 @@ void LuaVM::Hook()
     }
 
     {
-        const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::CScript_TDBIDConstructorDerive);
+        const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::CScript_TDBIDConstructorDerive);
         uint8_t* pLocation = func.GetAddr();
 
         if (pLocation)
@@ -428,7 +428,7 @@ void LuaVM::Hook()
     }
 
     {
-        const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::CScript_ToStringDEBUG);
+        const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::CScript_ToStringDEBUG);
         uint8_t* pLocation = func.GetAddr();
 
         if (pLocation)
@@ -444,7 +444,7 @@ void LuaVM::Hook()
     }
 
     {
-        const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::CScript_TranslateBytecode);
+        const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::CScript_TranslateBytecode);
         uint8_t* pLocation = func.GetAddr();
 
         if (pLocation)
@@ -460,7 +460,7 @@ void LuaVM::Hook()
     }
 
     {
-        const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::CScript_TweakDBLoad);
+        const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::CScript_TweakDBLoad);
         uint8_t* pLocation = func.GetAddr();
 
         if (pLocation)
@@ -475,7 +475,7 @@ void LuaVM::Hook()
     }
 
     {
-        const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::PlayerSystem_OnPlayerSpawned);
+        const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::PlayerSystem_OnPlayerSpawned);
         uint8_t* pLocation = func.GetAddr();
 
         if (pLocation)

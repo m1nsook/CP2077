@@ -87,9 +87,9 @@ std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> D3D12::Crea
 
 void D3D12::Hook()
 {
-    const RED4ext::UniversalRelocPtr<void> presentInternal(CyberEngineTweaks::AddressHashes::CRenderNode_Present_DoInternal);
-    const RED4ext::UniversalRelocPtr<void> resizeInternal(CyberEngineTweaks::AddressHashes::CRenderGlobal_Resize);
-    const RED4ext::UniversalRelocPtr<void> shutdownInternal(CyberEngineTweaks::AddressHashes::CRenderGlobal_Shutdown);
+    const RED4ext::UniversalRelocPtr<void> presentInternal(m1core::AddressHashes::CRenderNode_Present_DoInternal);
+    const RED4ext::UniversalRelocPtr<void> resizeInternal(m1core::AddressHashes::CRenderGlobal_Resize);
+    const RED4ext::UniversalRelocPtr<void> shutdownInternal(m1core::AddressHashes::CRenderGlobal_Shutdown);
 
     if (MH_CreateHook(presentInternal.GetAddr(), reinterpret_cast<void*>(&CRenderNode_Present_InternalPresent), reinterpret_cast<void**>(&m_realInternalPresent)) != MH_OK ||
         MH_EnableHook(presentInternal.GetAddr()) != MH_OK)

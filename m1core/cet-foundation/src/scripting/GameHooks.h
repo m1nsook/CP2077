@@ -41,10 +41,10 @@ private:
     };
 
     std::array<StateTickOverride, 4> m_stateTickOverrides{
-        StateTickOverride(CyberEngineTweaks::AddressHashes::CBaseInitializationState_OnTick, "CBaseInitializationState::OnTick"),
-        StateTickOverride(CyberEngineTweaks::AddressHashes::CInitializationState_OnTick, "CInitializationState::OnTick"),
-        StateTickOverride(CyberEngineTweaks::AddressHashes::CRunningState_OnTick, "CRunningState::OnTick"),
-        StateTickOverride(CyberEngineTweaks::AddressHashes::CShutdownState_OnTick, "CShutdownState::OnTick")};
+        StateTickOverride(m1core::AddressHashes::CBaseInitializationState_OnTick, "CBaseInitializationState::OnTick"),
+        StateTickOverride(m1core::AddressHashes::CInitializationState_OnTick, "CInitializationState::OnTick"),
+        StateTickOverride(m1core::AddressHashes::CRunningState_OnTick, "CRunningState::OnTick"),
+        StateTickOverride(m1core::AddressHashes::CShutdownState_OnTick, "CShutdownState::OnTick")};
 
     RepeatedTaskQueue m_genericQueue;
 };

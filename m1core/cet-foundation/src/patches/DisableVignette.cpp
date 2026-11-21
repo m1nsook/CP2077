@@ -3,7 +3,7 @@
 
 void DisableVignettePatch()
 {
-    const RED4ext::UniversalRelocPtr<uint8_t> func(CyberEngineTweaks::AddressHashes::CPatches_Vignette);
+    const RED4ext::UniversalRelocPtr<uint8_t> func(m1core::AddressHashes::CPatches_Vignette);
     const auto pLocation = func.GetAddr();
 
     if (pLocation == nullptr)

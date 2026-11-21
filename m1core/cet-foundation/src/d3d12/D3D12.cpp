@@ -11,7 +11,7 @@ void D3D12::SetTrapInputInImGui(const bool acEnabled)
 {
     static const RED4ext::CName cReason = "ImGui";
     static RED4ext::UniversalRelocFunc<void (*)(RED4ext::CBaseEngine::UnkD0* apThis, RED4ext::CName aReason, bool aShow)>
-        forceCursor(CyberEngineTweaks::AddressHashes::InputSystemWin32Base_ForceCursor);
+        forceCursor(m1core::AddressHashes::InputSystemWin32Base_ForceCursor);
 
     forceCursor(RED4ext::CGameEngine::Get()->unkD0, cReason, acEnabled);
 

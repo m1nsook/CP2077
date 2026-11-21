@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace CyberEngineTweaks::AddressHashes
+namespace m1core::AddressHashes
 {
 #pragma region CBaseInitializationState
 constexpr uint32_t CBaseInitializationState_OnTick = 4233370276UL; // red::GameAppBaseInitializationState::OnTick
@@ -75,4 +75,4 @@ constexpr uint32_t gameIGameSystem_SpawnCallback = 2840271332UL; // world::Runti
 #pragma region PlayerSystem
 constexpr uint32_t PlayerSystem_OnPlayerSpawned = 2050111212UL; // cp::PlayerSystem::OnPlayerMainObjectSpawned
 #pragma endregion
-} // namespace CyberEngineTweaks::AddressHashes
+} // namespace m1core::AddressHashes
