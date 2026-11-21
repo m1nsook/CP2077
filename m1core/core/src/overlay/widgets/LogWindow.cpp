@@ -3,6 +3,7 @@
 #include "LogWindow.h"
 
 #include <Utils.h>
+#include <overlay/FontPalette.h>
 
 LogWindow::LogWindow(const std::string& acpLoggerName)
     : m_loggerName(acpLoggerName)
@@ -28,6 +29,9 @@ void LogWindow::Draw(const ImVec2& size)
 
     const auto& style = ImGui::GetStyle();
 
+    // User-selected JetBrains Mono is used only for log contents.
+    if (ImFont* font = m1core::LogFont())
+        ImGui::PushFont(font);
     const auto frameId = ImGui::GetID(("##" + m_loggerName).c_str());
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0, 0, 0.5f));
     if (ImGui::BeginChildFrame(frameId, size, ImGuiWindowFlags_HorizontalScrollbar))
@@ -97,6 +101,8 @@ void LogWindow::Draw(const ImVec2& size)
     }
     ImGui::EndChildFrame();
     ImGui::PopStyleColor(1); // pop ImGuiCol_FrameBg
+    if (m1core::LogFont())
+        ImGui::PopFont();
 }
 
 void LogWindow::Log(const std::string& acpText)

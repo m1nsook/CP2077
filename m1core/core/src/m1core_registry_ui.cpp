@@ -6,6 +6,11 @@
 #include "registry.hpp"
 #include <M1CoreRuntime.h>
 #include <overlay/widgets/Bindings.h>
+#include <overlay/FontPalette.h>
+#include <overlay/PhosphorIcons.h>
+
+#include <filesystem>
+#include <fstream>
 
 #include <algorithm>
 #include <cctype>
@@ -23,6 +28,67 @@ char search[128]{};
 char profileName[96] = "default";
 bool confirmModReset = false;
 std::string notice;
+std::string logSnapshot;
+int logSource = 0;
+bool logLoaded = false;
+
+std::string ReadLogTail(const std::filesystem::path& file)
+{
+    // Read only the most recent 64 KiB and only when Logs is first opened
+    // or Refresh is pressed. No per-frame disk I/O while ImGui renders.
+    std::ifstream input(file, std::ios::binary | std::ios::ate);
+    if (!input)
+        return "Log file not created yet.";
+    const auto size = input.tellg();
+    if (size <= 0)
+        return "Log is empty.";
+    const auto length = static_cast<std::streamoff>(size);
+    const std::streamoff start = std::max<std::streamoff>(0, length - 65536);
+    input.seekg(start);
+    std::string text(static_cast<size_t>(length - start), '\0');
+    input.read(text.data(), static_cast<std::streamsize>(text.size()));
+    text.resize(static_cast<size_t>(input.gcount()));
+    if (start != 0)
+    {
+        const auto firstLineEnd = text.find('\n');
+        if (firstLineEnd != std::string::npos)
+            text.erase(0, firstLineEnd + 1);
+    }
+    return text;
+}
+
+void DrawLogsPage()
+{
+    const char* sources[] = {"m1core.log", "scripting.log"};
+    ImGui::SetNextItemWidth(190.0f);
+    if (ImGui::Combo("Log", &logSource, sources, IM_ARRAYSIZE(sources)))
+        logLoaded = false;
+    ImGui::SameLine();
+    if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_REFRESH " Refresh" : "Refresh"))
+        logLoaded = false;
+    if (!logLoaded)
+    {
+        logSnapshot = ReadLogTail(M1CoreRuntime::Get().GetPaths().CoreRoot() /
+                                  (logSource == 0 ? L"m1core.log" : L"scripting.log"));
+        logLoaded = true;
+    }
+    const auto error = Settings().LastError();
+    if (!error.empty())
+        ImGui::TextWrapped("Settings: %s", error.c_str());
+    ImGui::Separator();
+
+    if (ImGui::BeginChild("##m1core-log-output", ImVec2(0, 0),
+                          ImGuiChildFlags_Borders,
+                          ImGuiWindowFlags_HorizontalScrollbar))
+    {
+        if (ImFont* font = m1core::LogFont())
+            ImGui::PushFont(font);
+        ImGui::TextUnformatted(logSnapshot.c_str());
+        if (m1core::LogFont())
+            ImGui::PopFont();
+    }
+    ImGui::EndChild();
+}
 
 bool ContainsIgnoreCase(std::string_view value, std::string_view query)
 {
@@ -152,7 +218,7 @@ void DrawSettingsFor(const ModView& mod)
 void DrawSettingsPage()
 {
     ImGui::SetNextItemWidth(320);
-    ImGui::InputTextWithHint("##search", "Search mods or settings...",
+    ImGui::InputTextWithHint("##search", m1core::HasIcons() ? M1CORE_ICON_SEARCH " Search mods or settings..." : "Search mods or settings...",
                              search, sizeof(search));
     ImGui::Separator();
 
@@ -193,7 +259,7 @@ void DrawKeybindsPage()
     const auto& bindings = M1CoreRuntime::Get().GetBindings();
     const auto key = bindings.GetBindString(Bindings::GetOverlayToggleModBind());
     ImGui::Text("Current: %s", key.empty() ? "Not assigned" : key.c_str());
-    if (ImGui::Button("Change shortcut")) {
+    if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_EDIT " Change shortcut" : "Change shortcut")) {
         // Use the donated key capture engine instead of introducing another
         // raw/WM_KEYDOWN listener that can regress game input.
         M1CoreRuntime::Get().GetOverlay().GetBindings().Toggle();
@@ -210,7 +276,7 @@ void DrawProfilesPage()
     ImGui::InputTextWithHint("##profile", "Profile name",
                              profileName, sizeof(profileName));
     ImGui::SameLine();
-    if (ImGui::Button("Save profile")) {
+    if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_SAVE " Save profile" : "Save profile")) {
         if (Settings().SaveProfile(profileName)) {
             selectedProfile = profileName;
             notice = "Profile saved.";
@@ -222,12 +288,12 @@ void DrawProfilesPage()
             selectedProfile = name;
     }
     if (!selectedProfile.empty()) {
-        if (ImGui::Button("Load selected")) {
+        if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_REFRESH " Load selected" : "Load selected")) {
             notice = Settings().LoadProfile(selectedProfile) ?
                      "Profile loaded." : "Could not load profile.";
         }
         ImGui::SameLine();
-        if (ImGui::Button("Delete selected")) {
+        if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_DELETE " Delete selected" : "Delete selected")) {
             if (Settings().DeleteProfile(selectedProfile)) {
                 selectedProfile.clear();
                 notice = "Profile deleted.";
@@ -254,30 +320,36 @@ void DrawNativeRegistryUI()
                             ImVec2(0.5f,0.5f));
     ImGui::SetNextWindowSize(ImVec2(940,600), ImGuiCond_FirstUseEver);
     bool open = true;
-    if (ImGui::Begin("m1core - Mod Settings", &open,
-                     ImGuiWindowFlags_NoCollapse)) {
+    // Title text is rendered by Begin(), so override colors only until it
+    // returns. The dark content/tabs retain the user's regular theme.
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.91f, 0.92f, 0.94f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.97f, 0.98f, 0.99f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImVec4(0.91f, 0.92f, 0.94f, 0.95f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.055f, 0.065f, 0.08f, 1.0f));
+    const bool visible = ImGui::Begin("m1core - Mod Settings", &open,
+                                     ImGuiWindowFlags_NoCollapse);
+    ImGui::PopStyleColor(4);
+    if (visible) {
         if (!notice.empty())
             ImGui::TextDisabled("%s",notice.c_str());
         if (ImGui::BeginTabBar("m1core-tabs")) {
-            if (ImGui::BeginTabItem("Settings")) {
+            if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_SETTINGS "  Settings" : "Settings")) {
                 DrawSettingsPage();
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Keybinds")) {
+            if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_KEYBINDS "  Keybinds" : "Keybinds")) {
                 DrawKeybindsPage();
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Profiles")) {
+            if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_PROFILES "  Profiles" : "Profiles")) {
                 DrawProfilesPage();
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Logs")) {
-                const auto error=Settings().LastError();
-                if (!error.empty()) ImGui::TextWrapped("%s",error.c_str());
-                else ImGui::TextDisabled("No settings errors.");
+            if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_LOGS "  Logs" : "Logs")) {
+                DrawLogsPage();
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("About")) {
+            if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_ABOUT "  About" : "About")) {
                 DrawAboutPage();
                 ImGui::EndTabItem();
             }

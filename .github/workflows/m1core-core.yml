@@ -144,6 +144,41 @@ jobs:
           New-Item -ItemType Directory -Path (Split-Path $compiled) -Force | Out-Null
           xmake run -y m1core_weight_limit_tests "$source" "$compiled"
           if ($LASTEXITCODE -ne 0) { throw "Source and compiled weight limit / registry bridge tests failed" }
+      - name: Download only licensed Karla, JetBrains Mono and Phosphor fonts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dest = 'm1core/core/font-assets'
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+          # Immutable upstream commits, not CDN latest; each font's license
+          # accompanies the file. No original CET font/icon assets included.
+          $assets = @(
+            @{ Name='Karla-Regular.ttf'; Uri='https://raw.githubusercontent.com/googlefonts/karla/69b25f663101efb4113dd7ed416c120dd2dce56a/fonts/ttf/Karla-Regular.ttf' },
+            @{ Name='JetBrainsMono-Regular.ttf'; Uri='https://raw.githubusercontent.com/JetBrains/JetBrainsMono/19371302b95d218af43299bce79ddbddd0bc364d/fonts/ttf/JetBrainsMono-Regular.ttf' },
+            @{ Name='Phosphor-Regular.ttf'; Uri='https://raw.githubusercontent.com/phosphor-icons/web/3d40a3eaa73b25d20d263f0e1e55c9fed3e66809/src/regular/Phosphor.ttf' },
+            @{ Name='OFL-KARLA.txt'; Uri='https://raw.githubusercontent.com/googlefonts/karla/69b25f663101efb4113dd7ed416c120dd2dce56a/OFL.txt' },
+            @{ Name='OFL-JETBRAINS-MONO.txt'; Uri='https://raw.githubusercontent.com/JetBrains/JetBrainsMono/19371302b95d218af43299bce79ddbddd0bc364d/OFL.txt' },
+            @{ Name='LICENSE-PHOSPHOR-MIT.txt'; Uri='https://raw.githubusercontent.com/phosphor-icons/web/3d40a3eaa73b25d20d263f0e1e55c9fed3e66809/LICENSE' }
+          )
+          foreach ($asset in $assets) {
+            Invoke-WebRequest -Uri $asset.Uri -OutFile "$dest/$($asset.Name)"
+            if ((Get-Item "$dest/$($asset.Name)").Length -lt 1000) {
+              throw "Unexpected missing/truncated licensed font asset: $($asset.Name)"
+            }
+          }
+          foreach ($name in @('Karla-Regular.ttf','JetBrainsMono-Regular.ttf','Phosphor-Regular.ttf')) {
+            $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path "$dest/$name").Path)
+            $signature = [BitConverter]::ToString($bytes, 0, 4)
+            if ($signature -notin @('00-01-00-00', '4F-54-54-4F')) {
+              throw "Invalid TrueType/OpenType signature for $name"
+            }
+            Get-FileHash "$dest/$name" -Algorithm SHA256 | Format-List
+          }
+          if (!(Select-String -Path "$dest/OFL-KARLA.txt" -Pattern 'SIL OPEN FONT LICENSE' -Quiet) -or
+              !(Select-String -Path "$dest/OFL-JETBRAINS-MONO.txt" -Pattern 'SIL OPEN FONT LICENSE' -Quiet) -or
+              !(Select-String -Path "$dest/LICENSE-PHOSPHOR-MIT.txt" -Pattern 'MIT License' -Quiet)) {
+            throw 'Third-party font license files are missing or incorrect'
+          }
       - name: Package one game-root artifact — exclude CET icons/fonts
         shell: pwsh
         run: |
@@ -156,10 +191,67 @@ jobs:
           Copy-Item -LiteralPath 'm1core/LICENSE' -Destination "$dir/LICENSE"
           Copy-Item -LiteralPath 'm1core/core/LICENSE-MIT' -Destination "$dir/LICENSE-YAMASHI-MIT"
           Copy-Item -LiteralPath 'm1core/core/ThirdParty_LICENSES' -Destination "$dir/THIRD_PARTY_LICENSES"
+          $fontDir = "$dir/fonts"
+          New-Item -ItemType Directory -Path $fontDir -Force | Out-Null
+          Copy-Item -Path 'm1core/core/font-assets/*' -Destination $fontDir
           $files = @(Get-ChildItem -LiteralPath 'm1core/core/game-package' -File -Recurse)
-          if ($files.Count -ne 4) { throw "Unexpected game package file count: $($files.Count)" }
-          if ($files | Where-Object { $_.Extension -match '(?i)^\.(ttf|otf|woff|woff2|png|svg|ico|asi|lua)$' }) {
-            throw "Unauthorized CET font, icon, loader or script entered the package"
+          if ($files.Count -ne 10) { throw "Unexpected game package file count: $($files.Count)" }
+          $allowedFonts = @('JetBrainsMono-Regular.ttf','Karla-Regular.ttf','Phosphor-Regular.ttf')
+          $actualFonts = @((Get-ChildItem -LiteralPath $fontDir -File -Filter '*.ttf').Name)
+          if (@(Compare-Object -ReferenceObject $allowedFonts -DifferenceObject $actualFonts).Count -ne 0) {
+            throw 'Game artifact contains an unexpected font'
+          }
+          if ($files | Where-Object { $_.Extension -match '(?i)^\.(otf|woff|woff2|png|svg|ico|asi|lua)
+          if ($source[0].Length -lt 4096) { throw "Compiled CET-derived DLL unexpectedly small" }
+          Get-FileHash -LiteralPath "$dir/m1core.dll" -Algorithm SHA256 | Format-List
+          Write-Host 'This is a native compile artifact, NOT proof of game runtime compatibility'
+      - name: Package two standalone weight limit sample variants
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $src = 'm1core/examples/weight-limit/init.m1s'
+          $compiled = 'm1core/core/weight-limit-build/init.m1c'
+          if (!(Test-Path $src) -or !(Test-Path $compiled)) { throw "Missing sample source or real compiled bytecode" }
+          $raw = [System.IO.File]::ReadAllBytes((Resolve-Path $compiled).Path)
+          if ($raw.Length -lt 4 -or $raw[0] -ne 27 -or $raw[1] -ne 76 -or $raw[2] -ne 74) {
+            throw "init.m1c must contain authentic LuaJIT bytecode"
+          }
+          $sourceDir = 'm1core/core/sample-source/red4ext/plugins/m1core/mods/weight-limit-sample'
+          $byteDir = 'm1core/core/sample-bytecode/red4ext/plugins/m1core/mods/weight-limit-sample'
+          New-Item -ItemType Directory -Path $sourceDir,$byteDir -Force | Out-Null
+          Copy-Item -LiteralPath $src -Destination "$sourceDir/init.m1s"
+          Copy-Item -LiteralPath $compiled -Destination "$byteDir/init.m1c"
+          Copy-Item -LiteralPath 'm1core/LICENSE' -Destination "$sourceDir/LICENSE"
+          Copy-Item -LiteralPath 'm1core/LICENSE' -Destination "$byteDir/LICENSE"
+          if ((@(Get-ChildItem 'm1core/core/sample-source' -Recurse -File)).Count -ne 2 -or
+              (@(Get-ChildItem 'm1core/core/sample-bytecode' -Recurse -File)).Count -ne 2) {
+            throw "Each game-root variant needs exactly the entrypoint and MIT license"
+          }
+          Get-FileHash "$sourceDir/init.m1s" -Algorithm SHA256 | Format-List
+          Get-FileHash "$byteDir/init.m1c" -Algorithm SHA256 | Format-List
+      - name: Upload weight limit .m1s source variant
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1core-weight-limit-source
+          path: m1core/core/sample-source/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload weight limit .m1c bytecode variant
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1core-weight-limit-bytecode
+          path: m1core/core/sample-bytecode/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload single game-root package
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1core-native-x64-dev
+          path: m1core/core/game-package/
+          if-no-files-found: error
+          retention-days: 14
+ }) {
+            throw "Unauthorized CET icon, loader or script entered the package"
           }
           if ($source[0].Length -lt 4096) { throw "Compiled CET-derived DLL unexpectedly small" }
           Get-FileHash -LiteralPath "$dir/m1core.dll" -Algorithm SHA256 | Format-List

@@ -2,6 +2,7 @@
 #include "ImGuiCustomTheme.h"
 
 #include "D3D12.h"
+#include <overlay/FontPalette.h>
 #include "Options.h"
 #include "Utils.h"
 
@@ -145,10 +146,88 @@ bool D3D12::Initialize()
 void D3D12::ReloadFonts()
 {
     std::lock_guard _(m_imguiLock);
-    // Do not load or distribute M1CoreRuntime's NotoSans assets from another license.
     auto& io = ImGui::GetIO();
+
+    // Font references belong to this atlas; never retain dangling pointers.
+    io.FontDefault = nullptr;
+    m1core::SetLogFont(nullptr);
+    m1core::SetIconsAvailable(false);
     io.Fonts->Clear();
-    io.Fonts->AddFontDefault();
+
+    // Karla/JetBrains Mono are independently licensed SIL OFL fonts,
+    // bundled by CI with their own license notices. No donated CET fonts.
+    static const ImWchar latinExtended[] = {
+        0x0020, 0x024F, 0x2000, 0x206F, 0x20AC, 0x20AC, 0
+    };
+    const auto load = [&](const wchar_t* name, float size) -> ImFont*
+    {
+        const auto path = m_paths.Fonts() / name;
+        std::error_code error;
+        if (!std::filesystem::is_regular_file(path, error))
+        {
+            Log::Warn("m1core UI font is missing: {}", UTF16ToUTF8(path.native()));
+            return nullptr;
+        }
+
+        ImFontConfig config{};
+        config.OversampleH = m_options.Font.OversampleHorizontal;
+        config.OversampleV = m_options.Font.OversampleVertical;
+        // ImGui's Win32 font loader accepts paths in UTF-8.
+        return io.Fonts->AddFontFromFileTTF(
+            UTF16ToUTF8(path.native()).c_str(), size, &config, latinExtended);
+    };
+
+    const float size = std::clamp(m_options.Font.BaseSize, 12.0f, 30.0f);
+    ImFont* mainFont = load(L"Karla-Regular.ttf", size);
+    if (!mainFont)
+    {
+        // A damaged or old install must still show an operable settings UI.
+        mainFont = io.Fonts->AddFontDefault();
+        Log::Warn("Using Dear ImGui fallback font because Karla was unavailable");
+    }
+    io.FontDefault = mainFont;
+
+    // Merge only the needed Phosphor regular icons into Karla, keeping
+    // fonts in a single normal ImGui atlas and without custom DrawList UI.
+    // Codepoints come from phosphor-icons/web src/regular/style.css.
+    static const ImWchar phosphorRanges[] = {
+        0xE094, 0xE094, // arrows-clockwise
+        0xE23A, 0xE23A, // file-text
+        0xE248, 0xE248, // floppy-disk
+        0xE2CE, 0xE2CE, // info
+        0xE2D8, 0xE2D8, // keyboard
+        0xE30C, 0xE30C, // magnifying-glass
+        0xE3AE, 0xE3AE, // pencil
+        0xE432, 0xE432, // sliders
+        0xE4A6, 0xE4A6, // trash
+        0xE4C4, 0xE4C4, // user-circle
+        0
+    };
+    const auto iconPath = m_paths.Fonts() / L"Phosphor-Regular.ttf";
+    std::error_code iconError;
+    if (std::filesystem::is_regular_file(iconPath, iconError))
+    {
+        ImFontConfig iconConfig{};
+        iconConfig.MergeMode = true;
+        iconConfig.GlyphMinAdvanceX = size * 0.86f;
+        iconConfig.OversampleH = 2;
+        iconConfig.OversampleV = 1;
+        if (io.Fonts->AddFontFromFileTTF(
+                UTF16ToUTF8(iconPath.native()).c_str(), size, &iconConfig, phosphorRanges))
+            m1core::SetIconsAvailable(true);
+        else
+            Log::Warn("Failed to load Phosphor icons: using plain-text tab labels");
+    }
+    else
+    {
+        Log::Warn("Phosphor icon font not found: using plain-text tab labels");
+    }
+
+    ImFont* mono = load(L"JetBrainsMono-Regular.ttf", std::max(12.0f, size * 0.84f));
+    if (mono)
+        m1core::SetLogFont(mono);
+    else
+        Log::Warn("Using main UI font for logs because JetBrains Mono was unavailable");
 }
 
 bool D3D12::InitializeImGui(size_t aBuffersCounts)
