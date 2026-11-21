@@ -172,10 +172,14 @@ bool Bindings::FirstTimeSetup()
 
     // ImGui renders the title inside BeginPopupModal(). Limit the dark
     // foreground to the cyan title bar; keep regular body text unchanged.
+    const auto framePadding = ImGui::GetStyle().FramePadding;
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                        ImVec2(framePadding.x, 4.0f));
     ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
     const bool setupOpen = ImGui::BeginPopupModal(
         "M1CORE FIRST TIME SETUP", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
     if (setupOpen)
     {
         const auto shorterTextSz{ImGui::CalcTextSize("Combo can be composed from up to 4 keys.").x};

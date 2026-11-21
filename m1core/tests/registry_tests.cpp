@@ -1,6 +1,7 @@
 #include "../native/registry.hpp"
 #include "check.hpp"
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 
 using nlohmann::json;
@@ -36,6 +37,27 @@ int main()
     REQUIRE(!registry.Set("example","capacity","broken"));
     REQUIRE(registry.Set("example","mode","manual"));
     REQUIRE(!registry.Set("example","mode","no_such_value"));
+
+    // A setting changed through the UI is saved at the time of Set().
+    // Simulate a game restart BEFORE resetting the value: the next
+    // registry and state store must recover the non-default settings.
+    {
+        std::ifstream disk(path, std::ios::binary);
+        REQUIRE(disk.good());
+        const auto savedOnDisk = json::parse(disk);
+        REQUIRE(savedOnDisk["values"]["example"]["active"] == false);
+        REQUIRE(savedOnDisk["values"]["example"]["capacity"] == 250);
+        REQUIRE(savedOnDisk["values"]["example"]["mode"] == "manual");
+    }
+    m1core::StateStore restartBeforeReset;
+    restartBeforeReset.Configure(path);
+    REQUIRE(restartBeforeReset.Ready());
+    m1core::Registry restoredBeforeReset(restartBeforeReset);
+    REQUIRE(restoredBeforeReset.Register("example","Demo Settings",schema));
+    REQUIRE(restoredBeforeReset.Get("example","active").value() == false);
+    REQUIRE(restoredBeforeReset.Get("example","capacity").value() == 250);
+    REQUIRE(restoredBeforeReset.Get("example","mode").value() == "manual");
+
     // Unregistered mod values must survive a profile save.
     auto persisted = json::parse(store.Snapshot());
     persisted["values"]["offline-mod"] = {{"enabled",false}};

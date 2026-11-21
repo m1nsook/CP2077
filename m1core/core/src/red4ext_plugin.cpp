@@ -61,7 +61,13 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(
         M1CoreRuntime::Initialize();
         // Keep the existing m1core native registry and REDscript API.
         // The M1CoreRuntime window/input/render system replaces only its old frontend.
-        m1core::Store().Configure(M1CoreRuntime::Get().GetPaths().CoreRoot() / L"settings.json");
+        // Store was configured before Lua hooks became active.
+        // Never reset settings here after a mod may have registered.
+        if (!m1core::Store().Ready())
+        {
+            const auto error = m1core::Store().LastError();
+            Report(sdk, handle, (std::string("m1core settings unavailable: ") + error).c_str(), true);
+        }
         m1core::RegisterNativeModAPI();
         g_initialized.store(true);
         Report(sdk,handle,"m1core: native runtime and settings registry initialized");

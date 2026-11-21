@@ -103,6 +103,20 @@ void DrawLogsPage()
     ImGui::EndChild();
 }
 
+// Settings changes are durable immediately. Report filesystem failures at
+// the control that triggered them rather than silently discarding the input.
+void ApplySetting(const ModView& mod, const SettingView& setting, const nlohmann::json& value)
+{
+    if (Settings().Set(mod.id, setting.id, value))
+    {
+        notice.clear();
+        return;
+    }
+    const auto detail = Settings().LastError();
+    notice = detail.empty() ? "Could not save setting; check Logs."
+                            : "Could not save setting: " + detail;
+}
+
 bool ContainsIgnoreCase(std::string_view value, std::string_view query)
 {
     if (query.empty()) return true;
@@ -142,7 +156,7 @@ void DrawSetting(const ModView& mod, const SettingView& setting)
     case SettingKind::Boolean: {
         bool value = setting.value.get<bool>();
         if (ImGui::Checkbox("##value", &value))
-            Settings().Set(mod.id, setting.id, value);
+            ApplySetting(mod, setting, value);
         break;
     }
     case SettingKind::Integer: {
@@ -150,7 +164,7 @@ void DrawSetting(const ModView& mod, const SettingView& setting)
         if (ImGui::SliderInt("##value", &value,
             static_cast<int>(setting.minimum),
             static_cast<int>(setting.maximum)))
-            Settings().Set(mod.id, setting.id, value);
+            ApplySetting(mod, setting, value);
         break;
     }
     case SettingKind::Float: {
@@ -158,7 +172,7 @@ void DrawSetting(const ModView& mod, const SettingView& setting)
         if (ImGui::SliderFloat("##value", &value,
             static_cast<float>(setting.minimum),
             static_cast<float>(setting.maximum), "%.2f"))
-            Settings().Set(mod.id, setting.id, value);
+            ApplySetting(mod, setting, value);
         break;
     }
     case SettingKind::Choice: {
@@ -167,7 +181,7 @@ void DrawSetting(const ModView& mod, const SettingView& setting)
             for (const auto& option : setting.choices) {
                 const bool selected = option == current;
                 if (ImGui::Selectable(option.c_str(), selected))
-                    Settings().Set(mod.id, setting.id, option);
+                    ApplySetting(mod, setting, option);
                 if (selected) ImGui::SetItemDefaultFocus();
             }
             ImGui::EndCombo();
@@ -233,6 +247,10 @@ void DrawSettingsPage()
     ImGui::SetNextItemWidth(320);
     ImGui::InputTextWithHint("##search", m1core::HasIcons() ? M1CORE_ICON_SEARCH " Search mods or settings..." : "Search mods or settings...",
                              search, sizeof(search));
+    ImGui::SameLine();
+    ImGui::TextDisabled("Auto-saved to settings.json");
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+        ImGui::SetTooltip("Changes are written immediately; no Save button required.");
     ImGui::Separator();
 
     const auto mods = Settings().Snapshot();
@@ -332,19 +350,51 @@ void DrawNativeRegistryUI()
     ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_FirstUseEver,
                             ImVec2(0.5f,0.5f));
     ImGui::SetNextWindowSize(ImVec2(940,600), ImGuiCond_FirstUseEver);
-    bool open = true;
-    // Title text is rendered by Begin(), so override colors only until it
-    // returns. The dark content/tabs retain the user's regular theme.
-    ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.91f, 0.92f, 0.94f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.97f, 0.98f, 0.99f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImVec4(0.91f, 0.92f, 0.94f, 0.95f));
-    ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
-    const bool visible = ImGui::Begin("M1CORE - MOD SETTINGS", &open,
-                                     ImGuiWindowFlags_NoCollapse);
-    ImGui::PopStyleColor(4);
+    bool closeRequested = false;
+    // Use a compact header composed only of stock Dear ImGui widgets.
+    // The native close glyph is hardcoded in ImGui::CloseButton and cannot
+    // be swapped for Phosphor via a font. With NoTitleBar, a regular
+    // Phosphor SmallButton provides a properly sized clickable close.
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(7.0f, 6.0f));
+    const bool visible = ImGui::Begin("M1CORE - MOD SETTINGS", nullptr,
+                                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+    ImGui::PopStyleVar();
     if (visible) {
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.95f, 0.96f, 0.98f, 1.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(9.0f, 4.0f));
+        const bool headerVisible = ImGui::BeginChild(
+            "##m1core-titlebar", ImVec2(0.0f, 29.0f),
+            ImGuiChildFlags_None,
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        if (headerVisible) {
+            ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.95f, 0.96f, 0.98f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.83f, 0.86f, 0.90f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.75f, 0.79f, 0.83f, 1.0f));
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("M1CORE - MOD SETTINGS");
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 31.0f);
+            closeRequested = ImGui::SmallButton(
+                m1core::HasIcons() ? M1CORE_ICON_CLOSE "##m1core-close" : "X##m1core-close");
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                ImGui::SetTooltip("Close m1core");
+            ImGui::PopStyleColor(4);
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+        if (!Store().Ready()) {
+            const auto error = Store().LastError();
+            ImGui::TextColored(m1core::ui::WarningText(),
+                "Settings cannot be saved: %s", error.empty() ? "store not initialized" : error.c_str());
+        } else {
+            const auto error = Settings().LastError();
+            if (!error.empty())
+                ImGui::TextColored(m1core::ui::WarningText(), "Save failed: %s", error.c_str());
+        }
         if (!notice.empty())
-            ImGui::TextDisabled("%s",notice.c_str());
+            ImGui::TextColored(m1core::ui::WarningText(), "%s", notice.c_str());
         if (ImGui::BeginTabBar("m1core-tabs")) {
             if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_SETTINGS "  Settings" : "Settings")) {
                 DrawSettingsPage();
@@ -370,6 +420,6 @@ void DrawNativeRegistryUI()
         }
     }
     ImGui::End();
-    if (!open) M1CoreRuntime::Get().GetOverlay().Toggle();
+    if (closeRequested) M1CoreRuntime::Get().GetOverlay().Toggle();
 }
 } // namespace m1core

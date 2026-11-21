@@ -2,6 +2,7 @@
 
 #include "M1CoreRuntime.h"
 #include "Options.h"
+#include "state.hpp"
 
 using namespace std::chrono_literals;
 
@@ -11,6 +12,11 @@ static bool s_isRunning{true};
 void M1CoreRuntime::Initialize()
 {
     s_pInstance.reset(new M1CoreRuntime);
+
+    // Configure persistent settings before engine/Lua initialization can
+    // register any mods. A late Configure would discard the values that
+    // a mod saw during registration and make startup look like a reset.
+    m1core::Store().Configure(s_pInstance->GetPaths().CoreRoot() / L"settings.json");
 
     s_pInstance->GetVM().Prepare();
 }

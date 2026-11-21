@@ -13,3 +13,4 @@
 #define M1CORE_ICON_EDIT "\xEE\x8E\xAE" // U+E3AE
 #define M1CORE_ICON_SEARCH "\xEE\x8C\x8C" // U+E30C
 #define M1CORE_ICON_WARNING "\xEE\x93\xA0" // U+E4E0, warning triangle
+#define M1CORE_ICON_CLOSE "\xEE\x93\xB6" // U+E4F6, Phosphor X

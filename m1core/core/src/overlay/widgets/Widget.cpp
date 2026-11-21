@@ -99,9 +99,12 @@ void Widget::Draw()
         ImGui::SetNextWindowSizeConstraints(ImVec2(420, 315), ImVec2(FLT_MAX, FLT_MAX));
         // Apply dark title text only while ImGui builds the title bar.
         // Do not recolor buttons, labels or the regular window content.
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+            ImVec2(ImGui::GetStyle().FramePadding.x, 4.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
         const bool visible = ImGui::Begin(m_name.c_str(), &newEnabled);
         ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
         if (visible)
             OnUpdate();
         ImGui::End();

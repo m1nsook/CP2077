@@ -202,6 +202,7 @@ void D3D12::ReloadFonts()
         0xE4A6, 0xE4A6, // trash
         0xE4C4, 0xE4C4, // user-circle
         0xE4E0, 0xE4E0, // warning (triangle/exclamation)
+        0xE4F6, 0xE4F6, // x (close)
         0
     };
     const auto iconPath = m_paths.Fonts() / L"Phosphor-Regular.ttf";

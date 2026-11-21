@@ -202,10 +202,13 @@ TChangedCBResult UnsavedChangesPopup(
             aFirstTime = false;
         }
 
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+            ImVec2(ImGui::GetStyle().FramePadding.x, 4.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
         const bool popupVisible = ImGui::BeginPopupModal(
             popupTitle.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
         if (popupVisible)
         {
             const auto shorterTextSz{ImGui::CalcTextSize("You have some unsaved changes.").x};
