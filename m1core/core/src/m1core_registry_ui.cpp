@@ -243,7 +243,7 @@ void DrawAboutPage()
     ImGui::Separator();
     ImGui::TextWrapped("Native RED4ext mod settings framework.");
     ImGui::TextWrapped("Settings, keybindings and profiles with Dear ImGui.");
-    ImGui::TextWrapped("Standalone DLL. No separate M1CoreRuntime installation required.");
+    ImGui::TextWrapped("Native RED4ext DLL. No additional overlay installation required.");
 }
 } // namespace
 

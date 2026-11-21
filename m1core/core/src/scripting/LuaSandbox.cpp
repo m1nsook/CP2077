@@ -134,7 +134,7 @@ void LuaSandbox::Initialize()
     {
         if (auto existingLogger = spdlog::get("scripting"))
         {
-            existingLogger->warn("M1CoreRuntime launched with MO2.");
+            existingLogger->warn("m1core launched with MO2.");
         }
     }
 

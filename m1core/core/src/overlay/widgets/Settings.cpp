@@ -77,7 +77,7 @@ void Settings::OnUpdate()
             }
             ImGui::TreePop();
         }
-        if (ImGui::CollapsingHeader("M1CoreRuntime Development Settings", ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::CollapsingHeader("m1core Development Settings", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::TreePush("##DEV");
             if (ImGui::BeginTable("##SETTINGS_DEV", 2, ImGuiTableFlags_Sortable | ImGuiTableFlags_SizingStretchSame, ImVec2(-ImGui::GetStyle().IndentSpacing, 0)))

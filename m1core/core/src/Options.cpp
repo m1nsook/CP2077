@@ -178,7 +178,7 @@ Options::Options(Paths& aPaths)
 
     if (GameImage.FileVersion.major != 0)
     {
-        Log::Info("M1CoreRuntime version {}", M1CORE_VERSION_FULL);
+        Log::Info("m1core version {}", M1CORE_VERSION_FULL);
         Log::Info("Game version {}.{}.{}.{}", GameImage.FileVersion.major, GameImage.FileVersion.minor, GameImage.FileVersion.build, GameImage.FileVersion.revision);
         Log::Info("Root path: \"{}\"", UTF16ToUTF8(aPaths.GameRoot().native()));
         Log::Info("m1core path: \"{}\"", UTF16ToUTF8(aPaths.CoreRoot().native()));

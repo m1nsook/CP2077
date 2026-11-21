@@ -21,7 +21,7 @@ jobs:
   windows-native:
     runs-on: windows-2022
     timeout-minutes: 55
-    name: Compile original CET runtime as m1core.dll
+    name: Compile m1core native runtime
     steps:
       - uses: actions/checkout@v4
       - name: Install RED4ext SDK pinned to native framework
@@ -69,6 +69,10 @@ jobs:
           if (Test-Path -LiteralPath "$root/src/dllmain.cpp") {
             throw "Legacy ASI loader must not be included in the m1core source"
           }
+          $gui = Get-Content "$root/src/m1core_registry_ui.cpp" -Raw
+          if ($gui -match 'M1CoreRuntime installation|Cyber Engine Tweaks') {
+            throw "User-facing m1core UI must not contain legacy CET branding"
+          }
           $entry = Get-Content "$root/src/red4ext_plugin.cpp" -Raw
           if ($entry -match 'GetPaths\(\)\.CETRoot\(') {
             throw "RED4ext entry point must use renamed CoreRoot() accessor"
@@ -76,7 +80,7 @@ jobs:
           if (!(Test-Path "$root/vendor/RED4ext.SDK/include/RED4ext/RED4ext.hpp")) {
             throw "Pinned RED4ext SDK checkout failed"
           }
-      - name: Configure gifted CET runtime dependencies
+      - name: Configure m1core native dependencies
         working-directory: m1core/core
         shell: pwsh
         run: |
@@ -113,7 +117,7 @@ jobs:
       - name: Upload single game-root package
         uses: actions/upload-artifact@v4
         with:
-          name: m1core-cet-foundation-x64-dev
+          name: m1core-native-x64-dev
           path: m1core/core/game-package/
           if-no-files-found: error
           retention-days: 14

@@ -64,7 +64,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(
         m1core::Store().Configure(M1CoreRuntime::Get().GetPaths().CoreRoot() / L"settings.json");
         m1core::RegisterNativeModAPI();
         g_initialized.store(true);
-        Report(sdk,handle,"m1core: M1CoreRuntime-derived runtime and native registry initialized");
+        Report(sdk,handle,"m1core: native runtime and settings registry initialized");
         return true;
     }
     catch (...)
