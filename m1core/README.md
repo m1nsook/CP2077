@@ -10,9 +10,15 @@ The native game-window, DirectX 12, keyboard/mouse, input capture, overlay lifec
 
 ## Development status
 
-The author-supplied runtime **loads and responds to mouse and keyboard in Cyberpunk 2077 2.5**, confirmed in-game on November 21, 2026. The user-supplied Dear ImGui theme renders correctly. A subsequent build adds the **m1core application interface** with Settings, Keybinds, Profiles, Logs and About, and ports the earlier native REDscript mod-settings registry onto the same runtime. The m1core interface and renamed internal runtime still require an in-game check; **passing Windows CI is not proof of all in-game behavior**.
+The author-supplied runtime **loads and responds to mouse and keyboard in Cyberpunk 2077 2.5**, confirmed in-game on November 21, 2026. The user-supplied Dear ImGui theme renders correctly. A subsequent build adds the **m1core application interface** with Settings, Keybinds, Profiles, Logs and About, and ports the earlier native REDscript mod-settings registry onto the same runtime. The user confirmed the native m1core interface and Profiles UI work in-game; the cloud-sync loop was also fixed and user-confirmed. The subsequent `.m1s` / `.m1c` loader build passed Windows CI, but **real mod script execution is not yet confirmed in-game**. Passing CI is not proof of all in-game behavior.
 
 The project is unreleased. Support for fullscreen, windowed and borderless display modes, Alt+Tab, closure, and compatibility with other mods must remain reliable before release.
+
+## Lua scripting extensions
+
+m1core loads `init.m1s` as readable Lua source, `init.m1c` as LuaJIT bytecode, and traditional `init.lua` for compatibility. Scripts live under `red4ext/plugins/m1core/mods/<mod-id>/`. `.m1s` is the preferred source extension, `.m1c` is optional, and the loader supports module imports through the same formats.
+
+A matching LuaJIT compiler can produce bytecode using `luajit -b init.m1s init.m1c`; the m1core runtime requires compatible LuaJIT bytecode, not ordinary Lua bytecode. Only install bytecode from trusted sources. See [DEVELOPERS.md](DEVELOPERS.md) for module-loading details and safety limits.
 
 ## Source layout
 
