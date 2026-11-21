@@ -86,8 +86,10 @@ bool InputRouter::Install(HWND hwnd) noexcept
 {
     if (window_==hwnd && previous_) return true;
     if (window_) Uninstall();
-    if (!IsWindow(hwnd) || !ResolveGameSymbol(kGameForceCursor))
-        return false;
+    // A missing/late ForceCursor symbol must never prevent mounting
+    // the keyboard-only first-run binder or native ImGui renderer.
+    // General mouse input still requires actual cursor ownership.
+    if (!IsWindow(hwnd)) return false;
 
     SetLastError(0);
     const LONG_PTR prior=SetWindowLongPtrW(hwnd,GWLP_WNDPROC,
@@ -197,7 +199,8 @@ bool InputRouter::HandleKeyTransition(int key,bool down) noexcept
         if (edge==KeyEdge::Release) {
             if (key==VK_ESCAPE) {
                 recording_.store(false);
-            } else if (IsValidShortcut(key) && SetMenuKey(key)) {
+            } else if (plain && IsValidShortcut(key) && SetMenuKey(key)) {
+                RenderBridge::Get().LogInfo("m1core: overlay hotkey bound successfully");
                 recording_.store(false);
                 setup_.store(false);
                 visible_.store(false);
@@ -358,8 +361,8 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
             return 1;
     }
 
-    if (CanCaptureInput(visible_.load() || setup_.load(),foreground,
-                        Renderer::Get().AcceptingInput()) && CursorHeld() &&
+    if (CanRouteImGuiInput(visible_.load() || setup_.load(),foreground,
+                           Renderer::Get().AcceptingInput(),CursorHeld()) &&
         (IsKeyboardMessage(message) || IsMouseMessage(message) ||
          message==WM_INPUT)) {
         Renderer::Get().ForwardInput(hwnd,message,wp,lp);

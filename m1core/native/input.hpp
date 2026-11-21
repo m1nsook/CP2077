@@ -44,6 +44,15 @@ constexpr UINT kCursorSyncMessage = WM_APP + 0x4B3;
     return CanCaptureInput(setup, foreground, rendererReady);
 }
 
+// General UI input is allowed only when Cyberpunk's own cursor is held.
+// Keyboard-only first-run binding is handled separately above.
+[[nodiscard]] inline bool CanRouteImGuiInput(bool active, bool foreground,
+                                            bool rendererReady,
+                                            bool cursorHeld) noexcept
+{
+    return CanCaptureInput(active, foreground, rendererReady) && cursorHeld;
+}
+
 enum class KeyEdge { None, Press, Release };
 [[nodiscard]] inline KeyEdge TrackKeyEdge(std::array<bool,256>& keys,
                                           unsigned key,bool pressed) noexcept

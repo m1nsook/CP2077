@@ -33,6 +33,11 @@ int main()
     REQUIRE(!CanRecordKey(true,true,false));
     REQUIRE(!CanRecordKey(true,false,true));
     REQUIRE(!CanRecordKey(false,true,true));
+    using m1core::CanRouteImGuiInput;
+    REQUIRE(!CanRouteImGuiInput(true,true,true,false)); // Missing cursor
+    REQUIRE(!CanRouteImGuiInput(true,true,false,true)); // GPU not ready
+    REQUIRE(!CanRouteImGuiInput(true,false,true,true)); // Alt+Tab
+    REQUIRE(CanRouteImGuiInput(true,true,true,true));
     std::array<bool,256> keys{};
     using m1core::TrackKeyEdge;
     using m1core::KeyEdge;

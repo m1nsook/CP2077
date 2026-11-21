@@ -88,7 +88,11 @@ setup. This mirrors CET's post-initialization first-time-bind behavior,
 without depending on CET or guessing startup Enter/Space input.
 
 Keyboard-only first-run recording no longer requires the engine mouse
-cursor. After the first successfully submitted native ImGui frame,
+cursor. The game HWND listener also installs without requiring
+`ForceCursor` to be resolvable, so users may select a hotkey even when
+the game mouse cursor is late or unavailable. Focus regain re-arms a
+first-run recorder paused by Alt+Tab. An absent native cursor always
+disables general ImGui mouse and keyboard ownership. After the first successfully submitted native ImGui frame,
 the user-chosen binding is captured on a physical key-release edge.
 General ImGui keyboard/mouse input continues to require the owned
 REDengine cursor, and focus/shutdown protection remains in place.
