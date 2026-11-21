@@ -569,14 +569,14 @@ void DrawSidebar()
     if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
     ImGui::TextDisabled("CONFIGURATION");
     if (m1core::KarlaSemiBold()) ImGui::PopFont();
-    SidebarNav(M1CORE_ICON_SETTINGS,"Settings",Page::Settings);
+    SidebarNav(M1CORE_ICON_SLIDERS_HORIZONTAL,"Settings",Page::Settings);
     SidebarNav(M1CORE_ICON_KEYBINDS,"Keybinds",Page::Keybinds);
-    SidebarNav(M1CORE_ICON_PROFILES,"Profiles",Page::Profiles);
+    SidebarNav(M1CORE_ICON_USERS_THREE,"Profiles",Page::Profiles);
     ImGui::Dummy(ImVec2(0,18));
     if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
     ImGui::TextDisabled("SYSTEM");
     if (m1core::KarlaSemiBold()) ImGui::PopFont();
-    SidebarNav(M1CORE_ICON_LOGS,"Logs",Page::Logs);
+    SidebarNav(M1CORE_ICON_TERMINAL,"Logs",Page::Logs);
     SidebarNav(M1CORE_ICON_ABOUT,"About",Page::About);
 
     // The profile selector follows the HTML layout by staying at the
@@ -588,7 +588,8 @@ void DrawSidebar()
     ImGui::Separator();
     ImGui::TextDisabled("ACTIVE PROFILE");
     ImGui::PushStyleColor(ImGuiCol_Button,Color(30,31,35));
-    std::string profileLabel = activeProfile + "  " +
+    std::string profileLabel = (m1core::HasIcons() ? std::string(M1CORE_ICON_CHECK_CIRCLE) + "  " : "") +
+                               activeProfile + "  " +
         (m1core::HasIcons() ? M1CORE_ICON_CARET : "v");
     if (ImGui::Button(profileLabel.c_str(),ImVec2(-FLT_MIN,32)))
         currentPage = Page::Profiles;

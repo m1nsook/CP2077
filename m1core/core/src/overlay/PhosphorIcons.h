@@ -18,3 +18,8 @@
 #define M1CORE_ICON_CUBE "\xEE\x87\x9A" // U+E1DA cube
 #define M1CORE_ICON_MINUS "\xEE\x8C\xAA" // U+E32A minus
 #define M1CORE_ICON_CARET "\xEE\x84\xB6" // U+E136 caret-down
+
+#define M1CORE_ICON_SLIDERS_HORIZONTAL "\xEE\x90\xB4" // U+E434 sliders-horizontal
+#define M1CORE_ICON_USERS_THREE "\xEE\x9A\x8E" // U+E68E users-three
+#define M1CORE_ICON_TERMINAL "\xEE\xAB\xA8" // U+EAE8 terminal-window
+#define M1CORE_ICON_CHECK_CIRCLE "\xEE\x86\x84" // U+E184 check-circle
