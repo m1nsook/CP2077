@@ -26,7 +26,7 @@ void Overlay::PostInitialize()
             const auto cOverlayBindCode = M1CoreRuntime::Get().GetBindings().GetBindCodeForModBind(Bindings::GetOverlayToggleModBind());
             Toast startup{ToastType::Info, NOTIFY_DEFAULT_DISMISS,
                           "Shortcut: %s", VKBindings::GetBindString(cOverlayBindCode).c_str()};
-            startup.setTitle("m1core");
+            startup.setTitle("M1CORE");
             startup.setIcon(M1CORE_ICON_ABOUT);
             startup.setPosition(ImNotifyToastPos::BottomLeft);
             ImGui::InsertNotification(startup);

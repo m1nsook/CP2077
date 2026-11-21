@@ -3,6 +3,7 @@
 #include "Widget.h"
 
 #include <M1CoreRuntime.h>
+#include <overlay/M1CoreUIColors.h>
 
 Widget::Widget(const std::string& acpName, bool aOwnerDraw)
     : m_name(acpName)
@@ -96,7 +97,12 @@ void Widget::Draw()
         ImGui::SetNextWindowPos(ImVec2(width * 0.2f, height * 0.2f), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(width * 0.6f, height * 0.6f), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSizeConstraints(ImVec2(420, 315), ImVec2(FLT_MAX, FLT_MAX));
-        if (ImGui::Begin(m_name.c_str(), &newEnabled))
+        // Apply dark title text only while ImGui builds the title bar.
+        // Do not recolor buttons, labels or the regular window content.
+        ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
+        const bool visible = ImGui::Begin(m_name.c_str(), &newEnabled);
+        ImGui::PopStyleColor();
+        if (visible)
             OnUpdate();
         ImGui::End();
     }

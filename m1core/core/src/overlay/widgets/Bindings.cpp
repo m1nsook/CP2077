@@ -4,6 +4,9 @@
 
 #include <M1CoreRuntime.h>
 #include <Utils.h>
+#include <overlay/FontPalette.h>
+#include <overlay/PhosphorIcons.h>
+#include <overlay/M1CoreUIColors.h>
 
 namespace
 {
@@ -24,7 +27,7 @@ bool VKBindInfo::operator==(const std::string& id) const
 }
 
 Bindings::Bindings(VKBindings& aBindings, LuaVM& aVm)
-    : Widget("m1core Keybindings")
+    : Widget("M1CORE KEYBINDINGS")
     , m_bindings(aBindings)
     , m_vm(aVm)
 {
@@ -44,7 +47,7 @@ WidgetResult Bindings::OnEnable()
 WidgetResult Bindings::OnPopup()
 {
     const auto ret = UnsavedChangesPopup(
-        "Bindings", m_openChangesModal, m_madeChanges, [this] { Save(); }, [this] { ResetChanges(); });
+        "M1CORE KEYBINDINGS", m_openChangesModal, m_madeChanges, [this] { Save(); }, [this] { ResetChanges(); });
     m_madeChanges = ret == TChangedCBResult::CHANGED;
     m_popupResult = ret;
 
@@ -165,9 +168,15 @@ bool Bindings::FirstTimeSetup()
 
     m_vm.BlockDraw(true);
 
-    ImGui::OpenPopup("m1core First Time Setup");
+    ImGui::OpenPopup("M1CORE FIRST TIME SETUP");
 
-    if (ImGui::BeginPopupModal("m1core First Time Setup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    // ImGui renders the title inside BeginPopupModal(). Limit the dark
+    // foreground to the cyan title bar; keep regular body text unchanged.
+    ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
+    const bool setupOpen = ImGui::BeginPopupModal(
+        "M1CORE FIRST TIME SETUP", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::PopStyleColor();
+    if (setupOpen)
     {
         const auto shorterTextSz{ImGui::CalcTextSize("Combo can be composed from up to 4 keys.").x};
         const auto longerTextSz{ImGui::CalcTextSize("Please, bind some key combination for toggling overlay!").x};
@@ -333,10 +342,8 @@ void Bindings::UpdateAndDrawBinding(const VKModBind& acModBind, VKBindInfo& aVKB
     const bool modified = aVKBindInfo.CodeBind != aVKBindInfo.SavedCodeBind;
 
     ImVec4 curTextColor{ImGui::GetStyleColorVec4(ImGuiCol_Text)};
-    if (!bound)
-        curTextColor = ImVec4(1.0f, modified ? 0.5f : 0.0f, 0.0f, 1.0f);
-    else if (modified)
-        curTextColor = ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
+    if (!bound || modified)
+        curTextColor = m1core::ui::WarningText();
 
     ImGui::PushStyleColor(ImGuiCol_Text, curTextColor);
 
@@ -345,7 +352,12 @@ void Bindings::UpdateAndDrawBinding(const VKModBind& acModBind, VKBindInfo& aVKB
     ImGui::AlignTextToFramePadding();
 
     ImGui::PushID(&aVKBindInfo.Bind.ID);
-    ImGui::TextUnformatted(bind.DisplayName.c_str());
+    if (!bound)
+        ImGui::Text("%s %s",
+            m1core::HasIcons() ? M1CORE_ICON_WARNING : "!",
+            bind.DisplayName.c_str());
+    else
+        ImGui::TextUnformatted(bind.DisplayName.c_str());
     ImGui::PopID();
 
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -372,9 +384,13 @@ void Bindings::UpdateAndDrawBinding(const VKModBind& acModBind, VKBindInfo& aVKB
     ImGui::TableNextColumn();
 
     const auto currentBindState = aVKBindInfo.IsBinding ? m_bindings.GetLastRecordingResult() : aVKBindInfo.CodeBind;
+    std::string buttonLabel = aVKBindInfo.IsBinding && currentBindState == 0
+        ? "Binding..." : VKBindings::GetBindString(currentBindState);
+    if (!aVKBindInfo.IsBinding && currentBindState == 0)
+        buttonLabel.insert(0, std::string(m1core::HasIcons() ? M1CORE_ICON_WARNING : "!") + " ");
     ImGui::PushID(&aVKBindInfo.CodeBind);
     if (ImGui::Button(
-            aVKBindInfo.IsBinding && currentBindState == 0 ? "Binding..." : VKBindings::GetBindString(currentBindState).c_str(),
+            buttonLabel.c_str(),
             ImVec2(unbindable ? -(ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x) : -FLT_MIN, 0)))
     {
         if (!aVKBindInfo.IsBinding && !isRecording)

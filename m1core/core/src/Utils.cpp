@@ -1,6 +1,7 @@
 #include <stdafx.h>
 
 #include "Utils.h"
+#include <overlay/M1CoreUIColors.h>
 
 #include <spdlog/sinks/rotating_file_sink.h>
 
@@ -189,7 +190,7 @@ float GetCenteredOffsetForText(const char* acpText)
 TChangedCBResult UnsavedChangesPopup(
     const std::string& acpOwnerName, bool& aFirstTime, const bool acMadeChanges, const TWidgetCB& acpSaveCB, const TWidgetCB& acpLoadCB, const TWidgetCB& acpCancelCB)
 {
-    auto popupTitle = acpOwnerName.empty() ? "Unsaved changes" : fmt::format("{} - Unsaved changes", acpOwnerName);
+    auto popupTitle = acpOwnerName.empty() ? "UNSAVED CHANGES" : fmt::format("{} - UNSAVED CHANGES", acpOwnerName);
 
     if (acMadeChanges)
     {
@@ -201,7 +202,11 @@ TChangedCBResult UnsavedChangesPopup(
             aFirstTime = false;
         }
 
-        if (ImGui::BeginPopupModal(popupTitle.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
+        const bool popupVisible = ImGui::BeginPopupModal(
+            popupTitle.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::PopStyleColor();
+        if (popupVisible)
         {
             const auto shorterTextSz{ImGui::CalcTextSize("You have some unsaved changes.").x};
             const auto longerTextSz{ImGui::CalcTextSize("Do you wish to apply them or discard them?").x};

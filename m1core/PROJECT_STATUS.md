@@ -34,6 +34,13 @@ Build **m1core**, an independently branded native **RED4ext x64 DLL** and mod-de
 
 Only work on the m1core development branch and draft PR unless explicitly authorized; **do not merge into `main`**, rewrite other mods, or add CET requirements. Avoid asking users to repeat already confirmed input/UI tests. Do not promise background work.
 
+## Native first-run and title palette — 2026-11-21
+
+- Changed the first-run modal caption to **M1CORE FIRST TIME SETUP** and render the caption in **dark text** on the user's existing cyan ImGui title bar. The dark text override exists only during `BeginPopupModal()`; ordinary modal content retains the dark-theme foreground and focus behavior.
+- Set m1core-owned ImGui window titles uppercase: **M1CORE - MOD SETTINGS**, **M1CORE KEYBINDINGS**, and the uppercase `M1CORE KEYBINDINGS - UNSAVED CHANGES` modal; also uppercase the startup notice title. Existing hotkey IDs and persisted binding namespace are unchanged.
+- Replace red/orange-yellow hardcoded unbound/modified-keybind foregrounds with one **amber/orange** palette, using the genuine **Phosphor warning triangle** glyph U+E4E0 (merged into the existing ImGui font atlas) beside unbound binding labels and the Unbound button. No custom draw, new font or new runtime dependency. The glyph has a plain-text fallback when no icon font is present.
+- **Verification:** source/workflow changed; requires new Windows native CI compile and (only if user wants) targeted in-game visual inspection. Previously confirmed key capture, cursor, profiles and Weight Limit live updates are not to be retested.
+
 ## Current verified behavior (user-tested)
 
 1. **Native CET-derived foundation loads in Cyberpunk 2077 v2.5.** Original donated-runtime UI/console/bindings worked in-game with keyboard and mouse. The native m1core Dear ImGui interface subsequently appeared and worked.

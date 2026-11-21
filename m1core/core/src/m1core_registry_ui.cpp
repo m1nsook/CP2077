@@ -8,6 +8,7 @@
 #include <overlay/widgets/Bindings.h>
 #include <overlay/FontPalette.h>
 #include <overlay/PhosphorIcons.h>
+#include <overlay/M1CoreUIColors.h>
 #include <scripting/LuaVM.h>
 
 #include <filesystem>
@@ -337,8 +338,8 @@ void DrawNativeRegistryUI()
     ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.91f, 0.92f, 0.94f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.97f, 0.98f, 0.99f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImVec4(0.91f, 0.92f, 0.94f, 0.95f));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.055f, 0.065f, 0.08f, 1.0f));
-    const bool visible = ImGui::Begin("m1core - Mod Settings", &open,
+    ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
+    const bool visible = ImGui::Begin("M1CORE - MOD SETTINGS", &open,
                                      ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleColor(4);
     if (visible) {

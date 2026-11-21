@@ -77,6 +77,23 @@ jobs:
           if ($gui -match 'M1CoreRuntime installation|Cyber Engine Tweaks') {
             throw "User-facing m1core UI must not contain legacy CET branding"
           }
+          # Keep all m1core window captions uppercase and ensure the first
+          # setup dialog renders dark title text on cyan; unbound states use
+          # the separately merged Phosphor warning glyph, not red text.
+          $bindingsUi = Get-Content "$root/src/overlay/widgets/Bindings.cpp" -Raw
+          $widgetUi = Get-Content "$root/src/overlay/widgets/Widget.cpp" -Raw
+          $uiColors = Get-Content "$root/src/overlay/M1CoreUIColors.h" -Raw
+          $uiFonts = Get-Content "$root/src/d3d12/D3D12_Functions.cpp" -Raw
+          if ($bindingsUi -notmatch 'M1CORE FIRST TIME SETUP' -or
+              $bindingsUi -notmatch 'M1CORE_ICON_WARNING' -or
+              $bindingsUi -notmatch 'ui::WarningText' -or
+              $bindingsUi -notmatch 'ImGui::PopStyleColor' -or
+              $widgetUi -notmatch 'ui::TitleText' -or
+              $gui -notmatch 'M1CORE - MOD SETTINGS' -or
+              $uiFonts -notmatch '0xE4E0' -or
+              $uiColors -notmatch '0.65f, 0.20f') {
+            throw "m1core title/amber warning style regression"
+          }
           # Regression guard: native game functions outside the override
           # registry MUST pass through to the original script interpreter.
           # Aborting them caused repeated "hooked but isn't" console errors.
