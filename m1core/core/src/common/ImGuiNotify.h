@@ -93,6 +93,10 @@ private:
     ImGuiWindowFlags flags = NOTIFY_DEFAULT_TOAST_FLAGS;
 
     ToastType type = ToastType::None;
+    // Existing toasts remain bottom-right; m1core's startup toast opts into
+    // bottom-left without altering any notifications created by Lua mods.
+    ImNotifyToastPos position = ImNotifyToastPos::BottomRight;
+    std::string customIcon;
     char title[NOTIFY_MAX_MSG_LENGTH];
     char content[NOTIFY_MAX_MSG_LENGTH];
 
@@ -142,6 +146,18 @@ public:
         IM_ASSERT(type < ToastType::COUNT);
         this->type = type;
     };
+
+    inline void setPosition(ImNotifyToastPos nextPosition)
+    {
+        // Only the two supported bottom corners are used by this renderer.
+        IM_ASSERT(nextPosition == ImNotifyToastPos::BottomLeft ||
+                  nextPosition == ImNotifyToastPos::BottomRight);
+        position = nextPosition;
+    }
+
+    inline ImNotifyToastPos getPosition() const noexcept { return position; }
+
+    inline void setIcon(const std::string& utf8Icon) { customIcon = utf8Icon; }
 
     /**
      * @brief Set the ImGui window flags for the notification.
@@ -230,6 +246,18 @@ public:
      */
     inline const char* getIcon()
     {
+        // The Phosphor glyph is present only when m1core's independent icon
+        // font has loaded. Fall back to the existing ASCII toast marker when
+        // the font is absent, including older installations.
+        if (!customIcon.empty() && ImGui::GetCurrentContext())
+        {
+            unsigned int codepoint = 0;
+            ImTextCharFromUtf8(&codepoint, customIcon.c_str(), nullptr);
+            const ImFont* font = ImGui::GetFont();
+            if (font && font->FindGlyphNoFallback(static_cast<ImWchar>(codepoint)))
+                return customIcon.c_str();
+        }
+
         switch (this->type)
         {
         case ToastType::None: return nullptr;
@@ -445,7 +473,10 @@ inline void RenderNotifications()
 {
     const ImVec2 mainWindowSize = GetMainViewport()->Size;
 
-    float height = 0.f;
+    // Keep the two corners independently stacked so m1core does not
+    // overlap or move existing notifications (including CET's own toasts).
+    float bottomLeftHeight = 0.f;
+    float bottomRightHeight = 0.f;
 
     for (size_t i = 0; i < notifications.size(); ++i)
     {
@@ -471,6 +502,8 @@ inline void RenderNotifications()
         const char* content = currentToast->getContent();
         const char* defaultTitle = currentToast->getDefaultTitle();
         const float opacity = currentToast->getFadePercent(); // Get opacity based of the current phase
+        const bool onLeft = currentToast->getPosition() == ImNotifyToastPos::BottomLeft;
+        float& height = onLeft ? bottomLeftHeight : bottomRightHeight;
 
         // Window rendering
         ImVec4 textColor = currentToast->getColor();
@@ -497,16 +530,26 @@ inline void RenderNotifications()
         ImGuiPlatformIO& platformIO = GetPlatformIO();
         ImGuiPlatformMonitor& monitor = platformIO.Monitors[mainMonitorId];
 
-        // Set notification window position to bottom right corner of the monitor
-        SetNextWindowPos(
-            ImVec2(monitor.WorkPos.x + monitor.WorkSize.x - NOTIFY_PADDING_X, monitor.WorkPos.y + monitor.WorkSize.y - NOTIFY_PADDING_Y - height), ImGuiCond_Always,
-            ImVec2(1.0f, 1.0f));
+        const ImVec2 areaPos = monitor.WorkPos;
+        const ImVec2 areaSize = monitor.WorkSize;
 #else
-        // Set notification window position to bottom right corner of the main window, considering the main window size and location in relation to the display
-        ImVec2 mainWindowPos = GetMainViewport()->Pos;
-        SetNextWindowPos(
-            ImVec2(mainWindowPos.x + mainWindowSize.x - NOTIFY_PADDING_X, mainWindowPos.y + mainWindowSize.y - NOTIFY_PADDING_Y - height), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+        const ImVec2 areaPos = GetMainViewport()->Pos;
+        const ImVec2 areaSize = mainWindowSize;
 #endif
+        // Keep default toasts at their original bottom-right position.
+        // Only m1core's startup notice requests bottom-left.
+        if (onLeft)
+        {
+            SetNextWindowPos(
+                ImVec2(areaPos.x + NOTIFY_PADDING_X, areaPos.y + areaSize.y - NOTIFY_PADDING_Y - height),
+                ImGuiCond_Always, ImVec2(0.0f, 1.0f));
+        }
+        else
+        {
+            SetNextWindowPos(
+                ImVec2(areaPos.x + areaSize.x - NOTIFY_PADDING_X, areaPos.y + areaSize.y - NOTIFY_PADDING_Y - height),
+                ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+        }
 
         // Set notification window flags
         if (!NOTIFY_USE_DISMISS_BUTTON && currentToast->getOnButtonPress() == nullptr)

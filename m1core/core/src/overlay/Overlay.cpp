@@ -8,6 +8,7 @@
 #include <scripting/LuaVM.h>
 #include <Utils.h>
 #include "m1core_registry_ui.hpp"
+#include "PhosphorIcons.h"
 
 void Overlay::PostInitialize()
 {
@@ -23,7 +24,12 @@ void Overlay::PostInitialize()
         else
         {
             const auto cOverlayBindCode = M1CoreRuntime::Get().GetBindings().GetBindCodeForModBind(Bindings::GetOverlayToggleModBind());
-            ImGui::InsertNotification({ToastType::Info, NOTIFY_DEFAULT_DISMISS, "m1core Overlay Bind: %s", VKBindings::GetBindString(cOverlayBindCode).c_str()});
+            Toast startup{ToastType::Info, NOTIFY_DEFAULT_DISMISS,
+                          "Shortcut: %s", VKBindings::GetBindString(cOverlayBindCode).c_str()};
+            startup.setTitle("m1core");
+            startup.setIcon(M1CORE_ICON_ABOUT);
+            startup.setPosition(ImNotifyToastPos::BottomLeft);
+            ImGui::InsertNotification(startup);
         }
 
         m_initialized = true;

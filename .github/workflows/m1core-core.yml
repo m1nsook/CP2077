@@ -95,6 +95,16 @@ jobs:
           if (!(Test-Path "$root/vendor/RED4ext.SDK/include/RED4ext/RED4ext.hpp")) {
             throw "Pinned RED4ext SDK checkout failed"
           }
+          # Popup positioning must be opt-in, so external notification
+          # users preserve the default bottom-right corner.
+          $toasts = Get-Content "$root/src/common/ImGuiNotify.h" -Raw
+          $overlay = Get-Content "$root/src/overlay/Overlay.cpp" -Raw
+          if ($toasts -notmatch 'position = ImNotifyToastPos::BottomRight' -or
+              $toasts -notmatch 'bottomLeftHeight' -or
+              $overlay -notmatch 'startup.setPosition\(ImNotifyToastPos::BottomLeft\)' -or
+              $overlay -notmatch 'startup.setIcon\(M1CORE_ICON_ABOUT\)') {
+            throw "m1core startup toast must be bottom-left and others must remain bottom-right"
+          }
       - name: Configure m1core native dependencies
         working-directory: m1core/core
         shell: pwsh
