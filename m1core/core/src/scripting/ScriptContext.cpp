@@ -9,27 +9,34 @@
 
 namespace
 {
-// TODO: proper exception handling for Lua funcs!
-template <typename... Args> sol::protected_function_result TryLuaFunction(const std::shared_ptr<spdlog::logger>& acpLogger, const sol::function& aFunc, Args... aArgs)
+// Individual mod callbacks must not unwind into the host's update/draw loop.
+// sol may return a failed protected result or throw before a result exists.
+template <typename... Args> void TryLuaFunction(const std::shared_ptr<spdlog::logger>& logger, const sol::function& callback, Args... args)
 {
-    sol::protected_function_result result{};
-    if (aFunc)
+    if (!callback)
+        return;
+
+    try
     {
-        try
-        {
-            result = aFunc(aArgs...);
-        }
-        catch (std::exception& e)
-        {
-            acpLogger->error(e.what());
-        }
+        const sol::protected_function_result result = callback(args...);
         if (!result.valid())
         {
-            const sol::error cError = result;
-            acpLogger->error(cError.what());
+            const sol::error error = result;
+            logger->error("Lua callback failed: {}", error.what());
         }
     }
-    return result;
+    catch (const std::exception& error)
+    {
+        logger->error("Lua callback raised an exception: {}", error.what());
+    }
+    catch (const char* error)
+    {
+        logger->error("Lua callback failed: {}", error ? error : "(null)");
+    }
+    catch (...)
+    {
+        logger->error("Lua callback raised an unknown exception");
+    }
 }
 
 } // namespace
@@ -101,14 +108,13 @@ ScriptContext::ScriptContext(LuaSandbox& aLuaSandbox, const std::filesystem::pat
                     auto lockedState = aLuaSandbox.GetLockedState();
 
                     aLuaSandbox.SetImGuiAvailable(true);
-
                     const auto previousStyle = ImGui::GetStyle();
+                    const ScopeGuard restoreImGui([&aLuaSandbox, previousStyle] {
+                        ImGui::GetStyle() = previousStyle;
+                        aLuaSandbox.SetImGuiAvailable(false);
+                    });
 
                     TryLuaFunction(loggerRef, callback);
-
-                    ImGui::GetStyle() = previousStyle;
-
-                    aLuaSandbox.SetImGuiAvailable(false);
                 };
             }
             loggerRef->warn("Tried to register empty tooltip for handler!]");
@@ -277,14 +283,13 @@ void ScriptContext::TriggerOnDraw() const
     auto lockedState = m_sandbox.GetLockedState();
 
     m_sandbox.SetImGuiAvailable(true);
-
     const auto previousStyle = ImGui::GetStyle();
+    const ScopeGuard restoreImGui([this, previousStyle] {
+        ImGui::GetStyle() = previousStyle;
+        m_sandbox.SetImGuiAvailable(false);
+    });
 
     TryLuaFunction(m_logger, m_onDraw);
-
-    ImGui::GetStyle() = previousStyle;
-
-    m_sandbox.SetImGuiAvailable(false);
 }
 
 void ScriptContext::TriggerOnOverlayOpen() const
