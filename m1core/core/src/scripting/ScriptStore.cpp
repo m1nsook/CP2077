@@ -2,6 +2,7 @@
 
 #include "ScriptStore.h"
 #include "ScriptFormats.hpp"
+#include "ModDispatch.hpp"
 
 #include <M1CoreRuntime.h>
 
@@ -78,6 +79,10 @@ void ScriptStore::LoadAll()
         {
             consoleLogger->error("Mod {} could not be loaded: {} ('{}')", name, error.what(), pathStr);
         }
+        catch (...)
+        {
+            consoleLogger->error("Mod {} could not be loaded: unknown native C++ exception ('{}')", name, pathStr);
+        }
     }
 
     for (auto& contextIt : m_contexts)
@@ -114,47 +119,65 @@ const TiltedPhoques::Map<std::string, std::reference_wrapper<const TiltedPhoques
     return m_vkBinds;
 }
 
+namespace
+{
+void ReportModLifecycleFailure(std::string_view mod, std::string_view event,
+                               const char* reason)
+{
+    if (const auto logger = spdlog::get("scripting"))
+        logger->error("Mod '{}' failed during {}: {}", mod, event, reason);
+}
+} // namespace
+
 void ScriptStore::TriggerOnHook() const
 {
-    for (const auto& mod : m_contexts | std::views::values)
-        mod.TriggerOnHook();
+    m1core::scripts::ForEachModSafely(m_contexts, "onHook",
+        [&](const ScriptContext& mod) { mod.TriggerOnHook(); },
+        ReportModLifecycleFailure);
 }
 
 void ScriptStore::TriggerOnTweak() const
 {
-    for (const auto& mod : m_contexts | std::views::values)
-        mod.TriggerOnTweak();
+    m1core::scripts::ForEachModSafely(m_contexts, "onTweak",
+        [&](const ScriptContext& mod) { mod.TriggerOnTweak(); },
+        ReportModLifecycleFailure);
 }
 
 void ScriptStore::TriggerOnInit() const
 {
-    for (const auto& mod : m_contexts | std::views::values)
-        mod.TriggerOnInit();
+    m1core::scripts::ForEachModSafely(m_contexts, "onInit",
+        [&](const ScriptContext& mod) { mod.TriggerOnInit(); },
+        ReportModLifecycleFailure);
 }
 
 void ScriptStore::TriggerOnUpdate(float aDeltaTime) const
 {
-    for (const auto& mod : m_contexts | std::views::values)
-        mod.TriggerOnUpdate(aDeltaTime);
+    m1core::scripts::ForEachModSafely(m_contexts, "onUpdate",
+        [&](const ScriptContext& mod) { mod.TriggerOnUpdate(aDeltaTime); },
+        ReportModLifecycleFailure);
 }
 
 void ScriptStore::TriggerOnDraw() const
 {
-    for (const auto& mod : m_contexts | std::views::values)
-        mod.TriggerOnDraw();
+    m1core::scripts::ForEachModSafely(m_contexts, "onDraw",
+        [&](const ScriptContext& mod) { mod.TriggerOnDraw(); },
+        ReportModLifecycleFailure);
 }
 
 void ScriptStore::TriggerOnOverlayOpen() const
 {
-    for (const auto& mod : m_contexts | std::views::values)
-        mod.TriggerOnOverlayOpen();
+    m1core::scripts::ForEachModSafely(m_contexts, "onOverlayOpen",
+        [&](const ScriptContext& mod) { mod.TriggerOnOverlayOpen(); },
+        ReportModLifecycleFailure);
 }
 
 void ScriptStore::TriggerOnOverlayClose() const
 {
-    for (const auto& mod : m_contexts | std::views::values)
-        mod.TriggerOnOverlayClose();
+    m1core::scripts::ForEachModSafely(m_contexts, "onOverlayClose",
+        [&](const ScriptContext& mod) { mod.TriggerOnOverlayClose(); },
+        ReportModLifecycleFailure);
 }
+
 
 sol::object ScriptStore::GetMod(const std::string& acName) const
 {

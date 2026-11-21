@@ -156,3 +156,9 @@ target("m1core_mouse_click_tests")
     add_files("src/input/MouseClick.cpp", "../tests/mouse_click_tests.cpp")
     add_includedirs("src", "../tests")
     add_syslinks("User32")
+
+-- M7 pure-C++ callback isolation regression; no LuaJIT/game/ImGui dependency.
+target("m1core_mod_dispatch_tests")
+    set_kind("binary")
+    add_files("../tests/mod_dispatch_tests.cpp")
+    add_includedirs("src", "../tests")

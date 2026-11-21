@@ -9,6 +9,14 @@
 - **Canonical scripting API home:** [m1script](https://github.com/m1nsook/m1script), foundation [PR #10](https://github.com/m1nsook/m1script/pull/10) (merged; m1script CI and Pages deployed successfully). Do not expand the duplicated developer API docs in this repository.
 - **Runtime:** m1core is still the independent RED4ext DLL; no CET or extra m1script runtime dependency.
 
+## M7 — Isolated per-mod lifecycle dispatch (2026-11-21)
+
+- **In progress / requires new CI:** add a pure C++ per-mod dispatch guard for every lifecycle broadcast (`onHook`, `onTweak`, `onInit`, `onUpdate`, `onDraw`, `onOverlayOpen`, `onOverlayClose`) in `ScriptStore.cpp`. If a mod throws an unexpected native C++ exception outside its already-protected Lua callback, log the mod name and lifecycle event and keep running subsequent mods. Protect the failure reporter so a logger exception does not halt the loop.
+- **Source/tests:** `core/src/scripting/ModDispatch.hpp` and `tests/mod_dispatch_tests.cpp` (independent Windows test using a failing native callback, an unknown C++ exception, a throwing logger, and a healthy following mod). `ScriptContext` Lua callback implementation and `script_runtime_tests.cpp` are intentionally unchanged: the previous experimental protected Lua callback failure test caused an opaque Windows process termination and was reverted.
+- **Script loading:** catch an unknown native C++ exception during a single mod's discovery/load so later mod directories can continue.
+- **Guarantee scope:** this addresses C++ exceptions thrown from per-mod lifecycle functions. It does **not** promise recovery from process access violations, game hook errors, hard LuaJIT failures, or all possible crashes. No UI/input changes and no existing user mods modified. m1core PR #41 stays draft.
+- **Verification:** new Windows native CI pending, and in-game failure simulation not yet performed.
+
 ## Most recent verified build
 
 - **Current native CI PASS:** [#44956427285](https://github.com/m1nsook/CP2077/actions/runs/44956427285); source `b37deeb5`; single game-root `m1core-native-x64-dev` artifact **14727519281**. This includes registry durability tests and the internal mouse-click backend with **mocked** click tests; no in-game click automation is active.
