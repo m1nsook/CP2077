@@ -40,3 +40,5 @@ Registered mods appear in the Settings tab. Each can expose boolean, integer, fl
 m1core's own code is MIT. The CET-derived runtime uses the special **MIT-only source package provided directly by yamashi**; preserve `core/LICENSE-MIT` and third-party notices. Do not copy third-party fonts, icons, unauthorized binaries, or the ASI loader. The m1core developer will personally handle Nexus Mods release credits when the mod is published.
 
 **Branch:** `dev/m1core-cet-foundation`. No main-branch merge until the runtime, settings and input lifecycle are validated in game. The old `dev/m1core` implementation remains intact while the new foundation is tested.
+
+CI #44919804951 proved actual LuaJIT source/bytecode execution with the shared resolver. The m1core runtime source was not changed by this test-harness work.

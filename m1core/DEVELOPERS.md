@@ -78,7 +78,7 @@ registerForEvent("onInit", function()
 end)
 ```
 
-Windows [CI #44917769395](https://github.com/m1nsook/CP2077/actions/runs/44917769395) passes compiled DLL, registry/state, and script extension resolution tests. Real in-game execution of `.m1s` and `.m1c` is not yet confirmed.
+Windows [CI #44919804951](https://github.com/m1nsook/CP2077/actions/runs/44919804951) passes the compiled DLL, registry/state, extension-resolution, and **actual LuaJIT execution** tests. `m1core_script_runtime_tests` executes `.m1s` and `.lua`, generates a real LuaJIT `.m1c` using `lua_dump`, executes it in binary mode and rejects invalid formats. **In-game execution through m1core's `LuaSandbox`/`ScriptContext` has not yet been verified.**
 
 To compile an optional `.m1c` from source using a **matching LuaJIT version**:
 
