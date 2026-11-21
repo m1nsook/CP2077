@@ -37,11 +37,22 @@ void LuaVM::Update(float aDeltaTime)
 
     M1CoreRuntime::Get().GetBindings().Update();
 
-    if (m_reload)
+    // Consume the request before running callbacks: scripts may queue another
+    // reload without losing that request or racing the overlay/UI thread.
+    if (m_reload.exchange(false))
     {
-        m_scripting.ReloadAllMods();
-
-        m_reload = false;
+        try
+        {
+            m_scripting.ReloadAllMods();
+        }
+        catch (const std::exception& error)
+        {
+            spdlog::get("scripting")->error("m1core: script reload failed: {}", error.what());
+        }
+        catch (...)
+        {
+            spdlog::get("scripting")->error("m1core: script reload failed with an unknown exception");
+        }
     }
 
     m_scripting.TriggerOnUpdate(aDeltaTime);
@@ -58,7 +69,7 @@ void LuaVM::Draw() const
 void LuaVM::ReloadAllMods()
 {
     if (m_initialized)
-        m_reload = true;
+        m_reload.store(true);
 }
 
 void LuaVM::OnOverlayOpen() const
