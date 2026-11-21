@@ -158,6 +158,13 @@ Only work on the m1core development branch and draft PR unless explicitly author
 - `core/src/common/ImGuiNotify.h` now supports an opt-in **per-toast** position. Bottom-right remains the default for other notifications, including other Lua mods or separately installed CET; the left/right toast stacks are independent. No changes to the Win32 input hooks or D3D12 rendering backend.
 - The Phosphor glyph falls back to the existing ASCII icon if the font is absent. Native CI compilation is required; the visual placement is **not yet in-game verified**. The user does not need to repeat prior game input/hotkey tests.
 
+## M5 continuation — Lua developer API parity and reload regression (2026-11-21)
+
+- **Last verified native Windows CI before this change:** [#44951363754](https://github.com/m1nsook/CP2077/actions/runs/44951363754) **PASS** for code commit `b61005bd22b1df14a6eac991998bd3e19facf436`. Windows compilation, registry/profiles/persistence, LuaJIT, Weight Limit mock tests and a single game-root artifact passed. Framework artifact: `m1core-native-x64-dev`, artifact ID **14725627703**. This validates the previous M5 callback/discovery/reload hardening, **not** the new changes below.
+- **Current work in this update (Windows CI still needed):** expose `resetMod`, `saveProfile`, `loadProfile`, `deleteProfile`, `profiles`, and `lastError` on the existing Lua `m1core` table using the exact same native registry backend as the RTTI API. No new settings file, input hook, or external runtime dependency.
+- **Real LuaJIT tests expanded:** the existing Weight Limit source/bytecode mock integration test simulates `onShutdown → script entrypoint reload → onInit → onUpdate → onShutdown`, checks persisted capacity and zero leaked carry-capacity modifiers; a separate Lua-executed API regression tests the new profile/reset functions, invalid names/JSON, and settings persistence to disk. This does **not** exercise real game stat APIs or the in-game ScriptContext, so do not claim in-game verification.
+- **Next steps:** verify new Windows CI / game-root ZIP, then strengthen ScriptContext-specific sandbox/lifecycle integration and developer diagnostics. User-confirmed UI/Weight Limit baseline does not need retesting. Keep PR #41 draft; never merge without approval.
+
 ### M5 CI queue status (after latest M5 code push)
 
 - **Current M5 source commit:** `b61005bd22b1df14a6eac991998bd3e19facf436` (discovery, callback handling, atomic queued reload).

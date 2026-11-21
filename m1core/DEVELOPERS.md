@@ -140,6 +140,12 @@ data-only registry and `settings.json` as the built-in Settings tab:
 - `m1core.getJson(modId, settingId)` returns serialized JSON or `"null"`.
 - `m1core.setJson(modId, settingId, valueJson)` returns a boolean.
 - `m1core.resetSetting(modId, settingId)` returns a boolean.
+- `m1core.resetMod(modId)` resets every registered setting in the mod to its schema default.
+- `m1core.saveProfile(name)`, `m1core.loadProfile(name)`, and `m1core.deleteProfile(name)` return booleans. These operate on the **shared user profile store**, not on a per-mod sandbox; profile names follow the native identifier rules.
+- `m1core.profiles()` returns an array of saved profile names.
+- `m1core.lastError()` returns the native registry's latest persistence error string (which may be empty for validation failures).
+
+These Lua functions call the same native registry operations as the REDscript API. They do not add any CET runtime requirement. Loading a profile can affect settings belonging to **all** registered mods, so use it only in response to a deliberate user action.
 
 Read source and installable variants of the first actual mod consumer at
 [`m1core/examples/weight-limit`](examples/weight-limit/README.md).
@@ -152,7 +158,10 @@ installs: **never place `init.m1s` and `init.m1c` together** if you intend
 to verify both code paths.
 
 Windows CI builds an integration test using the **actual native settings
-registry** and **actual pinned LuaJIT** for both scripts. Game stats, game
+registry** and **actual pinned LuaJIT** for both scripts. The same test now exercises
+a simulated shutdown/reload cycle for both entrypoint formats and calls the
+new Lua developer API through LuaJIT (profiles, reset, invalid JSON and
+persistent writes). Game stats, game
 initialization and the Cyberpunk `ScriptContext` lifecycle are not exercised
 by this mock-based CI test, and still require a real game check.
 

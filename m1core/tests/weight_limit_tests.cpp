@@ -189,7 +189,78 @@ static void TestConsumer(const std::string& script, bool binary, const fs::path&
     test.Stop();
     CHECK(std::abs(test.Current() - test.base) < 0.01);
     CHECK(test.removals == 3);
-    std::cout << "m1core weight-limit " << label << ": settings + carry-capacity lifecycle passed\n";
+
+    // Simulate the real reload sequence: onShutdown, discard the former
+    // entrypoint callbacks, re-run source or compiled bytecode, then onInit.
+    // Existing persisted settings must survive registration and game stat
+    // modifiers must not accumulate across reloads.
+    test.Load(script, binary);
+    test.Init();
+    CHECK(m1core::Settings().Get("m1core.weight_limit_sample", "limit").value() == 850);
+    test.Tick();
+    CHECK(std::abs(test.Current() - 850.0) < 0.01);
+    CHECK(test.additions == 4 && test.removals == 3);
+    test.Stop();
+    CHECK(std::abs(test.Current() - test.base) < 0.01);
+    CHECK(test.additions == test.removals);
+
+    std::cout << "m1core weight-limit " << label
+              << ": settings + carry-capacity + reload lifecycle passed\n";
+}
+
+// Exercise the *actual* Lua-exported developer API in the pinned LuaJIT,
+// backed by the same native registry and StateStore as the game DLL.
+static void TestLuaDeveloperAPI(const fs::path& root)
+{
+    const auto storeFile = root / "lua-api.json";
+    fs::remove(storeFile);
+    m1core::Store().Configure(storeFile);
+    sol::state vm;
+    vm.open_libraries(sol::lib::base, sol::lib::string, sol::lib::table);
+    sol::table globals = vm.create_table();
+    m1core::BindLuaRegistryAPI(vm, globals);
+    vm["m1core"] = globals["m1core"];
+
+    const auto source = R"m1lua(
+        local api = m1core
+        assert(api.registerJson("m1core.lua_api_test", "Lua API Test",
+            '[{"id":"level","kind":"integer","default":2,"min":0,"max":40}]'))
+        assert(api.getJson("m1core.lua_api_test", "level") == "2")
+        assert(api.setJson("m1core.lua_api_test", "level", "7"))
+        assert(api.saveProfile("m1core_api_snapshot"))
+        assert(api.setJson("m1core.lua_api_test", "level", "13"))
+        assert(api.loadProfile("m1core_api_snapshot"))
+        assert(api.getJson("m1core.lua_api_test", "level") == "7")
+        local exists = false
+        for _, name in ipairs(api.profiles()) do
+            if name == "m1core_api_snapshot" then exists = true end
+        end
+        assert(exists)
+        assert(not api.setJson("m1core.lua_api_test", "level", "not-json"))
+        assert(not api.registerJson("broken", "Broken", "not-json"))
+        assert(not api.saveProfile("bad profile name"))
+        assert(not api.loadProfile("missing_profile"))
+        assert(api.getJson("m1core.lua_api_test", "level") == "7")
+        assert(type(api.lastError()) == "string")
+        assert(api.deleteProfile("m1core_api_snapshot"))
+        for _, name in ipairs(api.profiles()) do
+            assert(name ~= "m1core_api_snapshot")
+        end
+        assert(api.resetMod("m1core.lua_api_test"))
+        assert(api.getJson("m1core.lua_api_test", "level") == "2")
+    )m1lua";
+    auto chunk = vm.load(source, "@m1core-lua-developer-api", sol::load_mode::text);
+    CHECK(chunk.valid());
+    sol::protected_function script = chunk;
+    auto result = script();
+    if (!result.valid()) throw std::runtime_error(result.get<sol::error>().what());
+
+    CHECK(m1core::Settings().Get("m1core.lua_api_test", "level").value() == 2);
+    const auto saved = nlohmann::json::parse(Read(storeFile));
+    CHECK(saved["values"]["m1core.lua_api_test"]["level"] == 2);
+    CHECK(!saved["profiles"].contains("m1core_api_snapshot"));
+    fs::remove(storeFile);
+    std::cout << "m1core LuaJIT developer API: profiles, reset, invalid input + persistence passed\n";
 }
 
 int main(int argc, char** argv)
@@ -219,6 +290,7 @@ int main(int argc, char** argv)
         fs::remove(scratch / "bytecode.json");
         TestConsumer(text, false, scratch);
         TestConsumer(bytecode, true, scratch);
+        TestLuaDeveloperAPI(scratch);
 
         fs::remove(scratch / "source.json");
         fs::remove(scratch / "bytecode.json");

@@ -36,6 +36,31 @@ void BindLuaRegistryAPI(sol::state& lua, sol::table& globals)
                                          const std::string& settingId) -> bool {
         return Settings().Reset(modId, settingId);
     });
+    // These are the same operations exposed by the native REDscript/RTTI API.
+    // Keep profile persistence in the single native settings registry.
+    api.set_function("resetMod", [](const std::string& modId) -> bool {
+        return Settings().ResetMod(modId);
+    });
+    api.set_function("saveProfile", [](const std::string& name) -> bool {
+        return Settings().SaveProfile(name);
+    });
+    api.set_function("loadProfile", [](const std::string& name) -> bool {
+        return Settings().LoadProfile(name);
+    });
+    api.set_function("deleteProfile", [](const std::string& name) -> bool {
+        return Settings().DeleteProfile(name);
+    });
+    api.set_function("profiles", [state = lua.lua_state()]() -> sol::table {
+        sol::state_view vm(state);
+        sol::table names = vm.create_table();
+        std::size_t index = 1;
+        for (const auto& name : Settings().Profiles())
+            names[index++] = name;
+        return names;
+    });
+    api.set_function("lastError", []() -> std::string {
+        return Settings().LastError();
+    });
     globals["m1core"] = api;
 }
 } // namespace m1core
