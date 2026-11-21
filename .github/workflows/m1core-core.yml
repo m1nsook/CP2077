@@ -7,6 +7,9 @@ on:
     paths:
       - "m1core/core/**"
       - "m1core/native/ImGuiCustomTheme.h"
+      - "m1core/native/registry.*"
+      - "m1core/native/state.*"
+      - "m1core/tests/**"
       - ".github/workflows/m1core-core.yml"
   workflow_dispatch:
 
@@ -106,6 +109,19 @@ jobs:
           $ErrorActionPreference = 'Stop'
           xmake build -y -vD m1core
           if ($LASTEXITCODE -ne 0) { throw "CET-derived DLL compilation failed" }
+      - name: Test native registry, persistence, and profiles
+        working-directory: m1core/core
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          xmake build -y -vD m1core_registry_tests
+          if ($LASTEXITCODE -ne 0) { throw "Native registry tests did not compile" }
+          xmake run -y m1core_registry_tests
+          if ($LASTEXITCODE -ne 0) { throw "Native registry tests failed" }
+          xmake build -y -vD m1core_state_tests
+          if ($LASTEXITCODE -ne 0) { throw "Native persistence tests did not compile" }
+          xmake run -y m1core_state_tests
+          if ($LASTEXITCODE -ne 0) { throw "Native persistence tests failed" }
       - name: Package one game-root artifact — exclude CET icons/fonts
         shell: pwsh
         run: |

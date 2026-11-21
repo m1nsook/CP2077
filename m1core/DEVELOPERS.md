@@ -35,6 +35,8 @@ A `modId` and each `id` must contain 1–96 characters from `A-Z`, `a-z`, `0-9`,
 
 `M1Core_SetJson` accepts a JSON-formatted value string: `"true"` for a boolean, `"5"` for an integer, `"0.8"` for a float, or `"\"quiet\""` for a choice. `M1Core_GetJson` returns the serialized value. Settings changes are committed transactionally to `red4ext/plugins/m1core/settings.json`, and persist after restart; saved profile names and values share that file.
 
+Profiles contain the saved values for **all mods**, including mods that are currently unloaded. Loading a profile merges its values into `settings.json` without deleting settings created after the profile snapshot; when an unloaded mod registers again, it reads the restored values. For currently registered mods, profile values are type-checked against their schemas before committing. Invalid profiles fail without partial updates. Profile names follow the same identifier rules as mod and setting IDs.
+
 The native settings store is **separate** from the runtime's own `config.json`, `bindings.json`, and `persistent.json`. Do not replace or delete those files to configure another mod.
 
 ## Development / compatibility

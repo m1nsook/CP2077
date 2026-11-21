@@ -107,3 +107,17 @@ target("m1core")
         target:add("configvar",cfg)
         if not is_mode("release") then target:add("defines","M1CORE_DEBUG") end
     end)
+
+-- Native storage/registry tests run against the SAME source files compiled
+-- into the CET-derived core, without launching Cyberpunk or its input hooks.
+target("m1core_registry_tests")
+    set_kind("binary")
+    add_files("../native/state.cpp", "../native/registry.cpp", "../tests/registry_tests.cpp")
+    add_includedirs("../native", "../tests")
+    add_packages("nlohmann_json")
+
+target("m1core_state_tests")
+    set_kind("binary")
+    add_files("../native/state.cpp", "../tests/state_tests.cpp")
+    add_includedirs("../native", "../tests")
+    add_packages("nlohmann_json")
