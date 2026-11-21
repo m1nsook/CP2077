@@ -243,23 +243,46 @@ void DrawAboutPage()
     ImGui::TextUnformatted("Development build — not game-verified.");
 }
 
+// A built-in ImGui modal, like CET's first-time binding popup. This draws
+// Dear ImGui's built-in modal dim background and gives this UI focus without
+// custom draw lists, a fake fullscreen window or process-global hooks.
+constexpr const char* kFirstRunModal = "M1CORE - First time setup";
+constexpr const char* kSettingsModal = "M1CORE - Mod Settings";
+
 void DrawFirstRun()
 {
+    auto& input = InputRouter::Get();
     const auto* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing,
                              ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
-    if (ImGui::Begin("M1CORE - First time setup", nullptr,
-                      ImGuiWindowFlags_AlwaysAutoResize |
-                      ImGuiWindowFlags_NoCollapse)) {
+    ImGui::SetNextWindowSize(ImVec2(460, 0), ImGuiCond_Appearing);
+    ImGui::OpenPopup(kFirstRunModal);
+    if (ImGui::BeginPopupModal(kFirstRunModal, nullptr,
+                              ImGuiWindowFlags_AlwaysAutoResize |
+                              ImGuiWindowFlags_NoSavedSettings)) {
         ImGui::TextWrapped("Choose a key to open and close M1CORE.");
-        ImGui::Spacing();
-        if (InputRouter::Get().Recording())
-            ImGui::TextUnformatted("Press a key (Esc to cancel)...");
+        ImGui::Separator();
+        if (input.Recording())
+            ImGui::TextUnformatted("Press your chosen key now (Esc cancels).");
         else if (ImGui::Button("Bind menu key"))
-            InputRouter::Get().BeginKeyCapture();
+            input.BeginKeyCapture();
+        ImGui::EndPopup();
     }
-    ImGui::End();
+}
+
+void DismissActiveModals()
+{
+    if (ImGui::IsPopupOpen(kFirstRunModal) &&
+        ImGui::BeginPopupModal(kFirstRunModal, nullptr,
+                              ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+    if (ImGui::IsPopupOpen(kSettingsModal) &&
+        ImGui::BeginPopupModal(kSettingsModal)) {
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
 }
 
 void DrawWindow()
@@ -275,8 +298,9 @@ void DrawWindow()
                              ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(940, 600), ImGuiCond_FirstUseEver);
     bool open = true;
-    if (ImGui::Begin("M1CORE - Mod Settings", &open,
-                     ImGuiWindowFlags_NoCollapse)) {
+    ImGui::OpenPopup(kSettingsModal);
+    if (ImGui::BeginPopupModal(kSettingsModal, &open,
+                              ImGuiWindowFlags_NoSavedSettings)) {
         if (!notice.empty()) ImGui::TextDisabled("%s", notice.c_str());
         if (ImGui::BeginTabBar("M1CORE tabs")) {
             if (ImGui::BeginTabItem("Settings")) {
@@ -305,13 +329,19 @@ void DrawWindow()
             ImGui::EndTabBar();
         }
     }
-    ImGui::End();
+    ImGui::EndPopup();
     if (!open) input.Close();
 }
 } // namespace
 
 void DrawNativeSettingsUI()
 {
-    if (InputRouter::Get().ShouldDraw()) DrawWindow();
+    auto& input = InputRouter::Get();
+    if (input.NeedsPopupDismiss()) {
+        DismissActiveModals();
+        input.AcknowledgePopupDismiss();
+        return;
+    }
+    if (input.ShouldDraw()) DrawWindow();
 }
 } // namespace m1core

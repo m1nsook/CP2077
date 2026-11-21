@@ -166,7 +166,8 @@ void Renderer::Present(const GameFrame& source) noexcept
         Reset();
         return;
     }
-    if (!InputRouter::Get().ShouldDraw()) return;
+    if (!InputRouter::Get().ShouldDraw() &&
+        !InputRouter::Get().NeedsPopupDismiss()) return;
     const UINT index = swapchain_->GetCurrentBackBufferIndex();
     if (index >= buffers_.size()) return;
     auto& frame = buffers_[index];

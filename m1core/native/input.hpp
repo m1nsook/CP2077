@@ -72,6 +72,12 @@ public:
     [[nodiscard]] bool KeyAssigned() const noexcept { return hotkey_.load() != 0; }
     [[nodiscard]] std::string KeyDescription() const;
     [[nodiscard]] bool Recording() const noexcept { return recording_.load(); }
+    [[nodiscard]] bool NeedsPopupDismiss() const noexcept {
+        return popupDismiss_.load(std::memory_order_acquire);
+    }
+    void AcknowledgePopupDismiss() noexcept {
+        popupDismiss_.store(false, std::memory_order_release);
+    }
     [[nodiscard]] bool CursorHeld() const noexcept { return engineCursorHeld_.load(); }
     // Called only on the game render callback while a native UI is wanted.
     void RetryCursorSync() noexcept;
@@ -103,5 +109,6 @@ private:
     bool loggedCursorUnavailable_ = false;
     std::array<bool,256> keysDown_{};
     std::atomic_bool firstRunArmed_{false};
+    std::atomic_bool popupDismiss_{false};
 };
 } // namespace m1core

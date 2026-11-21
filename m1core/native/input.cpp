@@ -103,6 +103,7 @@ bool InputRouter::Install(HWND hwnd) noexcept
     }
     window_=hwnd;
     firstRunArmed_.store(false);
+    popupDismiss_.store(false);
     engineCursorHeld_.store(false);
     lastCursorRetry_.store(0);
     loggedCursorUnavailable_ = false;
@@ -164,6 +165,7 @@ bool InputRouter::SetMenuKey(int key) noexcept
     if (!Store().Update([key](nlohmann::json& state) {
             state["overlay"]=nlohmann::json::object({{"hotkey",key}});
         })) return false;
+    if (setup_.load()) popupDismiss_.store(true,std::memory_order_release);
     hotkey_.store(key);
     return true;
 }
@@ -211,7 +213,9 @@ bool InputRouter::HandleKeyTransition(int key,bool down) noexcept
     }
     if (hotkey_.load()!=0 && key==hotkey_.load() && plain) {
         if (edge==KeyEdge::Release) {
-            visible_.store(!visible_.load());
+            const bool nowOpen = !visible_.load();
+            visible_.store(nowOpen);
+            if (!nowOpen) popupDismiss_.store(true,std::memory_order_release);
             RequestCursorSync();
         }
         return true;
@@ -233,8 +237,8 @@ void InputRouter::ArmFirstRun() noexcept
 void InputRouter::Close() noexcept
 {
     if (!KeyAssigned()) firstRunArmed_.store(false);
-    visible_.store(false);
-    setup_.store(false);
+    if (visible_.exchange(false) || setup_.exchange(false))
+        popupDismiss_.store(true,std::memory_order_release);
     recording_.store(false);
     RequestCursorSync();
 }

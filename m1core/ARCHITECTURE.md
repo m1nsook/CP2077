@@ -57,6 +57,19 @@ replace the CET-dependent prototype, not augment it:
 - \`native/plugin.cpp\`: new native RED4ext RTTI access to register, read,
   write and reset settings. **No CET Lua files or CET installation.**
 
+### Standard ImGui modal focus and dimming (November 21)
+
+CET first-time setup uses `ImGui::OpenPopup` and
+`ImGui::BeginPopupModal` in its Bindings widget. The former m1core
+code used a small regular `ImGui::Begin` window; therefore the game
+background never dimmed and keyboard focus was not modal. The new
+implementation uses ImGui's built-in modal background for first-run
+binding and the settings window, without custom drawing or non-ImGui
+fullscreen panels. Closing and binding trigger a renderer-thread popup
+dismissal frame so modals cannot remain stuck after input returns to
+Cyberpunk. The screenshot from the user shows a real in-game regression;
+CI success is not an assertion of runtime focus correctness.
+
 ### CET source audit (November 21, 2026)
 
 Compared independently against `maximegmd/CyberEngineTweaks` master:
