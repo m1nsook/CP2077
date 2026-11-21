@@ -1,0 +1,125 @@
+name: m1core standalone RED4ext native CI
+
+on:
+  push:
+    branches:
+      - dev/m1core
+    paths:
+      - "m1core/**"
+      - ".github/workflows/m1core.yml"
+  pull_request:
+    paths:
+      - "m1core/**"
+      - ".github/workflows/m1core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m1core-standalone-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  native-compile:
+    name: Build and package standalone m1core.dll (development)
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure RED4ext native DLL
+        run: cmake -S m1core -B m1core/build -A x64 -DBUILD_TESTING=ON
+      - name: Compile DLL and tests
+        run: cmake --build m1core/build --config Release --parallel 4
+      - name: Test native data persistence
+        run: ctest --test-dir m1core/build -C Release --output-on-failure
+      - name: Verify DLL is standalone and no CET Lua frontend is included
+        shell: pwsh
+        run: |
+          # Regression: CET resets DX12 on fullscreen/windowed resize without
+          # dismissing its overlay. Never close m1core in the resize hook.
+          $bridge = Get-Content -LiteralPath "m1core/native/render_bridge.cpp" -Raw
+          $resize = ($bridge -split 'void\* RenderBridge::OnResize', 2)[1]
+          if (!$resize) { throw "Missing game resize handler" }
+          $resize = ($resize -split 'void\* RenderBridge::OnShutdown', 2)[0]
+          if ($resize -match 'InputRouter::Get\(\)\.Close\(') {
+            throw "Resize handler must preserve the overlay session across Alt+Tab"
+          }
+          $dll = "m1core/build/Release/m1core.dll"
+          if (!(Test-Path -LiteralPath $dll -PathType Leaf)) {
+            throw "Native m1core.dll was not compiled"
+          }
+          if ((Get-Item -LiteralPath $dll).Length -lt 8192) {
+            throw "Compiled DLL unexpectedly small"
+          }
+          if (Test-Path "m1core/src/init.lua") {
+            throw "CET Lua frontend is forbidden"
+          }
+          Write-Host "Standalone native DLL verified; runtime is not yet game-tested"
+
+      - name: Assemble a single game-root ZIP artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dll = "m1core/build/Release/m1core.dll"
+          $root = "m1core/game-package"
+          $target = Join-Path $root "red4ext/plugins/m1core"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          Copy-Item -LiteralPath $dll -Destination (Join-Path $target "m1core.dll")
+          Copy-Item -LiteralPath "m1core/LICENSE" -Destination (Join-Path $target "LICENSE")
+          # Preserve the original author's MIT notice for source derived
+          # from the explicitly supplied MIT-only CET 1.38.1 package.
+          Copy-Item -LiteralPath "m1core/LICENSE-YAMASHI-MIT" -Destination (Join-Path $target "LICENSE-YAMASHI-MIT")
+          $files = @(Get-ChildItem -LiteralPath $root -Recurse -File)
+          if ($files.Count -ne 3) { throw "Unexpected file count in game-root package" }
+          if (!(Test-Path -LiteralPath (Join-Path $target "LICENSE-YAMASHI-MIT"))) {
+            throw "Required original-author MIT copyright notice missing"
+          }
+          if (Get-ChildItem $root -Recurse -File | Where-Object { $_.Extension -in @('.ttf','.otf','.woff','.png','.svg','.ico') }) {
+            throw "Third-party icons/fonts must never be bundled"
+          }
+          $top = @(Get-ChildItem -LiteralPath $root -Directory | ForEach-Object Name)
+          if (($top -join ',') -ne 'red4ext') { throw "Archive must have only red4ext/ at root" }
+          if (!(Test-Path -LiteralPath (Join-Path $target 'm1core.dll'))) { throw "Missing native DLL" }
+          if (Get-ChildItem $root -Recurse -File | Where-Object { $_.Extension -eq '.lua' -or $_.Name -match '(?i)cet' }) {
+            throw "CET dependency mistakenly included"
+          }
+          $hash = (Get-FileHash -LiteralPath (Join-Path $target "m1core.dll") -Algorithm SHA256).Hash
+          Write-Host "Development m1core.dll SHA256: $hash"
+          Write-Host "Root: red4ext/plugins/m1core/m1core.dll"
+          Write-Host "NOTICE: CI compilation is not an in-game validation"
+
+      - name: Upload standalone DLL ZIP (development)
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1core-standalone-x64-dev
+          path: m1core/game-package/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Download and verify uploaded ZIP contents
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $verify = "m1core/artifact-check"
+          New-Item -ItemType Directory -Force -Path $verify | Out-Null
+          $ok = $false
+          for ($i = 0; $i -lt 8; $i++) {
+            gh run download "$env:GITHUB_RUN_ID" --repo "$env:GITHUB_REPOSITORY" --name "m1core-standalone-x64-dev" --dir "$verify"
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Start-Sleep -Seconds 5
+          }
+          if (!$ok) { throw "Could not download uploaded artifact" }
+          $expected = Join-Path $verify "red4ext/plugins/m1core/m1core.dll"
+          if (!(Test-Path -LiteralPath (Join-Path $verify "red4ext/plugins/m1core/LICENSE-YAMASHI-MIT"))) {
+            throw "Uploaded artifact is missing yamashi's original MIT license"
+          }
+          if (!(Test-Path -LiteralPath $expected -PathType Leaf)) { throw "Downloaded artifact missing native DLL" }
+          $actualTop = @(Get-ChildItem -LiteralPath $verify -Directory | ForEach-Object Name)
+          if (($actualTop -join ',') -ne 'red4ext') { throw "Artifact is nested or has unexpected root folders" }
+          $before = (Get-FileHash -LiteralPath "m1core/build/Release/m1core.dll" -Algorithm SHA256).Hash
+          $after = (Get-FileHash -LiteralPath $expected -Algorithm SHA256).Hash
+          if ($before -ne $after) { throw "Artifact DLL hash differs from compiled DLL" }
+          Write-Host "Verified uploaded artifact contents and DLL integrity: $after"
