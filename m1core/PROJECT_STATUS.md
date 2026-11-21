@@ -6,7 +6,7 @@
 
 ## API repository separation
 
-- **Canonical scripting API home:** [m1script](https://github.com/m1nsook/m1script), foundation [PR #10](https://github.com/m1nsook/m1script/pull/10) (m1script CI passed; Pages pending merge). Do not expand the duplicated developer API docs in this repository.
+- **Canonical scripting API home:** [m1script](https://github.com/m1nsook/m1script), foundation [PR #10](https://github.com/m1nsook/m1script/pull/10) (merged; m1script CI and Pages deployed successfully). Do not expand the duplicated developer API docs in this repository.
 - **Runtime:** m1core is still the independent RED4ext DLL; no CET or extra m1script runtime dependency.
 
 ## Quick links
@@ -166,7 +166,7 @@ Only work on the m1core development branch and draft PR unless explicitly author
 
 ## m1script repository split and M5 runtime CI correction (2026-11-21)
 
-- **User decision:** maintain public scripting API contracts, developer documentation, examples and editor support in **https://github.com/m1nsook/m1script**. Created [m1script PR #10](https://github.com/m1nsook/m1script/pull/10) with the migrated API reference, VitePress guide, `api/contract.json`, LuaLS types and `.m1s` examples. [m1script CI #44954056328](https://github.com/m1nsook/m1script/actions/runs/44954056328) **passed** its contract and VitePress build checks. m1script main is protected; changes are awaiting PR merge/deploy.
+- **User decision:** maintain public scripting API contracts, developer documentation, examples and editor support in **https://github.com/m1nsook/m1script**. Merged [m1script PR #10](https://github.com/m1nsook/m1script/pull/10) with the migrated API reference, VitePress guide, `api/contract.json`, LuaLS types and `.m1s` examples. [m1script CI #44954056328](https://github.com/m1nsook/m1script/actions/runs/44954056328) **passed** its contract and VitePress build checks. m1script protected main was updated through PR #10, and [Pages deployment #44954205630](https://github.com/m1nsook/m1script/actions/runs/44954205630) **succeeded**. Live docs: https://m1nsook.github.io/m1script/.
 - **Runtime remains m1core:** embedded LuaJIT, RED4ext DLL, native RTTI, settings registry, input, overlay, persistence and game-root package stay here, MIT-licensed. No GPL runtime code is copied from m1script into m1core, and no new DLL/CET requirement is introduced.
 - **Regression and restoration:** [m1core CI #44953301662](https://github.com/m1nsook/CP2077/actions/runs/44953301662) compiled the DLL but **failed** during the newly added callback-isolation LuaJIT test. The experimental `LuaCallback.hpp` integration, its new test and scan-count changes are **reverted** to the previous validated source. The last green full runtime build is [#44952396412](https://github.com/m1nsook/CP2077/actions/runs/44952396412), source `fbec37989b29ffd132a60cb69137eb767ea85a5b`. A fresh CI run for this restoration must complete before calling the latest branch green.
 - **Next:** finish m1script public API documentation and contract validation; keep any necessary native runtime corrections separate. Preserve approved UI and input. **Do not merge m1core PR #41 without approval.**

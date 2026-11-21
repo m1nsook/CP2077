@@ -4,8 +4,8 @@ The canonical developer-facing scripting API, reference, Lua editor definitions 
 
 - **Repository:** https://github.com/m1nsook/m1script
 - **API foundation PR:** https://github.com/m1nsook/m1script/pull/10
-- **Documentation (after the PR is merged and Pages deploys):** https://m1nsook.github.io/m1script/
-- **Machine-readable contract:** https://github.com/m1nsook/m1script/blob/dev/m1script-api-foundation/api/contract.json
+- **Published documentation:** https://m1nsook.github.io/m1script/
+- **Machine-readable contract:** https://github.com/m1nsook/m1script/blob/main/api/contract.json
 
 **m1core remains the standalone RED4ext DLL runtime:** LuaJIT, Win32 input, game hooks, native RTTI bridge, settings/persistence and installed game-root ZIP are implemented here. No additional CET or m1script runtime is required.
 
