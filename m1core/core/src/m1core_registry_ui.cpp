@@ -190,16 +190,34 @@ void DrawSetting(const ModView& mod, const SettingView& setting)
     }
     }
     ImGui::TableSetColumnIndex(2);
-    if (ImGui::SmallButton("Reset"))
-        Settings().Reset(mod.id, setting.id);
+    // Full-size action, exactly like the Logs page buttons. SmallButton()
+    // removes vertical FramePadding and caused the tiny Reset controls.
+    if (ImGui::Button("Reset", ImVec2(-FLT_MIN, 0.0f)))
+    {
+        if (!Settings().Reset(mod.id, setting.id))
+        {
+            const auto detail = Settings().LastError();
+            notice = detail.empty() ? "Could not reset setting." : "Could not reset setting: " + detail;
+        }
+        else
+            notice.clear();
+    }
     ImGui::PopID();
 }
 
 void DrawSettingsFor(const ModView& mod)
 {
+    // Keep the mod title aligned with a normal-height action at the
+    // right edge, instead of squeezing the button against the title.
+    const char* resetLabel = confirmModReset ? "Confirm reset" : "Reset mod";
+    const float actionWidth = ImGui::CalcTextSize(resetLabel).x +
+                              ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float rightEdge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
+    ImGui::AlignTextToFramePadding();
     ImGui::Text("%s (%zu settings)", mod.title.c_str(), mod.settings.size());
     ImGui::SameLine();
-    if (ImGui::Button(confirmModReset ? "Confirm reset" : "Reset mod")) {
+    ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightEdge - actionWidth));
+    if (ImGui::Button(resetLabel, ImVec2(actionWidth, 0.0f))) {
         if (confirmModReset) {
             if (!Settings().ResetMod(mod.id))
                 notice = "Could not reset settings.";
@@ -231,13 +249,19 @@ void DrawSettingsFor(const ModView& mod)
         const ImGuiTableFlags flags =
             ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg |
             ImGuiTableFlags_SizingStretchProp;
+        // The global theme uses 10px cell padding. Narrow that only
+        // for settings rows: full-height buttons shouldn't sit inside
+        // unnecessarily tall empty table cells.
+        const auto cellPadding = ImGui::GetStyle().CellPadding;
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(cellPadding.x, 5.0f));
         if (ImGui::BeginTable("settings", 3, flags)) {
             ImGui::TableSetupColumn("Setting", ImGuiTableColumnFlags_WidthStretch, 0.55f);
             ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.35f);
-            ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 65.0f);
+            ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 100.0f);
             for (const auto* setting : rows) DrawSetting(mod, *setting);
             ImGui::EndTable();
         }
+        ImGui::PopStyleVar();
         ImGui::PopID();
     }
 }
@@ -247,10 +271,10 @@ void DrawSettingsPage()
     ImGui::SetNextItemWidth(320);
     ImGui::InputTextWithHint("##search", m1core::HasIcons() ? M1CORE_ICON_SEARCH " Search mods or settings..." : "Search mods or settings...",
                              search, sizeof(search));
-    ImGui::SameLine();
-    ImGui::TextDisabled("Auto-saved to settings.json");
+    // Autosave remains active, but the long status message does not
+    // belong on the same line as the search control.
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-        ImGui::SetTooltip("Changes are written immediately; no Save button required.");
+        ImGui::SetTooltip("Changes save automatically to m1core/settings.json.");
     ImGui::Separator();
 
     const auto mods = Settings().Snapshot();
@@ -350,42 +374,22 @@ void DrawNativeRegistryUI()
     ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_FirstUseEver,
                             ImVec2(0.5f,0.5f));
     ImGui::SetNextWindowSize(ImVec2(940,600), ImGuiCond_FirstUseEver);
-    bool closeRequested = false;
-    // Use a compact header composed only of stock Dear ImGui widgets.
-    // The native close glyph is hardcoded in ImGui::CloseButton and cannot
-    // be swapped for Phosphor via a font. With NoTitleBar, a regular
-    // Phosphor SmallButton provides a properly sized clickable close.
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(7.0f, 6.0f));
-    const bool visible = ImGui::Begin("M1CORE - MOD SETTINGS", nullptr,
-                                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+    bool open = true;
+    // Stock Dear ImGui title bar + close button. No fake child title bar
+    // and no hand-built X. Keep the user's light title colors and uppercase.
+    // Compact only this title's vertical padding; controls inside the
+    // window continue to use the user's normal FramePadding.
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+        ImVec2(ImGui::GetStyle().FramePadding.x, 4.0f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.91f, 0.92f, 0.94f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.97f, 0.98f, 0.99f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImVec4(0.91f, 0.92f, 0.94f, 0.95f));
+    ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
+    const bool visible = ImGui::Begin("M1CORE - MOD SETTINGS", &open,
+                                     ImGuiWindowFlags_NoCollapse);
+    ImGui::PopStyleColor(4);
     ImGui::PopStyleVar();
     if (visible) {
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.95f, 0.96f, 0.98f, 1.0f));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(9.0f, 4.0f));
-        const bool headerVisible = ImGui::BeginChild(
-            "##m1core-titlebar", ImVec2(0.0f, 29.0f),
-            ImGuiChildFlags_None,
-            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        if (headerVisible) {
-            ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.95f, 0.96f, 0.98f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.83f, 0.86f, 0.90f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.75f, 0.79f, 0.83f, 1.0f));
-            // The child header is 29px high; do not apply the theme's 9px
-            // FramePadding text baseline here or the caption gets clipped.
-            ImGui::SetCursorPosY(6.0f);
-            ImGui::TextUnformatted("M1CORE - MOD SETTINGS");
-            ImGui::SameLine();
-            ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 31.0f);
-            closeRequested = ImGui::SmallButton(
-                m1core::HasIcons() ? M1CORE_ICON_CLOSE "##m1core-close" : "X##m1core-close");
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-                ImGui::SetTooltip("Close m1core");
-            ImGui::PopStyleColor(4);
-        }
-        ImGui::EndChild();
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor();
         if (!Store().Ready()) {
             const auto error = Store().LastError();
             ImGui::TextColored(m1core::ui::WarningText(),
@@ -397,6 +401,11 @@ void DrawNativeRegistryUI()
         }
         if (!notice.empty())
             ImGui::TextColored(m1core::ui::WarningText(), "%s", notice.c_str());
+        // Standard tabs, with the same vertical frame padding used by
+        // regular ImGui::Button() on the Logs page.
+        const auto framePadding = ImGui::GetStyle().FramePadding;
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                            ImVec2(framePadding.x + 3.0f, framePadding.y));
         if (ImGui::BeginTabBar("m1core-tabs")) {
             if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_SETTINGS "  Settings" : "Settings")) {
                 DrawSettingsPage();
@@ -420,8 +429,9 @@ void DrawNativeRegistryUI()
             }
             ImGui::EndTabBar();
         }
+        ImGui::PopStyleVar();
     }
     ImGui::End();
-    if (closeRequested) M1CoreRuntime::Get().GetOverlay().Toggle();
+    if (!open) M1CoreRuntime::Get().GetOverlay().Toggle();
 }
 } // namespace m1core

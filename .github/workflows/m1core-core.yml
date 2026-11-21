@@ -94,6 +94,15 @@ jobs:
               $uiColors -notmatch '0.65f, 0.20f') {
             throw "m1core title/amber warning style regression"
           }
+          # UI sizing regression: all settings actions must use the
+          # same normal-height Dear ImGui Button as the Logs controls.
+          # The former fake title child caused window layout regressions.
+          if ($gui -match 'ImGui::SmallButton\("Reset"\)' -or
+              $gui -match '##m1core-titlebar' -or
+              $gui -notmatch 'ImGui::Button\("Reset", ImVec2\(-FLT_MIN' -or
+              $gui -notmatch 'ImGui::Begin\("M1CORE - MOD SETTINGS", &open') {
+            throw "Settings controls must use regular ImGui buttons and native window title"
+          }
           # Regression guard: native game functions outside the override
           # registry MUST pass through to the original script interpreter.
           # Aborting them caused repeated "hooked but isn't" console errors.
