@@ -9,6 +9,10 @@
 - **Canonical scripting API home:** [m1script](https://github.com/m1nsook/m1script), foundation [PR #10](https://github.com/m1nsook/m1script/pull/10) (merged; m1script CI and Pages deployed successfully). Do not expand the duplicated developer API docs in this repository.
 - **Runtime:** m1core is still the independent RED4ext DLL; no CET or extra m1script runtime dependency.
 
+## Most recent verified build
+
+- **Current native CI PASS:** [#44956427285](https://github.com/m1nsook/CP2077/actions/runs/44956427285); source `b37deeb5`; single game-root `m1core-native-x64-dev` artifact **14727519281**. This includes registry durability tests and the internal mouse-click backend with **mocked** click tests; no in-game click automation is active.
+
 ## Quick links
 
 - **Source repo:** https://github.com/m1nsook/CP2077
@@ -164,6 +168,12 @@ Only work on the m1core development branch and draft PR unless explicitly author
 - Changed the existing m1core shortcut toast in `core/src/overlay/Overlay.cpp` to use **bottom-left** of the game viewport with a Phosphor information glyph, **m1core** title and readable `Shortcut: <binding>` content (no user-facing CET branding). This is a one-time on-startup notification.
 - `core/src/common/ImGuiNotify.h` now supports an opt-in **per-toast** position. Bottom-right remains the default for other notifications, including other Lua mods or separately installed CET; the left/right toast stacks are independent. No changes to the Win32 input hooks or D3D12 rendering backend.
 - The Phosphor glyph falls back to the existing ASCII icon if the font is absent. Native CI compilation is required; the visual placement is **not yet in-game verified**. The user does not need to repeat prior game input/hotkey tests.
+
+## New M6 / internal input Windows CI (2026-11-21)
+
+- **CI SUCCESS:** [run #44956427285](https://github.com/m1nsook/CP2077/actions/runs/44956427285) for source `b37deeb5b45d31d2048fe515a540993b9a58f076`. Native `m1core.dll` compiled; native typed-settings/profile tests (including disk normalization and frozen storage), **new mocked mouse-click helper test**, script-format and real LuaJIT tests, source and compiled-bytecode Weight Limit integration, and release-package asset/license checks all passed.
+- **Artifact:** `m1core-native-x64-dev` (single game-root package), GitHub artifact **14727519281**. Optional Weight Limit source/bytecode fixture artifacts **14727563490** / **14727946920**. These binaries are developer artifacts, not a published release or in-game validation of synthesized mouse clicks.
+- **Scope:** m1core remains a standalone public-distribution compiled DLL for the owner's mods. Repository source remains public during development for GitHub Actions; future source privacy is the owner's choice. The m1script repository is a public explanation of `.m1s` formats and script transparency, not a public SDK. PR #41 remains draft and unmerged.
 
 ## Internal mouse click utility (2026-11-21)
 
