@@ -87,3 +87,13 @@ luajit -b init.m1s init.m1c
 ```
 
 Prefer shipping the readable `.m1s` file where possible. Bytecode is not encryption and can be incompatible between LuaJIT builds.
+
+### LuaJIT integration fixture
+
+The standalone developer fixture is at
+[`m1core/examples/lua-smoke/`](examples/lua-smoke/).
+It tests `init.m1s` + `require('helper')` from `helper.m1s`, plus `compat.lua`.
+The native CI target `m1core_script_runtime_tests` compiles and executes
+real LuaJIT source, generates genuine LuaJIT bytecode via `lua_dump`,
+loads it in binary-only mode and rejects text/binary mode mismatches.
+This does not yet verify the in-game `LuaSandbox` lifecycle.
