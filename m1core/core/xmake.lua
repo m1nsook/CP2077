@@ -73,9 +73,8 @@ target("m1core")
 
     set_configdir(path.join("src", "config"))
     add_configfiles("src/xmake/M1CoreVersion.h.in")
-    -- Exclude the CET ASI DllMain; RED4ext invokes Main/Query/Supports.
+    -- RED4ext invokes Main/Query/Supports; the old ASI DllMain is removed.
     add_files("src/**.cpp", "../native/state.cpp", "../native/registry.cpp")
-    remove_files("src/dllmain.cpp")
     add_headerfiles("src/**.h", "src/**.hpp")
     add_includedirs("src", "build", "../native")
     add_syslinks("User32", "Version", "d3d11", "d3d12", "d3dcompiler",
