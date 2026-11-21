@@ -34,3 +34,31 @@ Standalone m1core must:
 
 This file describes the intended standalone design. It does not claim
 those capabilities are already implemented.
+
+
+## Current implementation phase (dev.3)
+
+The independent native implementation is being connected. These sources
+replace the CET-dependent prototype, not augment it:
+
+- \`native/render_bridge.*\`: hooks the game's internal Present, Resize and
+  Shutdown through **RED4ext SDK Hooking**, with graceful resolver failure.
+- \`native/renderer.*\`: private Dear ImGui Win32 + DirectX 12 context,
+  device, swapchain and command-queue integration, its own descriptor heaps,
+  command allocators and per-backbuffer GPU fences.
+- \`native/input.*\`: foreground-only Win32 message routing and native
+  REDengine \`ForceCursor\` ownership, one physical pointer and no API detours.
+  OS shutdown commands remain pass-through.
+- \`native/ui.*\`: standard Dear ImGui tables, colored navigation and typed
+  settings backed directly by the independent native registry.
+- \`native/plugin.cpp\`: new native RED4ext RTTI access to register, read,
+  write and reset settings. **No CET Lua files or CET installation.**
+
+The game symbol hashes and render-layout offsets must be verified against
+the target Cyberpunk build. Unknown symbols must leave the plugin inert
+rather than terminating Cyberpunk. Native compilation and unit tests are
+necessary but **insufficient for release**. The user will not test
+intermediate builds. Do not upload or label any developer build as an
+installable CET replacement until graphics lifecycle, first-run key
+binding, cursor ownership, shutdown and non-game focus handling receive
+end-to-end verification.
