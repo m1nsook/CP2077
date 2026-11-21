@@ -46,7 +46,16 @@ ImVec4 Color(int r, int g, int b, float a = 1.0f)
 }
 constexpr float kNavWidth = 240.0f;
 constexpr float kTitleHeight = 48.0f;
-constexpr float kPageHeaderHeight = 74.0f;
+constexpr float kPageHeaderHeight = 82.0f;
+void MoveDown(float px) { ImGui::SetCursorPosY(ImGui::GetCursorPosY()+px); }
+void PushLayoutFont(ImFont* f) { if (f) ImGui::PushFont(f); }
+void PopLayoutFont(ImFont* f) { if (f) ImGui::PopFont(); }
+std::string ToUppercaseASCII(std::string name) {
+    for (char& c : name)
+        if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
+    return name;
+}
+
 
 
 std::string ReadLogTail(const std::filesystem::path& file)
@@ -552,56 +561,111 @@ const char* PageDescription(Page p)
 
 void SidebarNav(const char* icon, const char* title, Page target)
 {
+    // The native Selectable owns mouse, keyboard and navigation state.
+    // Small draw-list decorations left-align the icon/text and round
+    // the active background exactly as in the supplied AFTER.html.
     ImGui::PushID(static_cast<int>(target));
     const bool active = currentPage == target;
-    ImGui::PushStyleColor(ImGuiCol_Button, active ? Color(38,56,86) : Color(24,25,28));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,Color(42,44,49));
-    ImGui::PushStyleColor(ImGuiCol_Text,active ? Color(96,165,250) : Color(148,163,184));
-    const std::string label = (m1core::HasIcons() ? std::string(icon)+"  " : "") + title;
-    if (ImGui::Button(label.c_str(),ImVec2(-FLT_MIN,36.0f)))
+    ImGui::PushStyleColor(ImGuiCol_Header,Color(0,0,0,0));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered,Color(0,0,0,0));
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive,Color(0,0,0,0));
+    if (ImGui::Selectable("##sidebar-nav",active,0,ImVec2(0,38)))
         currentPage = target;
+    const bool hovered = ImGui::IsItemHovered();
+    const ImVec2 top = ImGui::GetItemRectMin(), bottom = ImGui::GetItemRectMax();
+    auto* draw = ImGui::GetWindowDrawList();
+    if (active || hovered)
+        draw->AddRectFilled(top,bottom,active ? IM_COL32(33,47,70,255) :
+                                               IM_COL32(42,44,49,255),6.0f);
+    const ImU32 tint = active ? IM_COL32(96,165,250,255) :
+                            (hovered ? IM_COL32(248,250,252,255) : IM_COL32(148,163,184,255));
+    const bool hasIcon = m1core::HasIcons();
+    if (hasIcon)
+        draw->AddText(ImGui::GetFont(),ImGui::GetFontSize()*1.12f,
+                      ImVec2(top.x+12,top.y+10),tint,icon);
+    auto* font = m1core::KarlaSemiBold() ? m1core::KarlaSemiBold() : ImGui::GetFont();
+    draw->AddText(font,ImGui::GetFontSize(),
+                  ImVec2(top.x+(hasIcon?40.0f:12.0f),top.y+10),tint,title);
     ImGui::PopStyleColor(3);
     ImGui::PopID();
 }
 
+void SidebarGroup(const char* label)
+{
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX()+8);
+    PushLayoutFont(m1core::KarlaCaption());
+    ImGui::TextColored(Color(100,116,139),"%s",label);
+    PopLayoutFont(m1core::KarlaCaption());
+    MoveDown(5);
+}
+
 void DrawSidebar()
 {
-    if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
-    ImGui::TextDisabled("CONFIGURATION");
-    if (m1core::KarlaSemiBold()) ImGui::PopFont();
+    SidebarGroup("CONFIGURATION");
     SidebarNav(M1CORE_ICON_SLIDERS_HORIZONTAL,"Settings",Page::Settings);
     SidebarNav(M1CORE_ICON_KEYBINDS,"Keybinds",Page::Keybinds);
     SidebarNav(M1CORE_ICON_USERS_THREE,"Profiles",Page::Profiles);
-    ImGui::Dummy(ImVec2(0,18));
-    if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
-    ImGui::TextDisabled("SYSTEM");
-    if (m1core::KarlaSemiBold()) ImGui::PopFont();
+    MoveDown(20);
+    SidebarGroup("SYSTEM");
     SidebarNav(M1CORE_ICON_TERMINAL,"Logs",Page::Logs);
     SidebarNav(M1CORE_ICON_ABOUT,"About",Page::About);
 
-    // The profile selector follows the HTML layout by staying at the
-    // bottom of the sidebar. It navigates to Profiles; it does not silently
-    // load a profile or overwrite persistent settings.
-    const float desiredY = ImGui::GetWindowHeight()-104.0f;
-    if (ImGui::GetCursorPosY() < desiredY)
-        ImGui::SetCursorPosY(desiredY);
-    ImGui::Separator();
-    ImGui::TextDisabled("ACTIVE PROFILE");
-    ImGui::PushStyleColor(ImGuiCol_Button,Color(30,31,35));
-    std::string profileLabel = (m1core::HasIcons() ? std::string(M1CORE_ICON_CHECK_CIRCLE) + "  " : "") +
-                               activeProfile + "  " +
-        (m1core::HasIcons() ? M1CORE_ICON_CARET : "v");
-    if (ImGui::Button(profileLabel.c_str(),ImVec2(-FLT_MIN,32)))
-        currentPage = Page::Profiles;
+    // AFTER.html's 76px card is anchored above the bottom padding.
+    const float cardHeight = 76.0f;
+    const float footerY = ImGui::GetWindowHeight() -
+                          ImGui::GetStyle().WindowPadding.y - cardHeight;
+    if (ImGui::GetCursorPosY() < footerY)
+        ImGui::SetCursorPosY(footerY);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(30,31,35));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(12,9));
+    if (ImGui::BeginChild("##active-profile-card",ImVec2(0,cardHeight),
+        ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+        ImGuiWindowFlags_NoScrollbar))
+    {
+        PushLayoutFont(m1core::KarlaCaption());
+        ImGui::TextColored(Color(100,116,139),"Active Profile");
+        PopLayoutFont(m1core::KarlaCaption());
+        MoveDown(5);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(10,5));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,1.0f);
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::BeginCombo("##active-profile",activeProfile.c_str()))
+        {
+            for (const auto& name : Settings().Profiles())
+            {
+                const bool selected = activeProfile == name;
+                if (ImGui::Selectable(name.c_str(),selected))
+                {
+                    if (Settings().LoadProfile(name))
+                    {
+                        activeProfile = name;
+                        selectedProfile = name;
+                        notice = "Profile loaded.";
+                    }
+                    else notice = "Could not load profile.";
+                }
+                if (selected) ImGui::SetItemDefaultFocus();
+            }
+            if (ImGui::Selectable("Manage profiles...##manage-profiles"))
+                currentPage = Page::Profiles;
+            ImGui::EndCombo();
+        }
+        ImGui::PopStyleVar(2);
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
     ImGui::PopStyleColor();
 }
 
 void DrawPageHeader()
 {
-    if (auto* font = m1core::KarlaBold()) ImGui::PushFont(font);
+    auto* heading = m1core::KarlaPageTitle() ?
+        m1core::KarlaPageTitle() : m1core::KarlaBold();
+    PushLayoutFont(heading);
     ImGui::TextUnformatted(PageTitle(currentPage));
-    if (m1core::KarlaBold()) ImGui::PopFont();
-    ImGui::TextDisabled("%s",PageDescription(currentPage));
+    PopLayoutFont(heading);
+    MoveDown(3);
+    ImGui::TextColored(Color(148,163,184),"%s",PageDescription(currentPage));
 }
 
 void DrawPageBody()
@@ -636,11 +700,10 @@ void DrawNativeRegistryUI()
     ImGui::SetNextWindowSize(ImVec2(1150,680),ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSizeConstraints(ImVec2(760,490),viewport->Size);
 
-    // All AFTER.html-inspired colors/spacing are scoped to this one
-    // m1core window. Do not alter the user's native input layer,
-    // other ImGui windows or third-party mod windows.
+    // AFTER.html styling is scoped to the registry window only.
+    // Runtime-owned input and overlay visibility are never rehooked.
     int colors = 0;
-    const auto color = [&](ImGuiCol idx, ImVec4 value) {
+    const auto color = [&](ImGuiCol idx,ImVec4 value) {
         ImGui::PushStyleColor(idx,value);
         ++colors;
     };
@@ -652,10 +715,10 @@ void DrawNativeRegistryUI()
     color(ImGuiCol_Separator,Color(42,44,49));
     color(ImGuiCol_Button,Color(42,44,49));
     color(ImGuiCol_ButtonHovered,Color(63,66,74));
-    color(ImGuiCol_ButtonActive,Color(38,56,86));
-    color(ImGuiCol_Header,Color(38,56,86));
+    color(ImGuiCol_ButtonActive,Color(33,47,70));
+    color(ImGuiCol_Header,Color(33,47,70));
     color(ImGuiCol_HeaderHovered,Color(42,44,49));
-    color(ImGuiCol_HeaderActive,Color(38,56,86));
+    color(ImGuiCol_HeaderActive,Color(33,47,70));
     color(ImGuiCol_FrameBg,Color(12,13,15));
     color(ImGuiCol_FrameBgHovered,Color(42,44,49));
     color(ImGuiCol_FrameBgActive,Color(42,44,49));
@@ -664,38 +727,46 @@ void DrawNativeRegistryUI()
     color(ImGuiCol_SliderGrabActive,Color(96,165,250));
     color(ImGuiCol_PopupBg,Color(30,31,35));
     color(ImGuiCol_TableHeaderBg,Color(30,31,35));
-    color(ImGuiCol_TableRowBgAlt,Color(42,44,49,0.18f));
+    color(ImGuiCol_TableRowBgAlt,Color(42,44,49,0.12f));
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,12.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding,8.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,6.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(10,7));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(9,9));
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding,ImVec2(8,6));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(0,0));
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding,ImVec2(8,8));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize,1.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,0.0f);
 
     bool hideOverlay = false;
     const bool visible = ImGui::Begin("M1CORE##native-overlay",nullptr,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
     if (visible)
     {
-        const ImVec2 windowPos = ImGui::GetWindowPos();
-        bool draggingTitle = false;
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(8,8));
+        const auto windowPos = ImGui::GetWindowPos();
+        bool dragging = false;
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(16,8));
         if (ImGui::BeginChild("##app-titlebar",ImVec2(0,kTitleHeight),
-                ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar))
+            ImGuiChildFlags_AlwaysUseWindowPadding,
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
         {
-            const float dragWidth = std::max(100.0f,ImGui::GetContentRegionAvail().x-84.0f);
-            ImGui::InvisibleButton("##move-m1core",ImVec2(dragWidth,32.0f));
-            draggingTitle = ImGui::IsItemActive() &&
-                            ImGui::IsMouseDragging(ImGuiMouseButton_Left);
-            const ImVec2 top = ImGui::GetItemRectMin();
+            const float dragWidth = std::max(90.0f,ImGui::GetContentRegionAvail().x-72.0f);
+            ImGui::InvisibleButton("##drag-titlebar",ImVec2(dragWidth,32));
+            dragging = ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+            const auto top = ImGui::GetItemRectMin();
             auto* draw = ImGui::GetWindowDrawList();
+            auto* defaultFont = ImGui::GetFont();
+            const float size = ImGui::GetFontSize();
             if (m1core::HasIcons())
-                draw->AddText(ImVec2(top.x+7,top.y+8),IM_COL32(59,130,246,255),M1CORE_ICON_CUBE);
-            draw->AddText(ImVec2(top.x+(m1core::HasIcons()?34.0f:7.0f),top.y+8),
+                draw->AddText(defaultFont,size*1.18f,ImVec2(top.x+2,top.y+7),
+                              IM_COL32(59,130,246,255),M1CORE_ICON_CUBE);
+            auto* brand = m1core::KarlaBold() ? m1core::KarlaBold() : defaultFont;
+            draw->AddText(brand,size,ImVec2(top.x+(m1core::HasIcons()?34.0f:2.0f),top.y+9),
                           IM_COL32(248,250,252,255),"M1CORE");
-            ImGui::SameLine(0,5);
+            ImGui::SameLine(0,4);
+            ImGui::PushStyleColor(ImGuiCol_Button,Color(17,18,20));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,Color(42,44,49));
             if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_MINUS "##minimize" : "-##minimize",
                               ImVec2(32,32)))
                 hideOverlay = true;
@@ -706,25 +777,31 @@ void DrawNativeRegistryUI()
                               ImVec2(32,32)))
                 hideOverlay = true;
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-                ImGui::SetTooltip("Close m1core overlay");
+                ImGui::SetTooltip("Close m1core");
+            ImGui::PopStyleColor(2);
         }
         ImGui::EndChild();
         ImGui::PopStyleVar();
-        if (draggingTitle)
+        if (dragging)
         {
             const auto delta = ImGui::GetIO().MouseDelta;
             ImGui::SetWindowPos(ImVec2(windowPos.x+delta.x,windowPos.y+delta.y));
         }
         ImGui::Separator();
 
-        // Two children form the 240px navigation and flexible content
-        // columns. Each page gets standard native widgets and scrollbars.
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(0,0));
+        // Borderless ImGui child windows ignore WindowPadding unless the
+        // AlwaysUseWindowPadding flag is explicitly passed. This caused
+        // the missing margins seen in the first user screenshot.
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(12,16));
         ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(24,25,28));
         if (ImGui::BeginChild("##app-sidebar",ImVec2(kNavWidth,0),
-                ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar))
+            ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+            ImGuiWindowFlags_NoScrollbar))
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(4,4));
             DrawSidebar();
+            ImGui::PopStyleVar();
+        }
         ImGui::EndChild();
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
@@ -732,28 +809,29 @@ void DrawNativeRegistryUI()
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));
         if (ImGui::BeginChild("##app-content",ImVec2(0,0),
-                ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar))
+            ImGuiChildFlags_AlwaysUseWindowPadding,ImGuiWindowFlags_NoScrollbar))
         {
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(24,14));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(24,18));
             if (ImGui::BeginChild("##app-page-header",ImVec2(0,kPageHeaderHeight),
-                    ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar))
+                ImGuiChildFlags_AlwaysUseWindowPadding,ImGuiWindowFlags_NoScrollbar))
                 DrawPageHeader();
             ImGui::EndChild();
             ImGui::PopStyleVar();
             ImGui::Separator();
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(24,18));
+
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(24,20));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(8,8));
             if (ImGui::BeginChild("##app-page-body",ImVec2(0,0),
-                    ImGuiChildFlags_None,ImGuiWindowFlags_None))
+                ImGuiChildFlags_AlwaysUseWindowPadding,ImGuiWindowFlags_None))
                 DrawPageBody();
             ImGui::EndChild();
-            ImGui::PopStyleVar();
+            ImGui::PopStyleVar(2);
         }
         ImGui::EndChild();
         ImGui::PopStyleVar();
-        ImGui::PopStyleVar();
     }
     ImGui::End();
-    ImGui::PopStyleVar(7);
+    ImGui::PopStyleVar(9);
     ImGui::PopStyleColor(colors);
     if (hideOverlay)
         M1CoreRuntime::Get().GetOverlay().Toggle();
