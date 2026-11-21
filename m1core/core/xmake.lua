@@ -148,8 +148,8 @@ target("m1core_weight_limit_tests")
     add_includedirs("src", "../native", "../tests")
     add_packages("sol2", "openrestry-luajit", "nlohmann_json")
 
-// This target is isolated from game hooks and runs the exact native
-// Breach Protocol path-planner used by the future in-game adapter.
+-- This target is isolated from game hooks and runs the exact native
+-- Breach Protocol path-planner used by the future in-game adapter.
 target("m1core_breach_solver_tests")
     set_kind("binary")
     add_files("src/scripting/BreachSolver.cpp", "../tests/breach_solver_tests.cpp")
