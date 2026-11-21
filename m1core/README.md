@@ -1,97 +1,54 @@
-# m1core — native DLL with CET-hosted settings UI
+# M1CORE — native RED4ext replacement for Cyber Engine Tweaks
 
-**Development:** v1.0.0-dev.2; unreleased. Clean restart from the earlier
-unreleased m1core experiments. The old native overlay, rendering hooks,
-Win32 cursor hooks, RAWINPUT and redscript sources are deleted from this
-branch; no published mods require compatibility with those experiments.
+**Status: under development; DO NOT INSTALL or test yet.**
 
-## Architecture
+This project is a **standalone native Windows x64 DLL loaded by RED4ext**.
+It must work on Cyberpunk 2077 without Cyber Engine Tweaks installed.
+The previously published development artifact that required CET was a
+mistake, has been invalidated, and is no longer the product design.
 
-M1CORE is **a native RED4ext DLL**. The main module is
-\`red4ext/plugins/m1core/m1core.dll\`. It owns:
-- A thread-safe, versioned JSON settings-state store.
-- Persistent values and named profile snapshots.
-- Atomic settings writes and unreadable-file protection.
-- Native REDengine RTTI functions for reading/saving settings.
+## Non-negotiable requirements
 
-A small companion CET Lua mod in
-\`bin/x64/plugins/cyber_engine_tweaks/mods/m1core/\` provides:
-- The setting descriptors and live mod API through \`GetMod("m1core")\`.
-- The ImGui settings interface.
-- Menu show/hide via **CET's own user-configured binding**.
+- \`red4ext/plugins/m1core/m1core.dll\` is the framework.
+- CET **must not** be a runtime requirement, UI host, keybind provider,
+  scripting host, cursor manager, or bundled component.
+- Native Dear ImGui for the settings UI and user-selected hotkeys only;
+  no hard-coded F-key.
+- One game-ready ZIP when complete, with \`red4ext/\` at the root.
+- Keep all other mods and the repository under MIT. M1CORE is MIT too.
+- No process-global \`SetCursorPos\`, \`ClipCursor\`, \`ShowCursor\` detours,
+  no raw-input mouse-speed multiplier, and no software cursor if Windows'
+  engine-controlled cursor is present.
+- Alt+F4, Alt+Tab, game shutdown, and second-monitor input ownership
+  must be validated before a playable artifact is provided.
 
-This uses CET's real overlay, real mouse cursor, focus/input handling,
-ImGui frame and hotkey system. **There is no second DirectX renderer,
-Win32 hook, virtual cursor or input architecture in m1core.**
+## Engineering foundation
 
-### Native ↔ CET bridge
+Use the **proven architecture** of the source supplied for CET:
+a game render-present hook, the actual D3D12 swapchain/command queue,
+Dear ImGui with Win32/DX12 backends, and the REDengine ForceCursor API.
 
-The RED4ext DLL registers these native game functions, which CET Lua
-calls through its existing \`Game\` RTTI interface:
+The native code must be independently implemented. CET is GPLv3 with
+an exception for independent mods that use its public scripting interface;
+that exception **does not** relicense copies of CET's C++ core. No CET
+core code is copied into this MIT source.
 
-| Function | Role |
-|---|---|
-| \`Game.M1Core_NativeVersion()\` | DLL version |
-| \`Game.M1Core_NativeReady()\` | Native storage readiness |
-| \`Game.M1Core_NativeGetState()\` | Read authoritative JSON state |
-| \`Game.M1Core_NativeSetState(json)\` | Validate and persist JSON state |
-| \`Game.M1Core_NativeRevision()\` | Native revision counter |
-| \`Game.M1Core_NativeLastError()\` | Storage error details |
+The RED4ext SDK exposes \`sdk->hooking->Attach/Detach\` for game
+functions. Use this instead of adding unnecessary hook libraries.
+A missing game symbol should fail safely, leaving game input usable.
 
-The Lua frontend does **not** quietly fall back to a separate settings
-file if the DLL is missing. Both parts must be installed.
+## Development status
 
-## Installation
+- Old native overlay and CET-dependent Lua UI have been removed.
+- Native DLL state persistence and RED4ext plugin entrypoint are present,
+  with automated tests for atomic saves and corrupt-file protection.
+- Renderer lifecycle, native UI, cursor ownership and hotkeys are **not
+  complete**. The DLL is not a usable CET replacement yet.
+- CI compiles/tests the DLL only. **No game-installable artifact is
+  published until all standalone features are implemented.**
 
-Requires up-to-date **Cyber Engine Tweaks and RED4ext**.
+The old unreleased implementation remains in Git history and the
+\`archive/m1core-before-cet-reset-20261120\` branch. Since m1core was
+never released, no migration layer or compatibility bridge is required.
 
-1. Remove any files left over from the **old unreleased m1core prototype**
-   (\`red4ext/plugins/m1core/\` and \`r6/scripts/m1core/\`), if present.
-2. Extract the **single GitHub Actions ZIP** to the Cyberpunk 2077 game
-   root. It has two root directories: \`red4ext/\` and \`bin/\`.
-3. In CET's **Bindings**, set
-   \`M1CORE - Show / hide settings\` to a key of your choice.
-   No key is assigned by m1core, and none is hard-coded.
-4. Open CET's overlay to access the settings UI.
-
-Stored settings live alongside the native DLL:
-\`red4ext/plugins/m1core/settings.json\`.
-
-## Public settings API for CET mods
-
-\`\`\`lua
-registerForEvent("onInit", function()
-  local settings = GetMod("m1core")
-  if settings then
-    settings.register("my.example", "My Example", {
-      {id="enabled", type="boolean", default=true, group="General"},
-      {id="capacity", type="integer", min=1, max=500, default=100,
-       label="Carry capacity", group="Gameplay"},
-      {id="difficulty", type="choice",
-       choices={"normal", "hard"}, default="normal"}
-    })
-  end
-end)
-
--- Live read from another CET mod
-local settings = GetMod("m1core")
-local enabled = settings and settings.get("my.example", "enabled")
-\`\`\`
-
-The new version was never released, so no migration layer for the
-original prototype is necessary.
-
-## License and dependencies
-
-m1core's code is **MIT**. CET's own implementation is GPLv3 with
-\`LICENSE-EXCEPTION\`, permitting separately licensed mods that use its
-public scripting APIs. We use CET's public Lua/ImGui/RTTI interface, not
-copied CET source. RED4ext SDK is separately MIT. Other mods and
-their licenses are unchanged.
-
-## Verification limits
-
-CI builds an actual **Windows x64 m1core.dll**, tests native JSON storage,
-runs Lua tests, and checks the final combined ZIP. This does not prove
-runtime behavior or visual results inside Cyberpunk. In-game verification
-is still required before any public release.
+No changes are made to any other mod.

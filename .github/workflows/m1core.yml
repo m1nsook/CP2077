@@ -1,4 +1,4 @@
-name: m1core native DLL + CET UI CI
+name: m1core standalone RED4ext native CI
 
 on:
   push:
@@ -15,101 +15,38 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 concurrency:
-  group: m1core-native-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: m1core-standalone-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
-  lua-tests:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Lua
-        run: sudo apt-get update -qq && sudo apt-get install -y lua5.4
-      - name: Parse Lua sources
-        run: find m1core/src m1core/tests -name '*.lua' -print0 | xargs -0 -n1 luac5.4 -p
-      - name: Test registry and CET widget contract
-        run: |
-          lua5.4 m1core/tests/test_core.lua
-          lua5.4 m1core/tests/test_ui.lua
-
-  windows-build:
-    name: Build DLL, test native state, package CET UI
+  native-compile:
+    name: Compile native DLL and run C++ tests (no artifact until complete)
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Configure native DLL
+      - name: Configure RED4ext native DLL
         run: cmake -S m1core -B m1core/build -A x64 -DBUILD_TESTING=ON
-      - name: Compile
+      - name: Compile DLL and tests
         run: cmake --build m1core/build --config Release --parallel 4
-      - name: Run C++ persistence tests
+      - name: Test native data persistence
         run: ctest --test-dir m1core/build -C Release --output-on-failure
-      - name: Stage ONE game-ready ZIP
+      - name: Verify DLL is standalone and no CET Lua frontend is included
         shell: pwsh
         run: |
-          $root = "m1core/game-package"
-          $nativeDir = "$root/red4ext/plugins/m1core"
-          $cetDir = "$root/bin/x64/plugins/cyber_engine_tweaks/mods/m1core"
-          New-Item -ItemType Directory -Force -Path $nativeDir, $cetDir | Out-Null
-          Copy-Item "m1core/build/Release/m1core.dll" "$nativeDir/m1core.dll"
-          Copy-Item "m1core/src/init.lua" "$cetDir/init.lua"
-          Copy-Item "m1core/src/core.lua" "$cetDir/core.lua"
-          Copy-Item "m1core/src/storage.lua" "$cetDir/storage.lua"
-          Copy-Item "m1core/src/ui.lua" "$cetDir/ui.lua"
-          Copy-Item "m1core/LICENSE" "$nativeDir/LICENSE"
-          Copy-Item "m1core/LICENSE" "$cetDir/LICENSE"
-          if (!(Test-Path -LiteralPath "$nativeDir/m1core.dll" -PathType Leaf)) {
-            throw "m1core.dll missing"
+          $dll = "m1core/build/Release/m1core.dll"
+          if (!(Test-Path -LiteralPath $dll -PathType Leaf)) {
+            throw "Native m1core.dll was not compiled"
           }
-          if ((Get-Item -LiteralPath "$nativeDir/m1core.dll").Length -lt 8192) {
-            throw "DLL is abnormally small"
+          if ((Get-Item -LiteralPath $dll).Length -lt 8192) {
+            throw "Compiled DLL unexpectedly small"
           }
-          $folders = @(Get-ChildItem -LiteralPath $root -Directory | ForEach-Object Name | Sort-Object)
-          if (($folders -join ",") -ne "bin,red4ext") {
-            throw "Expected only bin/ and red4ext/ at archive root"
+          if (Test-Path "m1core/src/init.lua") {
+            throw "CET Lua frontend is forbidden"
           }
-          if (Get-ChildItem -LiteralPath $root -Filter "*.zip" -Recurse) {
-            throw "Nested ZIP detected"
+          if (Test-Path "m1core/game-package") {
+            throw "Do not produce an installable artifact until standalone overlay is complete"
           }
-      - name: Upload ONE game-ready DLL + CET UI archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: m1core-native-cet-game-ready
-          path: m1core/game-package/
-          if-no-files-found: error
-          retention-days: 7
-      - name: Re-download and verify the packaged DLL
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $false
-          $target = "m1core/verify-extract"
-          $success = $false
-          for ($i = 1; $i -le 8; $i++) {
-            New-Item -ItemType Directory -Force -Path $target | Out-Null
-            gh run download "$env:GITHUB_RUN_ID" --repo "$env:GITHUB_REPOSITORY" --name "m1core-native-cet-game-ready" --dir $target
-            if ($LASTEXITCODE -eq 0 -and (Test-Path "$target/red4ext/plugins/m1core/m1core.dll")) {
-              $success = $true
-              break
-            }
-            Remove-Item $target -Recurse -Force -ErrorAction SilentlyContinue
-            if ($i -lt 8) { Start-Sleep -Seconds 7 }
-          }
-          if (!$success) { throw "Could not retrieve this run's artifact" }
-          $folders = @(Get-ChildItem -LiteralPath $target -Directory | ForEach-Object Name | Sort-Object)
-          if (($folders -join ",") -ne "bin,red4ext") { throw "Archive root is wrong" }
-          foreach ($file in @(
-            "red4ext/plugins/m1core/m1core.dll",
-            "bin/x64/plugins/cyber_engine_tweaks/mods/m1core/init.lua",
-            "bin/x64/plugins/cyber_engine_tweaks/mods/m1core/core.lua",
-            "bin/x64/plugins/cyber_engine_tweaks/mods/m1core/storage.lua",
-            "bin/x64/plugins/cyber_engine_tweaks/mods/m1core/ui.lua"
-          )) {
-            if (!(Test-Path -LiteralPath (Join-Path $target $file) -PathType Leaf)) {
-              throw "Archive missing $file"
-            }
-          }
+          Write-Host "Standalone DLL compiles; this is NOT a playable release"
