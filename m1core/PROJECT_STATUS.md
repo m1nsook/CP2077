@@ -165,6 +165,14 @@ Only work on the m1core development branch and draft PR unless explicitly author
 - `core/src/common/ImGuiNotify.h` now supports an opt-in **per-toast** position. Bottom-right remains the default for other notifications, including other Lua mods or separately installed CET; the left/right toast stacks are independent. No changes to the Win32 input hooks or D3D12 rendering backend.
 - The Phosphor glyph falls back to the existing ASCII icon if the font is absent. Native CI compilation is required; the visual placement is **not yet in-game verified**. The user does not need to repeat prior game input/hotkey tests.
 
+## Breach Protocol built-in utility — native solver foundation (2026-11-21)
+
+- **User direction:** m1core can contain the previously planned **automatic Breach Protocol solver** for the owner's mods. The desired behavior is to open the existing vanilla puzzle, read its grid, buffer and daemon sequences, find a legal high-value route, and submit selections so Cyberpunk controls animations and rewards. There is no requirement to introduce CET or a second DLL.
+- **Added:** `core/src/scripting/BreachSolver.hpp/.cpp` — a standalone, bounded native matrix/sequence route planner. It searches first-row starting cells, alternating columns/rows without reusing cells, maximizes daemon priority/overlap, and returns the shortest equal-score route. It refuses malformed captures or unsupported large puzzles; valid puzzles with no route return **no selections**.
+- **CI regression:** `m1core_breach_solver_tests` validates known three-daemon overlapping paths, priorities, axis changes, no reuse, safe no-solution behavior and invalid captures using an independent route validator. Native source builds into the m1core.dll (under src/**.cpp); CI also compiles and executes its standalone tester.
+- **Not yet implemented:** identifying the active Cyberpunk 2.5 Breach Protocol UI/controller, reading its real grid/buffer/daemons, and safely submitting in-game selections. The solver does **not** currently auto-hack in game. Future adapter must preserve vanilla input handling, avoid touching overlay/title/menu input paths, and only act when a validated Breach Protocol minigame is active. No enlargement/redesign of accepted ImGui UI is included in this foundation.
+- **Scope:** dedicated internal utility, not a public m1script SDK or additional installation. Validate Windows CI before claiming compilation and then game integration separately.
+
 ## M6 — Registry durability and profile diagnostics (2026-11-21)
 
 - **In-progress native source/testing change; new Windows CI required:** m1core's private-use runtime continues on the public development branch for now, with the eventual plan to distribute the DLL publicly while keeping future source private. The owner explicitly intends **m1core for their own mods**, not as a public SDK. No GitHub visibility/license changes are being made in this patch.

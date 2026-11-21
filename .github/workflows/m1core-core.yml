@@ -205,6 +205,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Script extension tests did not compile" }
           xmake run -y m1core_script_formats_tests
           if ($LASTEXITCODE -ne 0) { throw "Script extension tests failed" }
+          xmake build -y -vD m1core_breach_solver_tests
+          if ($LASTEXITCODE -ne 0) { throw "Native breach solver tests did not compile" }
+          xmake run -y m1core_breach_solver_tests
+          if ($LASTEXITCODE -ne 0) { throw "Native breach solver tests failed" }
           xmake build -y -vD m1core_script_runtime_tests
           if ($LASTEXITCODE -ne 0) { throw "LuaJIT integration tests did not compile" }
           $fixture = (Resolve-Path -LiteralPath '../examples/lua-smoke').Path
