@@ -158,6 +158,12 @@ Only work on the m1core development branch and draft PR unless explicitly author
 - `core/src/common/ImGuiNotify.h` now supports an opt-in **per-toast** position. Bottom-right remains the default for other notifications, including other Lua mods or separately installed CET; the left/right toast stacks are independent. No changes to the Win32 input hooks or D3D12 rendering backend.
 - The Phosphor glyph falls back to the existing ASCII icon if the font is absent. Native CI compilation is required; the visual placement is **not yet in-game verified**. The user does not need to repeat prior game input/hotkey tests.
 
+### M5 CI queue status (after latest M5 code push)
+
+- **Current M5 source commit:** `b61005bd22b1df14a6eac991998bd3e19facf436` (discovery, callback handling, atomic queued reload).
+- **Native Windows CI:** [run #44951363754](https://github.com/m1nsook/CP2077/actions/runs/44951363754) was **pending** when this handoff was updated. Earlier M5 runs were cancelled by the workflow's `cancel-in-progress` concurrency rule. The older run #44951099779 was still in progress, and must not be presented as verification of final M5 code. Check the new run for compilation/tests before publishing a package.
+- **Latest known green independent game-root package remains** [run #44944819316](https://github.com/m1nsook/CP2077/actions/runs/44944819316) from the accepted UI baseline, not the new M5 patch.
+
 ## M5 continuation — fault-isolated script discovery (2026-11-21)
 
 - **User UI acceptance:** the square left sidebar, straight divider, rounded navigation/profile and AFTER.html-based native interface were approved in-game. Future work should focus on the remaining framework milestones, not redesign the accepted interface.
