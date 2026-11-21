@@ -233,10 +233,10 @@ public:
         switch (this->type)
         {
         case ToastType::None: return nullptr;
-        case ToastType::Success: return ICON_MD_CHECK_CIRCLE; // Font Awesome 6
-        case ToastType::Warning: return ICON_MD_ALERT;        // Font Awesome 6
-        case ToastType::Error: return ICON_MD_ALERT_DECAGRAM; // Font Awesome 6
-        case ToastType::Info: return ICON_MD_INFORMATION;     // Font Awesome 6
+        case ToastType::Success: return "OK"; // Font Awesome 6
+        case ToastType::Warning: return "!";        // Font Awesome 6
+        case ToastType::Error: return "ERROR"; // Font Awesome 6
+        case ToastType::Info: return "INFO";     // Font Awesome 6
         default: return nullptr;
         }
     }
@@ -573,7 +573,7 @@ inline void RenderNotifications()
                 SetCursorPosX(GetCursorPosX() + (GetWindowSize().x - GetCursorPosX()) * scale);
 
                 // If the button is pressed, we want to remove the notification
-                if (Button(ICON_MD_CLOSE_BOX))
+                if (Button("x"))
                 {
                     RemoveNotification(i);
                 }

@@ -165,9 +165,9 @@ bool Bindings::FirstTimeSetup()
 
     m_vm.BlockDraw(true);
 
-    ImGui::OpenPopup("CET First Time Setup");
+    ImGui::OpenPopup("m1core First Time Setup");
 
-    if (ImGui::BeginPopupModal("CET First Time Setup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    if (ImGui::BeginPopupModal("m1core First Time Setup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
         const auto shorterTextSz{ImGui::CalcTextSize("Combo can be composed from up to 4 keys.").x};
         const auto longerTextSz{ImGui::CalcTextSize("Please, bind some key combination for toggling overlay!").x};

@@ -63,12 +63,9 @@ void Scripting::Initialize()
     // as this could get overriden by LUA_PATH environment variable
     luaVm["package"]["path"] = "./?.lua";
 
-    // execute autoexec.lua inside our default script directory
-    const auto previousCurrentPath = std::filesystem::current_path();
-    current_path(m_paths.CETRoot() / "scripts");
-    luaVm.script("json = require 'json/json'", sol::detail::default_chunk_name(), sol::load_mode::text);
-    luaVm.script("IconGlyphs = require 'IconGlyphs/icons'", sol::detail::default_chunk_name(), sol::load_mode::text);
-    current_path(previousCurrentPath);
+    // The gifted CET source does not include its legacy IconGlyphs and
+    // json/json Lua resource scripts. Do not require missing assets.
+    // Native CET Lua/sol2 remains available for optional m1core scripts.
 
     // initialize sandbox
     m_sandbox.Initialize();

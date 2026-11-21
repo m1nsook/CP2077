@@ -58,9 +58,10 @@ Paths::Paths()
 
     m_gameRoot = m_exe.parent_path();
 
-    m_cetRoot = m_gameRoot;
-    m_cetRoot /= L"plugins";
-    m_cetRoot /= L"cyber_engine_tweaks";
+    // From bin/x64/Cyberpunk2077.exe, use the native RED4ext
+    // plugin directory. Never read/write an existing CET installation.
+    m_cetRoot = (m_gameRoot / L".." / L".." /
+                 L"red4ext" / L"plugins" / L"m1core").lexically_normal();
     create_directories(m_cetRoot);
 
     m_config = m_cetRoot / L"config.json";
@@ -80,6 +81,8 @@ Paths::Paths()
 
     m_modsRoot = m_cetRoot / L"mods";
     create_directories(m_modsRoot);
+    // The author package has no script resources or icon scripts.
+    create_directories(m_cetRoot / L"scripts");
 
     m_r6CacheModdedRoot = m_gameRoot;
     m_r6CacheModdedRoot /= L"..";
