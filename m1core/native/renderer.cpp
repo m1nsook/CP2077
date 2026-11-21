@@ -170,7 +170,7 @@ void Renderer::Present(const GameFrame& source) noexcept
     ImGui::NewFrame();
     DrawNativeSettingsUI();
     ImGui::Render();
-    const auto* draw = ImGui::GetDrawData();
+    auto* draw = ImGui::GetDrawData();
     if (!draw || draw->TotalVtxCount <= 0) return;
 
     if (FAILED(frame.allocator->Reset())) return;

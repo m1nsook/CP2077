@@ -71,4 +71,8 @@ if(BUILD_TESTING)
     add_executable(m1core_registry_tests tests/registry_tests.cpp)
     target_link_libraries(m1core_registry_tests PRIVATE m1core_registry)
     add_test(NAME m1core_registry_tests COMMAND m1core_registry_tests)
+
+    add_executable(m1core_input_policy_tests tests/input_policy_tests.cpp)
+    target_include_directories(m1core_input_policy_tests PRIVATE native)
+    add_test(NAME m1core_input_policy_tests COMMAND m1core_input_policy_tests)
 endif()
