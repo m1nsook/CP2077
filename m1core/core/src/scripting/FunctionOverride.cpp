@@ -140,7 +140,8 @@ bool FunctionOverride::HookRunPureScriptFunction(RED4ext::CClassFunction* apFunc
             // Returning false here aborts ordinary game script calls,
             // including possible main-menu service / cloud-sync calls.
             // Hand control back to the original engine interpreter.
-            lock.unlock(); // Do not execute game code under our shared lock.
+            // Do not execute game code while holding the shared mutex.
+            lock.unlock();
             return RealRunPureScriptFunction(apFunction, apStack, a3);
         }
 
