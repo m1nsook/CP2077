@@ -34,7 +34,16 @@ jobs:
         uses: xmake-io/github-action-setup-xmake@v1
         with:
           xmake-version: '3.1.2'
-      - name: Inspect native CET target and enforce license/asset restrictions
+      - name: Cache xmake Windows dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/AppData/Local/.xmake/packages
+            ~/AppData/Local/.xmake/cache
+          key: m1core-xmake-windows-x64-v1-${{ hashFiles('m1core/core/xmake.lua') }}
+          restore-keys: |
+            m1core-xmake-windows-x64-
+      - name: Inspect native core target and enforce license/asset restrictions
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -59,6 +68,10 @@ jobs:
           }
           if (Test-Path -LiteralPath "$root/src/dllmain.cpp") {
             throw "Legacy ASI loader must not be included in the m1core source"
+          }
+          $entry = Get-Content "$root/src/red4ext_plugin.cpp" -Raw
+          if ($entry -match 'GetPaths\(\)\.CETRoot\(') {
+            throw "RED4ext entry point must use renamed CoreRoot() accessor"
           }
           if (!(Test-Path "$root/vendor/RED4ext.SDK/include/RED4ext/RED4ext.hpp")) {
             throw "Pinned RED4ext SDK checkout failed"

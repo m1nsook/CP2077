@@ -61,7 +61,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(
         M1CoreRuntime::Initialize();
         // Keep the existing m1core native registry and REDscript API.
         // The M1CoreRuntime window/input/render system replaces only its old frontend.
-        m1core::Store().Configure(M1CoreRuntime::Get().GetPaths().CETRoot() / L"settings.json");
+        m1core::Store().Configure(M1CoreRuntime::Get().GetPaths().CoreRoot() / L"settings.json");
         m1core::RegisterNativeModAPI();
         g_initialized.store(true);
         Report(sdk,handle,"m1core: M1CoreRuntime-derived runtime and native registry initialized");
