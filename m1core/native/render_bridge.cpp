@@ -1,5 +1,6 @@
 #include "render_bridge.hpp"
 #include "renderer.hpp"
+#include "input.hpp"
 
 #include <d3d12.h>
 #include <dxgi1_5.h>
@@ -45,6 +46,34 @@ template<typename T>
     if (Readable(address,sizeof(T))) std::memcpy(&result,address,sizeof(T));
     return result;
 }
+
+[[nodiscard]] bool Executable(const void* address) noexcept
+{
+    MEMORY_BASIC_INFORMATION region{};
+    if (!address || VirtualQuery(address,&region,sizeof(region)) != sizeof(region) ||
+        region.State != MEM_COMMIT || (region.Protect & PAGE_GUARD) != 0)
+        return false;
+    switch (region.Protect & 0xFFu) {
+    case PAGE_EXECUTE:
+    case PAGE_EXECUTE_READ:
+    case PAGE_EXECUTE_READWRITE:
+    case PAGE_EXECUTE_WRITECOPY:
+        return true;
+    default:
+        return false;
+    }
+}
+
+[[nodiscard]] bool LikelyComInterface(const void* object) noexcept
+{
+    // Reject obviously stale renderer-layout pointers before invoking a
+    // COM method on game-owned memory. A changed game layout disables the
+    // overlay rather than blindly calling through an invalid vtable.
+    const void* vtable = Read<const void*>(object);
+    if (!vtable || !Readable(vtable,sizeof(void*)*8)) return false;
+    const void* firstMethod = Read<const void*>(vtable);
+    return Executable(firstMethod);
+}
 } // namespace
 
 std::uintptr_t ResolveGameSymbol(std::uint32_t hash) noexcept
@@ -69,7 +98,9 @@ GameFrame DiscoverGameFrame(std::int32_t deviceIndex) noexcept
     const auto swapchain = Read<IDXGISwapChain4*>(
         reinterpret_cast<const void*>(context+kDeviceBase+
             (static_cast<std::size_t>(deviceIndex-1)*kDeviceStride)));
-    if (!queue || !swapchain) return frame;
+    if (!queue || !swapchain ||
+        !LikelyComInterface(queue) || !LikelyComInterface(swapchain))
+        return frame;
 
     // The game, not our plugin, controls the DX12 output. Check its HWND and
     // device identity before the renderer ever reads a backbuffer.
@@ -126,6 +157,7 @@ bool RenderBridge::Install(RED4ext::v1::PluginHandle handle,
 void RenderBridge::Uninstall() noexcept
 {
     Renderer::Get().Shutdown();
+    InputRouter::Get().Uninstall();
     if (sdk_ && sdk_->hooking && sdk_->hooking->Detach) {
         if (shutdownAddress_ && originalShutdown_)
             sdk_->hooking->Detach(handle_,shutdownAddress_);
@@ -149,8 +181,14 @@ void* RenderBridge::OnPresent(std::int32_t* deviceIndex,
     auto& bridge = Get();
     if (deviceIndex && bridge.originalPresent_) {
         const auto frame = DiscoverGameFrame(*deviceIndex);
-        if (frame.window && GetForegroundWindow() == frame.window)
-            Renderer::Get().Present(frame);
+        if (frame.window) {
+            // A passive HWND listener doesn't create an ImGui context,
+            // allocate a GPU resource, or capture any startup input.
+            if (InputRouter::Get().Install(frame.window) &&
+                GetForegroundWindow() == frame.window &&
+                InputRouter::Get().ShouldDraw())
+                Renderer::Get().Present(frame);
+        }
     }
     return bridge.originalPresent_ ?
         bridge.originalPresent_(deviceIndex,sync,interval) : nullptr;
@@ -161,6 +199,7 @@ void* RenderBridge::OnResize(std::uint32_t width,std::uint32_t height,
                              std::int32_t* deviceIndex)
 {
     auto& bridge = Get();
+    InputRouter::Get().Close(); // Never capture while swapchain is unavailable.
     Renderer::Get().Reset();
     return bridge.originalResize_ ?
         bridge.originalResize_(width,height,other,mode,deviceIndex) : nullptr;
@@ -171,6 +210,7 @@ void* RenderBridge::OnShutdown(std::uint64_t a,std::uint64_t b,
 {
     auto& bridge = Get();
     Renderer::Get().Shutdown();
+    InputRouter::Get().Uninstall();
     return bridge.originalShutdown_ ?
         bridge.originalShutdown_(a,b,c,d) : nullptr;
 }

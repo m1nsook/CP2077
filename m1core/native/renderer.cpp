@@ -130,7 +130,7 @@ bool Renderer::Initialize(const GameFrame& source) noexcept
     if (!ImGui_ImplDX12_Init(&init)) { Release(); return false; }
     imguiDx12_ = true;
 
-    if (!InputRouter::Get().Install(gameWindow_)) {
+    if (!InputRouter::Get().Ready()) {
         Release();
         return false;
     }
@@ -222,7 +222,9 @@ bool Renderer::FlushGpu() noexcept
 
 void Renderer::Release() noexcept
 {
-    InputRouter::Get().Uninstall();
+    // The passive input listener survives a resize, allowing user hotkeys
+    // to work after device reinitialization without hooking the HWND again.
+    // The bridge uninstalls it on actual game/plugin shutdown.
     // The renderer must not release an in-flight allocator when GPU work
     // still references it. Game resize/shutdown normally drains the queue;
     // a bounded wait prevents a permanent process hang if it does not.

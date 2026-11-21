@@ -120,7 +120,19 @@ void InputRouter::Uninstall() noexcept
     setup_.store(false);
     recording_.store(false);
     focused_.store(false);
-    ApplyEngineCursor(window_);
+    if (IsWindow(window_) && engineCursorHeld_) {
+        const DWORD ownerThread = GetWindowThreadProcessId(window_,nullptr);
+        if (ownerThread == GetCurrentThreadId()) {
+            ApplyEngineCursor(window_);
+        } else {
+            // Don't invoke a game cursor API from the renderer thread.
+            // Deliver release on the actual game HWND thread, bounded so
+            // shutdown can never hang if the game window is unresponsive.
+            DWORD_PTR result{};
+            SendMessageTimeoutW(window_,kCursorSyncMessage,0,0,
+                SMTO_ABORTIFHUNG | SMTO_BLOCK,250,&result);
+        }
+    }
     if (IsWindow(window_) && previous_ &&
         reinterpret_cast<WNDPROC>(GetWindowLongPtrW(window_,GWLP_WNDPROC)) ==
         &WindowProc)
@@ -251,6 +263,17 @@ LRESULT InputRouter::Dispatch(HWND hwnd,UINT message,
         Close();
         PostMessageW(hwnd,WM_CLOSE,0,0);
         return next();
+    }
+
+    // The player-chosen toggle must not accidentally trigger a vanilla
+    // game action on keydown while we consume the matching keyup.
+    if (message==WM_KEYDOWN || message==WM_SYSKEYDOWN) {
+        if (!recording_.load() && hotkey_.load()!=0 &&
+            static_cast<int>(wp)==hotkey_.load() &&
+            (GetKeyState(VK_MENU)&0x8000)==0 &&
+            (GetKeyState(VK_CONTROL)&0x8000)==0 &&
+            (GetKeyState(VK_SHIFT)&0x8000)==0)
+            return 1;
     }
 
     if (message==WM_KEYUP || message==WM_SYSKEYUP) {
