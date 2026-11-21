@@ -96,7 +96,17 @@ jobs:
               $uiColors -notmatch '0.65f, 0.20f') {
             throw "m1core title/amber warning style regression"
           }
-          # AFTER.html redesign must use stock ImGui state and preserve the
+          # The screenshots exposed unpadded borderless children and
+          # centered nav buttons; keep those geometry fixes covered.
+          $palette = Get-Content "$root/src/overlay/FontPalette.h" -Raw
+          if ($gui -notmatch 'ImGuiChildFlags_AlwaysUseWindowPadding' -or
+              $gui -notmatch 'ImGui::Selectable\("##sidebar-nav"' -or
+              $gui -notmatch '##active-profile-card' -or
+              $gui -notmatch 'KarlaPageTitle' -or
+              $palette -notmatch 'SetKarlaLayoutFonts') {
+            throw "AFTER.html layout padding or typography regression"
+          }
+                    # AFTER.html redesign must use stock ImGui state and preserve the
           # existing backend rather than reintroducing web-rendered widgets.
           $layout = Get-Content "$root/src/m1core_registry_ui.cpp" -Raw
           if ($layout -notmatch '##app-sidebar' -or
@@ -131,7 +141,7 @@ jobs:
           # abandoned fake child bar from earlier builds.
           if ($gui -match 'ImGui::SmallButton\("Reset"\)' -or
               $gui -match '##m1core-titlebar' -or
-              $gui -notmatch 'ImGui::Button\("Reset", ImVec2\(-FLT_MIN' -or
+              $gui -notmatch 'M1CORE_ICON_RESET' -or
               $gui -notmatch '##app-titlebar') {
             throw "AFTER.html must preserve normal-sized controls and coherent title bar"
           }
