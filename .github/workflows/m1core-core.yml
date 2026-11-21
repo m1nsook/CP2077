@@ -95,6 +95,21 @@ jobs:
               $uiColors -notmatch '0.65f, 0.20f') {
             throw "m1core title/amber warning style regression"
           }
+          # AFTER.html redesign must use stock ImGui state and preserve the
+          # existing backend rather than reintroducing web-rendered widgets.
+          $layout = Get-Content "$root/src/m1core_registry_ui.cpp" -Raw
+          if ($layout -notmatch '##app-sidebar' -or
+              $layout -notmatch '##app-page-header' -or
+              $layout -notmatch '##app-page-body' -or
+              $layout -notmatch 'DrawSettingsFor' -or
+              $layout -notmatch 'DrawKeybindsPage' -or
+              $layout -notmatch 'GetAllBinds\(' -or
+              $layout -notmatch 'Settings\(\)\.Set' -or
+              $layout -notmatch 'ImGui::Checkbox' -or
+              $layout -notmatch 'ImGui::SliderInt' -or
+              $layout -notmatch 'ImGui::BeginCombo') {
+            throw "Native AFTER.html ImGui layout or persistent controls missing"
+          }
           # UI and typography regression: Karla's four official weights are
           # loaded separately; the existing Lua keybind editor remains in
           # charge of capture, conflicts and persistence.
@@ -110,14 +125,14 @@ jobs:
               $keybindUi -notmatch 'Configure keybinds') {
             throw "Karla weights and mod-specific keybind management must remain available"
           }
-          # UI sizing regression: all settings actions must use the
-          # same normal-height Dear ImGui Button as the Logs controls.
-          # The former fake title child caused window layout regressions.
+          # The approved AFTER.html redesign intentionally uses a single
+          # custom title drag header and native ImGui controls, not the
+          # abandoned fake child bar from earlier builds.
           if ($gui -match 'ImGui::SmallButton\("Reset"\)' -or
               $gui -match '##m1core-titlebar' -or
               $gui -notmatch 'ImGui::Button\("Reset", ImVec2\(-FLT_MIN' -or
-              $gui -notmatch 'ImGui::Begin\("M1CORE - MOD SETTINGS", &open') {
-            throw "Settings controls must use regular ImGui buttons and native window title"
+              $gui -notmatch '##app-titlebar') {
+            throw "AFTER.html must preserve normal-sized controls and coherent title bar"
           }
           # Regression guard: native game functions outside the override
           # registry MUST pass through to the original script interpreter.

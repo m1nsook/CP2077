@@ -1,6 +1,7 @@
-// m1core standard Dear ImGui settings frontend on yamashi's native M1CoreRuntime-derived backend.
-// Preserves the original m1core registry and profile API; M1CoreRuntime owns keyboard,
-// mouse, focus, D3D12 and hotkey lifecycle. No duplicate input hooks.
+// m1core native RED4ext settings frontend using the user's AFTER.html layout.
+// ImGui remains responsible for controls, keyboard focus, mouse and mod state;
+// only the small title drag region uses the standard ImDrawList text primitive.
+// No web view, CET runtime dependency or duplicate input hooks.
 #include <stdafx.h>
 #include "m1core_registry_ui.hpp"
 #include "registry.hpp"
@@ -33,6 +34,20 @@ std::string notice;
 std::string logSnapshot;
 int logSource = 0;
 bool logLoaded = false;
+char keybindSearch[128]{};
+std::string selectedKeybindMod = "m1core";
+std::string activeProfile = "default";
+enum class Page { Settings, Keybinds, Profiles, Logs, About };
+Page currentPage = Page::Settings;
+
+ImVec4 Color(int r, int g, int b, float a = 1.0f)
+{
+    return ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, a);
+}
+constexpr float kNavWidth = 240.0f;
+constexpr float kTitleHeight = 48.0f;
+constexpr float kPageHeaderHeight = 74.0f;
+
 
 std::string ReadLogTail(const std::filesystem::path& file)
 {
@@ -270,123 +285,191 @@ void DrawSettingsFor(const ModView& mod)
     }
 }
 
+
 void DrawSettingsPage()
 {
-    ImGui::SetNextItemWidth(320);
-    ImGui::InputTextWithHint("##search", m1core::HasIcons() ? M1CORE_ICON_SEARCH " Search mods or settings..." : "Search mods or settings...",
-                             search, sizeof(search));
-    // Autosave remains active, but the long status message does not
-    // belong on the same line as the search control.
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::InputTextWithHint("##settings-search",
+        m1core::HasIcons() ? M1CORE_ICON_SEARCH "  Search mods or settings..." :
+                             "Search mods or settings...", search, sizeof(search));
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-        ImGui::SetTooltip("Changes save automatically to m1core/settings.json.");
-    ImGui::Separator();
+        ImGui::SetTooltip("Values save automatically to m1core/settings.json.");
+    ImGui::Spacing();
 
     const auto mods = Settings().Snapshot();
-    if (selectedMod.empty() && !mods.empty()) selectedMod = mods.front().id;
+    if (selectedMod.empty() && !mods.empty())
+        selectedMod = mods.front().id;
+    const float remainingWidth = ImGui::GetContentRegionAvail().x;
+    const float modListWidth = std::min(240.0f, std::max(170.0f, remainingWidth * 0.29f));
 
-    const float available = ImGui::GetContentRegionAvail().x;
-    const float sidebarWidth = available >= 600.0f ? 220.0f :
-                               std::max(140.0f, available * 0.30f);
-    if (ImGui::BeginChild("Registered mods", ImVec2(sidebarWidth, 0),
-                          ImGuiChildFlags_Borders)) {
-        if (auto* font = m1core::KarlaMedium()) ImGui::PushFont(font);
-        ImGui::TextDisabled("Registered mods (%zu)", mods.size());
-        if (m1core::KarlaMedium()) ImGui::PopFont();
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, Color(30,31,35));
+    if (ImGui::BeginChild("##settings-mod-list", ImVec2(modListWidth,0),
+                          ImGuiChildFlags_Borders))
+    {
+        if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
+        ImGui::TextDisabled("REGISTERED MODS (%zu)", mods.size());
+        if (m1core::KarlaSemiBold()) ImGui::PopFont();
         ImGui::Separator();
-        for (const auto& mod : mods) {
+        bool anyVisible = false;
+        for (const auto& mod : mods)
+        {
             if (!Matches(mod, search)) continue;
-            if (ImGui::Selectable(mod.title.c_str(), selectedMod == mod.id)) {
+            anyVisible = true;
+            ImGui::PushID(mod.id.c_str());
+            if (ImGui::Selectable(mod.title.c_str(), selectedMod == mod.id))
+            {
                 selectedMod = mod.id;
                 confirmModReset = false;
             }
+            ImGui::PopID();
         }
+        if (!anyVisible)
+            ImGui::TextDisabled("No matching mods");
     }
     ImGui::EndChild();
-    ImGui::SameLine();
-    if (ImGui::BeginChild("Mod settings", ImVec2(0, 0),
-                          ImGuiChildFlags_Borders)) {
-        const auto found = std::find_if(mods.begin(), mods.end(),
-            [](const ModView& mod) { return mod.id == selectedMod; });
-        if (found != mods.end()) DrawSettingsFor(*found);
-        else ImGui::TextDisabled("Select a mod on the left.");
+    ImGui::PopStyleColor();
+
+    ImGui::SameLine(0.0f, 12.0f);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, Color(30,31,35));
+    if (ImGui::BeginChild("##settings-detail", ImVec2(0,0),
+                          ImGuiChildFlags_Borders))
+    {
+        const auto selected = std::find_if(mods.begin(), mods.end(),
+            [](const ModView& m) { return m.id == selectedMod; });
+        if (selected != mods.end() && Matches(*selected, search))
+            DrawSettingsFor(*selected);
+        else
+            ImGui::TextDisabled("Select a mod to edit its settings.");
     }
     ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
+
 
 
 void DrawKeybindsPage()
 {
     auto& runtime = M1CoreRuntime::Get();
     const auto& bindings = runtime.GetBindings();
+    const auto& registered = runtime.GetVM().GetAllBinds();
 
-    if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
-    ImGui::TextUnformatted("M1CORE SHORTCUT");
-    if (m1core::KarlaSemiBold()) ImGui::PopFont();
-    const auto key = bindings.GetBindString(Bindings::GetOverlayToggleModBind());
-    ImGui::Text("Toggle overlay: %s", key.empty() ? "Not assigned" : key.c_str());
-    if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_EDIT " Configure keybinds" : "Configure keybinds"))
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::InputTextWithHint("##keybind-search",
+        m1core::HasIcons() ? M1CORE_ICON_SEARCH "  Search mods or keybinds..." :
+                             "Search mods or keybinds...", keybindSearch, sizeof(keybindSearch));
+    ImGui::Spacing();
+
+    std::vector<std::string> visibleMods;
+    if (ContainsIgnoreCase("m1core", keybindSearch) ||
+        ContainsIgnoreCase("Toggle Menu", keybindSearch))
+        visibleMods.emplace_back("m1core");
+    for (const auto& [id, modBinds] : registered)
     {
-        // Reuse the proven mod-aware binding editor and raw input recorder;
-        // it handles all ScriptContext registeredHotkey/registerInput
-        // entries, collision checks and persisted bindings.json.
-        runtime.GetOverlay().GetBindings().Toggle();
+        bool matched = ContainsIgnoreCase(id, keybindSearch);
+        for (const auto& bind : modBinds.get())
+            matched = matched || ContainsIgnoreCase(bind.DisplayName, keybindSearch);
+        if (matched && !modBinds.get().empty() && id != "m1core")
+            visibleMods.push_back(id);
     }
-    ImGui::SameLine();
-    ImGui::TextDisabled("Edit m1core and mod shortcuts");
+    std::sort(visibleMods.begin(), visibleMods.end());
+    const float avail = ImGui::GetContentRegionAvail().x;
+    const float panelWidth = std::min(240.0f, std::max(170.0f, avail * 0.29f));
+    if (selectedKeybindMod.empty() || std::find(visibleMods.begin(), visibleMods.end(),
+                                                selectedKeybindMod) == visibleMods.end())
+        selectedKeybindMod = visibleMods.empty() ? "" : visibleMods.front();
 
-    ImGui::SeparatorText("REGISTERED MOD KEYBINDS");
-    const auto& modBinds = runtime.GetVM().GetAllBinds();
-    size_t modCount = 0;
-    size_t bindingCount = 0;
-    for (const auto& [name, binds] : modBinds)
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, Color(30,31,35));
+    if (ImGui::BeginChild("##keybind-mod-list", ImVec2(panelWidth,0),
+                          ImGuiChildFlags_Borders))
     {
-        if (!binds.get().empty())
+        if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
+        ImGui::TextDisabled("REGISTERED MODS (%zu)", visibleMods.size());
+        if (m1core::KarlaSemiBold()) ImGui::PopFont();
+        ImGui::Separator();
+        for (const auto& modId : visibleMods)
         {
-            ++modCount;
-            bindingCount += binds.get().size();
+            if (ImGui::Selectable(modId == "m1core" ? "M1CORE" : modId.c_str(),
+                                  selectedKeybindMod == modId))
+                selectedKeybindMod = modId;
         }
+        if (visibleMods.empty()) ImGui::TextDisabled("No matching mods");
     }
-    if (bindingCount == 0)
-    {
-        ImGui::TextDisabled("No installed Lua mods have registered hotkeys or inputs.");
-        ImGui::TextWrapped("Mods can register their own actions with registerHotkey() or registerInput().");
-        return;
-    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
 
-    ImGui::TextDisabled("%zu mod(s), %zu registered binding(s)", modCount, bindingCount);
-    const ImGuiTableFlags flags =
-        ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg |
-        ImGuiTableFlags_SizingStretchProp;
-    if (ImGui::BeginTable("##mod-keybindings", 3, flags))
+    ImGui::SameLine(0,12);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, Color(30,31,35));
+    if (ImGui::BeginChild("##keybind-detail", ImVec2(0,0),
+                          ImGuiChildFlags_Borders))
     {
-        ImGui::TableSetupColumn("Mod / action", ImGuiTableColumnFlags_WidthStretch, 0.48f);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 75.0f);
-        ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthStretch, 0.34f);
-        ImGui::TableHeadersRow();
-        for (const auto& [modId, binds] : modBinds)
+        if (selectedKeybindMod.empty())
+            ImGui::TextDisabled("No keybinds match your search.");
+        else
         {
-            for (const auto& bind : binds.get())
+            if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
+            ImGui::TextUnformatted(selectedKeybindMod == "m1core" ?
+                                   "M1CORE" : selectedKeybindMod.c_str());
+            if (m1core::KarlaSemiBold()) ImGui::PopFont();
+            ImGui::SameLine();
+            const float buttonWidth = 178.0f;
+            const float right = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
+            ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(),right-buttonWidth));
+            if (ImGui::Button("Configure keybinds", ImVec2(buttonWidth,0)))
+                runtime.GetOverlay().GetBindings().Toggle();
+            ImGui::Separator();
+            const ImGuiTableFlags flags =
+                ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg |
+                ImGuiTableFlags_SizingStretchProp;
+            if (ImGui::BeginTable("##keybind-actions",2,flags))
             {
-                ImGui::PushID(modId.c_str());
-                ImGui::PushID(bind.ID.c_str());
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-                if (auto* font = m1core::KarlaMedium()) ImGui::PushFont(font);
-                ImGui::TextUnformatted(bind.DisplayName.c_str());
-                if (m1core::KarlaMedium()) ImGui::PopFont();
-                ImGui::TextDisabled("%s", modId.c_str());
-                ImGui::TableSetColumnIndex(1);
-                ImGui::TextUnformatted(bind.IsHotkey() ? "Hotkey" : "Input");
-                ImGui::TableSetColumnIndex(2);
-                const auto shortcut = bindings.GetBindString({modId, bind.ID});
-                ImGui::TextUnformatted(shortcut.c_str());
-                ImGui::PopID();
-                ImGui::PopID();
+                ImGui::TableSetupColumn("ACTION",ImGuiTableColumnFlags_WidthStretch,0.70f);
+                ImGui::TableSetupColumn("KEYBIND",ImGuiTableColumnFlags_WidthStretch,0.30f);
+                ImGui::TableHeadersRow();
+                if (selectedKeybindMod == "m1core")
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted("Toggle Menu");
+                    ImGui::TextDisabled("Opens and closes the M1CORE overlay");
+                    ImGui::TableSetColumnIndex(1);
+                    const auto shortcut = bindings.GetBindString(Bindings::GetOverlayToggleModBind());
+                    if (ImGui::Button(shortcut.c_str(),ImVec2(-FLT_MIN,0)))
+                        runtime.GetOverlay().GetBindings().Toggle();
+                }
+                else
+                {
+                    auto it = registered.find(selectedKeybindMod);
+                    if (it != registered.end())
+                    {
+                        for (const auto& bind : it->second.get())
+                        {
+                            if (!ContainsIgnoreCase(selectedKeybindMod,keybindSearch) &&
+                                !ContainsIgnoreCase(bind.DisplayName,keybindSearch))
+                                continue;
+                            ImGui::PushID(bind.ID.c_str());
+                            ImGui::TableNextRow();
+                            ImGui::TableSetColumnIndex(0);
+                            ImGui::TextUnformatted(bind.DisplayName.c_str());
+                            if (bind.HasSimpleDescription())
+                                ImGui::TextDisabled("%s",std::get<std::string>(bind.Description).c_str());
+                            ImGui::TableSetColumnIndex(1);
+                            const auto key = bindings.GetBindString({selectedKeybindMod,bind.ID});
+                            if (ImGui::Button(key.c_str(),ImVec2(-FLT_MIN,0)))
+                                runtime.GetOverlay().GetBindings().Toggle();
+                            ImGui::PopID();
+                        }
+                    }
+                }
+                ImGui::EndTable();
             }
+            ImGui::Spacing();
+            ImGui::TextDisabled("Select a keybind to open the native recorder. Esc cancels.");
         }
-        ImGui::EndTable();
     }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
+
 
 void DrawProfilesPage()
 {
@@ -403,19 +486,27 @@ void DrawProfilesPage()
             notice = "Profile saved.";
         } else notice = "Could not save profile.";
     }
-    ImGui::Separator();
-    for (const auto& name : Settings().Profiles()) {
-        if (ImGui::Selectable(name.c_str(), selectedProfile == name))
-            selectedProfile = name;
+    ImGui::Spacing();
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, Color(30,31,35));
+    if (ImGui::BeginChild("##profile-list", ImVec2(0,220),ImGuiChildFlags_Borders)) {
+        for (const auto& name : Settings().Profiles()) {
+            if (ImGui::Selectable(name.c_str(), selectedProfile == name))
+                selectedProfile = name;
+        }
     }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
     if (!selectedProfile.empty()) {
         if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_REFRESH " Load selected" : "Load selected")) {
-            notice = Settings().LoadProfile(selectedProfile) ?
-                     "Profile loaded." : "Could not load profile.";
+            if (Settings().LoadProfile(selectedProfile)) {
+                activeProfile = selectedProfile;
+                notice = "Profile loaded.";
+            } else notice = "Could not load profile.";
         }
         ImGui::SameLine();
         if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_DELETE " Delete selected" : "Delete selected")) {
             if (Settings().DeleteProfile(selectedProfile)) {
+                if (activeProfile == selectedProfile) activeProfile = "default";
                 selectedProfile.clear();
                 notice = "Profile deleted.";
             } else notice = "Could not delete profile.";
@@ -427,79 +518,243 @@ void DrawProfilesPage()
 void DrawAboutPage()
 {
     if (auto* font = m1core::KarlaBold()) ImGui::PushFont(font);
-    ImGui::TextUnformatted("m1core");
+    ImGui::TextUnformatted("M1CORE");
     if (m1core::KarlaBold()) ImGui::PopFont();
     ImGui::Separator();
     ImGui::TextWrapped("Native RED4ext mod settings framework.");
     ImGui::TextWrapped("Settings, keybindings and profiles with Dear ImGui.");
     ImGui::TextWrapped("Native RED4ext DLL. No additional overlay installation required.");
 }
+
+const char* PageTitle(Page p)
+{
+    switch (p) {
+    case Page::Settings: return "Settings";
+    case Page::Keybinds: return "Keybinds";
+    case Page::Profiles: return "Profiles";
+    case Page::Logs: return "System Logs";
+    case Page::About: return "About M1CORE";
+    }
+    return "Settings";
+}
+
+const char* PageDescription(Page p)
+{
+    switch (p) {
+    case Page::Settings: return "Manage mod settings and configurations.";
+    case Page::Keybinds: return "Configure shortcuts and hotkeys for each mod.";
+    case Page::Profiles: return "Save and load your settings configurations.";
+    case Page::Logs: return "View real-time output from m1core.";
+    case Page::About: return "Information about the framework.";
+    }
+    return "";
+}
+
+void SidebarNav(const char* icon, const char* title, Page target)
+{
+    ImGui::PushID(static_cast<int>(target));
+    const bool active = currentPage == target;
+    ImGui::PushStyleColor(ImGuiCol_Button, active ? Color(38,56,86) : Color(24,25,28));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,Color(42,44,49));
+    ImGui::PushStyleColor(ImGuiCol_Text,active ? Color(96,165,250) : Color(148,163,184));
+    const std::string label = (m1core::HasIcons() ? std::string(icon)+"  " : "") + title;
+    if (ImGui::Button(label.c_str(),ImVec2(-FLT_MIN,36.0f)))
+        currentPage = target;
+    ImGui::PopStyleColor(3);
+    ImGui::PopID();
+}
+
+void DrawSidebar()
+{
+    if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
+    ImGui::TextDisabled("CONFIGURATION");
+    if (m1core::KarlaSemiBold()) ImGui::PopFont();
+    SidebarNav(M1CORE_ICON_SETTINGS,"Settings",Page::Settings);
+    SidebarNav(M1CORE_ICON_KEYBINDS,"Keybinds",Page::Keybinds);
+    SidebarNav(M1CORE_ICON_PROFILES,"Profiles",Page::Profiles);
+    ImGui::Dummy(ImVec2(0,18));
+    if (auto* font = m1core::KarlaSemiBold()) ImGui::PushFont(font);
+    ImGui::TextDisabled("SYSTEM");
+    if (m1core::KarlaSemiBold()) ImGui::PopFont();
+    SidebarNav(M1CORE_ICON_LOGS,"Logs",Page::Logs);
+    SidebarNav(M1CORE_ICON_ABOUT,"About",Page::About);
+
+    // The profile selector follows the HTML layout by staying at the
+    // bottom of the sidebar. It navigates to Profiles; it does not silently
+    // load a profile or overwrite persistent settings.
+    const float desiredY = ImGui::GetWindowHeight()-104.0f;
+    if (ImGui::GetCursorPosY() < desiredY)
+        ImGui::SetCursorPosY(desiredY);
+    ImGui::Separator();
+    ImGui::TextDisabled("ACTIVE PROFILE");
+    ImGui::PushStyleColor(ImGuiCol_Button,Color(30,31,35));
+    std::string profileLabel = activeProfile + "  " +
+        (m1core::HasIcons() ? M1CORE_ICON_CARET : "v");
+    if (ImGui::Button(profileLabel.c_str(),ImVec2(-FLT_MIN,32)))
+        currentPage = Page::Profiles;
+    ImGui::PopStyleColor();
+}
+
+void DrawPageHeader()
+{
+    if (auto* font = m1core::KarlaBold()) ImGui::PushFont(font);
+    ImGui::TextUnformatted(PageTitle(currentPage));
+    if (m1core::KarlaBold()) ImGui::PopFont();
+    ImGui::TextDisabled("%s",PageDescription(currentPage));
+}
+
+void DrawPageBody()
+{
+    if (!Store().Ready())
+    {
+        const auto error = Store().LastError();
+        ImGui::TextColored(m1core::ui::WarningText(),
+            "Settings unavailable: %s",error.empty() ? "Store not initialized" : error.c_str());
+    }
+    else if (const auto error = Settings().LastError(); !error.empty())
+        ImGui::TextColored(m1core::ui::WarningText(),"Save failed: %s",error.c_str());
+    if (!notice.empty())
+        ImGui::TextColored(m1core::ui::WarningText(),"%s",notice.c_str());
+
+    switch (currentPage)
+    {
+    case Page::Settings: DrawSettingsPage(); break;
+    case Page::Keybinds: DrawKeybindsPage(); break;
+    case Page::Profiles: DrawProfilesPage(); break;
+    case Page::Logs: DrawLogsPage(); break;
+    case Page::About: DrawAboutPage(); break;
+    }
+}
+
 } // namespace
 
 void DrawNativeRegistryUI()
 {
     const auto* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_FirstUseEver,
-                            ImVec2(0.5f,0.5f));
-    ImGui::SetNextWindowSize(ImVec2(940,600), ImGuiCond_FirstUseEver);
-    bool open = true;
-    // Stock Dear ImGui title bar + close button. No fake child title bar
-    // and no hand-built X. Keep the user's light title colors and uppercase.
-    // Compact only this title's vertical padding; controls inside the
-    // window continue to use the user's normal FramePadding.
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
-        ImVec2(ImGui::GetStyle().FramePadding.x, 4.0f));
-    ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.91f, 0.92f, 0.94f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.97f, 0.98f, 0.99f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImVec4(0.91f, 0.92f, 0.94f, 0.95f));
-    ImGui::PushStyleColor(ImGuiCol_Text, m1core::ui::TitleText());
-    const bool visible = ImGui::Begin("M1CORE - MOD SETTINGS", &open,
-                                     ImGuiWindowFlags_NoCollapse);
-    ImGui::PopStyleColor(4);
-    ImGui::PopStyleVar();
-    if (visible) {
-        if (!Store().Ready()) {
-            const auto error = Store().LastError();
-            ImGui::TextColored(m1core::ui::WarningText(),
-                "Settings cannot be saved: %s", error.empty() ? "store not initialized" : error.c_str());
-        } else {
-            const auto error = Settings().LastError();
-            if (!error.empty())
-                ImGui::TextColored(m1core::ui::WarningText(), "Save failed: %s", error.c_str());
+    ImGui::SetNextWindowPos(viewport->GetCenter(),ImGuiCond_FirstUseEver,ImVec2(0.5f,0.5f));
+    ImGui::SetNextWindowSize(ImVec2(1150,680),ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(760,490),viewport->Size);
+
+    // All AFTER.html-inspired colors/spacing are scoped to this one
+    // m1core window. Do not alter the user's native input layer,
+    // other ImGui windows or third-party mod windows.
+    int colors = 0;
+    const auto color = [&](ImGuiCol idx, ImVec4 value) {
+        ImGui::PushStyleColor(idx,value);
+        ++colors;
+    };
+    color(ImGuiCol_WindowBg,Color(17,18,20));
+    color(ImGuiCol_ChildBg,Color(17,18,20));
+    color(ImGuiCol_Text,Color(248,250,252));
+    color(ImGuiCol_TextDisabled,Color(148,163,184));
+    color(ImGuiCol_Border,Color(42,44,49));
+    color(ImGuiCol_Separator,Color(42,44,49));
+    color(ImGuiCol_Button,Color(42,44,49));
+    color(ImGuiCol_ButtonHovered,Color(63,66,74));
+    color(ImGuiCol_ButtonActive,Color(38,56,86));
+    color(ImGuiCol_Header,Color(38,56,86));
+    color(ImGuiCol_HeaderHovered,Color(42,44,49));
+    color(ImGuiCol_HeaderActive,Color(38,56,86));
+    color(ImGuiCol_FrameBg,Color(12,13,15));
+    color(ImGuiCol_FrameBgHovered,Color(42,44,49));
+    color(ImGuiCol_FrameBgActive,Color(42,44,49));
+    color(ImGuiCol_CheckMark,Color(59,130,246));
+    color(ImGuiCol_SliderGrab,Color(59,130,246));
+    color(ImGuiCol_SliderGrabActive,Color(96,165,250));
+    color(ImGuiCol_PopupBg,Color(30,31,35));
+    color(ImGuiCol_TableHeaderBg,Color(30,31,35));
+    color(ImGuiCol_TableRowBgAlt,Color(42,44,49,0.18f));
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,12.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding,8.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,6.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(10,7));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(9,9));
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding,ImVec2(8,6));
+
+    bool hideOverlay = false;
+    const bool visible = ImGui::Begin("M1CORE##native-overlay",nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+    if (visible)
+    {
+        const ImVec2 windowPos = ImGui::GetWindowPos();
+        bool draggingTitle = false;
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(8,8));
+        if (ImGui::BeginChild("##app-titlebar",ImVec2(0,kTitleHeight),
+                ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar))
+        {
+            const float dragWidth = std::max(100.0f,ImGui::GetContentRegionAvail().x-84.0f);
+            ImGui::InvisibleButton("##move-m1core",ImVec2(dragWidth,32.0f));
+            draggingTitle = ImGui::IsItemActive() &&
+                            ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+            const ImVec2 top = ImGui::GetItemRectMin();
+            auto* draw = ImGui::GetWindowDrawList();
+            if (m1core::HasIcons())
+                draw->AddText(ImVec2(top.x+7,top.y+8),IM_COL32(59,130,246,255),M1CORE_ICON_CUBE);
+            draw->AddText(ImVec2(top.x+(m1core::HasIcons()?34.0f:7.0f),top.y+8),
+                          IM_COL32(248,250,252,255),"M1CORE");
+            ImGui::SameLine(0,5);
+            if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_MINUS "##minimize" : "-##minimize",
+                              ImVec2(32,32)))
+                hideOverlay = true;
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                ImGui::SetTooltip("Hide m1core overlay");
+            ImGui::SameLine(0,4);
+            if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_CLOSE "##close" : "X##close",
+                              ImVec2(32,32)))
+                hideOverlay = true;
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                ImGui::SetTooltip("Close m1core overlay");
         }
-        if (!notice.empty())
-            ImGui::TextColored(m1core::ui::WarningText(), "%s", notice.c_str());
-        // Standard tabs, with the same vertical frame padding used by
-        // regular ImGui::Button() on the Logs page.
-        const auto framePadding = ImGui::GetStyle().FramePadding;
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
-                            ImVec2(framePadding.x + 3.0f, framePadding.y));
-        if (ImGui::BeginTabBar("m1core-tabs")) {
-            if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_SETTINGS "  Settings" : "Settings")) {
-                DrawSettingsPage();
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_KEYBINDS "  Keybinds" : "Keybinds")) {
-                DrawKeybindsPage();
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_PROFILES "  Profiles" : "Profiles")) {
-                DrawProfilesPage();
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_LOGS "  Logs" : "Logs")) {
-                DrawLogsPage();
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem(m1core::HasIcons() ? M1CORE_ICON_ABOUT "  About" : "About")) {
-                DrawAboutPage();
-                ImGui::EndTabItem();
-            }
-            ImGui::EndTabBar();
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+        if (draggingTitle)
+        {
+            const auto delta = ImGui::GetIO().MouseDelta;
+            ImGui::SetWindowPos(ImVec2(windowPos.x+delta.x,windowPos.y+delta.y));
         }
+        ImGui::Separator();
+
+        // Two children form the 240px navigation and flexible content
+        // columns. Each page gets standard native widgets and scrollbars.
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(0,0));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(12,16));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(24,25,28));
+        if (ImGui::BeginChild("##app-sidebar",ImVec2(kNavWidth,0),
+                ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar))
+            DrawSidebar();
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+        ImGui::SameLine(0,0);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));
+        if (ImGui::BeginChild("##app-content",ImVec2(0,0),
+                ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar))
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(24,14));
+            if (ImGui::BeginChild("##app-page-header",ImVec2(0,kPageHeaderHeight),
+                    ImGuiChildFlags_None,ImGuiWindowFlags_NoScrollbar))
+                DrawPageHeader();
+            ImGui::EndChild();
+            ImGui::PopStyleVar();
+            ImGui::Separator();
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(24,18));
+            if (ImGui::BeginChild("##app-page-body",ImVec2(0,0),
+                    ImGuiChildFlags_None,ImGuiWindowFlags_None))
+                DrawPageBody();
+            ImGui::EndChild();
+            ImGui::PopStyleVar();
+        }
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
         ImGui::PopStyleVar();
     }
     ImGui::End();
-    if (!open) M1CoreRuntime::Get().GetOverlay().Toggle();
+    ImGui::PopStyleVar(7);
+    ImGui::PopStyleColor(colors);
+    if (hideOverlay)
+        M1CoreRuntime::Get().GetOverlay().Toggle();
 }
 } // namespace m1core

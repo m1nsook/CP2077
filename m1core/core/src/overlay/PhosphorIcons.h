@@ -14,3 +14,7 @@
 #define M1CORE_ICON_SEARCH "\xEE\x8C\x8C" // U+E30C
 #define M1CORE_ICON_WARNING "\xEE\x93\xA0" // U+E4E0, warning triangle
 #define M1CORE_ICON_CLOSE "\xEE\x93\xB6" // U+E4F6, Phosphor X
+
+#define M1CORE_ICON_CUBE "\xEE\x87\x9A" // U+E1DA cube
+#define M1CORE_ICON_MINUS "\xEE\x8C\xAA" // U+E32A minus
+#define M1CORE_ICON_CARET "\xEE\x84\xB6" // U+E136 caret-down

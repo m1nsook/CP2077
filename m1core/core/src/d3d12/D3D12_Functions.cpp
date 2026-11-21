@@ -192,12 +192,15 @@ void D3D12::ReloadFonts()
     // fonts in a single normal ImGui atlas and without custom DrawList UI.
     // Codepoints come from phosphor-icons/web src/regular/style.css.
     static const ImWchar phosphorRanges[] = {
+        0xE136, 0xE136, // caret-down (active profile)
+        0xE1DA, 0xE1DA, // cube (m1core brand)
         0xE094, 0xE094, // arrows-clockwise
         0xE23A, 0xE23A, // file-text
         0xE248, 0xE248, // floppy-disk
         0xE2CE, 0xE2CE, // info
         0xE2D8, 0xE2D8, // keyboard
         0xE30C, 0xE30C, // magnifying-glass
+        0xE32A, 0xE32A, // minus (hide overlay)
         0xE3AE, 0xE3AE, // pencil
         0xE432, 0xE432, // sliders
         0xE4A6, 0xE4A6, // trash
