@@ -148,9 +148,11 @@ target("m1core_weight_limit_tests")
     add_includedirs("src", "../native", "../tests")
     add_packages("sol2", "openrestry-luajit", "nlohmann_json")
 
--- This target is isolated from game hooks and runs the exact native
--- Breach Protocol path-planner used by the future in-game adapter.
-target("m1core_breach_solver_tests")
+-- Internal Windows mouse-click helper. Tests use an injected fake backend;
+-- they NEVER send real input or move the test runner's cursor.
+target("m1core_mouse_click_tests")
     set_kind("binary")
-    add_files("src/scripting/BreachSolver.cpp", "../tests/breach_solver_tests.cpp")
+    add_defines("NOMINMAX", "WIN32_LEAN_AND_MEAN")
+    add_files("src/input/MouseClick.cpp", "../tests/mouse_click_tests.cpp")
     add_includedirs("src", "../tests")
+    add_syslinks("User32")
