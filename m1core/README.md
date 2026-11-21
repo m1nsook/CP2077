@@ -1,6 +1,6 @@
 # M1CORE — native RED4ext replacement for Cyber Engine Tweaks
 
-**Status: under development; DO NOT INSTALL or test yet.**
+**Status: unreleased development. Native Windows DLL build artifacts are now available from GitHub Actions; in-game behavior has not been verified.**
 
 This project is a **standalone native Windows x64 DLL loaded by RED4ext**.
 It must work on Cyberpunk 2077 without Cyber Engine Tweaks installed.
@@ -44,8 +44,13 @@ A missing game symbol should fail safely, leaving game input usable.
   with automated tests for atomic saves and corrupt-file protection.
 - Renderer lifecycle, native UI, cursor ownership and hotkeys are **not
   complete**. The DLL is not a usable CET replacement yet.
-- CI compiles/tests the DLL only. **No game-installable artifact is
-  published until all standalone features are implemented.**
+- CI compiles/tests the native DLL and publishes a **single development
+  ZIP** named `m1core-standalone-x64-dev`. Its only root folder is
+  `red4ext/`, with `red4ext/plugins/m1core/m1core.dll` inside.
+  It does not contain CET or require CET to build.
+- **This downloadable build is not a gameplay-tested release.** DLL compilation
+  and unit tests cannot establish startup, input, focus, cursor or rendering
+  correctness inside Cyberpunk.
 
 The old unreleased implementation remains in Git history and the
 \`archive/m1core-before-cet-reset-20261120\` branch. Since m1core was

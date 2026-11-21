@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   native-compile:
-    name: Compile native DLL and run C++ tests (no artifact until complete)
+    name: Build and package standalone m1core.dll (development)
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
@@ -46,7 +46,59 @@ jobs:
           if (Test-Path "m1core/src/init.lua") {
             throw "CET Lua frontend is forbidden"
           }
-          if (Test-Path "m1core/game-package") {
-            throw "Do not produce an installable artifact until standalone overlay is complete"
+          Write-Host "Standalone native DLL verified; runtime is not yet game-tested"
+
+      - name: Assemble a single game-root ZIP artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dll = "m1core/build/Release/m1core.dll"
+          $root = "m1core/game-package"
+          $target = Join-Path $root "red4ext/plugins/m1core"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          Copy-Item -LiteralPath $dll -Destination (Join-Path $target "m1core.dll")
+          Copy-Item -LiteralPath "m1core/LICENSE" -Destination (Join-Path $target "LICENSE")
+          $files = @(Get-ChildItem -LiteralPath $root -Recurse -File)
+          if ($files.Count -ne 2) { throw "Unexpected file count in game-root package" }
+          $top = @(Get-ChildItem -LiteralPath $root -Directory | ForEach-Object Name)
+          if (($top -join ',') -ne 'red4ext') { throw "Archive must have only red4ext/ at root" }
+          if (!(Test-Path -LiteralPath (Join-Path $target 'm1core.dll'))) { throw "Missing native DLL" }
+          if (Get-ChildItem $root -Recurse -File | Where-Object { $_.Extension -eq '.lua' -or $_.Name -match '(?i)cet' }) {
+            throw "CET dependency mistakenly included"
           }
-          Write-Host "Standalone DLL compiles; this is NOT a playable release"
+          $hash = (Get-FileHash -LiteralPath (Join-Path $target "m1core.dll") -Algorithm SHA256).Hash
+          Write-Host "Development m1core.dll SHA256: $hash"
+          Write-Host "Root: red4ext/plugins/m1core/m1core.dll"
+          Write-Host "NOTICE: CI compilation is not an in-game validation"
+
+      - name: Upload standalone DLL ZIP (development)
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1core-standalone-x64-dev
+          path: m1core/game-package/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Download and verify uploaded ZIP contents
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $verify = "m1core/artifact-check"
+          New-Item -ItemType Directory -Force -Path $verify | Out-Null
+          $ok = $false
+          for ($i = 0; $i -lt 8; $i++) {
+            gh run download "$env:GITHUB_RUN_ID" --repo "$env:GITHUB_REPOSITORY" --name "m1core-standalone-x64-dev" --dir "$verify"
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Start-Sleep -Seconds 5
+          }
+          if (!$ok) { throw "Could not download uploaded artifact" }
+          $expected = Join-Path $verify "red4ext/plugins/m1core/m1core.dll"
+          if (!(Test-Path -LiteralPath $expected -PathType Leaf)) { throw "Downloaded artifact missing native DLL" }
+          $actualTop = @(Get-ChildItem -LiteralPath $verify -Directory | ForEach-Object Name)
+          if (($actualTop -join ',') -ne 'red4ext') { throw "Artifact is nested or has unexpected root folders" }
+          $before = (Get-FileHash -LiteralPath "m1core/build/Release/m1core.dll" -Algorithm SHA256).Hash
+          $after = (Get-FileHash -LiteralPath $expected -Algorithm SHA256).Hash
+          if ($before -ne $after) { throw "Artifact DLL hash differs from compiled DLL" }
+          Write-Host "Verified uploaded artifact contents and DLL integrity: $after"
