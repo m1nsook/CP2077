@@ -62,8 +62,11 @@ struct SimulatedGame
     {
         vm.open_libraries(sol::lib::base, sol::lib::math,
                           sol::lib::string, sol::lib::table);
-        auto globals = vm.globals();
-        m1core::BindLuaRegistryAPI(vm, globals);
+        // The game bridge populates a sol::table sandbox base, not the
+        // sol::global_table wrapper returned by state::globals().
+        sol::table sandboxGlobals = vm.create_table();
+        m1core::BindLuaRegistryAPI(vm, sandboxGlobals);
+        vm["m1core"] = sandboxGlobals["m1core"];
 
         vm.set_function("registerForEvent", [this](const std::string& event, sol::function callback) {
             if (event == "onInit") initialize = sol::protected_function(callback);
