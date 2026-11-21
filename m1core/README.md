@@ -28,6 +28,13 @@ libraries and font assets remain in the distributed package.
   checked in native Windows CI, although the user has not identified
   which one was installed during the gameplay sample check.
 
+**Settings save automatically:** changing a checkbox, slider or choice commits
+to `red4ext/plugins/m1core/settings.json` immediately; you do **not** need a
+Save button. If a file cannot be opened or updated, the Settings interface now
+displays a visible warning. Automatic save/restart behavior is checked by
+Windows native regression tests; the current in-game restart report is still
+awaiting confirmation with the latest build.
+
 The framework is still in development. Test status and open items are maintained
 in [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
