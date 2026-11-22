@@ -4,13 +4,20 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## M8 UI polish — Windows CI PASS / artifact ready (2026-11-22)
+
+- **Verified Windows build:** [#45028217439](https://github.com/m1nsook/CP2077/actions/runs/45028217439) **PASS** at source `66271c5673b4195d647587efe1b9f7903e0dc58b`. The standalone RED4ext DLL compiled, native registry/state/profile + LuaJIT/Weight Limit + script dispatch + cleanup + mouse mock tests passed; CI source checks verified the new log viewers, titlebar-only window move and full-width dividers.
+- **Single game-root dev ZIP:** workflow artifact `m1core-native-x64-dev`, **14756389118**. Optional unchanged sample artifacts source **14757225272** / bytecode **14756693183**; not needed for this visual regression check.
+- **In-game validation scope:** the preceding Console `Game.GetPlayer():GetWorldPosition()` command **already worked** (user screenshot). The fresh UI fixes (newest-log opening, selecting/copying entries, window drag restriction, horizontal separator continuity) are compiled but **not yet user-tested** in the game. One focused UI check replaces all prior gameplay/script tests.
+- **Branch:** keep PR #41 draft, unmerged; no public release, new input hooks, or existing mod migrations.
+
 ## M8 UI polish — latest logs, selection, complete dividers (2026-11-22)
 
 - **User-verified in game:** m1core's new native Console successfully executed `print(Game.GetPlayer():GetWorldPosition())` and printed a real player `ToVector4` with x/y/z coordinates. The Lua→Cyberpunk game integration is confirmed; do not request this test again.
 - **Issue 1, stale scroll position:** Both Console and read-only Logs opened at the beginning of cached output (or retained an old scroll position). Now each page refreshes its bounded 64 KiB file snapshot on navigation, builds individual rows and requests scroll-to-bottom on first visit, command execution, Refresh, log-source change and script reload. Manual upward scrolling remains available without jumping to the bottom each frame.
 - **Issue 2, selection/copy:** Previously `ImGui::TextUnformatted` rendered unselectable text; dragging elsewhere also moved the ImGui root window. Log rows are now transparent `ImGui::InputText` with `ImGuiInputTextFlags_ReadOnly` (native text selection/Ctrl+C), displayed with `ImGuiListClipper`, plus Copy output buttons. The main window uses `ImGuiWindowFlags_NoMove` so only the existing custom title drag target can reposition it.
 - **Issue 3, broken lines:** The titlebar separator and content-header separator were formerly child-scoped `ImGui::Separator()` widgets clipped to different subwindows, causing visibly incomplete lines. Their 1px layout spacing is preserved and the divider lines are drawn once from the root ImGui draw list at exact window/page boundaries for continuous appearance matching AFTER.
-- **Scope:** No changes to Lua execution, input hooks, native settings, Weight Limit or existing mods. One Windows native DLL build plus UI source checks required; in-game visual confirmation not yet received. Draft PR #41 stays unmerged.
+- **Scope:** No changes to Lua execution, input hooks, native settings, Weight Limit or existing mods. Windows native DLL + regression CI passed #45028217439; in-game visual confirmation of the UI fixes is not yet received. Draft PR #41 stays unmerged.
 
 ## M8 Console page — verified Windows build (2026-11-22)
 
