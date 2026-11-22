@@ -1106,6 +1106,7 @@ void DrawNativeRegistryUI()
         ImGui::PopStyleVar();
         ImGui::SameLine(0,0);
 
+        float pageDividerY = titleDividerY;
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(0,0));
         if (ImGui::BeginChild("##app-content",ImVec2(0,0),
             ImGuiChildFlags_AlwaysUseWindowPadding,ImGuiWindowFlags_NoScrollbar))
@@ -1115,7 +1116,7 @@ void DrawNativeRegistryUI()
                 ImGuiChildFlags_AlwaysUseWindowPadding,ImGuiWindowFlags_NoScrollbar))
                 DrawPageHeader();
             ImGui::EndChild();
-            const float pageDividerY = ImGui::GetItemRectMax().y;
+            pageDividerY = ImGui::GetItemRectMax().y;
             ImGui::PopStyleVar();
             ImGui::Dummy(ImVec2(0,1));
 
