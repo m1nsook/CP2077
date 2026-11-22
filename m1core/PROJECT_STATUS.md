@@ -4,12 +4,19 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## M8 bottom-on-open scroll — Windows CI PASS (2026-11-22)
+
+- **Build verified:** [#45029392693](https://github.com/m1nsook/CP2077/actions/runs/45029392693), source `19dfcb7098507f7458faf862d209a27edcefd821`; standalone RED4ext m1core.dll compilation, native registry/state, LuaJIT/Weight Limit integration and source checks passed.
+- **Latest one-ZIP game-root artifact:** `m1core-native-x64-dev` ID **14757496507**. Optional unchanged Weight Limit fixtures: source **14757700157**, bytecode **14757257362**; not required for this UI test.
+- **Exact desired UX:** oldest entry remains first, latest entry remains last. Opening Console or Logs, switching log type or refreshing should position viewport at the **bottom** by including the actual final line in the ImGui clipper and `SetScrollHereY(1.0f)`. It does **not** sort or reverse entries, and should not override manual scrolling up after opening.
+- **Test status:** Native CI green, **new in-game scroll result not yet confirmed**. Earlier user verification of actual Console `Game` commands stands; don't repeat it. PR #41 stays draft/unmerged.
+
 ## M8: fix actual bottom-on-open scroll while retaining chronological order (2026-11-22)
 
 - **User tested previous build:** selectable logs, root window drag restriction, and header lines were corrected, but **both Console and Logs still opened at the top**, requiring manual scrolling. Mark prior claim of fixed bottom-on-open as **incorrect**.
 - **Intended behavior:** normal order **oldest at top → newest at bottom**, *not* reverse chronological. On entering Console or Logs, switching log source, Refresh, Reload Scripts, or submitting a Console command, the viewport initially scrolls to the **last** entry. Manual scrolling upward remains unrestricted and does not trigger auto-scroll every frame.
 - **Root cause and fix:** `DrawSelectableLogRows` used `ImGui::SetScrollY(FLT_MAX)` after an `ImGuiListClipper` had only submitted visible rows, so it did not reliably land on a real last row in-game. With ImGui 1.91.1, explicitly `IncludeItemByIndex(lastIndex)` before clipper Step and call `ImGui::SetScrollHereY(1.0f)` when the last row is drawn. This anchors scrolling to actual content and preserves row ordering. Empty logs reset to top. Existing entry selection and copy remain intact.
-- **Verification:** Windows CI compilation/regression must pass before shipping a build. Gameplay confirmation of initial bottom-on-open remains pending; no Lua/game hook, settings or released mod changes. PR #41 remains draft/unmerged.
+- **Verification:** Windows CI #45029392693 passed, gameplay confirmation of initial bottom-on-open remains pending; no Lua/game hook, settings or released mod changes. PR #41 remains draft/unmerged.
 
 ## M8 UI polish — Windows CI PASS / artifact ready (2026-11-22)
 
