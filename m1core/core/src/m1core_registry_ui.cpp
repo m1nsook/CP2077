@@ -35,17 +35,18 @@ std::string logSnapshot;
 int logSource = 0;
 bool logLoaded = false;
 
-// M8: the existing native LuaVM already executes game commands, but the
-// approved ImGui Logs page had no command input. Keep this surface inside
-// Logs (not a second overlay/window or a new input hook).
+// Console has its own page. Logs stays a read-only output viewer.
 char luaCommand[4096]{};
 std::vector<std::string> luaCommandHistory;
 std::size_t luaHistoryIndex = 0;
 std::string luaConsoleStatus;
+std::string consoleSnapshot;
+bool consoleLoaded = false;
+bool consoleShouldScroll = false;
 char keybindSearch[128]{};
 std::string selectedKeybindMod = "m1core";
 std::string activeProfile = "default";
-enum class Page { Settings, Keybinds, Profiles, Logs, About };
+enum class Page { Settings, Keybinds, Profiles, Console, Logs, About };
 Page currentPage = Page::Settings;
 
 ImVec4 Color(int r, int g, int b, float a = 1.0f)
@@ -153,10 +154,9 @@ void ExecuteLuaConsoleCommand()
     luaHistoryIndex = luaCommandHistory.size();
     luaCommand[0] = '\0';
 
-    // Show actual game/Lua output or error immediately, not a stale cached
-    // snapshot. Existing font (JetBrains Mono) and Logs layout stay intact.
-    logSource = 1; // scripting.log
-    logLoaded = false;
+    // Console uses its own log snapshot, without changing Logs selection.
+    consoleLoaded = false;
+    consoleShouldScroll = true;
 }
 
 void DrawLogsPage()
@@ -179,31 +179,6 @@ void DrawLogsPage()
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
         ImGui::SetTooltip("Unload all Lua mods (onShutdown), then reload scripts (onInit).");
-
-    // Native Lua command console backed by the EXISTING LuaVM and game RTTI.
-    // It is available only after the VM initializes and only while the
-    // user has opened m1core; no gameplay input is intercepted.
-    MoveDown(8);
-    auto& luaVm = M1CoreRuntime::Get().GetVM();
-    const bool luaReady = luaVm.IsInitialized();
-    if (!luaReady)
-        ImGui::TextDisabled("Lua console: waiting for in-game scripting.");
-    ImGui::BeginDisabled(!luaReady);
-    ImGui::SetNextItemWidth(-110.0f);
-    const bool pressedEnter = ImGui::InputTextWithHint(
-        "##m1core-lua-command",
-        "Lua command (e.g. print(Game.GetPlayer():GetWorldPosition()))",
-        luaCommand, sizeof(luaCommand),
-        ImGuiInputTextFlags_EnterReturnsTrue |
-        ImGuiInputTextFlags_CallbackHistory,
-        &LuaCommandHistoryCallback);
-    ImGui::SameLine();
-    const bool clickedRun = ImGui::Button("Run Lua", ImVec2(98, 0));
-    ImGui::EndDisabled();
-    if (pressedEnter || clickedRun)
-        ExecuteLuaConsoleCommand();
-    if (!luaConsoleStatus.empty())
-        ImGui::TextDisabled("%s", luaConsoleStatus.c_str());
 
     if (!logLoaded)
     {
@@ -230,6 +205,81 @@ void DrawLogsPage()
     ImGui::EndChild();
     ImGui::PopStyleVar();
     ImGui::PopStyleColor();
+}
+
+void DrawConsolePage()
+{
+    if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_REFRESH " Refresh output" : "Refresh output"))
+    {
+        consoleLoaded = false;
+        consoleShouldScroll = true;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("Live Lua console  |  Up/Down recalls commands");
+
+    if (!consoleLoaded)
+    {
+        consoleSnapshot = ReadLogTail(
+            M1CoreRuntime::Get().GetPaths().CoreRoot() / L"scripting.log");
+        consoleLoaded = true;
+    }
+
+    // A dedicated scrolling output region above the command input. This
+    // reuses the approved ImGui styling and JetBrains Mono log font.
+    const float footer = ImGui::GetFrameHeight() +
+        ImGui::GetTextLineHeightWithSpacing() +
+        ImGui::GetStyle().ItemSpacing.y * 3.0f;
+    MoveDown(5);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(10,10,12));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(16,16));
+    if (ImGui::BeginChild("##m1core-console-output",
+                          ImVec2(0, -footer),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_HorizontalScrollbar))
+    {
+        if (ImFont* font = m1core::LogFont())
+            ImGui::PushFont(font);
+        ImGui::TextUnformatted(consoleSnapshot.c_str());
+        if (m1core::LogFont())
+            ImGui::PopFont();
+        if (consoleShouldScroll)
+        {
+            ImGui::SetScrollHereY(1.0f);
+            consoleShouldScroll = false;
+        }
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
+
+    auto& vm = M1CoreRuntime::Get().GetVM();
+    const bool luaReady = vm.IsInitialized();
+    ImGui::BeginDisabled(!luaReady);
+    ImGui::SetNextItemWidth(-110.0f);
+    const bool pressedEnter = ImGui::InputTextWithHint(
+        "##m1core-lua-command", "Enter Lua command...",
+        luaCommand, sizeof(luaCommand),
+        ImGuiInputTextFlags_EnterReturnsTrue |
+        ImGuiInputTextFlags_CallbackHistory,
+        &LuaCommandHistoryCallback);
+    ImGui::SameLine();
+    const bool clickedRun = ImGui::Button("Run Lua", ImVec2(98, 0));
+    ImGui::EndDisabled();
+
+    if (pressedEnter || clickedRun)
+    {
+        ExecuteLuaConsoleCommand();
+        // The executor flushed the logger. Show result on this frame,
+        // rather than requiring a separate read-only Logs page refresh.
+        consoleSnapshot = ReadLogTail(
+            M1CoreRuntime::Get().GetPaths().CoreRoot() / L"scripting.log");
+        consoleLoaded = true;
+    }
+
+    if (!luaReady)
+        ImGui::TextDisabled("Game scripting is not initialized.");
+    else if (!luaConsoleStatus.empty())
+        ImGui::TextDisabled("%s", luaConsoleStatus.c_str());
 }
 
 // Settings changes are durable immediately. Report filesystem failures at
@@ -689,6 +739,7 @@ const char* PageTitle(Page p)
     case Page::Settings: return "Settings";
     case Page::Keybinds: return "Keybinds";
     case Page::Profiles: return "Profiles";
+    case Page::Console: return "Lua Console";
     case Page::Logs: return "System Logs";
     case Page::About: return "About M1CORE";
     }
@@ -701,7 +752,8 @@ const char* PageDescription(Page p)
     case Page::Settings: return "Manage mod settings and configurations.";
     case Page::Keybinds: return "Configure shortcuts and hotkeys for each mod.";
     case Page::Profiles: return "Save and load your settings configurations.";
-    case Page::Logs: return "View real-time output from m1core.";
+    case Page::Console: return "Execute Lua commands using Cyberpunk's game APIs.";
+    case Page::Logs: return "Read-only m1core and scripting log output.";
     case Page::About: return "Information about the framework.";
     }
     return "";
@@ -755,6 +807,7 @@ void DrawSidebar()
     SidebarNav(M1CORE_ICON_USERS_THREE,"Profiles",Page::Profiles);
     MoveDown(20);
     SidebarGroup("SYSTEM");
+    SidebarNav(M1CORE_ICON_TERMINAL,"Console",Page::Console);
     SidebarNav(M1CORE_ICON_TERMINAL,"Logs",Page::Logs);
     SidebarNav(M1CORE_ICON_ABOUT,"About",Page::About);
 
@@ -834,6 +887,7 @@ void DrawPageBody()
     case Page::Settings: DrawSettingsPage(); break;
     case Page::Keybinds: DrawKeybindsPage(); break;
     case Page::Profiles: DrawProfilesPage(); break;
+    case Page::Console: DrawConsolePage(); break;
     case Page::Logs: DrawLogsPage(); break;
     case Page::About: DrawAboutPage(); break;
     }

@@ -109,14 +109,24 @@ jobs:
                     # AFTER.html redesign must use stock ImGui state and preserve the
           # existing backend rather than reintroducing web-rendered widgets.
           $layout = Get-Content "$root/src/m1core_registry_ui.cpp" -Raw
-          # M8: a working in-game command console must stay connected to
-          # the actual LuaVM execution path, without new keyboard hooks.
-          if ($layout -notmatch '##m1core-lua-command' -or
-              $layout -notmatch 'LuaCommandHistoryCallback' -or
-              $layout -notmatch 'vm.ExecuteLua\(command\)' -or
-              $layout -notmatch 'logSource = 1' -or
-              $layout -notmatch 'vm.IsInitialized\(\)') {
-            throw "M8 Lua console not connected to game scripting runtime"
+          # Console is navigable and executable; System Logs stays read-only.
+          if ($layout -notmatch 'Page::Console' -or
+              $layout -notmatch 'SidebarNav\(M1CORE_ICON_TERMINAL,"Console",Page::Console\)' -or
+              $layout -notmatch 'case Page::Console: DrawConsolePage\(\);' -or
+              $layout -notmatch 'void DrawConsolePage\(\)' -or
+              $layout -notmatch '##m1core-console-output' -or
+              $layout -notmatch '##m1core-lua-command' -or
+              $layout -notmatch 'vm.ExecuteLua\(command\)') {
+            throw "M8 Console is missing, not navigable or not executable"
+          }
+          $logsStart = $layout.IndexOf('void DrawLogsPage()')
+          $consoleStart = $layout.IndexOf('void DrawConsolePage()')
+          if ($logsStart -lt 0 -or $consoleStart -le $logsStart) {
+            throw "M8 Console and read-only Logs functions not found"
+          }
+          $logsBlock = $layout.Substring($logsStart, $consoleStart - $logsStart)
+          if ($logsBlock -match 'ExecuteLuaConsoleCommand|##m1core-lua-command|Run Lua') {
+            throw "System Logs must remain read-only"
           }
           if ($layout -notmatch '##app-sidebar' -or
               $layout -notmatch '##app-page-header' -or

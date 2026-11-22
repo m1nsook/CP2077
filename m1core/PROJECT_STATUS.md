@@ -4,6 +4,13 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## M8 UI correction — dedicated Console, read-only Logs (2026-11-22)
+
+- **Correction from user:** System Logs is explicitly read-only; it is not the interactive Console. Previous M8 implementation incorrectly placed an editable Lua field on Logs. The prior claim that Logs was a proper console is superseded.
+- **New playable Console page:** a separate **Console** sidebar entry under SYSTEM, a dedicated **Lua Console** page with scrolling `scripting.log` output, editable 4096-byte command line, Run Lua button/Enter-to-run, in-session Up/Down history, and immediately refreshed command output. This uses the existing `LuaVM::ExecuteLua` live game bridge without CET or a new input hook.
+- **Logs preserved:** original log selector, Refresh, Reload Scripts, and read-only output remain in System Logs. It contains **no Lua command input**, and Console no longer changes the selected log source.
+- **Native Windows CI and real in-game verification needed** before calling the new Console available to the owner; CI checks specifically assert separate navigable Console and read-only Logs. No existing mods, approved colors/fonts/layout, plugin licensing or source visibility changed. Draft PR #41 remains unmerged.
+
 ## M8 — Live Cyberpunk Lua console: Windows CI PASS (2026-11-22)
 
 - **Verified build:** [Windows CI #45024771431](https://github.com/m1nsook/CP2077/actions/runs/45024771431) **PASS** for `4e07a7020962d46f16548212ceee999077000192`. The native RED4ext m1core.dll compiled; registry/profile, LuaJIT, Weight Limit source/bytecode, native callback safety, sandbox cleanup and mouse mock tests all passed; approved UI layout checks passed, including the new Lua console wiring guard.
