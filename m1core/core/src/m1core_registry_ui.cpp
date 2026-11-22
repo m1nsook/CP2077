@@ -137,6 +137,10 @@ void ExecuteLuaConsoleCommand()
         logger->info("> {}", command);
 
     const bool success = vm.ExecuteLua(command);
+    // Release DLL logging buffers informational print() messages. Flush so
+    // the file-backed Logs page shows the command result in this frame.
+    if (const auto logger = spdlog::get("scripting"))
+        logger->flush();
     luaConsoleStatus = success ? "Lua command executed."
                                : "Lua command failed. Read scripting.log below.";
 

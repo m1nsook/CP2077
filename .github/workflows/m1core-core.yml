@@ -96,15 +96,6 @@ jobs:
               $uiColors -notmatch '0.65f, 0.20f') {
             throw "m1core title/amber warning style regression"
           }
-          # M8: a working in-game command console must stay connected to
-          # the actual LuaVM execution path, without new keyboard hooks.
-          if ($layout -notmatch '##m1core-lua-command' -or
-              $layout -notmatch 'LuaCommandHistoryCallback' -or
-              $layout -notmatch 'vm.ExecuteLua\(command\)' -or
-              $layout -notmatch 'logSource = 1' -or
-              $layout -notmatch 'vm.IsInitialized\(\)') {
-            throw "M8 Lua console not connected to game scripting runtime"
-          }
           # The screenshots exposed unpadded borderless children and
           # centered nav buttons; keep those geometry fixes covered.
           $palette = Get-Content "$root/src/overlay/FontPalette.h" -Raw
@@ -118,6 +109,15 @@ jobs:
                     # AFTER.html redesign must use stock ImGui state and preserve the
           # existing backend rather than reintroducing web-rendered widgets.
           $layout = Get-Content "$root/src/m1core_registry_ui.cpp" -Raw
+          # M8: a working in-game command console must stay connected to
+          # the actual LuaVM execution path, without new keyboard hooks.
+          if ($layout -notmatch '##m1core-lua-command' -or
+              $layout -notmatch 'LuaCommandHistoryCallback' -or
+              $layout -notmatch 'vm.ExecuteLua\(command\)' -or
+              $layout -notmatch 'logSource = 1' -or
+              $layout -notmatch 'vm.IsInitialized\(\)') {
+            throw "M8 Lua console not connected to game scripting runtime"
+          }
           if ($layout -notmatch '##app-sidebar' -or
               $layout -notmatch '##app-page-header' -or
               $layout -notmatch '##app-page-body' -or

@@ -4,6 +4,12 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## M8 build note — console output and workflow ordering (2026-11-22)
+
+- The first run [#45024596031](https://github.com/m1nsook/CP2077/actions/runs/45024596031) failed in the **pre-build workflow inspection step**: the new M8 source guard referenced `$layout` before it was assigned. This is a CI check ordering bug, **not a compiler/test result**.
+- Fixed the guard placement immediately after loading `m1core_registry_ui.cpp`, and flush the release-mode scripting logger before reading the refreshed log, so `print()` results appear without a second manual Refresh.
+- This M8 feature is a **real, operator-triggered Lua game console** on the existing Logs page. Compile validation remains required; no in-game execution claim yet.
+
 ## M8 — In-game Lua console for live Cyberpunk integration (2026-11-22)
 
 - **Actual feature shipped on development branch (CI validation pending):** the existing `LuaVM::ExecuteLua` already executes in the live game scripting VM with `Game` RTTI bindings, but the approved native UI only exposed log files and Reload Scripts. The **Logs** page now has a user-driven command line: Enter/Run Lua executes a command in m1core's VM and shows the results or errors from `scripting.log` without manually refreshing. Up/Down recalls the last 50 commands from the current session.
