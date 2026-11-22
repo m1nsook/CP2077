@@ -73,7 +73,11 @@ void Overlay::Update()
         if (m_bindings.FirstTimeSetup())
             return;
         if (m_enabled) m_vm.OnOverlayClose();
-        else m_vm.OnOverlayOpen();
+        else
+        {
+            m_vm.OnOverlayOpen();
+            m1core::NotifyOverlayOpened();
+        }
         m_enabled = !m_enabled;
         M1CoreRuntime::Get().GetD3D12().DelayedSetTrapInputInImGui(m_enabled);
         m_toggled = false;

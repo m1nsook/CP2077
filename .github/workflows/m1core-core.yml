@@ -119,6 +119,27 @@ jobs:
               $layout -notmatch 'mods/39311') {
             throw "m1core mod compatibility check or user-facing warning disconnected"
           }
+          # The About page is user-facing product info, while compatibility
+          # warnings belong to a modal triggered on the overlay-open event.
+          $overlayUi = Get-Content "$root/src/overlay/Overlay.cpp" -Raw
+          $aboutBegin = $layout.IndexOf('void DrawAboutPage()')
+          $modalBegin = $layout.IndexOf('void DrawCompatibilityDialog()')
+          if ($aboutBegin -lt 0 -or $modalBegin -lt $aboutBegin -or
+              $layout -notmatch 'm1core on Nexus Mods' -or
+              $layout -notmatch 'Author profile' -or
+              $layout -notmatch 'https://www.nexusmods.com/profile/m1nsook/' -or
+              $layout -notmatch 'M1CORE_VERSION_SIMPLE' -or
+              $layout -notmatch 'ImGui::BeginPopupModal' -or
+              $layout -notmatch 'Download from Nexus Mods' -or
+              $layout -notmatch 'void NotifyOverlayOpened' -or
+              $overlayUi -notmatch 'm1core::NotifyOverlayOpened\(\)' -or
+              $layout -notmatch 'DrawCompatibilityDialog\(\);') {
+            throw "About page / separate on-open compatibility modal disconnected"
+          }
+          $aboutBody = $layout.Substring($aboutBegin, $modalBegin - $aboutBegin)
+          if ($aboutBody -match 'GetCompatibilityIssues|ImGui::OpenPopup') {
+            throw "About must contain framework information, not compatibility warnings"
+          }
           # Console is navigable and executable; System Logs stays read-only.
           if ($layout -notmatch 'Page::Console' -or
               $layout -notmatch 'SidebarNav\(M1CORE_ICON_TERMINAL,"Console",Page::Console\)' -or

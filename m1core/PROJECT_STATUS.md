@@ -4,6 +4,13 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## About page and menu-opening compatibility modal — user-facing UI (2026-11-22)
+
+- **About is always a product information page**, regardless of incompatibilities. It has structured panels for m1core identity and capabilities; installed version (from `M1CORE_VERSION_SIMPLE`), RED4ext and LuaJIT runtime; author **민숙 MISO @m1nsook**; buttons **m1core on Nexus Mods** (`https://www.nexusmods.com/cyberpunk2077/mods/39311`) and **Author profile** (`https://www.nexusmods.com/profile/m1nsook/`). No development-release or temporary warning page content.
+- **Incompatible mods trigger a modal only when the player opens the m1core menu**. `Overlay::Update` raises `NotifyOverlayOpened()` on the actual closed→open transition, and `DrawNativeRegistryUI` opens a standard Dear ImGui modal only if the already-loaded compatibility issue list is nonempty. The warning lists each mod's required and installed core version and explains it was skipped, with Close and (when m1core is too old) **Download from Nexus Mods**. It has no online version checks or automatic install.
+- The modal is separate from About, which remains ordinary navigation without warnings/counts. Opening an otherwise compatible m1core menu must not show the modal. Reopening the menu with incompatible mods should re-present it. Initial open before LuaVM initializes waits for initialized status.
+- **Scope:** UI/event routing only, retain the existing local `mod.json` compatibility gate, error diagnostics, core version constants, Console/Logs and game input. Verify Windows native CI and focused in-game About + incompatible-modal appearance before treating it as player-confirmed. PR #41 stays draft and unmerged.
+
 ## Mod compatibility and versioning (user-facing; pre-release implementation)
 
 - **Framework runtime version:** m1core's compiled numeric `M1CORE_VERSION_MAJOR/MINOR/PATCH` currently `1.0.0`. This is an intended baseline for compatibility logic, not a declaration that the framework has publicly released.

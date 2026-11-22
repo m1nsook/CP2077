@@ -53,6 +53,9 @@ std::string selectedKeybindMod = "m1core";
 std::string activeProfile = "default";
 enum class Page { Settings, Keybinds, Profiles, Console, Logs, About };
 Page currentPage = Page::Settings;
+// Set by the overlay's actual closed -> open transition. Only a detected
+// incompatible installed mod can open the warning; About is always informational.
+bool compatibilityDialogRequested = false;
 
 ImVec4 Color(int r, int g, int b, float a = 1.0f)
 {
@@ -812,87 +815,207 @@ void DrawProfilesPage()
 
 // The compatibility notice is centered like the AFTER draft. No separate
 // overlay/input hook: About continues to render inside the existing page.
-void CenterAboutText(const char* text, bool warning = false)
+// The About page is permanent product information, not an error screen.
+// Its cards use the approved Karla / ImGui styling rather than static prose.
+void AboutFactCard(const char* id, const char* label, const char* value)
 {
-    const float textWidth = ImGui::CalcTextSize(text).x;
-    const float space = ImGui::GetContentRegionAvail().x;
-    if (space > textWidth)
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (space - textWidth) * 0.5f);
-    if (warning)
-        ImGui::TextColored(m1core::ui::WarningText(), "%s", text);
-    else
-        ImGui::TextUnformatted(text);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(30,31,35));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(14,12));
+    if (ImGui::BeginChild(id,ImVec2(0,82),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_NoScrollbar))
+    {
+        PushLayoutFont(m1core::KarlaCaption());
+        ImGui::TextColored(Color(148,163,184),"%s",label);
+        PopLayoutFont(m1core::KarlaCaption());
+        MoveDown(8);
+        PushLayoutFont(m1core::KarlaBold());
+        ImGui::TextUnformatted(value);
+        PopLayoutFont(m1core::KarlaBold());
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
+}
+
+void OpenNexusPage(const wchar_t* address)
+{
+    ShellExecuteW(nullptr,L"open",address,nullptr,nullptr,SW_SHOWNORMAL);
 }
 
 void DrawAboutPage()
 {
-    const auto& issues = M1CoreRuntime::Get().GetVM().GetCompatibilityIssues();
-    if (issues.empty())
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(30,31,35));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(20,18));
+    if (ImGui::BeginChild("##about-brand",ImVec2(0,112),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_NoScrollbar))
     {
-        if (auto* font = m1core::KarlaBold()) ImGui::PushFont(font);
+        PushLayoutFont(m1core::KarlaPageTitle());
+        if (m1core::HasIcons())
+            ImGui::TextColored(Color(96,165,250),"%s",M1CORE_ICON_CUBE);
+        ImGui::SameLine(0,12);
         ImGui::TextUnformatted("M1CORE");
-        if (m1core::KarlaBold()) ImGui::PopFont();
-        ImGui::Separator();
-        ImGui::Text("Installed m1core: %s", M1CORE_VERSION_SIMPLE);
-        ImGui::TextWrapped("Native RED4ext mod settings framework.");
-        ImGui::TextWrapped("Settings, keybindings and profiles with Dear ImGui.");
-        ImGui::TextWrapped("Native RED4ext DLL. No additional overlay installation required.");
-        return;
-    }
-
-    MoveDown(48);
-    CenterAboutText(M1CORE_ICON_WARNING, true);
-    MoveDown(12);
-    if (auto* heading = m1core::KarlaPageTitle()) ImGui::PushFont(heading);
-    CenterAboutText("IMPORTANT");
-    if (m1core::KarlaPageTitle()) ImGui::PopFont();
-    MoveDown(10);
-    CenterAboutText("Some mods cannot run on this version of m1core.");
-    MoveDown(9);
-    ImGui::TextDisabled("Installed m1core: %s", M1CORE_VERSION_SIMPLE);
-    ImGui::Separator();
-    bool needsUpdate = false;
-    for (const auto& issue : issues)
-    {
-        ImGui::PushID(issue.folder.c_str());
-        const std::string modTitle = issue.name +
-            (issue.modVersion.empty() ? "" : "  v" + issue.modVersion);
-        ImGui::TextUnformatted(modTitle.c_str());
-
-        if (issue.reason == m1core::compat::Reason::NeedsNewerCore)
-        {
-            needsUpdate = true;
-            ImGui::TextColored(m1core::ui::WarningText(),
-                "Requires m1core %s or newer.", issue.requiredMin.c_str());
-        }
-        else if (issue.reason == m1core::compat::Reason::NeedsOlderCore)
-            ImGui::TextColored(m1core::ui::WarningText(),
-                "Requires m1core below %s.", issue.maximumExclusive.c_str());
-        else
-            ImGui::TextWrapped("Invalid mod.json: %s", issue.detail.c_str());
-        ImGui::PopID();
-        MoveDown(7);
-    }
-
-    if (needsUpdate)
-    {
-        MoveDown(9);
-        ImGui::TextDisabled("Incompatible mods were not loaded.");
+        PopLayoutFont(m1core::KarlaPageTitle());
         MoveDown(10);
-        // Direct link: compatibility is determined by mod.json, not by
-        // checking Nexus versions, release state, or a remote API.
-        const char* label = "Download from Nexus Mods";
-        const float buttonWidth = ImGui::CalcTextSize(label).x +
-            ImGui::GetStyle().FramePadding.x * 2.0f;
-        const float available = ImGui::GetContentRegionAvail().x;
-        if (available > buttonWidth)
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-                                 (available - buttonWidth) * 0.5f);
-        if (ImGui::Button(label))
-            ShellExecuteW(nullptr, L"open",
-                L"https://www.nexusmods.com/cyberpunk2077/mods/39311",
-                nullptr, nullptr, SW_SHOWNORMAL);
+        ImGui::TextColored(Color(148,163,184),
+                           "Native mod framework for Cyberpunk 2077");
+        MoveDown(4);
+        ImGui::TextDisabled("Independent RED4ext DLL. No Cyber Engine Tweaks required.");
     }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
+
+    MoveDown(18);
+    ImGui::TextDisabled("FRAMEWORK");
+    MoveDown(7);
+    if (ImGui::BeginTable("##about-facts",3,ImGuiTableFlags_SizingStretchSame))
+    {
+        ImGui::TableNextColumn();
+        AboutFactCard("##about-version","VERSION",M1CORE_VERSION_SIMPLE);
+        ImGui::TableNextColumn();
+        AboutFactCard("##about-runtime","RUNTIME","RED4ext");
+        ImGui::TableNextColumn();
+        AboutFactCard("##about-scripting","SCRIPTING","LuaJIT");
+        ImGui::EndTable();
+    }
+
+    MoveDown(18);
+    ImGui::TextDisabled("WHAT M1CORE DOES");
+    MoveDown(7);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(30,31,35));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(18,16));
+    if (ImGui::BeginChild("##about-capabilities",ImVec2(0,102),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_NoScrollbar))
+    {
+        ImGui::TextWrapped("Runs compatible m1core mods inside Cyberpunk 2077.");
+        MoveDown(8);
+        ImGui::TextColored(Color(148,163,184),
+            "Mod settings  /  Keybindings  /  Profiles  /  Lua console  /  Logs");
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
+
+    MoveDown(18);
+    ImGui::TextDisabled("AUTHOR & LINKS");
+    MoveDown(7);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg,Color(30,31,35));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(18,16));
+    if (ImGui::BeginChild("##about-links",ImVec2(0,126),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_NoScrollbar))
+    {
+        PushLayoutFont(m1core::KarlaBold());
+        ImGui::TextUnformatted("민숙 MISO @m1nsook");
+        PopLayoutFont(m1core::KarlaBold());
+        MoveDown(5);
+        ImGui::TextDisabled("Creator and maintainer");
+        MoveDown(12);
+        if (ImGui::Button("m1core on Nexus Mods"))
+            OpenNexusPage(L"https://www.nexusmods.com/cyberpunk2077/mods/39311");
+        ImGui::SameLine(0,12);
+        if (ImGui::Button("Author profile"))
+            OpenNexusPage(L"https://www.nexusmods.com/profile/m1nsook/");
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
+}
+
+// Rendered from the parent overlay window, *not* from the About page.
+// A warning appears only after the menu opens and an incompatible mod is
+// actually discovered. The modal naturally blocks clicks behind it.
+void DrawCompatibilityDialog()
+{
+    if (compatibilityDialogRequested)
+    {
+        const bool ready = M1CoreRuntime::Get().GetVM().IsInitialized();
+        if (ready)
+        {
+            compatibilityDialogRequested = false;
+            if (!M1CoreRuntime::Get().GetVM().GetCompatibilityIssues().empty())
+                ImGui::OpenPopup("m1core compatibility##incompatible-mods");
+        }
+    }
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(),
+                            ImGuiCond_Appearing,ImVec2(0.5f,0.5f));
+    ImGui::SetNextWindowSize(ImVec2(620,412),ImGuiCond_Appearing);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(22,20));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,12.0f);
+    if (ImGui::BeginPopupModal("m1core compatibility##incompatible-mods",
+        nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                 ImGuiWindowFlags_NoCollapse))
+    {
+        const auto issues = M1CoreRuntime::Get().GetVM().GetCompatibilityIssues();
+        if (issues.empty())
+            ImGui::CloseCurrentPopup();
+        else
+        {
+            ImGui::TextColored(Color(245,158,11),"%s",M1CORE_ICON_WARNING);
+            ImGui::SameLine(0,10);
+            PushLayoutFont(m1core::KarlaPageTitle());
+            ImGui::TextUnformatted("IMPORTANT");
+            PopLayoutFont(m1core::KarlaPageTitle());
+
+            MoveDown(8);
+            ImGui::TextWrapped("Some installed mods cannot run with your version of m1core.");
+            MoveDown(9);
+            ImGui::TextDisabled("Installed m1core: %s",M1CORE_VERSION_SIMPLE);
+            MoveDown(12);
+            ImGui::Separator();
+            MoveDown(10);
+
+            bool newerRequired = false;
+            for (const auto& issue : issues)
+                newerRequired |= issue.reason == m1core::compat::Reason::NeedsNewerCore;
+
+            // Multiple incompatible mods are scrollable; buttons stay in view.
+            if (ImGui::BeginChild("##incompatible-mod-list",ImVec2(0,157),
+                ImGuiChildFlags_None,ImGuiWindowFlags_AlwaysVerticalScrollbar))
+            {
+                for (const auto& issue : issues)
+                {
+                    ImGui::PushID(issue.folder.c_str());
+                    PushLayoutFont(m1core::KarlaBold());
+                    ImGui::TextUnformatted(issue.name.c_str());
+                    PopLayoutFont(m1core::KarlaBold());
+                    if (!issue.modVersion.empty())
+                    {
+                        ImGui::SameLine(0,10);
+                        ImGui::TextDisabled("v%s",issue.modVersion.c_str());
+                    }
+                    if (issue.reason == m1core::compat::Reason::NeedsNewerCore)
+                        ImGui::TextColored(Color(245,158,11),
+                            "Requires m1core %s or newer.",issue.requiredMin.c_str());
+                    else if (issue.reason == m1core::compat::Reason::NeedsOlderCore)
+                        ImGui::TextColored(Color(245,158,11),
+                            "Requires m1core below %s.",issue.maximumExclusive.c_str());
+                    else
+                        ImGui::TextWrapped("Invalid mod.json: %s",issue.detail.c_str());
+                    MoveDown(12);
+                    ImGui::PopID();
+                }
+            }
+            ImGui::EndChild();
+            MoveDown(8);
+            ImGui::TextDisabled("Affected mods were not loaded.");
+            MoveDown(15);
+            if (ImGui::Button("Close",ImVec2(112,34)))
+                ImGui::CloseCurrentPopup();
+            if (newerRequired)
+            {
+                ImGui::SameLine(0,12);
+                if (ImGui::Button("Download from Nexus Mods",ImVec2(227,34)))
+                    OpenNexusPage(L"https://www.nexusmods.com/cyberpunk2077/mods/39311");
+            }
+        }
+        ImGui::EndPopup();
+    }
+    ImGui::PopStyleVar(2);
 }
 
 const char* PageTitle(Page p)
@@ -979,11 +1102,7 @@ void DrawSidebar()
     SidebarGroup("SYSTEM");
     SidebarNav(M1CORE_ICON_TERMINAL,"Console",Page::Console);
     SidebarNav(M1CORE_ICON_TERMINAL,"Logs",Page::Logs);
-    const auto blockedMods = M1CoreRuntime::Get().GetVM().GetCompatibilityIssues().size();
-    const std::string aboutLabel = blockedMods
-        ? "About (" + std::to_string(blockedMods) + ")" : "About";
-    SidebarNav(blockedMods ? M1CORE_ICON_WARNING : M1CORE_ICON_ABOUT,
-               aboutLabel.c_str(),Page::About);
+    SidebarNav(M1CORE_ICON_ABOUT,"About",Page::About);
 
     // AFTER.html's 76px card is anchored above the bottom padding.
     const float cardHeight = 76.0f;
@@ -1068,6 +1187,11 @@ void DrawPageBody()
 }
 
 } // namespace
+
+void NotifyOverlayOpened()
+{
+    compatibilityDialogRequested = true;
+}
 
 void DrawNativeRegistryUI()
 {
@@ -1237,6 +1361,8 @@ void DrawNativeRegistryUI()
                              ImVec2(mainMax.x,titleDividerY), dividerColor,1.0f);
         layoutLines->AddLine(ImVec2(sidebarMax.x,pageDividerY),
                              ImVec2(mainMax.x,pageDividerY), dividerColor,1.0f);
+
+        DrawCompatibilityDialog();
     }
     ImGui::End();
     ImGui::PopStyleVar(9);
