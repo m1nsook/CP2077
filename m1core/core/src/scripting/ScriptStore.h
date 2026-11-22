@@ -1,6 +1,9 @@
 #pragma once
 
 #include "ScriptContext.h"
+#include "ModCompatibility.hpp"
+#include <mutex>
+#include <vector>
 
 struct ScriptStore
 {
@@ -24,9 +27,12 @@ struct ScriptStore
     void TriggerOnOverlayClose() const;
 
     [[nodiscard]] sol::object GetMod(const std::string& acName) const;
+    [[nodiscard]] std::vector<m1core::compat::Issue> GetCompatibilityIssues() const;
 
 private:
     TiltedPhoques::Map<std::string, ScriptContext> m_contexts{};
+    mutable std::mutex m_compatibilityMutex{};
+    std::vector<m1core::compat::Issue> m_compatibilityIssues{};
     TiltedPhoques::Map<std::string, std::reference_wrapper<const TiltedPhoques::Vector<VKBind>>> m_vkBinds{};
     LuaSandbox& m_sandbox;
     const Paths& m_paths;

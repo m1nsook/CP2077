@@ -626,6 +626,11 @@ void Scripting::UnloadAllMods()
     m_store.DiscardAll();
 }
 
+std::vector<m1core::compat::Issue> Scripting::GetCompatibilityIssues() const
+{
+    return m_store.GetCompatibilityIssues();
+}
+
 void Scripting::ReloadAllMods()
 {
     // LoadAll() already performs DiscardAll(). Calling UnloadAllMods()

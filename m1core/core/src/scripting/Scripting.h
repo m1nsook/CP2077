@@ -20,6 +20,7 @@ struct Scripting
     void PostInitializeMods();
 
     [[nodiscard]] const VKBind* GetBind(const VKModBind& acModBind) const;
+    [[nodiscard]] std::vector<m1core::compat::Issue> GetCompatibilityIssues() const;
     [[nodiscard]] const TiltedPhoques::Vector<VKBind>* GetBinds(const std::string& acModName) const;
     [[nodiscard]] const TiltedPhoques::Map<std::string, std::reference_wrapper<const TiltedPhoques::Vector<VKBind>>>& GetAllBinds() const;
 

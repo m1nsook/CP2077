@@ -4,6 +4,15 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## Mod compatibility and versioning (user-facing; pre-release implementation)
+
+- **Framework runtime version:** m1core's compiled numeric `M1CORE_VERSION_MAJOR/MINOR/PATCH` currently `1.0.0`. This is an intended baseline for compatibility logic, not a declaration that the framework has publicly released.
+- **Optional installed mod manifest:** each mod may put a plain-data `mod.json` beside its `init.m1s` or `init.m1c`, with independent `version` and required `m1core.min`. An optional `m1core.max_exclusive` constrains breaking forward changes. For example, mod `2.0.0` requiring core `1.0.0` runs with core `1.0.0`. Mod `1.1.0` requiring core `1.0.5` does not.
+- **Loader gating:** before any Lua sandbox is created, parse and validate `mod.json`. Missing manifest preserves all current mods. Invalid or incompatible manifests skip only that mod and leave a clear error and issue list for the in-game About tab. Reload recomputes compatibility from disk; no automatic updates or installation.
+- **User-facing About warning:** shows `IMPORTANT`, mod name/version, installed m1core version and required version, with a blocked-mod count beside About. A plain **Download from Nexus Mods** button always opens `https://www.nexusmods.com/cyberpunk2077/mods/39311` when a mod requires a newer core. There is no Nexus API call, remote release/version check, forced update, or development wording in the UI; this page ID is reserved until the first public release.
+- **CI:** native test for semantic numeric comparison, independent mod version, min/max bounds, legacy/no manifest, malformed JSON; Actions now packages `mod.json` with the existing Weight Limit sample's .m1s or generated .m1c.
+- **No released mods changed**; draft PR #41 remains unmerged. Verify via Windows CI and one targeted in-game incompatible test before publication.
+
 ## M8 bottom-on-open scroll — Windows CI PASS (2026-11-22)
 
 - **Build verified:** [#45029392693](https://github.com/m1nsook/CP2077/actions/runs/45029392693), source `19dfcb7098507f7458faf862d209a27edcefd821`; standalone RED4ext m1core.dll compilation, native registry/state, LuaJIT/Weight Limit integration and source checks passed.

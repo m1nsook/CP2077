@@ -3,6 +3,7 @@
 #include "ScriptStore.h"
 #include "ScriptFormats.hpp"
 #include "ModDispatch.hpp"
+#include "config/M1CoreVersion.h"
 
 #include <M1CoreRuntime.h>
 
@@ -17,6 +18,10 @@ ScriptStore::ScriptStore(LuaSandbox& aLuaSandbox, const Paths& aPaths, VKBinding
 
 void ScriptStore::DiscardAll()
 {
+    {
+        std::lock_guard lock(m_compatibilityMutex);
+        m_compatibilityIssues.clear();
+    }
     m_vkBinds.clear();
     m_contexts.clear();
     m_sandbox.ResetState();
@@ -66,6 +71,21 @@ void ScriptStore::LoadAll()
                 continue;
             }
 
+            // Reject incompatible mods BEFORE creating a sandbox or running Lua.
+            const auto check = m1core::compat::ReadManifest(path, name,
+                {M1CORE_VERSION_MAJOR, M1CORE_VERSION_MINOR, M1CORE_VERSION_PATCH});
+            if (check.issue)
+            {
+                {
+                    std::lock_guard lock(m_compatibilityMutex);
+                    m_compatibilityIssues.push_back(*check.issue);
+                }
+                consoleLogger->warn("Skipping mod '{}' (version '{}'): {} (installed m1core {})",
+                    check.issue->name, check.issue->modVersion,
+                    check.issue->detail, check.issue->installedCore);
+                continue;
+            }
+
             auto ctx = ScriptContext{m_sandbox, path, name};
             if (ctx.IsValid())
             {
@@ -89,6 +109,12 @@ void ScriptStore::LoadAll()
         m_vkBinds.insert({contextIt.first, contextIt.second.GetBinds()});
 
     m_bindings.InitializeMods(m_vkBinds);
+}
+
+std::vector<m1core::compat::Issue> ScriptStore::GetCompatibilityIssues() const
+{
+    std::lock_guard lock(m_compatibilityMutex);
+    return m_compatibilityIssues;
 }
 
 const VKBind* ScriptStore::GetBind(const VKModBind& acModBind) const

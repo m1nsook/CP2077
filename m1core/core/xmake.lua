@@ -78,7 +78,7 @@ target("m1core")
     add_headerfiles("src/**.h", "src/**.hpp")
     add_includedirs("src", "build", "../native")
     add_syslinks("User32", "Version", "d3d11", "d3d12", "d3dcompiler",
-                 "dxgi", "imm32", "Dbghelp")
+                 "dxgi", "imm32", "Dbghelp", "Shell32")
     add_packages("spdlog", "nlohmann_json", "minhook", "hopscotch-map",
         "imgui", "mem", "sol2", "tiltedcore", "sqlite3",
         "openrestry-luajit", "xbyak", "stb")
@@ -169,3 +169,10 @@ target("m1core_sandbox_cleanup_tests")
     set_kind("binary")
     add_files("../tests/sandbox_cleanup_tests.cpp")
     add_includedirs("src", "../tests")
+
+// Native version/manifest compatibility checks. No game or ImGui required.
+target("m1core_mod_compatibility_tests")
+    set_kind("binary")
+    add_files("../tests/mod_compatibility_tests.cpp")
+    add_includedirs("src", "../tests")
+    add_packages("nlohmann_json")

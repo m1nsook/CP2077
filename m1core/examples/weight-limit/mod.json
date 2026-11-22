@@ -1,0 +1,7 @@
+{
+  "name": "Weight Limit (Sample)",
+  "version": "1.0.0",
+  "m1core": {
+    "min": "1.0.0"
+  }
+}

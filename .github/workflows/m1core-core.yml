@@ -109,6 +109,16 @@ jobs:
                     # AFTER.html redesign must use stock ImGui state and preserve the
           # existing backend rather than reintroducing web-rendered widgets.
           $layout = Get-Content "$root/src/m1core_registry_ui.cpp" -Raw
+          # Compatibility enforcement occurs before Lua sandbox creation.
+          $store = Get-Content "$root/src/scripting/ScriptStore.cpp" -Raw
+          if ($store -notmatch 'ReadManifest\(' -or
+              $store -notmatch 'm_compatibilityIssues.push_back' -or
+              $store.IndexOf('ReadManifest(path') -gt $store.IndexOf('auto ctx = ScriptContext') -or
+              $layout -notmatch 'GetCompatibilityIssues\(' -or
+              $layout -notmatch 'M1CORE_VERSION_SIMPLE' -or
+              $layout -notmatch 'mods/39311') {
+            throw "m1core mod compatibility check or user-facing warning disconnected"
+          }
           # Console is navigable and executable; System Logs stays read-only.
           if ($layout -notmatch 'Page::Console' -or
               $layout -notmatch 'SidebarNav\(M1CORE_ICON_TERMINAL,"Console",Page::Console\)' -or
@@ -241,6 +251,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Script extension tests did not compile" }
           xmake run -y m1core_script_formats_tests
           if ($LASTEXITCODE -ne 0) { throw "Script extension tests failed" }
+          xmake build -y -vD m1core_mod_compatibility_tests
+          if ($LASTEXITCODE -ne 0) { throw "Mod compatibility tests did not compile" }
+          xmake run -y m1core_mod_compatibility_tests
+          if ($LASTEXITCODE -ne 0) { throw "Mod compatibility tests failed" }
           xmake build -y -vD m1core_mouse_click_tests
           if ($LASTEXITCODE -ne 0) { throw "Mouse click helper tests did not compile" }
           xmake run -y m1core_mouse_click_tests
@@ -351,6 +365,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $src = 'm1core/examples/weight-limit/init.m1s'
+          $manifest = 'm1core/examples/weight-limit/mod.json'
           $compiled = 'm1core/core/weight-limit-build/init.m1c'
           if (!(Test-Path $src) -or !(Test-Path $compiled)) { throw "Missing sample source or real compiled bytecode" }
           $raw = [System.IO.File]::ReadAllBytes((Resolve-Path $compiled).Path)
@@ -362,11 +377,13 @@ jobs:
           New-Item -ItemType Directory -Path $sourceDir,$byteDir -Force | Out-Null
           Copy-Item -LiteralPath $src -Destination "$sourceDir/init.m1s"
           Copy-Item -LiteralPath $compiled -Destination "$byteDir/init.m1c"
+          Copy-Item -LiteralPath $manifest -Destination "$sourceDir/mod.json"
+          Copy-Item -LiteralPath $manifest -Destination "$byteDir/mod.json"
           Copy-Item -LiteralPath 'm1core/LICENSE' -Destination "$sourceDir/LICENSE"
           Copy-Item -LiteralPath 'm1core/LICENSE' -Destination "$byteDir/LICENSE"
-          if ((@(Get-ChildItem 'm1core/core/sample-source' -Recurse -File)).Count -ne 2 -or
-              (@(Get-ChildItem 'm1core/core/sample-bytecode' -Recurse -File)).Count -ne 2) {
-            throw "Each game-root variant needs exactly the entrypoint and MIT license"
+          if ((@(Get-ChildItem 'm1core/core/sample-source' -Recurse -File)).Count -ne 3 -or
+              (@(Get-ChildItem 'm1core/core/sample-bytecode' -Recurse -File)).Count -ne 3) {
+            throw "Each game-root variant needs exactly the entrypoint, mod.json and MIT license"
           }
           Get-FileHash "$sourceDir/init.m1s" -Algorithm SHA256 | Format-List
           Get-FileHash "$byteDir/init.m1c" -Algorithm SHA256 | Format-List

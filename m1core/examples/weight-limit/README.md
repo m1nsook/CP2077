@@ -8,10 +8,13 @@ This is a **functional sample mod** to verify m1core's new Lua settings API and
 
 Download **one** GitHub Actions artifact, either
 `m1core-weight-limit-source` or `m1core-weight-limit-bytecode`, and extract
-directly into your **Cyberpunk 2077 game root**. Both contain exactly one
-entrypoint in `red4ext/plugins/m1core/mods/weight-limit-sample/`:
+directly into your **Cyberpunk 2077 game root**. Both contain a `mod.json` manifest and one entrypoint in
+`red4ext/plugins/m1core/mods/weight-limit-sample/`:
 - Source: `init.m1s`
 - Compiled: `init.m1c` — real bytecode from m1core's pinned LuaJIT build.
+
+The manifest declares **mod version 1.0.0** and **minimum m1core 1.0.0**.
+The mod version and m1core version are independent.
 
 **Do not install both**: `init.m1s` intentionally takes priority over
 `init.m1c`. Install the current `m1core.dll` from the framework's separate

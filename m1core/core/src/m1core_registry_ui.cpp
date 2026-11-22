@@ -11,6 +11,8 @@
 #include <overlay/PhosphorIcons.h>
 #include <overlay/M1CoreUIColors.h>
 #include <scripting/LuaVM.h>
+#include "config/M1CoreVersion.h"
+#include <shellapi.h>
 
 #include <filesystem>
 #include <fstream>
@@ -808,15 +810,89 @@ void DrawProfilesPage()
 }
 
 
+// The compatibility notice is centered like the AFTER draft. No separate
+// overlay/input hook: About continues to render inside the existing page.
+void CenterAboutText(const char* text, bool warning = false)
+{
+    const float textWidth = ImGui::CalcTextSize(text).x;
+    const float space = ImGui::GetContentRegionAvail().x;
+    if (space > textWidth)
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (space - textWidth) * 0.5f);
+    if (warning)
+        ImGui::TextColored(m1core::ui::WarningText(), "%s", text);
+    else
+        ImGui::TextUnformatted(text);
+}
+
 void DrawAboutPage()
 {
-    if (auto* font = m1core::KarlaBold()) ImGui::PushFont(font);
-    ImGui::TextUnformatted("M1CORE");
-    if (m1core::KarlaBold()) ImGui::PopFont();
+    const auto& issues = M1CoreRuntime::Get().GetVM().GetCompatibilityIssues();
+    if (issues.empty())
+    {
+        if (auto* font = m1core::KarlaBold()) ImGui::PushFont(font);
+        ImGui::TextUnformatted("M1CORE");
+        if (m1core::KarlaBold()) ImGui::PopFont();
+        ImGui::Separator();
+        ImGui::Text("Installed m1core: %s", M1CORE_VERSION_SIMPLE);
+        ImGui::TextWrapped("Native RED4ext mod settings framework.");
+        ImGui::TextWrapped("Settings, keybindings and profiles with Dear ImGui.");
+        ImGui::TextWrapped("Native RED4ext DLL. No additional overlay installation required.");
+        return;
+    }
+
+    MoveDown(48);
+    CenterAboutText(M1CORE_ICON_WARNING, true);
+    MoveDown(12);
+    if (auto* heading = m1core::KarlaPageTitle()) ImGui::PushFont(heading);
+    CenterAboutText("IMPORTANT");
+    if (m1core::KarlaPageTitle()) ImGui::PopFont();
+    MoveDown(10);
+    CenterAboutText("Some mods cannot run on this version of m1core.");
+    MoveDown(9);
+    ImGui::TextDisabled("Installed m1core: %s", M1CORE_VERSION_SIMPLE);
     ImGui::Separator();
-    ImGui::TextWrapped("Native RED4ext mod settings framework.");
-    ImGui::TextWrapped("Settings, keybindings and profiles with Dear ImGui.");
-    ImGui::TextWrapped("Native RED4ext DLL. No additional overlay installation required.");
+    bool needsUpdate = false;
+    for (const auto& issue : issues)
+    {
+        ImGui::PushID(issue.folder.c_str());
+        const std::string modTitle = issue.name +
+            (issue.modVersion.empty() ? "" : "  v" + issue.modVersion);
+        ImGui::TextUnformatted(modTitle.c_str());
+
+        if (issue.reason == m1core::compat::Reason::NeedsNewerCore)
+        {
+            needsUpdate = true;
+            ImGui::TextColored(m1core::ui::WarningText(),
+                "Requires m1core %s or newer.", issue.requiredMin.c_str());
+        }
+        else if (issue.reason == m1core::compat::Reason::NeedsOlderCore)
+            ImGui::TextColored(m1core::ui::WarningText(),
+                "Requires m1core below %s.", issue.maximumExclusive.c_str());
+        else
+            ImGui::TextWrapped("Invalid mod.json: %s", issue.detail.c_str());
+        ImGui::PopID();
+        MoveDown(7);
+    }
+
+    if (needsUpdate)
+    {
+        MoveDown(9);
+        ImGui::TextDisabled("Incompatible mods were not loaded.");
+        MoveDown(10);
+        // Direct link: compatibility is determined by mod.json, not by
+        // checking Nexus versions, release state, or a remote API.
+        const char* label = "Download from Nexus Mods";
+        const float buttonWidth = ImGui::CalcTextSize(label).x +
+            ImGui::GetStyle().FramePadding.x * 2.0f;
+        const float available = ImGui::GetContentRegionAvail().x;
+        if (available > buttonWidth)
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                                 (available - buttonWidth) * 0.5f);
+        if (ImGui::Button(label))
+            ShellExecuteW(nullptr, L"open",
+                L"https://www.nexusmods.com/cyberpunk2077/mods/39311",
+                nullptr, nullptr, SW_SHOWNORMAL);
+    }
 }
 
 const char* PageTitle(Page p)
@@ -903,7 +979,11 @@ void DrawSidebar()
     SidebarGroup("SYSTEM");
     SidebarNav(M1CORE_ICON_TERMINAL,"Console",Page::Console);
     SidebarNav(M1CORE_ICON_TERMINAL,"Logs",Page::Logs);
-    SidebarNav(M1CORE_ICON_ABOUT,"About",Page::About);
+    const auto blockedMods = M1CoreRuntime::Get().GetVM().GetCompatibilityIssues().size();
+    const std::string aboutLabel = blockedMods
+        ? "About (" + std::to_string(blockedMods) + ")" : "About";
+    SidebarNav(blockedMods ? M1CORE_ICON_WARNING : M1CORE_ICON_ABOUT,
+               aboutLabel.c_str(),Page::About);
 
     // AFTER.html's 76px card is anchored above the bottom padding.
     const float cardHeight = 76.0f;

@@ -4,6 +4,11 @@
 
 #include <M1CoreRuntime.h>
 
+std::vector<m1core::compat::Issue> LuaVM::GetCompatibilityIssues() const
+{
+    return m_scripting.GetCompatibilityIssues();
+}
+
 const VKBind* LuaVM::GetBind(const VKModBind& acModBind) const
 {
     return m_scripting.GetBind(acModBind);
