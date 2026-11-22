@@ -4,6 +4,14 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## M8 UI polish — latest logs, selection, complete dividers (2026-11-22)
+
+- **User-verified in game:** m1core's new native Console successfully executed `print(Game.GetPlayer():GetWorldPosition())` and printed a real player `ToVector4` with x/y/z coordinates. The Lua→Cyberpunk game integration is confirmed; do not request this test again.
+- **Issue 1, stale scroll position:** Both Console and read-only Logs opened at the beginning of cached output (or retained an old scroll position). Now each page refreshes its bounded 64 KiB file snapshot on navigation, builds individual rows and requests scroll-to-bottom on first visit, command execution, Refresh, log-source change and script reload. Manual upward scrolling remains available without jumping to the bottom each frame.
+- **Issue 2, selection/copy:** Previously `ImGui::TextUnformatted` rendered unselectable text; dragging elsewhere also moved the ImGui root window. Log rows are now transparent `ImGui::InputText` with `ImGuiInputTextFlags_ReadOnly` (native text selection/Ctrl+C), displayed with `ImGuiListClipper`, plus Copy output buttons. The main window uses `ImGuiWindowFlags_NoMove` so only the existing custom title drag target can reposition it.
+- **Issue 3, broken lines:** The titlebar separator and content-header separator were formerly child-scoped `ImGui::Separator()` widgets clipped to different subwindows, causing visibly incomplete lines. Their 1px layout spacing is preserved and the divider lines are drawn once from the root ImGui draw list at exact window/page boundaries for continuous appearance matching AFTER.
+- **Scope:** No changes to Lua execution, input hooks, native settings, Weight Limit or existing mods. One Windows native DLL build plus UI source checks required; in-game visual confirmation not yet received. Draft PR #41 stays unmerged.
+
 ## M8 Console page — verified Windows build (2026-11-22)
 
 - **Windows CI PASS:** [#45026459919](https://github.com/m1nsook/CP2077/actions/runs/45026459919), source `dcbcc72c6de9b1023f8015e49a7e68a6b3a76079`. The standalone RED4ext m1core.dll compiled and all automated tests passed. The UI-source regression check verifies separate Console sidebar navigation, runnable Lua command input and **no command input on Logs**.

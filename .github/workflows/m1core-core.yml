@@ -128,6 +128,21 @@ jobs:
           if ($logsBlock -match 'ExecuteLuaConsoleCommand|##m1core-lua-command|Run Lua') {
             throw "System Logs must remain read-only"
           }
+          # UI regression: real selectable log text, newest entries on first
+          # opening both pages, movable only from the custom titlebar, and
+          # uninterrupted parent-owned header divider lines.
+          if ($layout -notmatch 'ImGuiInputTextFlags_ReadOnly' -or
+              $layout -notmatch 'ImGuiListClipper' -or
+              $layout -notmatch 'DrawSelectableLogRows\(logRows, logShouldScroll\)' -or
+              $layout -notmatch 'DrawSelectableLogRows\(consoleRows, consoleShouldScroll\)' -or
+              $layout -notmatch 'ImGui::SetScrollY\(FLT_MAX\)' -or
+              $layout -notmatch 'target == Page::Logs' -or
+              $layout -notmatch 'target == Page::Console' -or
+              $layout -notmatch 'ImGuiWindowFlags_NoMove' -or
+              $layout -notmatch 'mainMin.x,titleDividerY' -or
+              $layout -notmatch 'sidebarMax.x,pageDividerY') {
+            throw "m1core log selection, latest scroll or full-width divider regression"
+          }
           if ($layout -notmatch '##app-sidebar' -or
               $layout -notmatch '##app-page-header' -or
               $layout -notmatch '##app-page-body' -or

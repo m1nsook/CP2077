@@ -32,8 +32,10 @@ char profileName[96] = "default";
 bool confirmModReset = false;
 std::string notice;
 std::string logSnapshot;
+std::vector<std::string> logRows;
 int logSource = 0;
 bool logLoaded = false;
+bool logShouldScroll = true;
 
 // Console has its own page. Logs stays a read-only output viewer.
 char luaCommand[4096]{};
@@ -41,8 +43,9 @@ std::vector<std::string> luaCommandHistory;
 std::size_t luaHistoryIndex = 0;
 std::string luaConsoleStatus;
 std::string consoleSnapshot;
+std::vector<std::string> consoleRows;
 bool consoleLoaded = false;
-bool consoleShouldScroll = false;
+bool consoleShouldScroll = true;
 char keybindSearch[128]{};
 std::string selectedKeybindMod = "m1core";
 std::string activeProfile = "default";
@@ -90,6 +93,63 @@ std::string ReadLogTail(const std::filesystem::path& file)
             text.erase(0, firstLineEnd + 1);
     }
     return text;
+}
+
+// ImGui::TextUnformatted cannot be selected. Render each log entry as a
+// transparent, read-only native text control so clicking/dragging selects
+// text, Ctrl+C copies it, and no interaction executes a command.
+std::vector<std::string> SplitLogRows(const std::string& snapshot)
+{
+    std::vector<std::string> rows;
+    std::size_t start = 0;
+    while (start < snapshot.size())
+    {
+        const auto end = snapshot.find('\n', start);
+        const auto size = end == std::string::npos ? snapshot.size() - start : end - start;
+        auto row = snapshot.substr(start, size);
+        if (!row.empty() && row.back() == '\r')
+            row.pop_back();
+        rows.emplace_back(std::move(row));
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    return rows;
+}
+
+void DrawSelectableLogRows(std::vector<std::string>& rows, bool& scrollToBottom)
+{
+    // Compact transparent read-only ImGui inputs look like the prior logs,
+    // but allow genuine character selection and native clipboard shortcuts.
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 1));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, Color(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, Color(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, Color(0, 0, 0, 0));
+
+    ImGuiListClipper clipper;
+    clipper.Begin(static_cast<int>(rows.size()));
+    while (clipper.Step())
+    {
+        for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
+        {
+            auto& line = rows[static_cast<std::size_t>(index)];
+            ImGui::PushID(index);
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::InputText("##selectable-log-line", line.data(), line.size() + 1,
+                             ImGuiInputTextFlags_ReadOnly);
+            ImGui::PopID();
+        }
+    }
+    clipper.End();
+    if (scrollToBottom)
+    {
+        // Scroll to the latest line on first visit and explicit refresh.
+        // A requested FLT_MAX target clamps to the calculated content end.
+        ImGui::SetScrollY(FLT_MAX);
+        scrollToBottom = false;
+    }
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar(2);
 }
 
 // Up/down uses the in-session command history. Commands are never executed
@@ -164,10 +224,16 @@ void DrawLogsPage()
     const char* sources[] = {"m1core.log", "scripting.log"};
     ImGui::SetNextItemWidth(190.0f);
     if (ImGui::Combo("##log-file", &logSource, sources, IM_ARRAYSIZE(sources)))
+    {
         logLoaded = false;
+        logShouldScroll = true;
+    }
     ImGui::SameLine();
     if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_REFRESH " Refresh" : "Refresh"))
+    {
         logLoaded = false;
+        logShouldScroll = true;
+    }
     ImGui::SameLine();
     if (ImGui::Button(m1core::HasIcons() ? M1CORE_ICON_REFRESH " Reload Scripts" : "Reload Scripts"))
     {
@@ -176,14 +242,19 @@ void DrawLogsPage()
         M1CoreRuntime::Get().GetVM().ReloadAllMods();
         notice = "Script reload queued.";
         logLoaded = false;
+        logShouldScroll = true;
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
         ImGui::SetTooltip("Unload all Lua mods (onShutdown), then reload scripts (onInit).");
+    ImGui::SameLine();
+    if (ImGui::Button("Copy output"))
+        ImGui::SetClipboardText(logSnapshot.c_str());
 
     if (!logLoaded)
     {
         logSnapshot = ReadLogTail(M1CoreRuntime::Get().GetPaths().CoreRoot() /
                                   (logSource == 0 ? L"m1core.log" : L"scripting.log"));
+        logRows = SplitLogRows(logSnapshot);
         logLoaded = true;
     }
     const auto error = Settings().LastError();
@@ -198,7 +269,7 @@ void DrawLogsPage()
     {
         if (ImFont* font = m1core::LogFont())
             ImGui::PushFont(font);
-        ImGui::TextUnformatted(logSnapshot.c_str());
+        DrawSelectableLogRows(logRows, logShouldScroll);
         if (m1core::LogFont())
             ImGui::PopFont();
     }
@@ -215,12 +286,16 @@ void DrawConsolePage()
         consoleShouldScroll = true;
     }
     ImGui::SameLine();
-    ImGui::TextDisabled("Live Lua console  |  Up/Down recalls commands");
+    if (ImGui::Button("Copy output"))
+        ImGui::SetClipboardText(consoleSnapshot.c_str());
+    ImGui::SameLine();
+    ImGui::TextDisabled("Select text with mouse / Ctrl+C  |  Up/Down: history");
 
     if (!consoleLoaded)
     {
         consoleSnapshot = ReadLogTail(
             M1CoreRuntime::Get().GetPaths().CoreRoot() / L"scripting.log");
+        consoleRows = SplitLogRows(consoleSnapshot);
         consoleLoaded = true;
     }
 
@@ -239,14 +314,9 @@ void DrawConsolePage()
     {
         if (ImFont* font = m1core::LogFont())
             ImGui::PushFont(font);
-        ImGui::TextUnformatted(consoleSnapshot.c_str());
+        DrawSelectableLogRows(consoleRows, consoleShouldScroll);
         if (m1core::LogFont())
             ImGui::PopFont();
-        if (consoleShouldScroll)
-        {
-            ImGui::SetScrollHereY(1.0f);
-            consoleShouldScroll = false;
-        }
     }
     ImGui::EndChild();
     ImGui::PopStyleVar();
@@ -273,7 +343,9 @@ void DrawConsolePage()
         // rather than requiring a separate read-only Logs page refresh.
         consoleSnapshot = ReadLogTail(
             M1CoreRuntime::Get().GetPaths().CoreRoot() / L"scripting.log");
+        consoleRows = SplitLogRows(consoleSnapshot);
         consoleLoaded = true;
+        consoleShouldScroll = true;
     }
 
     if (!luaReady)
@@ -770,7 +842,15 @@ void SidebarNav(const char* icon, const char* title, Page target)
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered,Color(0,0,0,0));
     ImGui::PushStyleColor(ImGuiCol_HeaderActive,Color(0,0,0,0));
     if (ImGui::Selectable("##sidebar-nav",active,0,ImVec2(0,38)))
+    {
+        if (currentPage != target)
+        {
+            // Refresh and show the newest entries when opening either page.
+            if (target == Page::Logs) { logLoaded = false; logShouldScroll = true; }
+            if (target == Page::Console) { consoleLoaded = false; consoleShouldScroll = true; }
+        }
         currentPage = target;
+    }
     const bool hovered = ImGui::IsItemHovered();
     const ImVec2 top = ImGui::GetItemRectMin(), bottom = ImGui::GetItemRectMax();
     auto* draw = ImGui::GetWindowDrawList();
@@ -943,7 +1023,7 @@ void DrawNativeRegistryUI()
 
     bool hideOverlay = false;
     const bool visible = ImGui::Begin("M1CORE##native-overlay",nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse);
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove);
     if (visible)
     {
         const auto windowPos = ImGui::GetWindowPos();
@@ -983,13 +1063,16 @@ void DrawNativeRegistryUI()
             ImGui::PopStyleColor(2);
         }
         ImGui::EndChild();
+        const float titleDividerY = ImGui::GetItemRectMax().y;
         ImGui::PopStyleVar();
         if (dragging)
         {
             const auto delta = ImGui::GetIO().MouseDelta;
             ImGui::SetWindowPos(ImVec2(windowPos.x+delta.x,windowPos.y+delta.y));
         }
-        ImGui::Separator();
+        // Reserve one pixel in layout; draw the edge-to-edge separator
+        // from the parent after child windows, so clipping cannot split it.
+        ImGui::Dummy(ImVec2(0,1));
 
         // Borderless ImGui child windows ignore WindowPadding unless the
         // AlwaysUseWindowPadding flag is explicitly passed. This caused
@@ -1032,8 +1115,9 @@ void DrawNativeRegistryUI()
                 ImGuiChildFlags_AlwaysUseWindowPadding,ImGuiWindowFlags_NoScrollbar))
                 DrawPageHeader();
             ImGui::EndChild();
+            const float pageDividerY = ImGui::GetItemRectMax().y;
             ImGui::PopStyleVar();
-            ImGui::Separator();
+            ImGui::Dummy(ImVec2(0,1));
 
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(24,20));
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(8,8));
@@ -1045,6 +1129,19 @@ void DrawNativeRegistryUI()
         }
         ImGui::EndChild();
         ImGui::PopStyleVar();
+
+        // Both horizontal separators are drawn in the top-level window,
+        // over the child windows, using screen coordinates. This removes
+        // the partial/clipped segments seen in the AFTER comparison.
+        auto* layoutLines = ImGui::GetWindowDrawList();
+        const ImVec2 mainMin = ImGui::GetWindowPos();
+        const ImVec2 mainMax(mainMin.x + ImGui::GetWindowSize().x,
+                             mainMin.y + ImGui::GetWindowSize().y);
+        const ImU32 dividerColor = IM_COL32(42,44,49,255);
+        layoutLines->AddLine(ImVec2(mainMin.x,titleDividerY),
+                             ImVec2(mainMax.x,titleDividerY), dividerColor,1.0f);
+        layoutLines->AddLine(ImVec2(sidebarMax.x,pageDividerY),
+                             ImVec2(mainMax.x,pageDividerY), dividerColor,1.0f);
     }
     ImGui::End();
     ImGui::PopStyleVar(9);
