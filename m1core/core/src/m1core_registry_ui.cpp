@@ -34,6 +34,14 @@ std::string notice;
 std::string logSnapshot;
 int logSource = 0;
 bool logLoaded = false;
+
+// M8: the existing native LuaVM already executes game commands, but the
+// approved ImGui Logs page had no command input. Keep this surface inside
+// Logs (not a second overlay/window or a new input hook).
+char luaCommand[4096]{};
+std::vector<std::string> luaCommandHistory;
+std::size_t luaHistoryIndex = 0;
+std::string luaConsoleStatus;
 char keybindSearch[128]{};
 std::string selectedKeybindMod = "m1core";
 std::string activeProfile = "default";
@@ -83,6 +91,70 @@ std::string ReadLogTail(const std::filesystem::path& file)
     return text;
 }
 
+// Up/down uses the in-session command history. Commands are never executed
+// by arrow-key navigation; only Enter or the explicit Run button can do so.
+int LuaCommandHistoryCallback(ImGuiInputTextCallbackData* data)
+{
+    if (data->EventFlag != ImGuiInputTextFlags_CallbackHistory ||
+        luaCommandHistory.empty())
+        return 0;
+
+    if (data->EventKey == ImGuiKey_UpArrow)
+    {
+        if (luaHistoryIndex > 0) --luaHistoryIndex;
+    }
+    else if (data->EventKey == ImGuiKey_DownArrow)
+    {
+        if (luaHistoryIndex < luaCommandHistory.size()) ++luaHistoryIndex;
+    }
+    else return 0;
+
+    const char* selected = luaHistoryIndex == luaCommandHistory.size()
+        ? "" : luaCommandHistory[luaHistoryIndex].c_str();
+    data->DeleteChars(0, data->BufTextLen);
+    data->InsertChars(0, selected);
+    return 0;
+}
+
+void ExecuteLuaConsoleCommand()
+{
+    std::string command(luaCommand);
+    const auto first = command.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return;
+    const auto last = command.find_last_not_of(" \t\r\n");
+    command = command.substr(first, last - first + 1);
+
+    // Only user-submitted commands execute. Nothing runs automatically on
+    // startup, reload, frame update, or text edit.
+    auto& vm = M1CoreRuntime::Get().GetVM();
+    if (!vm.IsInitialized())
+    {
+        luaConsoleStatus = "Game scripting is not ready yet.";
+        return;
+    }
+
+    if (const auto logger = spdlog::get("scripting"))
+        logger->info("> {}", command);
+
+    const bool success = vm.ExecuteLua(command);
+    luaConsoleStatus = success ? "Lua command executed."
+                               : "Lua command failed. Read scripting.log below.";
+
+    if (luaCommandHistory.empty() || luaCommandHistory.back() != command)
+    {
+        if (luaCommandHistory.size() >= 50)
+            luaCommandHistory.erase(luaCommandHistory.begin());
+        luaCommandHistory.push_back(command);
+    }
+    luaHistoryIndex = luaCommandHistory.size();
+    luaCommand[0] = '\0';
+
+    // Show actual game/Lua output or error immediately, not a stale cached
+    // snapshot. Existing font (JetBrains Mono) and Logs layout stay intact.
+    logSource = 1; // scripting.log
+    logLoaded = false;
+}
+
 void DrawLogsPage()
 {
     const char* sources[] = {"m1core.log", "scripting.log"};
@@ -103,6 +175,32 @@ void DrawLogsPage()
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
         ImGui::SetTooltip("Unload all Lua mods (onShutdown), then reload scripts (onInit).");
+
+    // Native Lua command console backed by the EXISTING LuaVM and game RTTI.
+    // It is available only after the VM initializes and only while the
+    // user has opened m1core; no gameplay input is intercepted.
+    MoveDown(8);
+    auto& luaVm = M1CoreRuntime::Get().GetVM();
+    const bool luaReady = luaVm.IsInitialized();
+    if (!luaReady)
+        ImGui::TextDisabled("Lua console: waiting for in-game scripting.");
+    ImGui::BeginDisabled(!luaReady);
+    ImGui::SetNextItemWidth(-110.0f);
+    const bool pressedEnter = ImGui::InputTextWithHint(
+        "##m1core-lua-command",
+        "Lua command (e.g. print(Game.GetPlayer():GetWorldPosition()))",
+        luaCommand, sizeof(luaCommand),
+        ImGuiInputTextFlags_EnterReturnsTrue |
+        ImGuiInputTextFlags_CallbackHistory,
+        &LuaCommandHistoryCallback);
+    ImGui::SameLine();
+    const bool clickedRun = ImGui::Button("Run Lua", ImVec2(98, 0));
+    ImGui::EndDisabled();
+    if (pressedEnter || clickedRun)
+        ExecuteLuaConsoleCommand();
+    if (!luaConsoleStatus.empty())
+        ImGui::TextDisabled("%s", luaConsoleStatus.c_str());
+
     if (!logLoaded)
     {
         logSnapshot = ReadLogTail(M1CoreRuntime::Get().GetPaths().CoreRoot() /

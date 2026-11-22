@@ -96,6 +96,15 @@ jobs:
               $uiColors -notmatch '0.65f, 0.20f') {
             throw "m1core title/amber warning style regression"
           }
+          # M8: a working in-game command console must stay connected to
+          # the actual LuaVM execution path, without new keyboard hooks.
+          if ($layout -notmatch '##m1core-lua-command' -or
+              $layout -notmatch 'LuaCommandHistoryCallback' -or
+              $layout -notmatch 'vm.ExecuteLua\(command\)' -or
+              $layout -notmatch 'logSource = 1' -or
+              $layout -notmatch 'vm.IsInitialized\(\)') {
+            throw "M8 Lua console not connected to game scripting runtime"
+          }
           # The screenshots exposed unpadded borderless children and
           # centered nav buttons; keep those geometry fixes covered.
           $palette = Get-Content "$root/src/overlay/FontPalette.h" -Raw

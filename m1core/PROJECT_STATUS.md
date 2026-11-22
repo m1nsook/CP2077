@@ -4,6 +4,14 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## M8 — In-game Lua console for live Cyberpunk integration (2026-11-22)
+
+- **Actual feature shipped on development branch (CI validation pending):** the existing `LuaVM::ExecuteLua` already executes in the live game scripting VM with `Game` RTTI bindings, but the approved native UI only exposed log files and Reload Scripts. The **Logs** page now has a user-driven command line: Enter/Run Lua executes a command in m1core's VM and shows the results or errors from `scripting.log` without manually refreshing. Up/Down recalls the last 50 commands from the current session.
+- **Direct in-game validation:** in a loaded save, open m1core with the already configured menu key, select **Logs**, enter `print(Game.GetPlayer():GetWorldPosition())`, and press Enter. The scripting log should show the actual player's world coordinates. Another read-only probe: `print(Game.GetQuestsSystem():GetFactStr("q000_var_arasaka_ui_on"))`. These APIs are the game's existing RTTI bindings; no CET installation is needed.
+- **Trust boundary:** commands execute only on explicit keyboard Enter or Run Lua click, not on UI load, overlay display or script reload. Input is disabled before LuaVM finishes initializing. Like an executable console, user commands can affect save/game state; run only commands you trust.
+- **No redesign:** existing Settings, Keybinds, Profiles, Logs and About navigation remains; the new field sits in the Logs page above existing JetBrains Mono output. No new native Win32 input hooks, mod migration, font changes or extra DLL.
+- **Windows build status:** new CI will confirm compilation, existing native/real LuaJIT/Weight Limit tests, and a narrow UI-to-LuaVM wiring guard. Only real gameplay can confirm `Game.GetPlayer()` returns a game entity in this UI runtime. PR #41 remains draft and unmerged.
+
 ## Latest native CI
 
 - **M7 safe-reload Windows CI PASS:** [#44960718074](https://github.com/m1nsook/CP2077/actions/runs/44960718074), head `580fd750`, game-root `m1core-native-x64-dev` artifact **14729806951**. Compiled/tests passed; real in-game recovery from a failing DB close remains unverified. Draft PR #41 is not merged.
