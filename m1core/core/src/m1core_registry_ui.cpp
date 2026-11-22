@@ -851,17 +851,21 @@ void DrawAboutPage()
                           ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_NoScrollbar))
     {
-        PushLayoutFont(m1core::KarlaPageTitle());
         if (m1core::HasIcons())
+        {
+            // Phosphor glyphs are merged into the default Karla font, not
+            // the separate page-title font weight.
             ImGui::TextColored(Color(96,165,250),"%s",M1CORE_ICON_CUBE);
-        ImGui::SameLine(0,12);
+            ImGui::SameLine(0,12);
+        }
+        PushLayoutFont(m1core::KarlaPageTitle());
         ImGui::TextUnformatted("M1CORE");
         PopLayoutFont(m1core::KarlaPageTitle());
         MoveDown(10);
         ImGui::TextColored(Color(148,163,184),
                            "Native mod framework for Cyberpunk 2077");
         MoveDown(4);
-        ImGui::TextDisabled("Independent RED4ext DLL. No Cyber Engine Tweaks required.");
+        ImGui::TextDisabled("Standalone RED4ext runtime; no additional scripting overlay needed.");
     }
     ImGui::EndChild();
     ImGui::PopStyleVar();
