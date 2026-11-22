@@ -4,11 +4,19 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## M8 — Live Cyberpunk Lua console: Windows CI PASS (2026-11-22)
+
+- **Verified build:** [Windows CI #45024771431](https://github.com/m1nsook/CP2077/actions/runs/45024771431) **PASS** for `4e07a7020962d46f16548212ceee999077000192`. The native RED4ext m1core.dll compiled; registry/profile, LuaJIT, Weight Limit source/bytecode, native callback safety, sandbox cleanup and mouse mock tests all passed; approved UI layout checks passed, including the new Lua console wiring guard.
+- **Single installable development package:** `m1core-native-x64-dev`, GitHub artifact ID **14755850121** (from the linked run). Optional unchanged Weight Limit samples: source **14755413332** / bytecode **14755507924**. Install the main framework package only to test the console.
+- **New player-visible feature:** In the already-approved m1core Logs tab, users can now execute trusted Lua game commands with Enter/Run Lua, recall in-session command history and see immediate `scripting.log` output. Native runtime handles the command; no CET dependency.
+- **First focused in-game test (not yet confirmed):** with a loaded save, open Logs and execute `print(Game.GetPlayer():GetWorldPosition())`; the game should print V's coordinates in `scripting.log`. No need to redo previously verified startup, UI/input, or Weight Limit tests.
+- **Scope:** Existing mods unchanged; no merged PR, no general-public SDK commitment, no license/visibility changes, and no redesign.
+
 ## M8 build note — console output and workflow ordering (2026-11-22)
 
 - The first run [#45024596031](https://github.com/m1nsook/CP2077/actions/runs/45024596031) failed in the **pre-build workflow inspection step**: the new M8 source guard referenced `$layout` before it was assigned. This is a CI check ordering bug, **not a compiler/test result**.
 - Fixed the guard placement immediately after loading `m1core_registry_ui.cpp`, and flush the release-mode scripting logger before reading the refreshed log, so `print()` results appear without a second manual Refresh.
-- This M8 feature is a **real, operator-triggered Lua game console** on the existing Logs page. Compile validation remains required; no in-game execution claim yet.
+- This M8 feature is a **real, operator-triggered Lua game console** on the existing Logs page. Windows compilation and native tests confirmed in CI #45024771431; actual in-game `Game` execution is not yet verified.
 
 ## M8 — In-game Lua console for live Cyberpunk integration (2026-11-22)
 
@@ -17,6 +25,10 @@
 - **Trust boundary:** commands execute only on explicit keyboard Enter or Run Lua click, not on UI load, overlay display or script reload. Input is disabled before LuaVM finishes initializing. Like an executable console, user commands can affect save/game state; run only commands you trust.
 - **No redesign:** existing Settings, Keybinds, Profiles, Logs and About navigation remains; the new field sits in the Logs page above existing JetBrains Mono output. No new native Win32 input hooks, mod migration, font changes or extra DLL.
 - **Windows build status:** new CI will confirm compilation, existing native/real LuaJIT/Weight Limit tests, and a narrow UI-to-LuaVM wiring guard. Only real gameplay can confirm `Game.GetPlayer()` returns a game entity in this UI runtime. PR #41 remains draft and unmerged.
+
+## Latest M8 development artifact
+
+- **Native Windows CI green:** [#45024771431](https://github.com/m1nsook/CP2077/actions/runs/45024771431), head `4e07a70`, game-root artifact **14755850121** (`m1core-native-x64-dev`). Adds runnable Lua console in Logs, with session history and flushed output. Game command execution awaits the first in-game test.
 
 ## Latest native CI
 
