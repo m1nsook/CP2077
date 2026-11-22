@@ -126,8 +126,16 @@ void DrawSelectableLogRows(std::vector<std::string>& rows, bool& scrollToBottom)
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, Color(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_FrameBgActive, Color(0, 0, 0, 0));
 
+    // Entries remain chronological: oldest first, latest last. On opening
+    // the page, force the last item to be submitted even when the clipper
+    // would normally render only the first visible screenful.
+    // SetScrollY(FLT_MAX) after a clipped list had no real last item to
+    // anchor to, and left the view at the top in-game.
+    const int lastIndex = static_cast<int>(rows.size()) - 1;
     ImGuiListClipper clipper;
     clipper.Begin(static_cast<int>(rows.size()));
+    if (scrollToBottom && lastIndex >= 0)
+        clipper.IncludeItemByIndex(lastIndex);
     while (clipper.Step())
     {
         for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
@@ -138,14 +146,20 @@ void DrawSelectableLogRows(std::vector<std::string>& rows, bool& scrollToBottom)
             ImGui::InputText("##selectable-log-line", line.data(), line.size() + 1,
                              ImGuiInputTextFlags_ReadOnly);
             ImGui::PopID();
+            if (scrollToBottom && index == lastIndex)
+            {
+                // Target the actual final row, not an artificial maximum.
+                // Only on navigation/refresh/new command; never every frame,
+                // so normal upward scrolling still works.
+                ImGui::SetScrollHereY(1.0f);
+                scrollToBottom = false;
+            }
         }
     }
     clipper.End();
-    if (scrollToBottom)
+    if (scrollToBottom && rows.empty())
     {
-        // Scroll to the latest line on first visit and explicit refresh.
-        // A requested FLT_MAX target clamps to the calculated content end.
-        ImGui::SetScrollY(FLT_MAX);
+        ImGui::SetScrollY(0.0f);
         scrollToBottom = false;
     }
     ImGui::PopStyleColor(3);

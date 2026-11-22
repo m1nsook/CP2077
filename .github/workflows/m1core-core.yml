@@ -135,7 +135,9 @@ jobs:
               $layout -notmatch 'ImGuiListClipper' -or
               $layout -notmatch 'DrawSelectableLogRows\(logRows, logShouldScroll\)' -or
               $layout -notmatch 'DrawSelectableLogRows\(consoleRows, consoleShouldScroll\)' -or
-              $layout -notmatch 'ImGui::SetScrollY\(FLT_MAX\)' -or
+              $layout -notmatch 'clipper.IncludeItemByIndex\(lastIndex\)' -or
+              $layout -notmatch 'index == lastIndex' -or
+              $layout -notmatch 'ImGui::SetScrollHereY\(1.0f\)' -or
               $layout -notmatch 'target == Page::Logs' -or
               $layout -notmatch 'target == Page::Console' -or
               $layout -notmatch 'ImGuiWindowFlags_NoMove' -or
