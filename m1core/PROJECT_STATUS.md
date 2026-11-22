@@ -4,12 +4,23 @@
 >
 > **Last updated:** 2026-11-21 (Europe/Warsaw). This file represents the status at the commit that contains it. Check newer commits, PR comments and CI before assuming it is current.
 
+## M8 Console page — verified Windows build (2026-11-22)
+
+- **Windows CI PASS:** [#45026459919](https://github.com/m1nsook/CP2077/actions/runs/45026459919), source `dcbcc72c6de9b1023f8015e49a7e68a6b3a76079`. The standalone RED4ext m1core.dll compiled and all automated tests passed. The UI-source regression check verifies separate Console sidebar navigation, runnable Lua command input and **no command input on Logs**.
+- **Single game-root installable artifact:** `m1core-native-x64-dev`, GitHub artifact **14755219494**. Optional unchanged Weight Limit fixtures **14756130990** (source) and **14755703439** (compiled), not needed for Console testing.
+- **One targeted in-game check remains:** In Cyberpunk after starting a save, open m1core with the configured key, select the **new Console** sidebar page, enter `print(Game.GetPlayer():GetWorldPosition())`, hit Enter or Run Lua and confirm V's coordinates appear in the console output. This tests the newly exposed game-API execution, not previously accepted overlay/Weight Limit behavior.
+- **Scope:** Logs is still read-only, previously working native UI/input remains. No PR merge or release; do not confuse Windows CI with an in-game confirmation.
+
 ## M8 UI correction — dedicated Console, read-only Logs (2026-11-22)
 
 - **Correction from user:** System Logs is explicitly read-only; it is not the interactive Console. Previous M8 implementation incorrectly placed an editable Lua field on Logs. The prior claim that Logs was a proper console is superseded.
 - **New playable Console page:** a separate **Console** sidebar entry under SYSTEM, a dedicated **Lua Console** page with scrolling `scripting.log` output, editable 4096-byte command line, Run Lua button/Enter-to-run, in-session Up/Down history, and immediately refreshed command output. This uses the existing `LuaVM::ExecuteLua` live game bridge without CET or a new input hook.
 - **Logs preserved:** original log selector, Refresh, Reload Scripts, and read-only output remain in System Logs. It contains **no Lua command input**, and Console no longer changes the selected log source.
-- **Native Windows CI and real in-game verification needed** before calling the new Console available to the owner; CI checks specifically assert separate navigable Console and read-only Logs. No existing mods, approved colors/fonts/layout, plugin licensing or source visibility changed. Draft PR #41 remains unmerged.
+- **Native Windows CI PASSED #45026459919** for the new Console; in-game game-command execution still needs one focused check. CI checks specifically assert separate navigable Console and read-only Logs. No existing mods, approved colors/fonts/layout, plugin licensing or source visibility changed. Draft PR #41 remains unmerged.
+
+## Superseded M8 layout — original Logs input attempt (historical only)
+
+The prior M8 implementation placed input on the Logs page. That is superseded by the standalone Console tab above. This section records the previous CI baseline only and must **not** be used as current UI guidance.
 
 ## M8 — Live Cyberpunk Lua console: Windows CI PASS (2026-11-22)
 
