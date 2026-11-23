@@ -568,7 +568,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       return;
     };
     if !M1Arc_BreachInputAvailable() {
-      this.Report(44, "Native selector unavailable: check m1arc entry in RED4ext log for version/signature reason");
+      this.Report(44, "Native input not ready: check selector version, game focus and M1 Arc overlay in RED4ext log");
       return;
     };
     // First-time UI controllers can become available AFTER board capture.
