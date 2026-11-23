@@ -21,6 +21,33 @@ not establish first-puzzle gameplay success.
 not yet been verified in-game. The development solver and Python tests under
 `dev/` are not packaged.
 
+## November 23 09:09 first-board state gating
+
+New game log: the first board initialized at 09:09:29.383 and the
+game-native selector was called at 09:09:30.391 while state was still
+`Unknown`. No `OnPositionSelected` ever acknowledged that dispatch.
+At 09:09:31.403 it briefly reported `InProgress` and entered a
+terminal state 26 ms later. The second board, by contrast, reached
+`InProgress` **before** dispatch (09:10:35.758) and acknowledged all six
+selections between 09:10:36.006 and 09:10:36.135.
+
+The source supplied by the AutoBreach author also requires
+`HackingMinigameState.InProgress` before selecting anything. Its
+native DLL's input handler calls a game selection function; static
+analysis does not establish a separate first-board activation step.
+Thus the current build **never dispatches from Unknown**. It leaves the
+first capture pending until the game reports **20 sustained UI
+updates of InProgress** and the *actual planned first cell* has live
+grid geometry. No 3-second delay, synthetic Blackboard mutation,
+blind input retries, or cancellation/reopening workaround.
+
+**Important limitation:** the first InProgress signal occurred immediately
+before a terminal event. This may be a cancellation transition, not
+normal readiness. If the game never reaches sustained InProgress on an
+untouched first board, this implementation will safely leave that board
+manual. That means it has **not** solved the original first-screen bug.
+Do not ask the player to repeat the mission that fails on cancellation.
+
 ## November 23 08:46 game log: Win32 pointer path failed
 
 User-provided M1 Arc log showed Skip Breach captured/planned both
@@ -108,21 +135,23 @@ produce an `OnPositionSelected` acknowledgement, and stopped. Subsequent
 on the first screen: these are not reliable readiness signals. The
 second board entered InProgress, then accepted all native selections.
 
-**Updated source behavior:** never require the first board to become
-InProgress by itself and **do not wait three arbitrary seconds**.
-Skip Breach preserves its original capture until the real game UI grid
-has a valid rendered layout. It resolves each cell from the
+**Updated source behavior:** require an actual sustained
+`InProgress` state, without inventing a fixed intro delay or changing
+game facts. Skip Breach preserves its original captured board while
+`Unknown`; nothing is dispatched in that state. It resolves the planned
+first cell from the live
 `AllParts/Top/.../ContentContainer/GridContainer/Grid` ink widget path,
-checks current wrapping width equals the captured matrix dimension,
-and validates row/column positions against the visible first/right/down
-cells. Only then does M1 Arc's internal game-native selector receive
-the selected row and column. Its C++ bridge validates the game version,
-the function signature, the focused game window and the overlay state.
+checks the wrapping width against the captured matrix, and validates
+row/column positions against the visible first/right/down cells. Only
+after both the state and geometry are ready does M1 Arc's internal
+game-native selector receive a row and column. Its C++ bridge validates
+game version, signature, window focus and overlay state.
 The game's `OnPositionSelected` must acknowledge every selection;
 a dispatched native action alone is **never counted as success**.
-No unacknowledged click is blindly repeated. The first untouched board
-can be in Unknown=0 when this starts; the C++/REDscript path never
-changes any quest facts, puzzle state, rewards or timers.
+No unacknowledged native input is blindly repeated. The first
+untouched board remains captured while Unknown=0 and native selection
+begins only at sustained InProgress=1; C++/REDscript never changes
+quest facts, puzzle state, rewards or timers.
 
 **Validation:** native M1 Arc compilation, REDscript **syntax/parser**
 checks, and offline sequencing/unit tests are separate from actual
