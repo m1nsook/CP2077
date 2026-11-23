@@ -77,6 +77,7 @@ class BreachSequencer:
         self.ack_timeout = ack_timeout
         self.intro_delay = intro_delay
         self._unknown_since: float | None = None
+        self._sent_in_unknown = False
         self.solution: Solution | None = None
         self._fingerprint: tuple[object, ...] | None = None
         self._confirmed = 0
@@ -140,6 +141,8 @@ class BreachSequencer:
         # Hold the SAME captured board through the initial UI animation,
         # not indefinitely for InProgress. Native selector dispatch is
         # still one-shot and must receive real game acknowledgement.
+        if board.game_state == 0 and self._pending_time is not None and not self._sent_in_unknown:
+            return self._abort("native state regressed to Unknown after dispatch")
         if board.game_state == 0 and self._pending_time is None:
             if self._unknown_since is None:
                 self._unknown_since = now
@@ -182,6 +185,7 @@ class BreachSequencer:
         if not self.adapter.select_cell(position):
             return self._abort("selection adapter rejected click")
         self._pending_serial = board.selection_serial
+        self._sent_in_unknown = board.game_state == 0
         self._pending_time = now
         return StepResult(Step.WAITING, "selection requested", position)
 
