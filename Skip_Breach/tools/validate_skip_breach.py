@@ -15,6 +15,13 @@ schema = json.loads((mod/"settings.json").read_text(encoding="utf8"))
 english = json.loads((mod/"language/en_US.json").read_text(encoding="utf8"))
 template = json.loads((mod/"language/en_US.json.example").read_text(encoding="utf8"))
 source = reds.read_text(encoding="utf8")
+native_file = root / "r6/scripts/M1ArcSkipBreach/M1ArcBreachNative.reds"
+native_source = native_file.read_text(encoding="utf8")
+assert 'native func M1Arc_BreachInputAvailable() -> Bool;' in native_source
+assert ('native func M1Arc_BreachSelectCell(controller: wref<inkLogicController>, '
+        'position: Vector2) -> Bool;') in native_source
+assert "@addMethod(inkLogicController)" not in native_source
+assert "native func M1Arc_Breach" not in source  # contained in the optional API only
 
 assert manifest["format"] == 1
 assert manifest["id"] == mod.name

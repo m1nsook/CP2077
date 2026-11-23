@@ -38,7 +38,13 @@ red4ext/plugins/m1arc/mods/m1nsook.skipbreach/
     ├── en_US.json
     └── en_US.json.example
 r6/scripts/M1ArcSkipBreach/M1ArcSkipBreach.reds
+r6/scripts/M1ArcSkipBreach/M1ArcBreachNative.reds
 ```
+
+The experimental native declarations live **with Skip Breach**, not
+`r6/scripts/m1arc/M1Arc.reds`. If RED4ext reports native validation
+errors after a game update, removing `r6/scripts/M1ArcSkipBreach/`
+(and its manifest) leaves the previously working M1 Arc core API intact.
 
 Open M1 Arc. **Automatically solve Breach Protocol** is **OFF by default**.
 When first testing, ensure no existing AutoBreach installation is present:

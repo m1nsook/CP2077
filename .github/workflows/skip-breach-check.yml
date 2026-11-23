@@ -44,6 +44,7 @@ jobs:
               files = set(z.namelist())
               required = {
                   "r6/scripts/M1ArcSkipBreach/M1ArcSkipBreach.reds",
+                  "r6/scripts/M1ArcSkipBreach/M1ArcBreachNative.reds",
                   "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/mod.json",
                   "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/settings.json",
                   "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/language/en_US.json",
