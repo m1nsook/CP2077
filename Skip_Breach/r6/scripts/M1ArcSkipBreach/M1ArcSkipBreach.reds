@@ -646,13 +646,22 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.Report(41, "No captured, usable puzzle data; vanilla puzzle remains playable");
       return;
     };
-    // The FIRST board can stay Unknown until its first accepted grid selection.
-    // No guessed intro timer; use live rendered grid as a readiness guard.
-    if this.m_gameState < 0 || this.m_gameState > 1 {
+    // In the Nov 23 09:09 log, dispatch from Unknown at +0.7 s was
+    // ignored, while every second-board dispatch after InProgress was
+    // acknowledged. The author's original Lua also requires InProgress.
+    // Do NOT consume the first captured board in Unknown, and never force
+    // a Blackboard transition (which could fail a stealth objective).
+    // An InProgress seen only during cancellation is transient; require
+    // a sustained run of UI updates before attempting the first cell.
+    if this.m_gameState == 0 {
+      this.Report(42, "First board preserved in Unknown; waiting for native InProgress");
+      return;
+    };
+    if this.m_gameState != 1 {
       this.Report(43, "Breach is terminal; leaving puzzle manual");
       return;
     };
-    if this.m_gameState == 1 && this.m_inProgressTicks < 20 {
+    if this.m_inProgressTicks < 20 {
       this.Report(59, "Waiting for stable InProgress before native input");
       return;
     };
@@ -819,8 +828,9 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
           this.Report(54, "No board captured after 120 UI updates; manual puzzle remains playable");
         };
       };
-      // Preserve the first generated board until ink grid geometry is ready.
-      // A real pointer input starts vanilla interaction (Unknown is valid).
+      // Keep the first generated board pending while Unknown.
+      // Dispatch is allowed only after genuine, sustained InProgress
+      // and verified ink layout; never try the internal selector in Unknown.
       if this.m_ready && this.m_captureSerial != this.m_handledCapture
         && this.m_gameState >= 0 && this.m_gameState <= 1
         && M1Arc_GetBool("m1nsook.skipbreach","enabled") {
@@ -830,9 +840,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
         this.TryStart();
       };
     };
-    // No idle background poller. Deliver one pulse at a time while
-    // waiting for Unknown -> InProgress on the SAME captured board.
-    // Do not stop the pulse or mark the capture handled during intro.
+    // No idle background poller. Keep the SAME original captured board
+    // through Unknown and never mark it handled while the intro runs.
     if this.m_active || (this.m_ready
       && this.m_captureSerial != this.m_handledCapture
       && !this.m_cancelled
