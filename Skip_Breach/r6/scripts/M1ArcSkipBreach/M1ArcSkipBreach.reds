@@ -118,15 +118,6 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     };
   }
 
-  public func RecordUserClick(ctrl: wref<HackingMinigameGameController>) -> Void {
-    if this.m_controller != ctrl {
-      return;
-    };
-    this.m_cancelled = true;
-    this.Report(11, "Manual click detected: automation cancelled for this board");
-    this.StopExecution();
-  }
-
   public func RecordSelection(ctrl: wref<HackingMinigameGameController>, position: Vector2) -> Void {
     if this.m_controller != ctrl {
       return;
@@ -135,6 +126,11 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_lastColumn = Cast<Int32>(position.Y);
     this.m_selectionSerial += 1;
     if !this.m_active {
+      // This is a confirmed MATRIX cell selection, unlike a generic
+      // UI pointer click that can also be emitted while the puzzle opens.
+      // Never start automated input on an already touched puzzle.
+      this.m_cancelled = true;
+      this.Report(11, "Player already selected a matrix cell; leaving this board manual");
       return;
     };
     if !this.m_waiting || this.m_nextStep >= ArraySize(this.m_path) {
@@ -430,8 +426,12 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
           this.Report(54, "No board captured after 2s. Enable Skip Breach BEFORE opening the minigame.");
         };
       };
+      // A captured puzzle stays available when a user enables the setting
+      // mid-puzzle. Previously a disabled setting marked the capture as
+      // handled, forcing the player to exit/re-enter (mission failure).
       if this.m_captureSerial != this.m_handledCapture
-        && this.m_gameState == 1 {
+        && this.m_gameState == 1
+        && M1Arc_GetBool("m1nsook.skipbreach","enabled") {
         this.m_handledCapture = this.m_captureSerial;
         this.TryStart();
       };
@@ -478,15 +478,14 @@ protected cb func OnInitialize() -> Bool {
       board.GetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults));
     sys.BeginSession(this,Cast<Int32>(data.gridSize),Cast<Int32>(data.bufferSize),
                      board.GetInt(GetAllBlackboardDefs().HackingMinigame.State));
-    if M1Arc_GetBool("m1nsook.skipbreach","enabled") {
-      // Always capture first: input compatibility is checked separately
-      // and logged after capture. Do not silently skip board discovery
-      // just because the native selector is unsupported on this build.
-      let rule: ref<M1ArcSkipBreachCaptureRule> = new M1ArcSkipBreachCaptureRule();
-      rule.minigameController = this;
-      ArrayPush(data.rules,rule);
-      board.SetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults,data,true);
-    };
+    // Always install our passive generation observer, even while the
+    // M1 Arc toggle is OFF. It does not change any cell or daemon.
+    // First-puzzle capture and later opt-in must NEVER require exiting
+    // and re-entering a gig's one-shot Breach Protocol attempt.
+    let rule: ref<M1ArcSkipBreachCaptureRule> = new M1ArcSkipBreachCaptureRule();
+    rule.minigameController = this;
+    ArrayPush(data.rules,rule);
+    board.SetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults,data,true);
   };
 }
 
@@ -526,14 +525,6 @@ protected cb func OnGameStateChanged(value: Int32) -> Bool {
   wrappedMethod(value);
 }
 
-@wrapMethod(HackingMinigameGameController)
-protected cb func OnHandleInput(evt: ref<inkPointerEvent>) -> Bool {
-  let player: wref<GameObject> = this.GetPlayerControlledObject();
-  if IsDefined(evt) && evt.IsAction(n"click") && IsDefined(player) {
-    let sys: ref<M1ArcSkipBreachSystem> = M1ArcSkipBreachSystem.Get(player.GetGame());
-    if IsDefined(sys) {
-      sys.RecordUserClick(this);
-    };
-  };
-  return wrappedMethod(evt);
-}
+// Do not intercept generic UI click events: they can fire while the
+// puzzle opens and are not proof that a matrix cell was selected.
+// OnPositionSelected is the only reliable manual-selection signal.

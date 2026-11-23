@@ -53,6 +53,27 @@ not yet been verified in-game. The development solver and Python tests under
   A missing native selector no longer prevents the board capture hook from
   registering, so the failure is visible.
 
+## First-attempt safety — gig failure is not reversible
+
+A failed Breach Protocol can immediately trigger detection and end a gig.
+**Never exit and reopen a live puzzle as an activation workaround.**
+That behavior previously occurred because capture was registered only when
+the setting was already ON at `OnInitialize`, and disabled captures could
+be marked "handled" before later enabling. The controller now always
+registers a *passive* board capture observer (which returns the original
+grid unchanged). Execution can be enabled while the same board is still
+untouched and interactive. If a real matrix selection was made by the
+player, automation is cancelled for that board.
+
+The previous generic `OnHandleInput(n"click")` cancellation hook could
+react to a non-matrix UI click during opening and was removed. Only a
+confirmed `OnPositionSelected` event counts as a manual cell selection.
+
+**This is a source-level lifecycle correction, NOT an in-game working
+claim. Do not rely on this experimental mod during an irreversible gig.**
+Only advance release testing in a repeatable, non-mission Breach Protocol
+or with a recoverable save, after real REDscript validation.
+
 ## Install and test
 
 Install the **matching M1 Arc PR #1 development artifact** first (the

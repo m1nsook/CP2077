@@ -46,7 +46,6 @@ for required in [
     "@wrapMethod(HackingMinigameGameController)",
     "OnPositionSelected(position: Vector2)",
     "OnGameStateChanged(value: Int32)",
-    "OnHandleInput(evt: ref<inkPointerEvent>)",
     "M1Arc_GetBool(\"m1nsook.skipbreach\",\"enabled\")",
     "M1Arc_BreachInputAvailable()",
     "M1Arc_BreachSelectCell(logic, Vector2(",
@@ -76,6 +75,12 @@ for forbidden in [
 assert 'module MisoSkipBreach' in source
 assert 'Get(n"MisoSkipBreach.M1ArcSkipBreachSystem")' in source
 assert 'Get(n"M1ArcSkipBreachSystem") as M1ArcSkipBreachSystem' not in source
+assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
+assert 'RecordUserClick(' not in source, "Only native matrix selection can cancel"
+assert ('this.m_gameState == 1\n        && M1Arc_GetBool("m1nsook.skipbreach","enabled")' in source), (
+    "A mid-puzzle toggle must not mark the capture handled before ON")
+assert 'Always install our passive generation observer' in source, (
+    "Capture must not depend on toggle state")
 assert '&& M1Arc_BreachInputAvailable() {' not in source, "Don't hide capture behind selector readiness"
 assert "return !this.m_budgetHit && this.m_bestScore > 0" not in source, "Budget must not discard valid paths"
 print("PASS: game-root manifest, opt-in setting, native diagnostics, best-effort solver and no CET dependency")
