@@ -26,7 +26,8 @@ class BoardSnapshot:
     overlay_open: bool = False
     capture_serial: int = 0  # increments on every generated board
     selection_serial: int = 0  # increments in OnPositionSelected
-    game_state: int = 1  # 0 Unknown (intro), 1 InProgress, 2/3 terminal
+    game_state: int = 1  # 0 Unknown (before first click), 1 InProgress, 2/3 terminal
+    grid_click_ready: bool = True  # live ink cells have valid geometry
 
     def fingerprint(self) -> tuple[object, ...]:
         return (self.session_id, self.capture_serial,
@@ -67,16 +68,11 @@ class BreachSequencer:
     No forced-success actions, daemon modifications or blind click loops.
     """
 
-    def __init__(self, adapter: SelectionAdapter, *, ack_timeout: float = 1.0,
-                 intro_delay: float = 3.0):
+    def __init__(self, adapter: SelectionAdapter, *, ack_timeout: float = 1.0):
         if ack_timeout <= 0:
             raise ValueError("ack_timeout must be positive")
-        if intro_delay <= 0:
-            raise ValueError("intro_delay must be positive")
         self.adapter = adapter
         self.ack_timeout = ack_timeout
-        self.intro_delay = intro_delay
-        self._unknown_since: float | None = None
         self._sent_in_unknown = False
         self.solution: Solution | None = None
         self._fingerprint: tuple[object, ...] | None = None
@@ -136,18 +132,16 @@ class BreachSequencer:
             return self._abort("game UI unavailable, unfocused or overlay active")
         if board.fingerprint() != self._fingerprint:
             return self._abort("puzzle changed or new session started")
-        # Vanilla minigameData.timerWaitsForInteraction=True: the initial
-        # Unknown=0 state can legitimately persist until first cell click.
-        # Hold the SAME captured board through the initial UI animation,
-        # not indefinitely for InProgress. Native selector dispatch is
-        # still one-shot and must receive real game acknowledgement.
+        # The first game board remains Unknown until its first real pointer
+        # selection. Never wait for InProgress or a fixed 3s intro timeout.
+        # An adapter must report that the *live rendered cell geometry* is
+        # usable before any click. If it is unavailable, preserve the board.
         if board.game_state == 0 and self._pending_time is not None and not self._sent_in_unknown:
             return self._abort("native state regressed to Unknown after dispatch")
-        if board.game_state == 0 and self._pending_time is None:
-            if self._unknown_since is None:
-                self._unknown_since = now
-            if now - self._unknown_since < self.intro_delay:
-                return StepResult(Step.WAITING, "waiting for first UI intro elapsed")
+        if not board.grid_click_ready:
+            if self._pending_time is not None:
+                return self._abort("hacking grid disappeared during input")
+            return StepResult(Step.WAITING, "waiting for live grid cell geometry")
         cells = self.solution.cells
 
         if self._pending_time is not None:
