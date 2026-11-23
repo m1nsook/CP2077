@@ -20,8 +20,9 @@ native_source = native_file.read_text(encoding="utf8")
 assert 'native func M1Arc_BreachInputAvailable() -> Bool;' in native_source
 assert ('native func M1Arc_BreachSelectCell(controller: wref<inkLogicController>, '
         'position: Vector2) -> Bool;') in native_source
-assert ('native func LogChannel(channel: CName, const text: script_ref<String>);' in native_source), (    'Cyberpunk 2.01+ omits the LogChannel script declaration; keep the logging header installed')
-assert native_source.count('native func LogChannel(') == 1
+assert 'native func M1Arc_BreachTrace(message: String) -> Bool;' in native_source
+assert 'native func LogChannel(' not in native_source, (
+    "Skip Breach diagnostics must use the native M1 Arc log bridge, not an unverified DEBUG channel")
 assert "@addMethod(inkLogicController)" not in native_source
 assert "native func M1Arc_Breach" not in source  # contained in the optional API only
 
@@ -69,7 +70,8 @@ for required in [
     "First cell not accepted yet; retrying same board",
     "this.m_handledCapture = this.m_captureSerial;",
     "this.m_bestScore > 0 && ArraySize(this.m_bestPath) > 0",
-    "LogChannel(n\"DEBUG\", \"[Skip Breach] \" + message);",
+    "M1Arc_BreachTrace(message);",
+    'M1Arc_BreachTrace("Matching OnPositionSelected callback received");',
     "this.Report(44, \"Native input not ready:",
     "this.Report(54, \"No board captured after 120 UI updates;",
 ]:
@@ -86,12 +88,12 @@ for forbidden in [
 # The installed capture-rule and generation callback must each leave a
 # distinct trace, including the null-player and unready-system cases.
 for trace in [
-    "[Skip Breach] Hacking UI OnInitialize entered",
-    "[Skip Breach] Passive capture rule installed on initial board defaults",
-    "[Skip Breach] Passive generation observer invoked",
-    "[Skip Breach] Capture skipped: missing minigame controller",
-    "[Skip Breach] Capture skipped: player object unavailable",
-    "[Skip Breach] Capture skipped: ScriptableSystem unavailable",
+    'M1Arc_BreachTrace("Hacking UI OnInitialize entered")',
+    'M1Arc_BreachTrace("Passive capture rule installed on initial board defaults")',
+    'M1Arc_BreachTrace("Passive generation observer invoked")',
+    'M1Arc_BreachTrace("Capture skipped: missing minigame controller")',
+    'M1Arc_BreachTrace("Capture skipped: player object unavailable")',
+    'M1Arc_BreachTrace("Capture skipped: ScriptableSystem unavailable")',
 ]:
     assert trace in source, f"Missing first-screen lifecycle diagnostic: {trace}"
 
@@ -126,6 +128,8 @@ assert 'this.RecordGameState(this.m_controller,observedState);' in source, (
     "Initial Blackboard state must be observed even if the delayed listener misses it")
 assert 'this.m_controller.PauseTheTimer()' not in source, (
     "Do not pause a one-shot puzzle before dispatch")
+assert 'LogChannel(' not in source, (
+    "All runtime lifecycle diagnostics must reach red4ext/logs/m1arc*.log via the bridge")
 assert '&& M1Arc_BreachInputAvailable() {' not in source, "Don't hide capture behind selector readiness"
 assert "return !this.m_budgetHit && this.m_bestScore > 0" not in source, "Budget must not discard valid paths"
 print("PASS: game-root manifest, opt-in setting, native diagnostics, best-effort solver and no CET dependency")
