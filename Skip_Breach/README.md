@@ -71,36 +71,43 @@ Every event carries the exact session and capture serial, stale
 pulses cannot affect a regenerated matrix, and only one outstanding
 event is allowed. Safety stops exist after 1,500 UI updates.
 
-**First-screen timing regression fixed in source (not yet game verified):**
-the user's Nov 23 M1 Arc runtime log showed the first board initialized at
-07:34:26.292, with a native cell dispatched at 07:34:26.879 while
-`HackingMinigameState.Unknown = 0`. It produced **no**
-`OnPositionSelected` acknowledgement, then the 120-update safety timeout
-fired at 07:34:27.901. The game entered `InProgress = 1` only
-at 07:34:28.647, after the mod had consumed the capture. By contrast,
-the second board entered `InProgress` before its first dispatch and
-acknowledged all five selections.
+**Base-game first-input lifecycle, sourced from the vanilla controller:**
+`HackingMinigameGameController.OnInitialize` explicitly sets
+`minigameData.timerWaitsForInteraction = true`. The timer does not
+start until the player's first accepted matrix selection. The minigame
+can remain in `HackingMinigameState.Unknown=0` before that selection.
+Our previous rule demanding `InProgress=1` before sending any native
+cell introduced a circular dependency on the **first** puzzle.
 
-**New behavior:** the untouched capture remains pending through Unknown;
-the session-tagged UI event pump continues without invoking the native
-selector. Once the actual game Blackboard reports InProgress and stays there
-for 20 UI event updates, Skip Breach plans and submits the first cell,
-still requiring each game's native `OnPositionSelected` acknowledgement.
-This short stability gate is important because the **failed** first attempt
-reported InProgress only **58 ms before the terminal state**: that transition
-could have been caused by cancelling the puzzle rather than the intro
-finishing. It must not trigger native input into an exiting board.
-The counter resets on a new board or state change; no actual timer is
-paused or reset. It never forces a Blackboard
-state change, resets a puzzle, repeats a dispatched but unacknowledged
-cell, modifies mission facts or pauses the vanilla timer. Terminal
-states are never automated. This specifically removes the premature
-dispatch demonstrated by the logs; it does **not** prove the first screen
-will reach InProgress automatically in every situation.
+The user's Nov 23 log also shows the earlier native dispatch happened
+only **0.587 seconds** after the first UI initialization, failed to
+produce an `OnPositionSelected` acknowledgement, and stopped. Subsequent
+`InProgress` transitions happened **92 ms before terminal failure**
+on the first screen: these are not reliable readiness signals. The
+second board entered InProgress, then accepted all native selections.
 
-REDscript CLI parser validation is NOT semantic game compilation or
-proof of successful first-screen input. Keep PR draft pending the
-pre-attempt-save in-game acceptance test.
+**Updated source behavior:** capture the first generated matrix as
+before, allow the REDscript event pump to run while in Unknown, and use
+`EngineTime.ToFloat(GameInstance.GetEngineTime(...))` to wait
+**three seconds after capture** for the opening animation/UI to settle
+(regardless of frame rate or the deliberately stationary hacking timer).
+At that point, if the same board remains untouched, Skip Breach can
+request the first native cell **while still Unknown**; that real
+selection is expected to let vanilla transition into InProgress.
+For a board already InProgress, the existing 20-update stability guard
+avoids dispatch during a transient closing/failure transition.
+
+The first native call is still ONE-SHOT: it waits for the original
+`OnPositionSelected` event before advancing and never blindly repeats
+an unacknowledged call. Terminal states, player touches, focus/overlay
+loss or missing native input stop execution. There are no fake rewards,
+timer modifications, mission-fact changes, synthetic state transitions,
+CET dependencies or extra scripting runtimes.
+
+**Validation scope:** offline source/solver/sequence checks are useful
+regression protection but cannot guarantee the 2.5 UI accepts the
+first click after the elapsed intro time. The PR stays draft and we
+are not requesting another repeat of the user's high-risk gig.
 
 ## First-attempt initialization and timer safety
 
