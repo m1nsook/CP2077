@@ -71,15 +71,30 @@ Every event carries the exact session and capture serial, stale
 pulses cannot affect a regenerated matrix, and only one outstanding
 event is allowed. Safety stops exist after 1,500 UI updates.
 
-The first screen can report `HackingMinigameState.Unknown = 0`
-before any selection; we now allow the first automated selection once
-the actual hacking UI logic controller is present, instead of waiting
-for `InProgress = 1` (which may itself require a first click).
-Succeeded and Failed states are never automated.
+**First-screen timing regression fixed in source (not yet game verified):**
+the user's Nov 23 M1 Arc runtime log showed the first board initialized at
+07:34:26.292, with a native cell dispatched at 07:34:26.879 while
+`HackingMinigameState.Unknown = 0`. It produced **no**
+`OnPositionSelected` acknowledgement, then the 120-update safety timeout
+fired at 07:34:27.901. The game entered `InProgress = 1` only
+at 07:34:28.647, after the mod had consumed the capture. By contrast,
+the second board entered `InProgress` before its first dispatch and
+acknowledged all five selections.
 
-This is a source-level hypothesis informed by vanilla controller and
-the supplied reference. REDscript CLI parser validation is NOT
-semantic game compilation or proof of successful first-screen input.
+**New behavior:** the untouched capture remains pending through Unknown;
+the session-tagged UI event pump continues without invoking the native
+selector. Once the actual game Blackboard reports InProgress, Skip Breach
+plans and submits the first cell, still requiring each game's native
+`OnPositionSelected` acknowledgement. It never forces a Blackboard
+state change, resets a puzzle, repeats a dispatched but unacknowledged
+cell, modifies mission facts or pauses the vanilla timer. Terminal
+states are never automated. This specifically removes the premature
+dispatch demonstrated by the logs; it does **not** prove the first screen
+will reach InProgress automatically in every situation.
+
+REDscript CLI parser validation is NOT semantic game compilation or
+proof of successful first-screen input. Keep PR draft pending the
+pre-attempt-save in-game acceptance test.
 
 ## First-attempt initialization and timer safety
 
