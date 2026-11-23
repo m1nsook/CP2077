@@ -54,14 +54,60 @@ adapter that selects **one real cell**. The coordinator:
 `test_selection_sequencer.py` uses a **fake game adapter** and no OS
 injection. This is logic-level verification, not an installable mod.
 
+## What the supplied AutoBreach 0.4.0 ZIP confirms
+
+This analysis is based directly on the user's supplied
+`AutoBreach 35512 ...zip`, not an assumed generic minigame API:
+
+- The ZIP installs **CET Lua** (`init.lua`, `solver.lua`, coordinate
+  adapter), **REDscript** (`autobreach.reds`) and a separate
+  **RED4ext binary** (`AutoBreachInput.dll`). We will **not** make CET
+  or that third-party binary a Skip Breach requirement.
+- The REDscript code observes `HackingMinigameGameController` lifecycle,
+  blackboard minigame state and `OnPositionSelected(Vector2)`. It
+  injects a `MinigameGenerationRule` to capture
+  `GridCell.rarityValue` directly during board generation.
+- Visible/unfulfilled `UnlockableProgram` entries are matched by
+  display index to `CharactersChain.ownerId`, to obtain actual daemon
+  token sequences (up to four). This avoids using localized display text.
+- Native game positions are **(row, column)**. The AutoBreach Lua solver
+  uses an unusual transposed **(column, row)** representation and converts
+  both ways. The CP2077 Python solver is already row-major, so the
+  `dev/native_capture.py` adapter retains native coordinates unchanged.
+- The ZIP does **not** implement raw mouse movement as the primary
+  selector. REDscript asks a native method on
+  `gameuiHackingMinigameLogicController` to select a cell. The DLL
+  explicitly requires Cyberpunk 2.5 build `3.0.88.46235` and verifies
+  the target function signature before enabling this action. Reusing the
+  previous generic mouse-click helper as the primary input would be a
+  regression.
+- Its runtime uses generation/selection serials, cancellation and
+  acknowledgement before advancing; it pauses/resumes the minigame timer
+  around execution.
+
+**Actual game functions learned from the reference (not yet integrated):**
+`MinigameGenerationRule.OnProcessRule`,
+`HackingMinigameGameController.OnInitialize/OnUninitialize`,
+`OnPositionSelected`, `OnGameStateChanged`,
+`GetProgramsChains`, `GetUnlockablePrograms`,
+`GetControllerByType` and a game-version-checked direct input call.
+
+The new development-only `native_capture.py` and tests validate the
+capture schema, display-order matching and row/column conventions; the
+selection sequencer now checks a **selection-event serial** as well as
+the selected path, and treats a regenerated but identical board as a
+new puzzle. None of this claims a native input selector is implemented.
+
 ## Remaining steps
 
-
-- Inspect Cyberpunk 2077 2.5 \`HackingMinigameGameController\` and related
+- Confirm the Cyberpunk 2077 2.5 \`HackingMinigameGameController\` and related
   game scripts (REDscript / WolvenKit), and verify the actual member types
   for the matrix, daemon programs, buffer and selectable cell controls.
 - Port/test the solver against real controller data; do not silently
   treat the Python prototype as a shipped in-game implementation.
+- Implement our **own version-verified native RED4ext cell selector**
+  (not a hard-coded copy of the supplied DLL). It must fail closed when
+  signatures/game versions differ, and never send arbitrary mouse input.
 - Build a safe in-game selection adapter, validate node-by-node state
   changes and ensure the existing M1 Arc overlay does not own the cursor.
 - Add the mod's own \`mod.json\`, \`settings.json\` and \`language/en_US.json\`

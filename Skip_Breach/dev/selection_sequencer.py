@@ -24,9 +24,12 @@ class BoardSnapshot:
     active: bool = True
     focused: bool = True
     overlay_open: bool = False
+    capture_serial: int = 0  # increments on every generated board
+    selection_serial: int = 0  # increments in OnPositionSelected
 
     def fingerprint(self) -> tuple[object, ...]:
-        return self.session_id, self.matrix, self.daemons, self.buffer_size
+        return (self.session_id, self.capture_serial,
+                self.matrix, self.daemons, self.buffer_size)
 
 
 class SelectionAdapter(Protocol):
@@ -72,6 +75,8 @@ class BreachSequencer:
         self._fingerprint: tuple[object, ...] | None = None
         self._confirmed = 0
         self._pending_time: float | None = None
+        self._pending_serial: int | None = None
+        self._last_serial: int | None = None
         self._ended = False
 
     @staticmethod
@@ -104,6 +109,7 @@ class BreachSequencer:
         if not path_is_valid(board.matrix, solution.cells):
             return self._abort("solver produced an illegal path")
         self.solution = solution
+        self._last_serial = board.selection_serial
         self._fingerprint = board.fingerprint()
         return StepResult(Step.IDLE, "legal path planned")
 
@@ -126,21 +132,30 @@ class BreachSequencer:
 
         if self._pending_time is not None:
             desired = cells[:self._confirmed + 1]
-            if board.selected == desired:
+            if board.selected == desired and (
+                self._pending_serial is not None
+                and board.selection_serial > self._pending_serial
+            ):
                 self._pending_time = None
+                self._pending_serial = None
+                self._last_serial = board.selection_serial
                 self._confirmed += 1
                 if self._confirmed == len(cells):
                     self._ended = True
                     return StepResult(Step.COMPLETE, "all cells acknowledged")
                 return StepResult(Step.CONFIRMED, "selected node acknowledged")
-            if board.selected != cells[:self._confirmed]:
+            if board.selected != cells[:self._confirmed] and board.selected != desired:
                 return self._abort("game selection diverged from planned path")
+            if board.selection_serial < (self._pending_serial or 0):
+                return self._abort("selection serial rolled back")
             if now - self._pending_time > self.ack_timeout:
                 return self._abort("game did not acknowledge selection")
             return StepResult(Step.WAITING, "waiting for game acknowledgement")
 
         if board.selected != cells[:self._confirmed]:
             return self._abort("manual selection or out-of-order state")
+        if self._last_serial is not None and board.selection_serial != self._last_serial:
+            return self._abort("manual input received outside our selection")
         if self._confirmed == len(cells):
             self._ended = True
             return StepResult(Step.COMPLETE, "all cells acknowledged")
@@ -149,10 +164,12 @@ class BreachSequencer:
         # before the physical click or in-game widget event.
         if not self.adapter.select_cell(position):
             return self._abort("selection adapter rejected click")
+        self._pending_serial = board.selection_serial
         self._pending_time = now
         return StepResult(Step.WAITING, "selection requested", position)
 
     def _abort(self, reason: str) -> StepResult:
         self._ended = True
         self._pending_time = None
+        self._pending_serial = None
         return StepResult(Step.ABORTED, reason)

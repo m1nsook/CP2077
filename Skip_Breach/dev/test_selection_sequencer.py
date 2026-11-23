@@ -27,7 +27,9 @@ class FakeGame:
 
     def acknowledge(self, position: tuple[int, int]) -> None:
         self.board = replace(
-            self.board, selected=self.board.selected + (position,)
+            self.board,
+            selected=self.board.selected + (position,),
+            selection_serial=self.board.selection_serial + 1,
         )
 
 
@@ -84,6 +86,7 @@ class SequencerTests(unittest.TestCase):
     def test_cancels_on_new_game_or_board_changes(self):
         for changed in (
             {"session_id": "breach-2"},
+            {"capture_serial": 1},
             {"matrix": (("1C", "55"), ("55", "BD"))},
             {"buffer_size": 2},
             {"daemons": (("1C",),)},
@@ -101,6 +104,26 @@ class SequencerTests(unittest.TestCase):
         seq.begin()
         game.board = replace(game.board, selected=((0, 1),))
         self.assertEqual(seq.tick(1).state, Step.ABORTED)
+        self.assertEqual(game.requests, [])
+
+    def test_selection_must_have_game_event_serial(self):
+        game = FakeGame()
+        seq = BreachSequencer(game, ack_timeout=0.2)
+        self.assertEqual(seq.begin().state, Step.IDLE)
+        seq.tick(0)
+        # A fabricated/synthetic selected list cannot substitute for the
+        # game's OnPositionSelected callback acknowledgement.
+        game.board = replace(game.board, selected=((0, 0),))
+        self.assertEqual(seq.tick(.1).state, Step.WAITING)
+        self.assertEqual(seq.tick(.25).state, Step.ABORTED)
+        self.assertEqual(game.requests, [(0, 0)])
+
+    def test_unsolicited_selection_event_cancels(self):
+        game = FakeGame()
+        seq = BreachSequencer(game)
+        seq.begin()
+        game.board = replace(game.board, selection_serial=1)
+        self.assertEqual(seq.tick(.1).state, Step.ABORTED)
         self.assertEqual(game.requests, [])
 
     def test_cancels_on_mismatch_after_click(self):
