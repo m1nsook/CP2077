@@ -53,6 +53,10 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private let m_pulseQueued: Bool;
   private let m_pulseCount: Int32;
   private let m_inProgressTicks: Int32;
+  private let m_unknownTicks: Int32;
+  private let m_terminalTicks: Int32;
+  private let m_earlyTwoLogged: Bool;
+  private let m_ackRetries: Int32;
 
   // Only log transitions. Do not fill REDscript.log every 100ms.
   private func Report(code: Int32, message: String) -> Void {
@@ -147,6 +151,12 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_pulseQueued = false;
     this.m_pulseCount = 0;
     this.m_inProgressTicks = 0;
+    this.m_unknownTicks = 0;
+    this.m_terminalTicks = 0;
+    this.m_earlyTwoLogged = false;
+    // Per-session selection bookkeeping: 0 means no cell was selected yet.
+    this.m_selectionSerial = 0;
+    this.m_pendingSerial = 0;
     this.m_lastDiagnostic = 0;
     this.Report(10, "Breach controller initialized; waiting for puzzle capture");
     ArrayClear(this.m_grid);
@@ -166,21 +176,49 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_inProgressTicks = 0;
   }
 
+  // Live blackboard value, independent of any (possibly stale) listener callback.
+  private func LiveState() -> Int32 {
+    let board: ref<IBlackboard> = GameInstance.GetBlackboardSystem(
+      this.GetGameInstance()).Get(GetAllBlackboardDefs().HackingMinigame);
+    if !IsDefined(board) {
+      return -1;
+    };
+    return board.GetInt(GetAllBlackboardDefs().HackingMinigame.State);
+  }
+
   public func RecordGameState(ctrl: wref<HackingMinigameGameController>, state: Int32) -> Void {
     if this.m_controller != ctrl {
+      return;
+    };
+    // FIX: on the first breach after launch the blackboard reports Succeeded(2)
+    // ~90ms after InProgress and keeps it there, yet the puzzle still accepts
+    // cell selections (logs: cell 0 acknowledged while live=2) and only ends
+    // later with Failed(3) when the timer runs out. A genuine success cannot
+    // happen before any cell is selected, nor before our planned path has been
+    // fully acknowledged, so a 2 in either situation must not abort the run.
+    if state == 2 && (this.m_selectionSerial == 0
+        || (this.m_active && this.m_nextStep < ArraySize(this.m_path))) {
+      if !this.m_earlyTwoLogged {
+        this.m_earlyTwoLogged = true;
+        M1Arc_BreachTrace("[diag] ignoring Succeeded(2): no cell selected yet or planned path incomplete; puzzle still live");
+      };
+      this.ScheduleNext();
       return;
     };
     // Event-based trace, not frame polling: identify first-screen Unknown
     // versus interactive/terminal states in the *same* native log file.
     if state != this.m_gameState {
+      M1Arc_BreachTrace("[diag] state " + IntToString(this.m_gameState)
+        + " -> " + IntToString(state) + ", live blackboard=" + IntToString(this.LiveState()));
       this.m_inProgressTicks = 0;
+      this.m_terminalTicks = 0;
       if state == 0 {
         M1Arc_BreachTrace("Minigame entered Unknown state (first interaction pending)");
       } else {
         if state == 1 {
           M1Arc_BreachTrace("Minigame entered InProgress state");
         } else {
-          M1Arc_BreachTrace("Minigame entered terminal state (success/failure)");
+          M1Arc_BreachTrace("Minigame entered terminal state (success/failure), raw=" + IntToString(state));
         };
       };
     };
@@ -189,9 +227,12 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     // 2/3 are terminal Success/Failure and must always abort.
     if state > 1 {
       this.StopExecution();
-    } else {
-      this.ScheduleNext();
     };
+    // FIX: never let a terminal value kill the pulse pump. The first breach after
+    // launch reports state 2 in the same millisecond as InProgress while the puzzle
+    // keeps running (it later ended with 3). Keep pulsing so Tick() can re-read the
+    // live blackboard and recover; the pump stops itself after a bounded time.
+    this.ScheduleNext();
   }
 
   public func RecordSelection(ctrl: wref<HackingMinigameGameController>, position: Vector2) -> Void {
@@ -646,22 +687,21 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.Report(41, "No captured, usable puzzle data; vanilla puzzle remains playable");
       return;
     };
-    // In the Nov 23 09:09 log, dispatch from Unknown at +0.7 s was
-    // ignored, while every second-board dispatch after InProgress was
-    // acknowledged. The author's original Lua also requires InProgress.
-    // Do NOT consume the first captured board in Unknown, and never force
-    // a Blackboard transition (which could fail a stealth objective).
-    // An InProgress seen only during cancellation is transient; require
-    // a sustained run of UI updates before attempting the first cell.
-    if this.m_gameState == 0 {
-      this.Report(42, "First board preserved in Unknown; waiting for native InProgress");
-      return;
-    };
-    if this.m_gameState != 1 {
+    // The FIRST board can stay Unknown until its first accepted grid selection.
+    // No guessed intro timer; use live rendered grid as a readiness guard.
+    if this.m_gameState < 0 || this.m_gameState > 1 {
       this.Report(43, "Breach is terminal; leaving puzzle manual");
       return;
     };
-    if this.m_inProgressTicks < 20 {
+    // FIX: the intro animation keeps the state at Unknown (0) for ~2s while the
+    // grid is already laid out and visible, so a visible grid is NOT proof the
+    // game accepts input. Wait for InProgress; only fall back to Unknown after
+    // ~600 UI updates in case a build really stays Unknown until first input.
+    if this.m_gameState == 0 && this.m_unknownTicks < 600 {
+      this.Report(60, "Waiting for InProgress; grid is visible but intro is still running");
+      return;
+    };
+    if this.m_gameState == 1 && this.m_inProgressTicks < 20 {
       this.Report(59, "Waiting for stable InProgress before native input");
       return;
     };
@@ -708,6 +748,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     };
     this.m_handledCapture = this.m_captureSerial;
     this.m_firstCellRejects = 0;
+    this.m_ackRetries = 0;
     this.m_lockedSession = this.m_session;
     this.m_lockedCapture = this.m_captureSerial;
     this.m_path = this.m_bestPath;
@@ -745,6 +786,12 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     if this.m_gameState == 1 && this.m_inProgressTicks < 20 {
       this.m_inProgressTicks += 1;
     };
+    if this.m_gameState == 0 && this.m_unknownTicks < 1000 {
+      this.m_unknownTicks += 1;
+    };
+    if this.m_gameState > 1 && this.m_terminalTicks < 300 {
+      this.m_terminalTicks += 1;
+    };
     if this.m_active {
       if !this.m_ready || this.m_cancelled
         || this.m_gameState < 0 || this.m_gameState > 1
@@ -758,9 +805,20 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
           this.m_waitTicks += 1;
           if this.m_waitTicks > 120 {
             // Frame-driven events, not 0.1-second DelayCallback ticks.
-            // Never repeat a dispatched click without native acknowledgement.
-            this.Report(51, "No native selection acknowledgement after 120 UI updates");
-            this.StopExecution();
+            // Only the FIRST cell may be re-sent, and only if RecordSelection saw
+            // no OnPositionSelected at all since dispatch (serial unchanged), so
+            // the board is provably untouched. Later cells are never repeated.
+            if this.m_nextStep == 0 && this.m_selectionSerial == this.m_pendingSerial
+              && this.m_ackRetries < 3 {
+              this.m_ackRetries += 1;
+              this.m_waiting = false;
+              this.m_waitTicks = 0;
+              this.m_delayTicks = 30;
+              this.Report(63, "No acknowledgement for first cell; board untouched, retrying");
+            } else {
+              this.Report(51, "No native selection acknowledgement after 120 UI updates");
+              this.StopExecution();
+            };
           };
         } else {
           if this.m_delayTicks > 0 {
@@ -828,9 +886,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
           this.Report(54, "No board captured after 120 UI updates; manual puzzle remains playable");
         };
       };
-      // Keep the first generated board pending while Unknown.
-      // Dispatch is allowed only after genuine, sustained InProgress
-      // and verified ink layout; never try the internal selector in Unknown.
+      // Preserve the first generated board until ink grid geometry is ready.
+      // A real pointer input starts vanilla interaction (Unknown is valid).
       if this.m_ready && this.m_captureSerial != this.m_handledCapture
         && this.m_gameState >= 0 && this.m_gameState <= 1
         && M1Arc_GetBool("m1nsook.skipbreach","enabled") {
@@ -840,9 +897,13 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
         this.TryStart();
       };
     };
-    // No idle background poller. Keep the SAME original captured board
-    // through Unknown and never mark it handled while the intro runs.
-    if this.m_active || (this.m_ready
+    // No idle background poller. Deliver one pulse at a time while
+    // waiting for Unknown -> InProgress on the SAME captured board.
+    // Do not stop the pulse or mark the capture handled during intro.
+    if this.m_active
+      || (this.m_gameState > 1 && this.m_terminalTicks < 300
+          && this.m_captureSerial != this.m_handledCapture)
+      || (this.m_ready
       && this.m_captureSerial != this.m_handledCapture
       && !this.m_cancelled
       && this.m_gameState >= 0 && this.m_gameState <= 1
