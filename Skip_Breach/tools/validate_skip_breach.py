@@ -132,6 +132,16 @@ assert 'this.m_gameState >= 0 && this.m_gameState <= 1' in source, (
     "UI event pump must remain alive in Unknown until the first board becomes interactive")
 assert 'Never consume/dispatch a captured' in source, (
     "First-input state gate must explain the no-ack regression")
+assert 'private let m_inProgressTicks: Int32;' in source
+assert 'this.m_inProgressTicks = 0;' in source
+assert 'this.m_inProgressTicks += 1;' in source
+assert 'this.m_inProgressTicks < 20' in source
+assert 'Waiting for stable InProgress (20 UI updates)' in source
+assert source.index('if this.m_inProgressTicks < 20 {') < source.index(
+    'this.m_handledCapture = this.m_captureSerial;', source.index('private func TryStart')), (
+    "Native dispatch must be delayed until the active session is stable")
+assert 'this.m_gameState == 1 && this.m_inProgressTicks < 20' in source, (
+    "Only count readiness updates while the real game is InProgress")
 assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
 assert 'RecordUserClick(' not in source, "Only native matrix selection can cancel"
 assert ('this.m_gameState >= 0 && this.m_gameState <= 1\n        && M1Arc_GetBool("m1nsook.skipbreach","enabled")' in source), (
