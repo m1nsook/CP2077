@@ -713,14 +713,22 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
 
 public class M1ArcSkipBreachCaptureRule extends MinigameGenerationRule {
   protected func OnProcessRule(size: Uint32, out grid: array<array<GridCell>>) -> Bool {
+    LogChannel(n"DEBUG", "[Skip Breach] Passive generation observer invoked");
     let ctrl: wref<HackingMinigameGameController> = this.minigameController;
-    if !IsDefined(ctrl) || !IsDefined(ctrl.GetPlayerControlledObject()) {
+    if !IsDefined(ctrl) {
+      LogChannel(n"DEBUG", "[Skip Breach] Capture skipped: missing minigame controller");
       return true;
     };
-    let sys: ref<M1ArcSkipBreachSystem> = M1ArcSkipBreachSystem.Get(
-      ctrl.GetPlayerControlledObject().GetGame());
+    let player: wref<GameObject> = ctrl.GetPlayerControlledObject();
+    if !IsDefined(player) {
+      LogChannel(n"DEBUG", "[Skip Breach] Capture skipped: player object unavailable");
+      return true;
+    };
+    let sys: ref<M1ArcSkipBreachSystem> = M1ArcSkipBreachSystem.Get(player.GetGame());
     if IsDefined(sys) {
       sys.Capture(ctrl,size,grid,ctrl.GetProgramsChains(),ctrl.GetUnlockablePrograms());
+    } else {
+      LogChannel(n"DEBUG", "[Skip Breach] Capture skipped: ScriptableSystem unavailable");
     };
     return true;
   }
@@ -728,6 +736,9 @@ public class M1ArcSkipBreachCaptureRule extends MinigameGenerationRule {
 
 @wrapMethod(HackingMinigameGameController)
 protected cb func OnInitialize() -> Bool {
+  // First-run diagnostics: differentiate a hook that never ran from
+  // a missing ScriptableSystem or a missing generation callback.
+  LogChannel(n"DEBUG", "[Skip Breach] Hacking UI OnInitialize entered");
   wrappedMethod();
   let player: wref<GameObject> = this.GetPlayerControlledObject();
   let sys: ref<M1ArcSkipBreachSystem>;
@@ -755,6 +766,7 @@ protected cb func OnInitialize() -> Bool {
   rule.minigameController = this;
   ArrayPush(data.rules,rule);
   board.SetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults,data,true);
+  LogChannel(n"DEBUG", "[Skip Breach] Passive capture rule installed on initial board defaults");
 }
 
 @wrapMethod(HackingMinigameGameController)
