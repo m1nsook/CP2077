@@ -112,26 +112,29 @@ assert 'this.m_handledCapture = this.m_captureSerial;\n        this.TryStart();'
 assert 'class M1ArcSkipBreachTick extends DelayCallback' not in source, (
     "No DelayCallback game-time pump: first puzzle waits for initial input")
 assert 'GameInstance.GetDelaySystem' not in source, "Use UISystem event updates"
-# Real first-open logs: first dispatch during Unknown had no callback, but
-# InProgress arrived 2.355s after OnInitialize. The second puzzle's first
-# cell was dispatched after InProgress and all five callbacks succeeded.
-# Do not regress to dispatching during the opening animation.
+# Source-derived base-game contract: vanilla OnInitialize sets
+# minigameData.timerWaitsForInteraction = true. Unknown=0 can therefore
+# remain until the first actual click; InProgress is NOT a prerequisite.
+# Previous first-screen early dispatch at 0.587 s produced no callback.
+assert 'private let m_firstIntroReadyAt: Float;' in source
+assert 'this.m_firstIntroReadyAt = EngineTime.ToFloat(' in source
+assert 'GameInstance.GetEngineTime(this.GetGameInstance())) + 3.0;' in source
 assert 'if this.m_gameState == 0 {' in source
-assert 'Waiting for native minigame InProgress after intro; first board preserved' in source
-assert 'if this.m_gameState != 1 {' in source
-assert 'this.m_gameState != 1' in source, (
-    "An active solver must abort rather than dispatch when the state is no longer interactive")
+assert 'First puzzle Unknown; waiting for intro before first native selection' in source
+assert 'Intro elapsed; attempting first native selection while Unknown' in source
+assert 'this.m_gameState < 0 || this.m_gameState > 1' in source, (
+    "Valid pending native input must be allowed in Unknown or InProgress, never terminal")
+assert 'if this.m_gameState != 1 {' in source, (
+    "Any non-Unknown state must still be validated before execution")
+assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source, (
+    "Preserve the first capture through the intro without consuming it")
+assert 'this.m_gameState >= 0 && this.m_gameState <= 1' in source, (
+    "UI event pump must keep running in Unknown until the intro elapses")
 start_logic = source.split('private func TryStart() -> Void {', 1)[1].split(
     'public func Tick() -> Void {', 1)[0]
 assert start_logic.index('if this.m_gameState == 0 {') < start_logic.index(
     'this.m_handledCapture = this.m_captureSerial;'), (
-    "Unknown board must be held pending inside TryStart, not consumed")
-assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source, (
-    "Preserve the current generation while waiting for InProgress")
-assert 'this.m_gameState >= 0 && this.m_gameState <= 1' in source, (
-    "UI event pump must remain alive in Unknown until the first board becomes interactive")
-assert 'Never consume/dispatch a captured' in source, (
-    "First-input state gate must explain the no-ack regression")
+    "Unknown initial capture must be held until elapsed intro time")
 assert 'private let m_inProgressTicks: Int32;' in source
 assert 'this.m_inProgressTicks = 0;' in source
 assert 'this.m_inProgressTicks += 1;' in source
@@ -139,9 +142,9 @@ assert 'this.m_inProgressTicks < 20' in source
 assert 'Waiting for stable InProgress (20 UI updates)' in source
 assert source.index('if this.m_inProgressTicks < 20 {') < source.index(
     'this.m_handledCapture = this.m_captureSerial;', source.index('private func TryStart')), (
-    "Native dispatch must be delayed until the active session is stable")
-assert 'this.m_gameState == 1 && this.m_inProgressTicks < 20' in source, (
-    "Only count readiness updates while the real game is InProgress")
+    "Already-InProgress board must remain stable before dispatch")
+assert 'this.m_gameState == 1 && this.m_inProgressTicks < 20' in source
+
 assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
 assert 'RecordUserClick(' not in source, "Only native matrix selection can cancel"
 assert ('this.m_gameState >= 0 && this.m_gameState <= 1\n        && M1Arc_GetBool("m1nsook.skipbreach","enabled")' in source), (
