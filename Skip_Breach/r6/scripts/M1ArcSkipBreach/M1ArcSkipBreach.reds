@@ -119,6 +119,17 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   }
 
   public func BeginSession(ctrl: wref<HackingMinigameGameController>, size: Int32, buffer: Int32, gameState: Int32) -> Void {
+    // A generation observer may run before the enclosing OnInitialize
+    // wrapper reaches BeginSession. Preserve an already-captured board
+    // rather than resetting its first (and potentially only) generation.
+    if this.m_controller == ctrl {
+      this.m_dimension = size;
+      this.m_bufferSize = buffer;
+      if gameState == 1 {
+        this.m_gameState = gameState;
+      };
+      return;
+    };
     this.StopExecution();
     this.m_session += 1;
     this.m_controller = ctrl;
@@ -209,7 +220,22 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
                       chains: array<CharactersChain>,
                       programs: array<UnlockableProgram>) -> Void {
     if this.m_controller != ctrl {
-      return;
+      // On a fresh game UI, the passive generation rule can fire before
+      // OnInitialize's system handshake. Adopt only an unowned session;
+      // never steal an active puzzle belonging to another controller.
+      if IsDefined(this.m_controller) || !IsDefined(ctrl) {
+        return;
+      };
+      let board: ref<IBlackboard> = GameInstance.GetBlackboardSystem(
+        this.GetGameInstance()).Get(GetAllBlackboardDefs().HackingMinigame);
+      if !IsDefined(board) {
+        return;
+      };
+      let defaults: MinigameData = FromVariant<MinigameData>(
+        board.GetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults));
+      this.BeginSession(ctrl,Cast<Int32>(size),Cast<Int32>(defaults.bufferSize),
+                        board.GetInt(GetAllBlackboardDefs().HackingMinigame.State));
+      this.Report(22, "First-board capture initialized its own session");
     };
     this.StopExecution();
     this.m_dimension = Cast<Int32>(size);
@@ -580,6 +606,21 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     if !this.m_running {
       return;
     };
+    if IsDefined(this.m_controller) {
+      // The state listener is delayed. In particular, the FIRST opening
+      // can initialize while the Blackboard still says Unknown (0).
+      // Read the live state every tick rather than requiring a second
+      // minigame to deliver a new callback. This never changes game state.
+      let stateBoard: ref<IBlackboard> = GameInstance.GetBlackboardSystem(
+        this.GetGameInstance()).Get(GetAllBlackboardDefs().HackingMinigame);
+      if IsDefined(stateBoard) {
+        let observedState: Int32 = stateBoard.GetInt(
+          GetAllBlackboardDefs().HackingMinigame.State);
+        if observedState != this.m_gameState {
+          this.RecordGameState(this.m_controller,observedState);
+        };
+      };
+    };
     if this.m_active {
       if !this.m_ready || this.m_cancelled || this.m_gameState > 1
         || this.m_session != this.m_lockedSession
@@ -693,21 +734,27 @@ protected cb func OnInitialize() -> Bool {
   if IsDefined(player) {
     sys = M1ArcSkipBreachSystem.Get(player.GetGame());
   };
+  let board: ref<IBlackboard> = this.GetBlackboardSystem().Get(GetAllBlackboardDefs().HackingMinigame);
+  if !IsDefined(board) {
+    LogChannel(n"DEBUG", "[Skip Breach] No HackingMinigame Blackboard at OnInitialize");
+    return true;
+  };
+  let data: MinigameData = FromVariant<MinigameData>(
+    board.GetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults));
   if IsDefined(sys) {
-    let board: ref<IBlackboard> = this.GetBlackboardSystem().Get(GetAllBlackboardDefs().HackingMinigame);
-    let data: MinigameData = FromVariant<MinigameData>(
-      board.GetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults));
     sys.BeginSession(this,Cast<Int32>(data.gridSize),Cast<Int32>(data.bufferSize),
                      board.GetInt(GetAllBlackboardDefs().HackingMinigame.State));
-    // Always install our passive generation observer, even while the
-    // M1 Arc toggle is OFF. It does not change any cell or daemon.
-    // First-puzzle capture and later opt-in must NEVER require exiting
-    // and re-entering a gig's one-shot Breach Protocol attempt.
-    let rule: ref<M1ArcSkipBreachCaptureRule> = new M1ArcSkipBreachCaptureRule();
-    rule.minigameController = this;
-    ArrayPush(data.rules,rule);
-    board.SetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults,data,true);
+  } else {
+    // System attachment may lag the FIRST UI initialization. Do not
+    // withhold the capture rule merely because Get() was not ready yet.
+    LogChannel(n"DEBUG", "[Skip Breach] System lookup delayed; observer still installed");
   };
+  // Install the observer regardless of settings AND system readiness.
+  // It never edits grid cells; Capture() can adopt an unowned session.
+  let rule: ref<M1ArcSkipBreachCaptureRule> = new M1ArcSkipBreachCaptureRule();
+  rule.minigameController = this;
+  ArrayPush(data.rules,rule);
+  board.SetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults,data,true);
 }
 
 @wrapMethod(HackingMinigameGameController)
