@@ -141,10 +141,11 @@ assert 'let firstIndex: Int32 = this.m_bestPath[0];' in source
 assert 'firstIndex / this.m_dimension, firstIndex % this.m_dimension' in source
 assert 'if actualFirst.X < 0.0 {' in source, (
     "A visible cell (0,0) does not prove the solver-chosen first cell is clickable")
-assert source.index('if actualFirst.X < 0.0 {') < source.index(
-    'this.m_handledCapture = this.m_captureSerial;', source.index(
-        'private func TryStart()')), (
-    "Do not consume the one-shot first capture before its actual first cell is ready")
+start_logic = source.split('private func TryStart() -> Void {', 1)[1].split(
+    'public func Tick() -> Void {', 1)[0]
+assert start_logic.index('if actualFirst.X < 0.0 {') < start_logic.index(
+    'this.m_handledCapture = this.m_captureSerial;\n    this.m_firstCellRejects = 0;'), (
+    "Do not consume a solvable first board before its planned first cell is ready")
 assert 'this.m_delayTicks = 2;' in source
 assert 'M1Arc_BreachSelectCell(logic,' not in source, (
     "Do not regress to the game-internal selector that ignored first board")
