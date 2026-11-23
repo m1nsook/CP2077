@@ -20,6 +20,7 @@ native_source = native_file.read_text(encoding="utf8")
 assert 'native func M1Arc_BreachInputAvailable() -> Bool;' in native_source
 assert ('native func M1Arc_BreachSelectCell(controller: wref<inkLogicController>, '
         'position: Vector2) -> Bool;') in native_source
+assert 'native func M1Arc_BreachClickAt(controller: wref<inkLogicController>, normalized: Vector2) -> Bool;' in native_source
 assert 'native func M1Arc_BreachTrace(message: String) -> Bool;' in native_source
 assert 'native func LogChannel(' not in native_source, (
     "Skip Breach diagnostics must use the native M1 Arc log bridge, not an unverified DEBUG channel")
@@ -49,7 +50,7 @@ for required in [
     "OnGameStateChanged(value: Int32)",
     "M1Arc_GetBool(\"m1nsook.skipbreach\",\"enabled\")",
     "M1Arc_BreachInputAvailable()",
-    "M1Arc_BreachSelectCell(logic, Vector2(",
+    "M1Arc_BreachClickAt(logic,this.ResolveClickPoint(row,col))",
     "this.m_captureSerial += 1",
     "this.m_selectionSerial += 1",
     "this.m_waitTicks > 120",
@@ -112,37 +113,32 @@ assert 'this.m_handledCapture = this.m_captureSerial;\n        this.TryStart();'
 assert 'class M1ArcSkipBreachTick extends DelayCallback' not in source, (
     "No DelayCallback game-time pump: first puzzle waits for initial input")
 assert 'GameInstance.GetDelaySystem' not in source, "Use UISystem event updates"
-# Source-derived base-game contract: vanilla OnInitialize sets
-# minigameData.timerWaitsForInteraction = true. Unknown=0 can therefore
-# remain until the first actual click; InProgress is NOT a prerequisite.
-# Previous first-screen early dispatch at 0.587 s produced no callback.
-assert 'private let m_firstIntroReadyAt: Float;' in source
-assert 'this.m_firstIntroReadyAt = EngineTime.ToFloat(' in source
-assert 'GameInstance.GetEngineTime(this.GetGameInstance())) + 3.0;' in source
-assert 'if this.m_gameState == 0 {' in source
-assert 'First puzzle Unknown; waiting for intro before first native selection' in source
-assert 'Intro elapsed; attempting first native selection while Unknown' in source
-assert 'this.m_gameState < 0 || this.m_gameState > 1' in source, (
-    "Valid pending native input must be allowed in Unknown or InProgress, never terminal")
-assert 'if this.m_gameState != 1 {' in source, (
-    "Any non-Unknown state must still be validated before execution")
-assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source, (
-    "Preserve the first capture through the intro without consuming it")
-assert 'this.m_gameState >= 0 && this.m_gameState <= 1' in source, (
-    "UI event pump must keep running in Unknown until the intro elapses")
+# First board: original native selector was called early during Unknown but
+# wasn't acknowledged; 3-second guess then blocked all first attempts in logs.
+# The new Win32 mouse path resolves actual 2.5 ink widget geometry instead.
+assert 'private let m_firstIntroReadyAt:' not in source, (
+    "Never gate the first actual physical click on a guessed intro timer")
+assert 'this.m_firstIntroReadyAt' not in source
+assert 'private func ResolveClickPoint(row: Int32, col: Int32) -> Vector2' in source
+assert 'GetScreenPosition(root)' in source
+assert 'GetScreenPosition(cell)' in source
+assert 'grid.GetWrappingWidgetCount() != Cast<Uint32>(this.m_dimension)' in source
+assert 'grid.GetNumChildren() < this.m_dimension * this.m_dimension' in source
+assert 'AllParts/Top/NetworkCodeMapAndButton/wrapper/NetworkCodeMap/NetworkCodeMap/ContentWithBorder/ContentContainer/GridContainer/Grid' in source
+assert 'this.ResolveClickPoint(0,0)' in source
+assert 'this.m_gameState < 0 || this.m_gameState > 1' in source
+assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source
+assert 'this.m_gameState >= 0 && this.m_gameState <= 1' in source
+assert 'M1Arc_BreachClickAt(logic,this.ResolveClickPoint(row,col))' in source
+assert 'M1Arc_BreachSelectCell(logic,' not in source, (
+    "Do not regress to the game-internal selector that ignored first board")
 start_logic = source.split('private func TryStart() -> Void {', 1)[1].split(
     'public func Tick() -> Void {', 1)[0]
-assert start_logic.index('if this.m_gameState == 0 {') < start_logic.index(
+assert start_logic.index('this.ResolveClickPoint(0,0)') < start_logic.index(
     'this.m_handledCapture = this.m_captureSerial;'), (
-    "Unknown initial capture must be held until elapsed intro time")
+    "Do not consume the first board until its live grid is visible")
 assert 'private let m_inProgressTicks: Int32;' in source
-assert 'this.m_inProgressTicks = 0;' in source
 assert 'this.m_inProgressTicks += 1;' in source
-assert 'this.m_inProgressTicks < 20' in source
-assert 'Waiting for stable InProgress (20 UI updates)' in source
-assert source.index('if this.m_inProgressTicks < 20 {') < source.index(
-    'this.m_handledCapture = this.m_captureSerial;', source.index('private func TryStart')), (
-    "Already-InProgress board must remain stable before dispatch")
 assert 'this.m_gameState == 1 && this.m_inProgressTicks < 20' in source
 
 assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
