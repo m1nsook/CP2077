@@ -1,6 +1,0 @@
--- m1core smoke test: Lua source running through our embedded LuaJIT.
-local helper = require("helper")
-registerForEvent("onInit", function()
-    smoke_result = helper.answer
-    print("[m1core] Lua smoke test loaded; helper.answer=" .. tostring(helper.answer))
-end)
