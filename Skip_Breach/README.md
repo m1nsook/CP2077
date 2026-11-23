@@ -97,6 +97,28 @@ normal rewards and game focus/cancellation. Windows CI only compiles
 M1 Arc C++ and verifies Python solver and source/package contracts; it
 does not compile game REDscript.
 
+## Official REDscript CLI validation (GitHub Actions)
+
+The `windows-redscript-cli` job downloads the official
+[`jac3km4/redscript` v1.0.1 CLI](https://github.com/jac3km4/redscript/releases/tag/v1.0.1)
+and verifies its SHA-256. It **always checks REDscript source parsing**
+for both Skip Breach scripts and the pinned matching M1 Arc core API.
+No Electron, CET, or separate scripting language is introduced.
+
+Actual type checking/semantic validation and game script compilation
+require a **private, vanilla Cyberpunk 2077 2.5**
+`r6/cache/final.redscripts` bundle. These CDPR game assets cannot be
+stored in our public repository. Configure GitHub Actions secrets
+`REDSCRIPT_GAME_BUNDLE_URL` (private HTTPS URL to the unmodified bundle)
+and `REDSCRIPT_GAME_BUNDLE_SHA256` to enable **both**
+`redscript-cli lint` and `redscript-cli compile` with
+`--runtime-compatible`. Temporary compiled outputs are deleted and
+never uploaded.
+
+**Without that game bundle, only parsing is actually checked; the
+workflow explicitly marks semantic lint/compile as SKIPPED.** This is
+not a substitute for an actual Cyberpunk game runtime verification.
+
 ## Cyberpunk 2.x-compatible solver reference
 
 The [Breach Protocol Autosolver by Marcin Cichocki](https://github.com/marcincichocki/breach-protocol-autosolver)

@@ -21,6 +21,34 @@ permissions:
   contents: read
 
 jobs:
+  # Actual redscript v1.0.1 CLI. Always parse-check; full semantic
+  # lint and compile require a verified private vanilla 2.5 bundle.
+  windows-redscript-cli:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin the matching M1 Arc core REDscript API
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Path ".ci/m1arc-api" -Force | Out-Null
+          # This API comes from an already tested pre-Breach declaration
+          # set and is pinned to an immutable commit, not a moving branch.
+          $commit = "dcc7fc402368a886ca3812e6deb539a341602f97"
+          $url = "https://raw.githubusercontent.com/m1nsook/m1arc/$commit/r6/scripts/m1arc/M1Arc.reds"
+          Invoke-WebRequest -Uri $url -OutFile ".ci/m1arc-api/M1Arc.reds"
+          if (!(Test-Path ".ci/m1arc-api/M1Arc.reds")) {
+            throw "Missing M1 Arc native API dependencies"
+          }
+      - name: REDscript CLI syntax / optional semantic compilation
+        shell: pwsh
+        env:
+          REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
+          REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
+        run: |
+          ./Skip_Breach/tools/check_redscript_cli.ps1 -SourceRoots @("Skip_Breach/r6/scripts", ".ci/m1arc-api")
+          if ($LASTEXITCODE -ne 0) { throw "REDscript CLI validation failed" }
+
   test-and-package:
     runs-on: ubuntu-latest
     steps:
