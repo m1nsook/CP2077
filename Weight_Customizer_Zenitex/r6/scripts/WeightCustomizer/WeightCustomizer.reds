@@ -16,6 +16,7 @@ public class WeightCustomizerSystem extends ScriptableSystem {
   private let m_zenitexHasModifier: Bool;
   private let m_zenitexOwnerEntity: EntityID;
   private let m_zenitexBonus: Float;
+  private let m_zenitexVanillaBonus: Float;
 
   private func OnAttach() -> Void {
     this.m_running = true;
@@ -78,23 +79,32 @@ public class WeightCustomizerSystem extends ScriptableSystem {
     this.ForgetZenitexModifier();
   }
 
-  // Equipment-EX represents appearance-only items as preview items in
-  // OutfitSlots.Back. Never award a bonus just for owning a backpack.
-  // Vanilla equipment slots already apply Zenitex's intrinsic stat mod,
-  // so they must NOT receive an extra copy from this compatibility addon.
-  private func GetZenitexBonus(player: ref<PlayerPuppet>) -> Float {
+  // Equipment-EX uses preview items for its cosmetic slot. Vanilla Torso
+  // equipment is real: its intrinsic bonus must count toward our target,
+  // but must never receive a second physical stat modifier.
+  private func GetZenitexBonusForSlot(
+    player: ref<PlayerPuppet>,
+    slotID: TweakDBID,
+    cosmetic: Bool
+  ) -> Float {
     let transaction = GameInstance.GetTransactionSystem(this.GetGameInstance());
     if !IsDefined(transaction) {
       return 0.0;
     }
 
-    let backItem = transaction.GetItemInSlot(player, t"OutfitSlots.Back");
+    let backItem = transaction.GetItemInSlot(player, slotID);
     if !IsDefined(backItem) {
       return 0.0;
     }
 
     let itemID = backItem.GetItemID();
-    if !ItemID.IsValid(itemID) || !ItemID.HasFlag(itemID, gameEItemIDFlag.Preview) {
+    if !ItemID.IsValid(itemID) {
+      return 0.0;
+    }
+    if cosmetic && !ItemID.HasFlag(itemID, gameEItemIDFlag.Preview) {
+      return 0.0;
+    }
+    if !cosmetic && ItemID.HasFlag(itemID, gameEItemIDFlag.Preview) {
       return 0.0;
     }
 
@@ -140,7 +150,14 @@ public class WeightCustomizerSystem extends ScriptableSystem {
     stats: ref<StatsSystem>,
     currentEntity: EntityID
   ) -> Void {
-    let bonus = this.GetZenitexBonus(player);
+    this.m_zenitexVanillaBonus = this.GetZenitexBonusForSlot(
+      player, t"AttachmentSlots.Torso", false
+    );
+
+    let bonus = 0.0;
+    if this.m_zenitexVanillaBonus <= 0.0 {
+      bonus = this.GetZenitexBonusForSlot(player, t"OutfitSlots.Back", true);
+    }
     if this.m_zenitexHasModifier && this.m_zenitexBonus == bonus {
       return;
     }
@@ -175,6 +192,7 @@ public class WeightCustomizerSystem extends ScriptableSystem {
       // Never run an old modifier against the new save's player.
       this.ForgetModifier();
       this.ForgetZenitexModifier();
+      this.m_zenitexVanillaBonus = 0.0;
       return;
     }
 
@@ -202,7 +220,7 @@ public class WeightCustomizerSystem extends ScriptableSystem {
     let entity = Cast<StatsObjectID>(currentEntity);
     // Weight Customizer's configured total is the baseline, not the ceiling:
     // an equipped Zenitex backpack adds its own separate bonus on top.
-    let wanted = Cast<Float>(target) + this.m_zenitexBonus;
+    let wanted = Cast<Float>(target) + this.m_zenitexBonus + this.m_zenitexVanillaBonus;
     let actual = stats.GetStatValue(entity, gamedataStatType.CarryCapacity);
 
     // Recheck every half second: responds to settings changes *and* to
