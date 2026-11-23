@@ -37,6 +37,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private let m_nodeCount: Int32;
   private let m_budgetHit: Bool;
   private let m_bestScore: Int32;
+  private let m_bestMask: Int32;
   private let m_bestPath: array<Int32>;
   private let m_lastDiagnostic: Int32;
   private let m_waitForBoardTicks: Int32;
@@ -227,17 +228,26 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     return -1;
   }
 
-  private func Consider(path: array<Int32>, codes: array<Int32>) -> Void {
-    let score: Int32 = 0;
+  // Source-informed native REDscript planner. The supplied AutoBreach
+  // solver.lua uses daemon match masks, ranked search, optimistic bounds
+  // and shortest-path reconstruction. It is a Lua 5.1 implementation,
+  // so we reproduce the ALGORITHM here without requiring CET or copying
+  // Lua into the game. The full Lua automaton/memo solver is more complete;
+  // this bounded native planner is not claimed to be an exact port.
+
+  // Each displayed daemon is a bit of a four-bit mask (A=1 .. D=8).
+  // Match contiguous sequences, including those that overlap.
+  private func MatchMask(codes: array<Int32>) -> Int32 {
+    let mask: Int32 = 0;
+    let bit: Int32 = 1;
     let daemon: Int32 = 0;
     while daemon < ArraySize(this.m_daemonLengths) {
       let length: Int32 = this.m_daemonLengths[daemon];
       let offset: Int32 = this.m_daemonOffsets[daemon];
       let start: Int32 = 0;
-      let matched: Bool = false;
-      while start + length <= ArraySize(codes) && !matched {
+      while start + length <= ArraySize(codes) {
+        let matched: Bool = true;
         let j: Int32 = 0;
-        matched = true;
         while j < length {
           if codes[start + j] != this.m_daemonTokens[offset + j] {
             matched = false;
@@ -245,38 +255,140 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
           };
           j += 1;
         };
+        if matched {
+          mask += bit;
+          break;
+        };
         start += 1;
       };
-      if matched {
-        score += 1;
-      };
+      bit *= 2;
       daemon += 1;
     };
-    if score > this.m_bestScore
-      || (score == this.m_bestScore && score > 0
+    return mask;
+  }
+
+  private func CountMask(mask: Int32) -> Int32 {
+    let count: Int32 = 0;
+    while mask > 0 {
+      count += mask % 2;
+      mask /= 2;
+    };
+    return count;
+  }
+
+  // Rank matches by number of completed daemons, then display-order mask,
+  // matching the working reference's rankMask() priority.
+  private func RankMask(mask: Int32) -> Int32 {
+    return this.CountMask(mask) * 16 + mask;
+  }
+
+  // Longest suffix of selections that is also this daemon's prefix.
+  // Supports overlapping daemon sequences without requiring an exact
+  // concatenation or spending every buffer slot on a single daemon.
+  private func PrefixLength(codes: array<Int32>, daemon: Int32) -> Int32 {
+    let length: Int32 = this.m_daemonLengths[daemon];
+    let offset: Int32 = this.m_daemonOffsets[daemon];
+    let limit: Int32 = Min(length, ArraySize(codes));
+    while limit > 0 {
+      let ok: Bool = true;
+      let i: Int32 = 0;
+      while i < limit {
+        if codes[ArraySize(codes) - limit + i] != this.m_daemonTokens[offset + i] {
+          ok = false;
+          break;
+        };
+        i += 1;
+      };
+      if ok {
+        return limit;
+      };
+      limit -= 1;
+    };
+    return 0;
+  }
+
+  // A geometry-free optimistic upper bound. If a daemon needs more
+  // tokens than remaining buffer slots, it cannot improve this branch.
+  // Allow overlaps freely: that makes this bound safe, not pessimistic.
+  private func UpperScore(codes: array<Int32>, mask: Int32, remaining: Int32) -> Int32 {
+    let result: Int32 = this.CountMask(mask);
+    let daemon: Int32 = 0;
+    let bit: Int32 = 1;
+    while daemon < ArraySize(this.m_daemonLengths) {
+      if (mask / bit) % 2 == 0 {
+        let needed: Int32 = this.m_daemonLengths[daemon] - this.PrefixLength(codes,daemon);
+        if needed <= remaining {
+          result += 1;
+        };
+      };
+      bit *= 2;
+      daemon += 1;
+    };
+    return result;
+  }
+
+  // Ordering heuristic from the working solver's rank-first candidate
+  // ordering: completed daemon masks first, then partial prefixes.
+  private func CandidatePriority(codes: array<Int32>) -> Int32 {
+    let mask: Int32 = this.MatchMask(codes);
+    let progress: Int32 = 0;
+    let daemon: Int32 = 0;
+    let bit: Int32 = 1;
+    while daemon < ArraySize(this.m_daemonLengths) {
+      if (mask / bit) % 2 == 0 {
+        progress += this.PrefixLength(codes,daemon);
+      };
+      bit *= 2;
+      daemon += 1;
+    };
+    return this.RankMask(mask) * 256 + progress;
+  }
+
+  private func Consider(path: array<Int32>, mask: Int32) -> Void {
+    let score: Int32 = this.CountMask(mask);
+    if score == 0 {
+      return;
+    };
+    let newRank: Int32 = this.RankMask(mask);
+    let bestRank: Int32 = this.RankMask(this.m_bestMask);
+    if newRank > bestRank
+      || (newRank == bestRank
           && (ArraySize(this.m_bestPath) == 0
               || ArraySize(path) < ArraySize(this.m_bestPath))) {
+      this.m_bestMask = mask;
       this.m_bestScore = score;
       this.m_bestPath = path;
     };
   }
 
   private func Search(path: array<Int32>, codes: array<Int32>,
-                      row: Int32, col: Int32, pickColumn: Bool) -> Void {
+                      row: Int32, col: Int32, pickColumn: Bool,
+                      depthLimit: Int32) -> Void {
     if this.m_nodeCount >= 50000 {
       this.m_budgetHit = true;
       return;
     };
     this.m_nodeCount += 1;
-    this.Consider(path,codes);
-    if ArraySize(path) >= this.m_bufferSize
-      || ArraySize(path) >= ArraySize(this.m_grid)
-      || this.m_bestScore >= ArraySize(this.m_daemonLengths) {
+    let mask: Int32 = this.MatchMask(codes);
+    this.Consider(path,mask);
+    if this.m_bestScore >= ArraySize(this.m_daemonLengths)
+      || ArraySize(path) >= depthLimit
+      || ArraySize(path) >= ArraySize(this.m_grid) {
       return;
     };
 
+    let remaining: Int32 = depthLimit - ArraySize(path);
+    if this.UpperScore(codes,mask,remaining) < this.m_bestScore {
+      return; // no completion can outrank the best existing mask
+    };
+
+    // 7x7 game boards have at most seven candidates per alternation.
+    // Stable rank-first insertion ensures useful daemon prefixes win over
+    // unproductive cells before we spend the bounded 50k-state budget.
+    let candidates: array<Int32>;
+    let priorities: array<Int32>;
     let i: Int32 = 0;
-    while i < this.m_dimension && !this.m_budgetHit {
+    while i < this.m_dimension {
       let nextRow: Int32 = row;
       let nextCol: Int32 = col;
       if pickColumn {
@@ -295,35 +407,64 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
         j += 1;
       };
       if !visited {
-        let nextPath: array<Int32> = path;
-        let nextCodes: array<Int32> = codes;
-        ArrayPush(nextPath, flat);
-        ArrayPush(nextCodes, this.m_grid[flat]);
-        this.Search(nextPath,nextCodes,nextRow,nextCol,!pickColumn);
+        let preview: array<Int32> = codes;
+        ArrayPush(preview,this.m_grid[flat]);
+        let priority: Int32 = this.CandidatePriority(preview);
+        let position: Int32 = ArraySize(priorities);
+        while position > 0 && priority > priorities[position - 1] {
+          position -= 1;
+        };
+        ArrayInsert(candidates,position,flat);
+        ArrayInsert(priorities,position,priority);
       };
       i += 1;
+    };
+
+    let index: Int32 = 0;
+    while index < ArraySize(candidates) && !this.m_budgetHit {
+      let flat: Int32 = candidates[index];
+      let nextPath: array<Int32> = path;
+      let nextCodes: array<Int32> = codes;
+      ArrayPush(nextPath,flat);
+      ArrayPush(nextCodes,this.m_grid[flat]);
+      this.Search(nextPath,nextCodes,flat / this.m_dimension,
+                  flat % this.m_dimension,!pickColumn,depthLimit);
+      if this.m_bestScore >= ArraySize(this.m_daemonLengths) {
+        return;
+      };
+      index += 1;
     };
   }
 
   private func Plan() -> Bool {
     ArrayClear(this.m_bestPath);
+    this.m_bestMask = 0;
     this.m_bestScore = 0;
     this.m_nodeCount = 0;
     this.m_budgetHit = false;
-    let col: Int32 = 0;
-    while col < this.m_dimension && !this.m_budgetHit {
-      let path: array<Int32>;
-      let codes: array<Int32>;
-      ArrayPush(path,col); // first selection must be row 0
-      ArrayPush(codes,this.m_grid[col]);
-      this.Search(path,codes,0,col,true);
-      col += 1;
+
+    // Iterative deepening, similar to the working solver's shortest
+    // completion-depth phase: inspect all first-row starts at each depth,
+    // instead of exhausting one arbitrary starting cell first.
+    let limit: Int32 = 1;
+    let maxDepth: Int32 = Min(this.m_bufferSize,ArraySize(this.m_grid));
+    while limit <= maxDepth && !this.m_budgetHit {
+      let col: Int32 = 0;
+      while col < this.m_dimension && !this.m_budgetHit {
+        let path: array<Int32>;
+        let codes: array<Int32>;
+        ArrayPush(path,col);
+        ArrayPush(codes,this.m_grid[col]);
+        this.Search(path,codes,0,col,true,limit);
+        if this.m_bestScore >= ArraySize(this.m_daemonLengths) {
+          return true;
+        };
+        col += 1;
+      };
+      limit += 1;
     };
-    // Every candidate is a legal native row/column path. If the search
-    // budget expires, prefer a VERIFIED, rewarding best-found path over
-    // silently discarding every successful candidate. It may not be optimal.
     if this.m_budgetHit && this.m_bestScore > 0 {
-      this.Report(31, "Search budget reached; executing best legal path found (not guaranteed optimal)");
+      this.Report(31,"Search budget reached; using best verified legal path (may not be optimal)");
     };
     return this.m_bestScore > 0 && ArraySize(this.m_bestPath) > 0;
   }
