@@ -158,7 +158,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     while row < this.m_dimension {
       let col: Int32 = 0;
       while col < this.m_dimension {
-        ArrayPush(this.m_grid, Cast<Int32>(grid[row][col].rarityValue));
+        ArrayPush(this.m_grid, grid[row][col].rarityValue);
         col += 1;
       };
       row += 1;
