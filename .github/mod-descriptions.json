@@ -40,5 +40,9 @@
   "Camera_Killer": {
     "name": "Camera Killer",
     "summary": "Shuts down cameras connected to the same access point or surveillance system when V turns off one camera."
+  },
+  "Skip_Breach": {
+    "name": "Skip Breach (M1 Arc)",
+    "summary": "Automatically solve and submit Breach Protocol cell selections using M1 Arc's version-checked native bridge. Experimental, disabled by default."
   }
 }

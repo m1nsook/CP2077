@@ -1,9 +1,11 @@
-name: Skip Breach solver checks
+name: Skip Breach development checks
 
 on:
   pull_request:
     paths:
       - "Skip_Breach/**"
+      - "scripts/package_release.py"
+      - ".github/mod-descriptions.json"
       - ".github/workflows/skip-breach-check.yml"
   workflow_dispatch:
 
@@ -11,12 +13,42 @@ permissions:
   contents: read
 
 jobs:
-  pure-solver:
+  test-and-package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Validate vanilla-path solver only (no game UI claims)
+      - name: Test legal solver, capture and selection sequencing
         run: python3 -m unittest discover -s Skip_Breach/dev -p "test_*.py" -v
+      - name: Validate experimental REDscript/M1 Arc manifest contract
+        run: python3 Skip_Breach/tools/validate_skip_breach.py
+      - name: Build standalone game-root ZIP
+        run: |
+          python3 scripts/package_release.py --mod Skip_Breach --tag 0.1.0-dev.1 --output dist
+          mkdir -p game-root
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          file = next(Path("dist").glob("*.zip"))
+          with ZipFile(file) as z:
+              files = set(z.namelist())
+              required = {
+                  "r6/scripts/M1ArcSkipBreach/M1ArcSkipBreach.reds",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/mod.json",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/settings.json",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/language/en_US.json",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/language/en_US.json.example",
+              }
+              assert files == required, f"Wrong game-root content: {files ^ required}"
+              z.extractall("game-root")
+          print("PASS: direct-to-game artifact (no CET, Python or nested ZIP)")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skip-breach-m1arc-game-root-dev
+          path: |
+            game-root/red4ext/
+            game-root/r6/
+          if-no-files-found: error
