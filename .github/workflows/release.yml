@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - Weight_Customizer
+          - Daemon
           - No_Tracking_Please
           - Free_Chrome
           - Camera_Killer
