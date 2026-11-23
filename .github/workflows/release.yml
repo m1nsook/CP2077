@@ -11,6 +11,7 @@ on:
         options:
           - NetDeck
           - Weight_Customizer
+          - Arc_Converter
           - Daemon
           - No_Tracking_Please
           - Free_Chrome

@@ -1,0 +1,51 @@
+{
+  "name": "Arc Converter - Automatic Item Processing",
+  "shortDesc": "Automatically disassemble newly acquired weapons and craft ammunition from components",
+  "settings": {
+    "enabled": {
+      "label": "Enable Arc Converter",
+      "description": "Master switch for automatic item processing.",
+      "group": "General"
+    },
+    "disassemble": {
+      "label": "Auto-disassemble new weapons",
+      "description": "Only process weapons newly added to V's inventory. Existing weapons are never scanned.",
+      "group": "Disassembly"
+    },
+    "tier1": {
+      "label": "Tier 1 (including + variants)",
+      "description": "Disassemble eligible newly acquired Tier 1 weapons.",
+      "group": "Disassembly"
+    },
+    "tier2": {
+      "label": "Tier 2 (including + variants)",
+      "description": "Disassemble eligible newly acquired Tier 2 weapons.",
+      "group": "Disassembly"
+    },
+    "tier3": {
+      "label": "Tier 3 (including + variants)",
+      "description": "Disassemble eligible newly acquired Tier 3 weapons.",
+      "group": "Disassembly"
+    },
+    "tier4": {
+      "label": "Tier 4 (including + variants)",
+      "description": "Disassemble eligible newly acquired Tier 4 weapons.",
+      "group": "Disassembly"
+    },
+    "tier5": {
+      "label": "Tier 5 (including + variants)",
+      "description": "Disassemble eligible newly acquired Tier 5 weapons.",
+      "group": "Disassembly"
+    },
+    "ammo": {
+      "label": "Automatically craft ammunition",
+      "description": "Craft vanilla ammo for the equipped weapon using real components.",
+      "group": "Ammunition"
+    },
+    "threshold": {
+      "label": "Craft when reserve below (%)",
+      "description": "Trigger crafting when equipped weapon's ammunition is below this percentage of capacity.",
+      "group": "Ammunition"
+    }
+  }
+}

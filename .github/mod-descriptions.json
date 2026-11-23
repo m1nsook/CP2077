@@ -52,5 +52,9 @@
   "NetDeck": {
     "name": "NetWatch Σ MK.1",
     "summary": "NetWatch Σ MK.1 iconic cyberdeck with built-in NETWORM quickhack. Requires Phantom Liberty, Codeware, TweakXL, REDscript and M1 Arc 1.0.0."
+  },
+  "Arc_Converter": {
+    "name": "Arc Converter - Automatic Item Processing",
+    "summary": "Automatically disassemble newly acquired weapons by tier and craft ammunition from crafting components. Requires M1 Arc 1.0.0."
   }
 }

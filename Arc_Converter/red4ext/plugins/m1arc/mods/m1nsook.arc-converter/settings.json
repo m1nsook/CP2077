@@ -1,0 +1,77 @@
+[
+  {
+    "id": "enabled",
+    "kind": "boolean",
+    "label": "Enable Arc Converter",
+    "description": "Master switch for automatic item processing.",
+    "default": true,
+    "group": "General"
+  },
+  {
+    "id": "disassemble",
+    "kind": "boolean",
+    "label": "Auto-disassemble new weapons",
+    "description": "Only process weapons newly added to V's inventory. Existing weapons are never scanned.",
+    "default": false,
+    "group": "Disassembly"
+  },
+  {
+    "id": "tier1",
+    "kind": "boolean",
+    "label": "Tier 1 (including + variants)",
+    "description": "Automatically dismantle newly acquired, eligible Tier 1 weapons. Iconic, quest, equipped and crafted weapons remain protected.",
+    "default": false,
+    "group": "Disassembly"
+  },
+  {
+    "id": "tier2",
+    "kind": "boolean",
+    "label": "Tier 2 (including + variants)",
+    "description": "Automatically dismantle newly acquired, eligible Tier 2 weapons. Iconic, quest, equipped and crafted weapons remain protected.",
+    "default": false,
+    "group": "Disassembly"
+  },
+  {
+    "id": "tier3",
+    "kind": "boolean",
+    "label": "Tier 3 (including + variants)",
+    "description": "Automatically dismantle newly acquired, eligible Tier 3 weapons. Iconic, quest, equipped and crafted weapons remain protected.",
+    "default": false,
+    "group": "Disassembly"
+  },
+  {
+    "id": "tier4",
+    "kind": "boolean",
+    "label": "Tier 4 (including + variants)",
+    "description": "Automatically dismantle newly acquired, eligible Tier 4 weapons. Iconic, quest, equipped and crafted weapons remain protected.",
+    "default": false,
+    "group": "Disassembly"
+  },
+  {
+    "id": "tier5",
+    "kind": "boolean",
+    "label": "Tier 5 (including + variants)",
+    "description": "Automatically dismantle newly acquired, eligible Tier 5 weapons. Iconic, quest, equipped and crafted weapons remain protected.",
+    "default": false,
+    "group": "Disassembly"
+  },
+  {
+    "id": "ammo",
+    "kind": "boolean",
+    "label": "Automatically craft ammunition",
+    "description": "Use vanilla crafting and components to replenish ammunition for the currently equipped weapon.",
+    "default": true,
+    "group": "Ammunition"
+  },
+  {
+    "id": "threshold",
+    "kind": "integer",
+    "label": "Craft when reserve below (%)",
+    "description": "Craft one vanilla recipe batch when ammunition falls below this percentage of its capacity. Never exceed the game's ammo limit.",
+    "min": 1,
+    "max": 100,
+    "step": 5,
+    "default": 25,
+    "group": "Ammunition"
+  }
+]

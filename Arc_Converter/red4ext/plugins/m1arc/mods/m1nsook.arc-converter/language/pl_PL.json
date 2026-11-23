@@ -1,0 +1,51 @@
+{
+  "name": "Arc Converter - Automatyczne przetwarzanie przedmiotów",
+  "shortDesc": "Automatycznie rozmontowuje nowo zdobyte bronie i wytwarza amunicję z komponentów",
+  "settings": {
+    "enabled": {
+      "label": "Włącz Arc Converter",
+      "description": "Główny przełącznik automatycznego przetwarzania przedmiotów.",
+      "group": "Ogólne"
+    },
+    "disassemble": {
+      "label": "Automatyczny demontaż nowych broni",
+      "description": "Przetwarza tylko nowo zdobyte bronie. Przedmioty już znajdujące się w ekwipunku pozostają nietknięte.",
+      "group": "Demontaż"
+    },
+    "tier1": {
+      "label": "Poziom 1 (także warianty +)",
+      "description": "Demontuje odpowiednie nowo zdobyte bronie poziomu 1.",
+      "group": "Demontaż"
+    },
+    "tier2": {
+      "label": "Poziom 2 (także warianty +)",
+      "description": "Demontuje odpowiednie nowo zdobyte bronie poziomu 2.",
+      "group": "Demontaż"
+    },
+    "tier3": {
+      "label": "Poziom 3 (także warianty +)",
+      "description": "Demontuje odpowiednie nowo zdobyte bronie poziomu 3.",
+      "group": "Demontaż"
+    },
+    "tier4": {
+      "label": "Poziom 4 (także warianty +)",
+      "description": "Demontuje odpowiednie nowo zdobyte bronie poziomu 4.",
+      "group": "Demontaż"
+    },
+    "tier5": {
+      "label": "Poziom 5 (także warianty +)",
+      "description": "Demontuje odpowiednie nowo zdobyte bronie poziomu 5.",
+      "group": "Demontaż"
+    },
+    "ammo": {
+      "label": "Automatyczne wytwarzanie amunicji",
+      "description": "Wytwarza amunicję do aktywnej broni z posiadanych komponentów według receptur gry.",
+      "group": "Amunicja"
+    },
+    "threshold": {
+      "label": "Wytwarzaj poniżej (%)",
+      "description": "Rozpoczyna wytwarzanie, gdy zapas amunicji spadnie poniżej tego procentu pojemności.",
+      "group": "Amunicja"
+    }
+  }
+}

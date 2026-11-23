@@ -1,0 +1,68 @@
+name: Arc Converter - development checks
+
+on:
+  pull_request:
+    paths:
+      - "Arc_Converter/**"
+      - "scripts/package_release.py"
+      - ".github/mod-descriptions.json"
+      - ".github/workflows/arc-converter-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parser:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin M1 Arc native declarations
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory ".ci/m1arc-api" -Force | Out-Null
+          $commit = "94b2484c54813fb2f1ed9be4d333c6e26fea1dc4"
+          $url = "https://raw.githubusercontent.com/m1nsook/m1arc/$commit/r6/scripts/m1arc/M1Arc.reds"
+          Invoke-WebRequest -Uri $url -OutFile ".ci/m1arc-api/M1Arc.reds"
+      - name: Parse REDscript (semantic compilation optional)
+        shell: pwsh
+        env:
+          REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
+          REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Arc_Converter/r6/scripts", ".ci/m1arc-api")
+          if ($LASTEXITCODE -ne 0) { throw "REDscript checks failed" }
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate mod contracts
+        run: python3 Arc_Converter/tools/validate_arc_converter.py
+      - name: Build installable development ZIP
+        run: |
+          python3 scripts/package_release.py --mod Arc_Converter --tag 0.1.0-dev.1 --output dist
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive = next(Path("dist").glob("*.zip"))
+          root = "red4ext/plugins/m1arc/mods/m1nsook.arc-converter/"
+          expected = {
+              "r6/scripts/ArcConverter/ArcConverter.reds",
+              root + "mod.json",
+              root + "settings.json",
+              *(root + f"language/{lang}.json" for lang in ("en_US", "pl_PL", "ko_KR")),
+          }
+          with ZipFile(archive) as z:
+              names = set(z.namelist())
+              assert names == expected, names ^ expected
+              assert not any("m1arc.dll" in n or "cyber_engine_tweaks" in n for n in names)
+              z.extractall("game-root")
+          print("PASS: 6 installation files, no additional framework or scripts")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arc-converter-game-root-dev
+          path: game-root/
+          if-no-files-found: error
