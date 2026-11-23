@@ -1,0 +1,21 @@
+[
+  {
+    "id": "enabled",
+    "kind": "boolean",
+    "label": "Custom carry capacity",
+    "description": "Turn the custom carry capacity on or off. Disabling restores the value from the game and other mods.",
+    "default": true,
+    "group": "Capacity"
+  },
+  {
+    "id": "limit",
+    "kind": "integer",
+    "label": "Carry capacity (kg)",
+    "description": "Set V's total carrying capacity. Changes apply without reloading the save.",
+    "min": 50,
+    "max": 5000,
+    "step": 10,
+    "default": 500,
+    "group": "Capacity"
+  }
+]

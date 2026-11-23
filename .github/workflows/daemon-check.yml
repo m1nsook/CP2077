@@ -1,0 +1,92 @@
+name: Daemon development checks
+
+on:
+  push:
+    branches:
+      - "feat/skip-breach-solver-foundation"
+    paths:
+      - "Daemon/**"
+      - "scripts/package_release.py"
+      - ".github/mod-descriptions.json"
+      - ".github/workflows/daemon-check.yml"
+  pull_request:
+    paths:
+      - "Daemon/**"
+      - "scripts/package_release.py"
+      - ".github/mod-descriptions.json"
+      - ".github/workflows/daemon-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Actual redscript v1.0.1 CLI. Always parse-check; full semantic
+  # lint and compile require a verified private vanilla 2.5 bundle.
+  windows-redscript-cli:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin the matching M1 Arc core REDscript API
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Path ".ci/m1arc-api" -Force | Out-Null
+          # This API comes from an already tested pre-Breach declaration
+          # set and is pinned to an immutable commit, not a moving branch.
+          $commit = "94b2484c54813fb2f1ed9be4d333c6e26fea1dc4"
+          $url = "https://raw.githubusercontent.com/m1nsook/m1arc/$commit/r6/scripts/m1arc/M1Arc.reds"
+          Invoke-WebRequest -Uri $url -OutFile ".ci/m1arc-api/M1Arc.reds"
+          if (!(Test-Path ".ci/m1arc-api/M1Arc.reds")) {
+            throw "Missing M1 Arc native API dependencies"
+          }
+      - name: REDscript CLI syntax / optional semantic compilation
+        shell: pwsh
+        env:
+          REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
+          REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Daemon/r6/scripts", ".ci/m1arc-api")
+          if ($LASTEXITCODE -ne 0) { throw "REDscript CLI validation failed" }
+
+  test-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test legal solver, capture and selection sequencing
+        run: python3 -m unittest discover -s Daemon/dev -p "test_*.py" -v
+      - name: Validate experimental REDscript/M1 Arc manifest contract
+        run: python3 Daemon/tools/validate_skip_breach.py
+      - name: Build standalone game-root ZIP
+        run: |
+          python3 scripts/package_release.py --mod Daemon --tag 0.1.0-dev.1 --output dist
+          mkdir -p game-root
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          file = next(Path("dist").glob("*.zip"))
+          with ZipFile(file) as z:
+              files = set(z.namelist())
+              required = {
+                  "r6/scripts/M1ArcSkipBreach/M1ArcSkipBreach.reds",
+                  "r6/scripts/M1ArcSkipBreach/M1ArcBreachNative.reds",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/mod.json",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/settings.json",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/language/en_US.json",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/language/pl_PL.json",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/language/ko_KR.json",
+              }
+              assert files == required, f"Wrong game-root content: {files ^ required}"
+              z.extractall("game-root")
+          print("PASS: direct-to-game artifact (no CET, Python or nested ZIP)")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: daemon-m1arc-game-root-dev
+          path: |
+            game-root/red4ext/
+            game-root/r6/
+          if-no-files-found: error

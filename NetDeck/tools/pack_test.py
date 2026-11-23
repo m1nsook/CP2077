@@ -1,165 +1,40 @@
 #!/usr/bin/env python3
-"""Build a standalone GAME-ROOT NetWatch Σ MK.1 development ZIP (no publishing)."""
+"""Build a standalone game-root Infiltration development ZIP with no CET files."""
 from __future__ import annotations
-
-import argparse
-import hashlib
+import argparse,hashlib
 from pathlib import Path
-from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
+from zipfile import ZIP_DEFLATED,ZipFile,ZipInfo
 
-MOD = Path(__file__).resolve().parents[1]
-ROOT_FILES = (
-    "r6/scripts/NetDeck/NetDeck.reds",
-    "r6/scripts/NetDeck/NetDeckHudSkin.reds",
-    "r6/scripts/NetDeck/Localization.reds",
-    "r6/tweaks/NetDeck/NetDeck.yaml",
-    "bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua",
-    "bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings/init.lua",
+ROOT=Path(__file__).resolve().parents[1]
+FILES=(
+ "r6/scripts/NetDeck/NetDeck.reds",
+ "r6/scripts/NetDeck/NetDeckM1Arc.reds",
+ "r6/scripts/NetDeck/NetDeckHudSkin.reds",
+ "r6/scripts/NetDeck/Localization.reds",
+ "r6/tweaks/NetDeck/NetDeck.yaml",
+ "red4ext/plugins/m1arc/mods/m1nsook.infiltration/mod.json",
+ "red4ext/plugins/m1arc/mods/m1nsook.infiltration/settings.json",
+ "red4ext/plugins/m1arc/mods/m1nsook.infiltration/language/en_US.json",
+ "red4ext/plugins/m1arc/mods/m1nsook.infiltration/language/pl_PL.json",
+ "red4ext/plugins/m1arc/mods/m1nsook.infiltration/language/ko_KR.json",
 )
-TESTING = """Infiltration — NetWatch Σ MK.1 / NETWORM SOURCE-ONLY TEST — NOT A RELEASE
+def build(dest:Path)->None:
+ dest.parent.mkdir(parents=True,exist_ok=True)
+ with ZipFile(dest,"w",compression=ZIP_DEFLATED,compresslevel=9) as z:
+  for name in FILES:
+   content=(ROOT/name).read_bytes()
+   info=ZipInfo(name,(2020,1,1,0,0,0))
+   info.compress_type=ZIP_DEFLATED
+   info.external_attr=0o100644<<16
+   z.writestr(info,content)
+ with ZipFile(dest) as z:
+  assert set(z.namelist())==set(FILES)
+  assert z.testzip() is None
+ digest=hashlib.sha256(dest.read_bytes()).hexdigest()
+ (dest.parent/"NetDeck-TEST-SHA256SUMS.txt").write_text(digest+"  "+dest.name+"\n",encoding="utf-8")
+ print("Built",dest,"sha256",digest)
 
-Requires Cyberpunk 2077 2.5 + Phantom Liberty, RED4ext, redscript, TweakXL and Codeware.
-
-INSTALL:
-1. Back up the save you will use for testing and CLOSE THE GAME.
-2. Extract this ZIP into the Cyberpunk 2077 game root.
-3. Make sure r6/scripts/NetDeck/NetDeck.reds,
-   r6/scripts/NetDeck/NetDeckHudSkin.reds,
-   r6/scripts/NetDeck/Localization.reds and r6/tweaks/NetDeck/NetDeck.yaml exist.
-4. This diagnostic artifact contains REDscript, TweakXL and CET Lua (no binary
-   assets). Diagnostics: bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua
-   SETTINGS: bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings/init.lua
-   Open the CET overlay and adjust the NETWORM - Test Settings sliders.
-   The settings window only appears while the CET overlay is open, never
-   in gameplay. Its close button hides it until CET is reopened.
-   Values are saved next to the Lua script in settings.json on disk.
-   Advanced Crash Reporter reads its [NetDeck/DIAG] output from CET scripting.log.
-   Original icon PNGs, WolvenKit raw project, .inkatlas, .xbm and compiled
-   .archive are PRIVATE and NOT included. A separate locally packed archive
-   containing both icon atlases is required for custom icons to display.
-5. FIRST: Launch/load the SAME map or save that crashed previously. Do not
-   use NETWORM or open its HUD yet. Test whether world loading is now stable.
-   If a crash occurs, share the Advanced Crash Reporter .txt; it captures
-   CET scripting.log, including [NetDeck/DIAG] session and heartbeat entries.
-   If REDscript compilation or TweakXL loading fails, send the redscript
-   and TweakXL errors; do not proceed to combat testing.
-6. To add the experimental deck through CET console:
-   Game.AddToInventory("Items.NESTCyberdeck", 1)
-7. Equip NetWatch Σ MK.1; test NETWORM on a camera, terminal, isolated device,
-   and a hostile NPC without requiring Ping. A camera is not required.
-8. Confirm the original Ping is offered and works separately.
-9. Test connected security effects without any camera in the network.
-10. Check an unrelated network remains unaffected.
-11. AFTER confirming stable loading: test ONE NETWORM upload against a gang.
-    Several nearby enemies should receive Tier 5 Sonic Shock at the
-    configured interval (default 0.25s).
-    Passive NPC and vehicle attach-based discovery was disabled for crash
-    isolation, so spreading to targets not scanned may temporarily regress.
-    Check a road barrier and a non-quest door separately.
-    Confirm the experimental native upload bar closes after a finished hack.
-    The old "EXTRACTED DATA" reward notification is still present.
-12. With Carhacker, verify NETWORM appears in the vehicle scanner.
-    Vehicle NETWORM is now a safe entry/relay only, NOT a force-brake action.
-13. Confirm ordinary NETWORM is not traced; NetWatch still triggers five stars.
-14. Check €$ siphon totals and number of sources in the feedback.
-15. Normal Netrunner XP is allowed. Check crafting components awarded.
-
-IMPORTANT LIMITATIONS:
-- v0.6.11 removes global NPCPuppet AND VehicleObject attach/detach wrappers
-  to isolate repeated map-loading crashes after installing NetDeck.
-  This is NOT compiler-verified and not a confirmed crash fix.
-- CET logging is optional: it observes our upload/HUD methods (if available)
-  and emits a 15s heartbeat without scanning entities or world streams.
-  Advanced Crash Reporter 1.6 collects CET scripting.log automatically.
-  If CET cannot observe a method, observer_unavailable is logged instead.
-- Confirm map stability BEFORE trying hacks. If still crashing, remove NetDeck.
-- Native HUD is an independent elapsed-time upload (default 2s) with
-  ~30Hz updates. It finishes separately from the infection wave.
-- CET settings provide upload duration, scan radius, relay-hop radius,
-  infection interval, max infections, maximum targets, and max fanout.
-  Default scan 105m, jump radius 75m, interval 0.25s; "Club takeover"
-  preset scans 145m and infects every 0.14s. Settings are live and persistent.
-- A bounded native pre-scan queues eligible loaded hostile NPCs
-  before the upload bar shows its discovered-target estimate. This is not
-  a guarantee every NPC in the building is loaded/visible to the game.
-- The native quickhack's internal uploadTime/activationTime TweakDB property
-  is not changed by the HUD slider; it affects our separate presentation.
-- NetDeckHudSkin.reds applies a NETWORM-only blue skin to the native Neutral
-  widget and swaps its layered triangle for the real "networmhack" atlas part.
-  The icon appears only if you keep your privately packed NetDeck.archive.
-  When another quest uses the bar, vanilla visuals are restored.
-  This scoped HUD-controller wrap is UNVERIFIED and is a new crash-test risk.
-  If a crash begins after upgrading, remove only NetDeckHudSkin.reds to
-  compare against the previously stable v0.6.6 HUD with neutral triangle.
-  The old EXTRACTED DATA completion notification is still present.
-- Uses Phantom Liberty's QuickHack.BaseBlackWallHack record for the NPC action.
-- Native Blackwall start/completion effects are cleared; confirm no lethal effect.
-- Repeating Ping network grid audio/VFX and per-hop reward notifications are removed.
-- Jumps default to every 0.25 seconds, with a max 100 steps; adjust in CET.
-- The HUD pre-scan targets count is an estimate of loaded eligible targets.
-  Device effects are counted separately; vehicle effects are disabled.
-- Loaded hostile-NPC fallback registers scanned or explicitly uploaded NPCs.
-  Large-area pre-scan uses the native targeting system without world hooks.
-- Previous build's network shutdown, vendor and stats were user-confirmed.
-- Codeware interface-language packages cover 19 UI languages, with English fallback.
-- No NETWORM access-point scanner actions. NPC/vehicle/door/network effects are experimental.
-- No copyrighted or private icon/ArchiveXL/WolvenKit binary assets are distributed.
-- NETWORM no longer inherits PingDevice, so vanilla Ping must remain
-  an independent, functioning quickhack when NetWatch Σ MK.1 is installed.
-- Timed PlayerPuppet worm wave defaults to a 0.25s infection interval, 105m
-  pre-scan, 75m native relay hops, 100 steps and 120 affected entities.
-  Change these values live using the CET overlay. Native network descendants
-  also join the queue.
-- Vehicle braking and automatic car infection are DISABLED for crash
-  isolation. Nov 19 ACR points to native ActivateNetrunnerQuickhack during
-  NetDeckWaveInfect. Cars may still be hacked as the entry/relay point,
-  but NETWORM does not brake them in this build. Vanilla car hacks remain.
-- Dedicated VehicleQuickHack requires Carhacker and equipped NetWatch Σ MK.1.
-- This is an unverified experimental build, not a confirmed gameplay fix.
-  If a crash persists, send the FULL Advanced Crash Reporter text.
-- Eurodollar siphon is a capped gameplay reward; it does not drain actual
-  NPC inventories. Normal Netrunner XP gain is allowed.
-- Robotic NPC shutdown, drones and mechs are NOT yet covered.
-- NETWORM does not need Camera Killer; test with or without it.
-- Do not publish this ZIP as a Nexus Mods release.
-
-REMOVE:
-Delete r6/scripts/NetDeck and r6/tweaks/NetDeck, and optionally
-bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics and
-bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings.
-If you installed a separate local NetDeck.archive, disable it too.
-""".replace("\n", "\n")
-
-def build(output: Path) -> None:
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with ZipFile(output, "w", compression=ZIP_DEFLATED, compresslevel=9) as package:
-        for entry in ROOT_FILES:
-            source = MOD / entry
-            if not source.is_file():
-                raise FileNotFoundError(source)
-            data = source.read_bytes()
-            info = ZipInfo(entry, date_time=(2026, 11, 18, 0, 0, 0))
-            info.compress_type = ZIP_DEFLATED
-            info.external_attr = 0o644 << 16
-            package.writestr(info, data)
-        info = ZipInfo("NetDeck-READ-FIRST.txt", date_time=(2026, 11, 18, 0, 0, 0))
-        info.compress_type = ZIP_DEFLATED
-        info.external_attr = 0o644 << 16
-        package.writestr(info, TESTING.encode("utf-8"))
-
-    with ZipFile(output) as package:
-        names = set(package.namelist())
-        assert names == set(ROOT_FILES) | {"NetDeck-READ-FIRST.txt"}, names
-        assert package.testzip() is None
-    digest = hashlib.sha256(output.read_bytes()).hexdigest()
-    sums = output.with_name("NetDeck-TEST-SHA256SUMS.txt")
-    sums.write_text(f"{digest}  {output.name}\n", encoding="utf-8")
-    print(f"Created {output} ({output.stat().st_size} bytes)")
-    print(f"SHA-256: {digest}")
-    print(f"Checksum: {sums}")
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=MOD / "dist/NetDeck-v0.6.11-SOURCE-TEST.zip")
-    args = parser.parse_args()
-    build(args.output)
+if __name__=="__main__":
+ parser=argparse.ArgumentParser()
+ parser.add_argument("--output",type=Path,default=Path("dist/NetDeck-v1.0.0-rc1.zip"))
+ build(parser.parse_args().output)

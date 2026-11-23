@@ -405,7 +405,7 @@ private let netDeckHudStartTime: Float;
 @addField(PlayerPuppet)
 private let netDeckWavePreviewCount: Int32;
 
-// Live CET settings; safe defaults are used if the optional menu is absent.
+// Live M1 Arc settings; safe defaults are used until the native settings manifest loads.
 @addField(PlayerPuppet)
 private let netDeckSettingsApplied: Bool;
 @addField(PlayerPuppet)

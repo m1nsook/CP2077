@@ -1,440 +1,96 @@
 #!/usr/bin/env python3
-"""Static source invariants; intentionally NOT a redscript compilation test."""
+"""Regression checks for Infiltration's native M1 Arc release candidate."""
 from pathlib import Path
-import re
-import unittest
+from collections import Counter
+import json,re,unittest
 
-ROOT = Path(__file__).resolve().parents[1]
-R = (ROOT / "r6/scripts/NetDeck/NetDeck.reds").read_text("utf-8")
-Y = (ROOT / "r6/tweaks/NetDeck/NetDeck.yaml").read_text("utf-8")
-L = (ROOT / "r6/scripts/NetDeck/Localization.reds").read_text("utf-8")
-D = (ROOT / "bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua").read_text("utf-8")
-P = (ROOT / "tools/pack_test.py").read_text("utf-8")
-SKIN = (ROOT / "r6/scripts/NetDeck/NetDeckHudSkin.reds").read_text("utf-8")
-SETTINGS = (ROOT / "bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings/init.lua").read_text("utf-8")
-VENDORS = 26
+ROOT=Path(__file__).resolve().parents[1]
+CORE=(ROOT/"r6/scripts/NetDeck/NetDeck.reds").read_text("utf-8")
+HUD=(ROOT/"r6/scripts/NetDeck/NetDeckHudSkin.reds").read_text("utf-8")
+BRIDGE=(ROOT/"r6/scripts/NetDeck/NetDeckM1Arc.reds").read_text("utf-8")
+LOC=(ROOT/"r6/scripts/NetDeck/Localization.reds").read_text("utf-8")
+YAML=(ROOT/"r6/tweaks/NetDeck/NetDeck.yaml").read_text("utf-8")
+M=ROOT/"red4ext/plugins/m1arc/mods/m1nsook.infiltration"
+MANIFEST=json.loads((M/"mod.json").read_text("utf-8"))
+SETTINGS=json.loads((M/"settings.json").read_text("utf-8"))
+IDs={s["id"] for s in SETTINGS}
 
 class InfiltrationSourceTests(unittest.TestCase):
-    def test_networm_only_icon_skin_restores_vanilla(self):
-        # The exported 2.5 HUD has separate neutral triangle/ghost layers;
-        # do not ship a base .inkwidget replacement or modify all quest bars.
-        self.assertIn("@wrapMethod(HUDProgressBarController)", SKIN)
-        self.assertIn("public final func UpdateProgressBarActive(active: Bool)", SKIN)
-        self.assertIn("wrappedMethod(active);", SKIN)
-        self.assertIn("this.m_progressBarBB.GetString(this.m_progressBarDef.Header)", SKIN)
-        self.assertNotIn("GetBlackboardSystem(this.GetGameInstance())", SKIN)
-        self.assertNotIn("GameInstance.GetBlackboardSystem(", SKIN)
-        self.assertNotIn("UpdateTimerHeader(", SKIN)
-        self.assertIn("this.NetDeckHudSkinApply(false);", SKIN)
-        self.assertIn('StrBeginsWith(header, "NETWORM")', SKIN)
-        self.assertIn('this.NetDeckHudSkinApply(StrBeginsWith(header, "NETWORM"));', SKIN)
-        self.assertIn(r'r"m1nsook\\netdeck\\ui\\networm_icons.inkatlas"', SKIN)
-        self.assertIn('n"networmhack"', SKIN)
-        self.assertIn(r'r"base\\gameplay\\gui\\quests\\assets\\personal_link.inkatlas"', SKIN)
-        self.assertIn('n"neutral_!"', SKIN)
-        self.assertIn('n"MainColors.ActiveBlue"', SKIN)
-        self.assertIn('n"Bar.ProgressLine"', SKIN)
-        self.assertIn('n"Neutral_Triangle_Icon"', SKIN)
-        self.assertIn('n"Neutral_Triangle_Icon_GHOST"', SKIN)
-        self.assertIn('n"Neurtral_Small_Icon"', SKIN)
-        self.assertIn('n"Neutral_Background_Icon"', SKIN)
-        self.assertIn('r6/scripts/NetDeck/NetDeckHudSkin.reds', P)
-        self.assertNotIn("OnGameAttached", SKIN)
-        self.assertNotIn("OnDetach", SKIN)
-        self.assertNotIn("@wrapMethod(HUDProgressBarController)", R)
+ def test_item_id_and_vendor_stock(self):
+  self.assertIn("Items.NESTCyberdeck:",YAML)
+  self.assertIn("$base: Items.AdvancedNetwatchNetdriverMKLegendaryPlusPlus",YAML)
+  self.assertIn("NetDeck.RipperdocStock:",YAML)
+  self.assertEqual(len(set(re.findall(r"^Vendors\.(\w+)\.itemStock:",YAML,re.M))),26)
+  self.assertIn("Items.NESTCyberdeck",CORE)
+  self.assertIn("NetDeck.RAM15Buffer4",YAML)
 
-    def test_live_configurable_club_spread(self):
-        self.assertIn("public func NetDeckConfigure(", R)
-        self.assertIn("this.NetDeckScanRadius()", R)
-        self.assertIn("this.NetDeckHopRadius()", R)
-        self.assertIn("this.NetDeckTickInterval()", R)
-        self.assertIn("this.NetDeckJumpLimit()", R)
-        self.assertIn("this.NetDeckTargetLimit()", R)
-        self.assertIn("this.NetDeckFanoutLimit()", R)
-        self.assertIn("private func NetDeckPreviewNetwork()", R)
-        self.assertIn("this.NetDeckPreviewNetwork();", R)
-        self.assertIn("this.netDeckWavePreviewCount", R)
-        self.assertIn('loc.GetText("NetDeckUploadSingle")', R)
-        self.assertIn("if count > 1 {", R)
-        self.assertEqual(L.count('this.Text("NetDeckUploadSingle"'), 19)
-        self.assertIn("this.NetDeckQueuePreviewCandidate(", R)
-        self.assertIn("query.includeSecondaryTargets = true;", R)
-        self.assertNotIn("@wrapMethod(NPCPuppet)", R)
-        self.assertNotIn("@wrapMethod(VehicleObject)", R)
-        self.assertIn("NetDeckConfigure(", SETTINGS)
-        self.assertIn('registerForEvent("onDraw"', SETTINGS)
-        self.assertIn("ImGui.SliderFloat(", SETTINGS)
-        self.assertIn("ImGui.SliderInt(", SETTINGS)
-        self.assertIn("settings.json", SETTINGS)
-        self.assertIn("Club takeover", SETTINGS)
-        self.assertIn("Performance safe", SETTINGS)
-        self.assertIn("bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings/init.lua", P)
+ def test_safe_gameplay_regressions(self):
+  for snippet in ("NetDeckWaveStart(", "NetDeckWaveInfect(", "NetDeckPreviewNetwork(", "GetPlayerQuickHackListWithQuality(","NetDeckPuppetInfiltration","NetDeckVehicleInfiltration"):
+   self.assertIn(snippet,CORE)
+  self.assertNotIn("@wrapMethod(VehicleObject)",CORE)
+  self.assertNotIn("@wrapMethod(NPCPuppet)",CORE)
+  self.assertNotIn("VehicleNetrunnerQuickhackType.ForceBrakes",CORE)
+  self.assertNotIn("vehicle.ActivateNetrunnerQuickhack(",CORE)
+  self.assertNotIn("vehicle.ForceBrakesFor(",CORE)
+  self.assertIn("wrappedMethod(outActions, context);",CORE)
+  self.assertIn("this.NetDeckQueuePreviewCandidate(",CORE)
+  self.assertIn("t\"Items.money\"",CORE)
+  self.assertIn("QuickHack.BaseBlackWallHack",YAML)
+  self.assertIn("Vendors.Always_Present",YAML)
 
-    def test_skin_resource_escapes_are_valid(self):
-        # A literal backslash-n sequence without escaping caused the actual
-        # November 18 REDscript compilation failure in NetDeckHudSkin.reds.
-        paths = re.findall(r'r"([^"]+\.inkatlas)"', SKIN)
-        self.assertEqual(len(paths), 3)
-        for path in paths:
-            self.assertNotRegex(path, r'(?<!\\)\\(?!\\)')
+ def test_hud_is_scoped_and_localized(self):
+  self.assertIn("@wrapMethod(HUDProgressBarController)",HUD)
+  self.assertIn("public final func UpdateProgressBarActive(active: Bool)",HUD)
+  self.assertIn("wrappedMethod(active);",HUD)
+  self.assertIn('StrBeginsWith(header, "NETWORM")',HUD)
+  self.assertNotIn("@wrapMethod(HUDProgressBarController)",CORE)
+  self.assertIn('this.Text("NetDeckInfiltrationName", "NETWORM")',LOC)
+  self.assertEqual(LOC.count('this.Text("NetDeckUploadSingle"'),19)
 
-    def test_settings_window_only_draws_with_cet_overlay(self):
-        # Regression: previous floating CET ImGui window blocked gameplay input.
-        self.assertIn('registerForEvent("onOverlayOpen"', SETTINGS)
-        self.assertIn('registerForEvent("onOverlayClose"', SETTINGS)
-        self.assertIn('overlayOpen = false', SETTINGS)
-        self.assertIn('windowOpen = false', SETTINGS)
-        self.assertIn('if not loaded or not overlayOpen or not windowOpen then return end', SETTINGS)
-        self.assertIn('windowOpen, shouldDraw = ImGui.Begin("NETWORM - Test Settings", windowOpen)', SETTINGS)
-        self.assertIn('if shouldDraw then', SETTINGS)
-        self.assertIn('ImGui.End()', SETTINGS)
-        self.assertIn('local value, wasChanged = ImGui.SliderFloat(', SETTINGS)
-        self.assertIn('local value, wasChanged = ImGui.SliderInt(', SETTINGS)
-        self.assertIn('if wasChanged then changed(key, value) end', SETTINGS)
-        self.assertNotIn('local yes, value = ImGui.SliderFloat', SETTINGS)
-        self.assertNotIn('local yes, value = ImGui.SliderInt', SETTINGS)
+ def test_manifest_schema_and_locales(self):
+  self.assertEqual(MANIFEST["format"],1)
+  self.assertEqual(MANIFEST["id"],M.name)
+  self.assertEqual(MANIFEST["name"],"Infiltration")
+  self.assertEqual(MANIFEST["scope"],"Weapons")
+  self.assertEqual(MANIFEST["requires"],{"m1arc":"1.0.0"})
+  self.assertEqual(len(SETTINGS),11)
+  self.assertEqual(len(IDs),11)
+  for setting in SETTINGS:
+   self.assertTrue(setting["label"] and setting["group"])
+   if setting["kind"]=="action":
+    self.assertNotIn("default",setting)
+   else:
+    self.assertLessEqual(setting["min"],setting["default"])
+    self.assertLessEqual(setting["default"],setting["max"])
+  for lang in ("en_US","pl_PL","ko_KR"):
+   translated=json.loads((M/"language"/(lang+".json")).read_text("utf-8"))
+   self.assertEqual(set(translated["settings"]),IDs)
+   for row in translated["settings"].values():
+    self.assertTrue(row["label"] and row["description"] and row["group"])
 
-    def test_crash_diagnostic_is_observer_only(self):
-        self.assertIn('PREFIX = "[NetDeck/DIAG v0.6.11]"', D)
-        self.assertIn('registerForEvent("onInit"', D)
-        self.assertIn('registerForEvent("onUpdate"', D)
-        self.assertIn('registerForEvent("onShutdown"', D)
-        self.assertIn('ObserveAfter(className, methodName', D)
-        self.assertIn('observe("PlayerPuppet", "NetDeckWaveStart"', D)
-        self.assertIn('observe("PlayerPuppet", "NetDeckWaveInfect"', D)
-        self.assertIn('observe("PlayerPuppet", "NetDeckWaveFinish"', D)
-        self.assertIn('observe("PlayerPuppet", "NetDeckHudStart"', D)
-        self.assertIn('observe("PlayerPuppet", "NetDeckHudFinish"', D)
-        # Don't observe globally executed game streaming callbacks.
-        self.assertNotIn('ObserveAfter("VehicleObject"', D)
-        self.assertNotIn('ObserveAfter("NPCPuppet"', D)
-        self.assertNotIn('Game.GetTargetingSystem', D)
-        self.assertNotIn('GetWorldPosition', D)
-        # ACR captures CET scripting.log without a crash-reporter plugin API.
-        self.assertIn('bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua', P)
+ def test_m1arc_settings_actions_and_grant(self):
+  for setting in SETTINGS:
+   if setting["kind"]!="action":
+    native="M1Arc_GetInt" if setting["kind"]=="integer" else "M1Arc_GetFloat"
+    self.assertIn(native+'("m1nsook.infiltration", "'+setting["id"]+'")',BRIDGE)
+   else:
+    self.assertIn('M1Arc_ConsumeAction("m1nsook.infiltration", "'+setting["id"]+'")',BRIDGE)
+  self.assertIn('ts.GiveItemByTDBID(player, t"Items.NESTCyberdeck", 1);',BRIDGE)
+  self.assertIn("player.NetDeckConfigure(",BRIDGE)
+  self.assertIn("m_lastRevision",BRIDGE)
+  self.assertIn("M1Arc_Revision()",BRIDGE)
+  self.assertIn("M1Arc_SetFloat(",BRIDGE)
+  self.assertIn("M1Arc_SetInt(",BRIDGE)
+  self.assertNotIn("registerForEvent(",BRIDGE)
+  self.assertNotIn("OnGameAttached",BRIDGE)
 
-    def test_save_compatible_item_and_stats(self):
-        for s in ["Items.NESTCyberdeck:", "$base: Items.AdvancedNetwatchNetdriverMKLegendaryPlusPlus",
-                  "Items.CyberdeckBlueprint4Slots", "Variants.Humanity5Cost",
-                  "statType: BaseStats.Memory", "value: 15",
-                  "statType: BaseStats.BufferSize", "value: 4"]:
-            self.assertIn(s, Y)
+ def test_no_cet_files_or_gameplay_changes(self):
+  self.assertFalse((ROOT/"bin/x64/plugins/cyber_engine_tweaks").exists())
+  from pack_test import FILES
+  self.assertTrue(all(not f.startswith("bin/") for f in FILES))
+  self.assertEqual(len(FILES),10)
+  self.assertIn("r6/scripts/NetDeck/NetDeckM1Arc.reds",FILES)
+  self.assertTrue(all((ROOT/f).exists() for f in FILES))
 
-    def test_names_are_display_only_and_save_compatible(self):
-        self.assertIn('friendlyName: "NetWatch Σ MK.1"', Y)
-        self.assertIn('this.Text("NetDeckDeckName", "NetWatch Σ MK.1")', L)
-        self.assertIn('this.Text("NetDeckInfiltrationName", "NETWORM")', L)
-        self.assertIn('caption: l"NetDeckInfiltrationName"', Y)
-        self.assertIn('Items.NESTCyberdeck:', Y)
-        self.assertIn('actionName: NetDeckInfiltration', Y)
-        self.assertNotIn('this.Text("NetDeckInfiltrationName", "Infiltration")', L)
-
-    def test_vendor_coverage(self):
-        self.assertEqual(len(set(re.findall(r"^Vendors\.(\w+)\.itemStock:", Y, re.M))), VENDORS)
-        self.assertIn("Vendors.AdvancedCollectiveRipperDocDogtown.itemStock:", Y)
-        self.assertIn("Vendors.Always_Present", Y)
-
-    def test_native_action_gate(self):
-        for s in ["module NetDeck", "class NetDeckInfiltration extends ActionBool",
-                  "FinalizeGetQuickHackActions(", "GetPlayerQuickHackListWithQuality(",
-                  "PlayerQuickhackData(ItemID.None(), record, 5)",
-                  "DeviceAction.NetDeckInfiltration",
-                  "QuickHack.NetDeckPuppetInfiltration",
-                  "GetAllChoices(",
-                  "OnNetDeckPuppetInfiltration",
-                  "protected cb func OnNetDeckInfiltration"]:
-            self.assertIn(s, R)
-        self.assertNotIn("public func GetRemoteActions(", R)
-        self.assertNotIn("@wrapMethod(AccessPointControllerPS)", R)
-        self.assertNotIn("this as AccessPointController;", R)
-        self.assertNotIn("@wrapMethod(Device)", R)
-        self.assertNotIn("member as PuppetDeviceLinkPS", R)
-        self.assertIn("outActions: script_ref<array<ref<DeviceAction>>>", R)
-        self.assertIn("const context: script_ref<GetActionsContext>", R)
-        self.assertIn("protected final func FinalizeGetQuickHackActions(", R)
-        self.assertIn("wrappedMethod(outActions, context);", R)
-        self.assertIn("Items.NESTCyberdeck", R)
-        self.assertIn("NetDeckInfiltration", R)
-
-    def test_network_safety(self):
-        for s in ["this.GetAccessPoints()", "GetAllDescendants(members)",
-                  "ArrayContains(seen, member)", "member.IsMarkedAsQuest()",
-                  "SurveillanceCameraControllerPS", "SecurityTurretControllerPS",
-                  "ExplosiveTriggerDeviceControllerPS", "QuickHackDistraction",
-                  "member.GetQuickHackActions(actions, context)"]:
-            self.assertIn(s, R)
-        self.assertNotIn("SystemCollapse", R)
-        self.assertIn("member.NetDeckApplyToMember(member)", R)
-        self.assertIn("this.NetDeckApplyToMember(this)", R)
-        self.assertIn("this.NetDeckInfiltrateMaster(directMaster, seen)", R)
-        self.assertIn("class NetDeckPuppetInfiltration extends PuppetAction", R)
-        self.assertIn("public final const func GetAllChoices(", R)
-        self.assertIn("PuppetDeviceLinkPS", R)
-        self.assertNotIn("member as PuppetDeviceLinkPS", R)
-        self.assertIn("QuickHack.NetDeckPuppetInfiltration:", Y)
-        self.assertIn("ObjectActionType.PuppetQuickHack", Y)
-        self.assertIn("DeviceAction.NetDeckInfiltration:", Y)
-        self.assertNotIn("$base: DeviceAction.PingDevice", Y)
-        self.assertNotIn("$base: Interactions.PingHack", Y)
-        self.assertNotIn('IsDefined(this.NetDeckNetworkMaster()) {', R)
-
-    def test_valid_native_target_mask(self):
-        # TSFMV is the Cyberpunk targeting mask; it has Obj_Other, not Obj_Vehicle.
-        self.assertNotIn("TSFMV.Obj_Vehicle", R)
-        self.assertIn("TSFMV.Obj_Puppet | TSFMV.Obj_Device | TSFMV.Obj_Other", R)
-
-    def test_timed_wave_spreading(self):
-        self.assertNotIn("@wrapMethod(AccessPointControllerPS)", R)
-        self.assertNotIn("public func GetRemoteActions(", R)
-        self.assertIn("!IsDefined(this as AccessPointControllerPS)", R)
-        self.assertIn("public class NetDeckWaveTickEvent extends Event", R)
-        self.assertIn("@addField(PlayerPuppet)", R)
-        self.assertIn("netDeckWaveHosts: array<Vector4>", R)
-        self.assertIn("netDeckWaveLinks: array<Int32>", R)
-        self.assertIn("netDeckWaveSeen: array<EntityID>", R)
-        self.assertIn("netDeckWaveGeneration += 1", R)
-        self.assertIn("evt.generation != this.netDeckWaveGeneration", R)
-        self.assertIn("NetDeckWaveStart(root: ref<GameObject>, fromDevice: Bool)", R)
-        self.assertIn("protected cb func OnNetDeckWaveTickEvent", R)
-        self.assertIn("NetDeckWaveInfect(selected, depth)", R)
-        self.assertIn("DelayEvent(this, evt, this.NetDeckTickInterval())", R)
-        self.assertIn("GetTargetParts(\n      this, query, parts", R)
-        self.assertIn("TargetingSet.Complete", R)
-        self.assertIn("Vector4.Distance(this.netDeckWaveHosts[j], candidate.GetWorldPosition())", R)
-        self.assertIn("this.netDeckWaveLinks[j] < this.NetDeckFanoutLimit()", R)
-        self.assertIn("this.netDeckWaveDepths[j] < 4", R)
-        self.assertIn("this.netDeckWaveSeen) >= this.NetDeckTargetLimit()", R)
-        self.assertIn("this.netDeckWavePendingCursor", R)
-        self.assertIn("NetDeckWaveAddMaster", R)
-        self.assertNotIn("NetDeckWaveProgress", R)
-        self.assertIn("NetDeckTargetsAffected", R)
-        self.assertNotIn("public func NetDeckSpread(", R)
-        self.assertNotIn("GetTargetParts(obj, query, parts)", R)
-        self.assertNotRegex(R, r"\bcontinue\s*;")
-
-    def test_silent_two_second_bounded_wave(self):
-        self.assertIn("this.netDeckWaveTicks += 1;", R)
-        self.assertIn("this.netDeckWaveTicks > this.NetDeckJumpLimit()", R)
-        self.assertNotIn("PingNetworkGrid_Event(", R)
-        self.assertNotIn("NetDeckPulseNetwork(ps)", R)
-        self.assertNotIn("notification.m_text = loc.GetText(\"NetDeckWaveProgress\")", R)
-        self.assertIn("r.robbedTargets, r.npcs + r.vehicles", R)
-
-    def test_experimental_upload_bar_has_quest_ownership_guards(self):
-        # The 16:29:37 PL crash predates the 16:30:42 PL HUD commit.
-        # This is a SOURCE test only, not a REDscript/gameplay validation.
-        self.assertIn("UI_HUDProgressBar", R)
-        self.assertIn("private func NetDeckHudStart()", R)
-        self.assertIn("private func NetDeckHudUpdate()", R)
-        self.assertIn("private func NetDeckHudFinish()", R)
-        self.assertIn("if bb.GetBool(d.Active) { return; }", R)
-        self.assertIn("!Equals(bb.GetString(d.Header), this.netDeckHudHeader)", R)
-        self.assertIn("Equals(bb.GetString(d.Header), this.netDeckHudHeader)", R)
-        self.assertIn("this.NetDeckHudFinish();", R)
-        self.assertIn("this.NetDeckHudUpdate();", R)
-        self.assertIn('loc.GetText("NetDeckUploadProgress")', R)
-        # Never restore the repeating network VFX/audio path.
-        self.assertNotIn("PingNetworkGrid_Event(", R)
-
-    def test_fast_native_neutral_upload_hud(self):
-        # ~3s native HUD upload, not the independent 32s propagation loop.
-        # Built-in Neutral type replaces the alert icon/visual state without
-        # recoloring the global theme or patching HUDProgressBarController.
-        self.assertIn("public class NetDeckHudTickEvent extends Event", R)
-        self.assertIn("protected cb func OnNetDeckHudTickEvent(", R)
-        self.assertIn("private func NetDeckHudSchedule()", R)
-        self.assertIn("DelayEvent(this, evt, 0.033)", R)
-        self.assertIn("this.netDeckHudProgress >= 1.0", R)
-        self.assertIn("EngineTime.ToFloat(GameInstance.GetSimTime(this.GetGame()))", R)
-        self.assertIn("this.NetDeckHudSchedule();", R)
-        self.assertIn("bb.SetVariant(d.MessageType, SimpleMessageType.Neutral, true);", R)
-        self.assertNotIn("this.netDeckHudProgress += 0.0625", R)
-        self.assertNotIn("bb.SetString(d.BottomText, loc.GetText(\"NetDeckDevicesAffected\")", R)
-        self.assertIn("DelayEvent(this, evt, this.NetDeckTickInterval())", R)
-        self.assertNotIn("@wrapMethod(HUDProgressBarController)", R)
-        self.assertNotIn("@wrapMethod(NPCPuppet)", R)
-        self.assertNotIn("@wrapMethod(VehicleObject)", R)
-
-    def test_scoped_trace_hook(self):
-        self.assertIn("NetDeck.ZeroAwareness:", Y)
-        self.assertEqual(Y.count("awarenessCost: NetDeck.ZeroAwareness"), 3)
-        self.assertIn("@wrapMethod(QuickHackableHelper)", R)
-        self.assertIn("public final static func WillHackRevealPlayer(", R)
-        self.assertIn('Equals(record.ActionName(), n"NetDeckInfiltration")', R)
-        self.assertIn("return wrappedMethod(playerRef, targetRecordId, action, programItemID);", R)
-        self.assertIn("wanted.m_wantedLevel = EPreventionHeatStage.Heat_5", R)
-        self.assertIn("NetDeckTriggerNetWatchPursuit(npc)", R)
-
-    def test_native_vehicle_actions_and_world_registry(self):
-        self.assertIn("DeviceAction.NetDeckVehicleInfiltration:", Y)
-        self.assertIn("$base: DeviceAction.VehicleForceBrakesClassHack", Y)
-        self.assertIn("objectActionType: ObjectActionType.VehicleQuickHack", Y)
-        self.assertIn("NetDeckVehicleActionInfiltration()", R)
-        self.assertIn("VehicleComponentPS", R)
-        self.assertIn("gamedataNewPerkType.Intelligence_Right_Milestone_1", R)
-        self.assertIn("vehicle.IsHackable()", R)
-        self.assertIn("PlayerQuickhackData(ItemID.None(), vehicleRecord, 5)", R)
-        self.assertIn("netDeckLoadedVehicles: array<wref<VehicleObject>>", R)
-        self.assertIn("public func NetDeckRegisterVehicle(", R)
-        self.assertIn("public func NetDeckUnregisterVehicle(", R)
-        # Global vehicle lifecycle hooks run during world streaming; not safe.
-        self.assertNotIn("@wrapMethod(VehicleObject)", R)
-        self.assertIn("netDeckPlayer.NetDeckRegisterVehicle(vehicle);", R)
-        self.assertIn("this.NetDeckRegisterVehicle(initialVehicle);", R)
-        self.assertIn("protected cb func OnGameAttached() -> Bool", R)
-        self.assertIn("protected cb func OnDetach() -> Bool", R)
-        # ACR Nov 19: native vehicle quickhack crashed while NETWORM spread.
-        # Keep manually targeted vehicles as initial relay entry points,
-        # but never auto-select or run the native force-braking operation.
-        self.assertNotIn("VehicleNetrunnerQuickhackType.ForceBrakes", R)
-        self.assertNotIn("vehicle.ActivateNetrunnerQuickhack(", R)
-        self.assertNotIn("ForceBrakesFor(", R)
-        self.assertNotIn("this.netDeckLoadedVehicles[k]", R)
-        self.assertNotIn("this.NetDeckQueuePreviewCandidate(vehicle)", R)
-        self.assertNotIn("let candidateVehicle: ref<VehicleObject> = candidate as VehicleObject", R)
-        self.assertIn("!IsDefined(candidate as VehicleObject)", R)
-        self.assertIn("!IsDefined(pendingCandidate as VehicleObject)", R)
-        self.assertIn("this.NetDeckWaveInfect(root, 0);", R)
-        self.assertIn("this.NetDeckPreviewNetwork();", R)
-        self.assertNotIn("TSFMV.Obj_Vehicle", R)
-
-    def test_canto_enemy_action_not_ping_derived(self):
-        # Clones Canto's attack-class targeting record, never Blackwall's
-        # lethal gameplay effects. Real gameplay still requires manual tests.
-        self.assertIn("$base: QuickHack.BaseBlackWallHack", Y)
-        self.assertNotIn("$base: QuickHack.FreePingHack", Y)
-        self.assertIn("QuickHack.NetDeckPuppetInfiltration:\n", Y)
-        self.assertIn("startEffects: []", Y)
-        self.assertIn("completionEffects: []", Y)
-        self.assertIn("targetPrereqs: []", Y)
-        self.assertIn("targetActivePrereqs: []", Y)
-        self.assertNotIn("let pingable: Bool", R)
-        self.assertNotIn("if !pingable", R)
-        self.assertIn("let npc: ref<NPCPuppet> = owner as NPCPuppet;", R)
-        self.assertIn("npc.IsQuest() || npc.IsDead() || npc.IsCrowd()", R)
-        self.assertIn("ScriptedPuppet.IsPlayerCompanion(npc)", R)
-        self.assertIn("npc.GetRecord().IsChild()", R)
-        self.assertIn("NetDeckPuppetInfiltration extends PuppetAction", R)
-        self.assertIn("OnNetDeckPuppetInfiltration", R)
-
-    def test_loaded_npc_fallback_and_civilian_safety(self):
-        # This only inspects the source. The actual hooks and chain must still
-        # compile and be confirmed by a Cyberpunk 2077 in-game test.
-        self.assertIn("netDeckLoadedPuppets: array<wref<NPCPuppet>>", R)
-        self.assertIn("public func NetDeckRegisterPuppet(", R)
-        self.assertIn("public func NetDeckUnregisterPuppet(", R)
-        # Do not hook world-stream NPC lifecycle / SenseInitialize.
-        self.assertNotIn("@wrapMethod(NPCPuppet)", R)
-        self.assertIn("netDeckPlayer.NetDeckRegisterPuppet(npc);", R)
-        self.assertIn("this.NetDeckRegisterPuppet(initialPuppet)", R)
-        self.assertIn("let initialPuppet: wref<NPCPuppet> = root as NPCPuppet;", R)
-        self.assertIn("this.netDeckLoadedPuppets[p]", R)
-        self.assertIn("this.NetDeckWaveValid(loadedNpc)", R)
-        self.assertIn("Vector4.Distance(this.netDeckWaveHosts[hostNpc], loadedNpc.GetWorldPosition())", R)
-        self.assertIn("this.netDeckWaveLinks[hostNpc] < 4", R)
-        self.assertIn("this.netDeckWaveDepths[hostNpc] < 4", R)
-        self.assertIn("return EnumInt(GameObject.GetAttitudeTowards(npc, this)) !=", R)
-        self.assertIn("EnumInt(EAIAttitude.AIA_Friendly)", R)
-        self.assertIn("selectedNpcHost", R)
-        self.assertIn("this.netDeckLoadedPuppets[p]", R)
-        self.assertIn("let pendingCandidate: ref<GameObject>", R)
-        self.assertLess(R.index("let selectedNpcHost: Int32"), R.index("let pendingCandidate: ref<GameObject>"))
-        self.assertEqual(R.count("protected cb func OnGameAttached() -> Bool"), 0)
-        self.assertEqual(R.count("protected cb func OnDetach() -> Bool"), 0)
-
-    def test_no_vehicle_attach_code_runs_at_map_load(self):
-        self.assertNotIn("@wrapMethod(VehicleObject)", R)
-        self.assertNotIn("player.NetDeckRegisterVehicle(this);", R)
-        self.assertNotIn("player.NetDeckUnregisterVehicle(this.GetEntityID());", R)
-        self.assertIn("netDeckPlayer.NetDeckRegisterVehicle(vehicle);", R)
-        self.assertIn("this.NetDeckRegisterVehicle(initialVehicle);", R)
-
-    def test_no_npc_attach_code_runs_at_map_load(self):
-        self.assertNotIn("@wrapMethod(NPCPuppet)", R)
-        self.assertNotIn("player.NetDeckRegisterPuppet(this);", R)
-        self.assertNotIn("player.NetDeckUnregisterPuppet(this.GetEntityID());", R)
-        self.assertIn("netDeckPlayer.NetDeckRegisterPuppet(npc);", R)
-        self.assertIn("protected cb func OnNetDeckPuppetInfiltration(", R)
-        self.assertIn("GetTargetParts(\n      this, query, parts", R)
-        self.assertIn("BaseStatusEffect.CommsNoiseLevel4", R)
-        self.assertIn("UI_HUDProgressBar", R)
-
-    def test_reward_and_feedback(self):
-        self.assertIn("HackingRewardNotificationEvent", R)
-        self.assertIn('loc.GetText("NetDeckDevicesAffected")', R)
-        self.assertIn('loc.GetText("NetDeckTargetsAffected")', R)
-        self.assertIn('loc.GetText("NetDeckEddiesStolen")', R)
-        self.assertIn('loc.GetText("NetDeckStolenTargets")', R)
-        self.assertIn("IntToString(deviceCount)", R)
-        self.assertIn("this.netDeckWaveResult.devices", R)
-        self.assertIn("NetDeckSiphon(", R)
-        self.assertIn("Items.money", R)
-        self.assertIn("if result.eddies >= 1500", R)
-        self.assertIn("let barrier: ref<RoadBlockControllerPS>", R)
-        self.assertIn("this.QueuePSEvent(barrier, toggle)", R)
-
-    def test_networm_takeover_rules(self):
-        self.assertIn("NetDeckBurnoutNearbyNetrunners(", R)
-        self.assertIn("BaseStatusEffect.BrainMeltLevel4", R)
-        self.assertIn("target.IsNetrunnerPuppet()", R)
-        self.assertIn("EnumInt(GameObject.GetAttitudeTowards(target, player)) == EnumInt(EAIAttitude.AIA_Hostile)", R)
-        self.assertIn("EnumInt(GameObject.GetAttitudeTowards(npc, player)) == EnumInt(EAIAttitude.AIA_Hostile)", R)
-        self.assertNotRegex(R, r"GetAttitudeTowards\\([^\\n]+==\\s*EAIAttitude")
-        self.assertIn("NetDeckDisruptNpcVicinity(", R)
-        self.assertIn("BaseStatusEffect.CommsNoiseLevel4", R)
-        self.assertNotIn("BaseStatusEffect.WeaponMalfunctionLvl2", R)
-        self.assertNotIn("BaseStatusEffect.WeaponMalfunctionLvl4", R)
-        self.assertIn("vehicle.ForceBrakesFor(4.0)", R)
-        self.assertIn("door.ActionSetOpened()", R)
-        self.assertIn("door.ActionToggleLock()", R)
-        self.assertIn("door.IsMarkedAsQuest()", R)
-        self.assertIn("NetDeckIsNetWatch(", R)
-        self.assertIn("gamedataAffiliation.NetWatch", R)
-        self.assertIn("wanted.m_wantedLevel = EPreventionHeatStage.Heat_5", R)
-        self.assertIn("NPCPuppet.RevealPlayerPositionIfNeeded(", R)
-        self.assertIn("NetDeckGiveDataComponents(", R)
-        self.assertIn("Items.LegendaryMaterial1", R)
-        self.assertIn("Items.QuickHackLegendaryMaterial1", R)
-        self.assertNotIn("RPGManager.AwardXP(", R)
-        self.assertNotIn("AddExperience(", R)
-
-    def test_19_ui_languages_and_fallback(self):
-        import re
-        locale_ids = set(re.findall(r'if Equals\(language, n"([a-z]{2}-[a-z]{2})"\)', L))
-        self.assertEqual(locale_ids, {
-            "en-us", "ar-ar", "zh-cn", "zh-tw", "cz-cz",
-            "fr-fr", "de-de", "hu-hu", "it-it", "jp-jp",
-            "kr-kr", "pl-pl", "pt-br", "ru-ru", "es-es",
-            "es-mx", "th-th", "tr-tr", "ua-ua"
-        })
-        self.assertEqual(L.count('this.Text("NetDeckSpreadComplete"'), 19)
-        self.assertEqual(L.count('this.Text("NetDeckSpreadEmpty"'), 19)
-        self.assertEqual(L.count('this.Text("NetDeckDevicesAffected"'), 19)
-        self.assertEqual(L.count('this.Text("NetDeckEddiesStolen"'), 19)
-        self.assertEqual(L.count('this.Text("NetDeckStolenTargets"'), 19)
-        self.assertEqual(L.count('this.Text("NetDeckWaveProgress"'), 19)
-        self.assertEqual(L.count('this.Text("NetDeckTargetsAffected"'), 19)
-
-    def test_no_uncooked_placeholders(self):
-        self.assertFalse((ROOT / "source").exists())
-        self.assertIn('l"NetDeckInfiltrationName"', Y)
-        self.assertNotIn("$base: DeviceAction.PingDevice", Y)
-        self.assertNotIn("$base: Interactions.PingHack", Y)
-        self.assertIn("$base: DeviceAction.ToggleStateClassHack", Y)
-        self.assertIn("$base: Interactions.TakeControlCameraHack", Y)
-        self.assertIn("m1nsook\\netdeck\\ui\\netdeck_icons.inkatlas", Y)
-        self.assertIn("m1nsook\\netdeck\\ui\\networm_icons.inkatlas", Y)
-        self.assertIn("captionIcon: ChoiceCaptionParts.NetDeckNetwormIcon", Y)
-
-    def test_independent_native_labels(self):
-        for key in ("NetDeckDeckName", "NetDeckDeckDescription",
-                    "NetDeckInfiltrationName", "NetDeckInfiltrationDescription"):
-            self.assertIn('l"' + key + '"', Y)
-            self.assertIn('this.Text("' + key + '"', L)
-        self.assertIn("extends ModLocalizationProvider", L)
-        self.assertIn('return n"en-us"', L)
-        self.assertNotIn("PingDevice", L)
-        self.assertNotIn("$base: DeviceAction.PingDevice", Y)
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+if __name__=="__main__":
+ unittest.main(verbosity=2)

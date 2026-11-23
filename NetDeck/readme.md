@@ -1,506 +1,56 @@
 # Infiltration — NetWatch Σ MK.1 / NETWORM
 
-**Cyberpunk 2077 2.5 · v0.6.11 NATIVE VEHICLE CRASH ISOLATION TEST · NOT game-compiler verified.**
-
-**Mod:** Infiltration. **Deck:** NetWatch Σ MK.1. **Quickhack:** NETWORM.
-**Source folder/prefix:** NetDeck. **Save-compatible item:** `Items.NESTCyberdeck`.
-
-## v0.6.11 — disable native vehicle quickhack crashing during NETWORM propagation (UNVERIFIED)
-
-On 19 November 2026 the user posted Advanced Crash Reporter analysis
-[on PR #36](https://github.com/m1nsook/CP2077/pull/36#issuecomment-7003958626).
-ACR reported two similar recent crashes and identified this **likely**
-call chain: `PlayerPuppet.OnNetDeckWaveTickEvent` →
-`PlayerPuppet.NetDeckWaveInfect` →
-**native `VehicleObject.ActivateNetrunnerQuickhack`**, with the fault
-occurring in `Cyberpunk2077.exe`.
-
-The source confirmed exactly that native call in the `VehicleObject`
-branch of `NetDeckWaveInfect`, invoked when the worm reached a
-non-parked vehicle. To isolate this fault without compromising
-the rest of NETWORM, the automatic
-`vehicle.ActivateNetrunnerQuickhack(VehicleNetrunnerQuickhackType.ForceBrakes)`
-call is **removed**. The wide-area preview queue now includes only
-eligible NPC puppets rather than NPCs and cars; tick selection ignores
-vehicles from the targeting system, registered vehicle fallbacks and
-pending network candidates. This also prevents the displayed preview
-count from including automatically discovered cars that are not hacked.
-
-**Temporary limitation:** NETWORM does not force-brake vehicles and
-does not automatically propagate to cars. A vehicle can still be a
-manually targeted *entry point* for spreading the worm to nearby
-eligible NPCs and devices. This is a crash-isolation experiment, not
-a permanent removal decision. Vanilla vehicle quickhacks are
-unmodified. No global NPC/vehicle world-loading hooks were added back.
-
-**Test order:** Compile REDscript first. Load the same save and run
-NETWORM on a device or hostile NPC where cars are present. Verify
-that NPC/device propagation still works and map loading remains
-stable. Optionally, separately try starting NETWORM from a vehicle,
-expecting NO force brakes. If it crashes again, supply the complete
-Advanced Crash Reporter `.txt` (the PR comment only includes the
-diagnosis excerpt), particularly its native stack and NetDeck frames.
-
-All existing adjustable CET speeds, scan radii, the smooth native
-upload bar and user-provided icon references are unchanged. Tests
-assert that the unsafe native vehicle quickhack call cannot reappear.
-**No game compile or gameplay confirmation yet; PR remains draft.**
-
-## v0.6.10 — CET settings window must not block gameplay (UNVERIFIED)
-
-The player reported that the previous `NetDeckSettings` ImGui window
-stayed on screen and intercepted gameplay input while the CET overlay was
-closed; attempting to open CET made the settings window unusable.
-**Emergency recovery without changing anything else:** close the game,
-rename or delete
-`bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings`, relaunch.
-Only the optional settings UI is disabled; NETWORM's REDscript default
-values and all cyberdeck features remain installed.
-
-**Fixed:** The CET Lua settings module now requires both explicit
-`onOverlayOpen` state AND an open window to render, and resets both on
-`onOverlayClose`. It begins hidden until CET itself opens and closes
-when CET closes. Using CET's `ImGui.Begin(title, windowOpen)` overload
-provides an X close button, with the correct `windowOpen, shouldDraw`
-return order; `ImGui.End()` is still unconditional after Begin.
-The UI does not draw, and therefore should not capture gameplay input,
-when the CET overlay is closed.
-
-**Also fixed:** `ImGui.SliderFloat`/`ImGui.SliderInt` return
-`newValue, wasChanged` in CET, not `wasChanged, newValue`; the old
-order prevented sliders from updating. They now use the documented
-return order. Values still persist to the existing `settings.json`.
-
-Only `NetDeckSettings/init.lua` (plus tests/build metadata/docs)
-changed. REDscript, HUD icon skin, quickhack mechanics and scan/spread
-settings are unchanged. Player has not yet retested v0.6.10 in the game.
-
-## v0.6.9 — REDscript HUD wrapper signature fix (UNVERIFIED)
-
-**Player-reported compile failure:** 18 Nov 2026, 19:35:53 Europe/Warsaw,
-`[UNRESOLVED_METHOD]` at `NetDeckHudSkin.reds:92`,
-`@wrapMethod(HUDProgressBarController)` from trying to wrap
-`UpdateTimerHeader(const label: ref<String>)`.
-
-The native decompiled script signatures differ: one resource uses a plain
-`String`, and another uses `const script_ref<String>`. Neither matches
-the previously committed `ref<String>` wrapper. Rather than ship another
-unverified guess at the string signature, **removed that entire wrapper**.
-
-The scoped icon-and-color skin now wraps
-`HUDProgressBarController.UpdateProgressBarActive(active: Bool) -> Void`
-with `public final func`, matching a known working REDscript wrapper
-of the vanilla HUD controller used by Dark Future. The implementation
-calls `wrappedMethod(active)` first, applies the NETWORM blue/icon skin
-only if the active bar's header is prefixed `NETWORM`, and restores
-vanilla art when the bar becomes inactive. The user's private quickhack
-icon archive is still required.
-
-No other v0.6.8 spread, CET menu, scan-radius or timing behavior changed
-for this focused compile fix. The native game compile remains unverified
-until tested in Cyberpunk 2077. If it fails again, **send the full new
-REDscript log**; do not assume success from source-level tests.
-
-## v0.6.8 — fix HUD syntax, add live config, scan the club (UNVERIFIED)
-
-The user's installed `NetDeckHudSkin.reds` reported a **real REDscript
-lexer error** at the `networm_icons.inkatlas` path on 18 Nov 2026:
-the resource literal used unescaped backslashes (`\n` was read as an
-invalid sequence). This has been corrected: the source now stores doubled
-backslashes in **all three** atlas resource literals. A source regression
-test explicitly rejects single unescaped backslashes.
-
-**HUD behavior:** Instead of incrementing by 5% every 0.15 seconds (which
-looked like an artificial stop/start animation), the native blackboard
-progress now follows **elapsed simulation time**, at ~30 refreshes/sec,
-clamped from 0 to 1. Default upload display is 2 seconds, adjustable from
-0.7 to 4.5 in the new CET menu. It ends independently of the longer
-infection wave even if only one enemy was available to infect. A quest
-that already owns the progress bar still takes priority.
-
-**Target preview:** Before opening the HUD, NETWORM now uses a bounded
-native TargetingSystem query and the player's weak-ref scanned NPC/vehicle
-registries to pre-discover eligible loaded targets. Newly found NPCs/cars
-join the infection queue (no need to hack each one separately). The HUD
-shows **the preflight discovered target estimate**, not the old current
-infected count starting at 0. Linked devices and the root are counted once
-where eligible. The resulting count is an **estimate**, not a claim that
-every person in an interior is exposed to native targeting or will
-successfully receive the effect.
-
-**Live in-game settings** (included CET overlay module):
-`bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings/init.lua`
-
-Persistent `settings.json`, automatically saved as sliders change.
-Menu: **NETWORM - Test Settings** in the CET overlay. Sliders include:
-
-- HUD upload duration: 0.7–4.5 seconds (default 2.0)
-- Native pre-scan radius: 30–180 m (default 105)
-- Relay hop range: 15–130 m (default 75)
-- Delay between infection steps: 0.10–2.50 s (default 0.25)
-- Maximum infection steps: 4–150 (default 100)
-- Max affected targets: 8–160 (default 120)
-- Max relay fanout per host: 1–16 (default 10)
-
-Presets: **Club takeover** (145 m scan, 115 m hops, 0.14 s per
-infection), **Balanced**, and **Performance safe** (lower load).
-The CET module calls REDscript `PlayerPuppet.NetDeckConfigure(...)` via
-RTTI, wrapped in Lua `pcall`, and retries after the game loads. If the
-method is unavailable, it logs a single error and REDscript uses its
-default settings. **These settings control NETWORM's custom upload
-display and spread; they do not alter vanilla quickhack activationTime
-in the game's TweakDB.**
-
-**Important safeguards:** No global NPC/vehicle spawn hooks added back.
-Quest, companion, crowd and child NPCs remain excluded. The larger scan
-can increase load or produce less predictable counts; use Performance
-safe as a rollback preset. Neither the CET bridge, new scan behavior,
-HUD icon nor redscript compiler result has been verified in the user's
-game yet. Leave PR #36 draft; send the full next redscript compile log
-if it reports a new error. Keep a backed-up save.
-
-## v0.6.7 — scoped blue HUD and actual NETWORM icon (UNVERIFIED)
-
-The player's WolvenKit 10.0.0-beta.1 CP2077 2.5 export
-`hud_progress_bar.inkwidget.json` shows the neutral slot contains
-multiple separate layers: `Neutral_Triangle_Icon`,
-`Neutral_Exlmtion_Icon`, `Neutral_Background_Icon`,
-`Neurtral_Small_Icon`, and `Neutral_Triangle_Icon_GHOST`.
-The exported `progress_bar.inkstyle` maps state `Neutral` to
-`MainColors.Blue` and `MainColors.ActiveBlue`. The player's
-private `networm_icons.inkatlas` has texture part **`networmhack`**,
-with 32x32/64x64 variants.
-
-A separate `NetDeckHudSkin.reds` adds one **NETWORM-only**
-`HUDProgressBarController.UpdateTimerHeader` wrapper. After the
-native method, it checks the progress bar's actual header and active
-state for NETWORM; only then does it swap the existing neutral icon
-image to `m1nsook\\netdeck\\ui\\networm_icons.inkatlas`,
-part `networmhack`, hide four triangle layers, and bind the
-main bar and icon to `MainColors.ActiveBlue`. If the atlas
-part cannot be used, it restores the vanilla symbol. When another
-quest uses the progress bar, it restores the original icon,
-triangle visibility, and `Bar.Red`/`Bar.ProgressLine` bindings.
-
-**We do NOT patch or ship the game's base HUD .inkwidget/.inkstyle,**
-which would unintentionally recolor mission and hacking HUDs.
-This uses the user's **existing** local `NetDeck.archive`; the
-public source-only ZIP intentionally does not redistribute it.
-
-**New experimental risk:** even a scoped HUD controller wrap changes
-the code path for all HUD progress bar header changes. It is not
-REDscript compiler-verified or tested in-game. To isolate a new crash,
-remove ONLY `r6/scripts/NetDeck/NetDeckHudSkin.reds` while keeping the
-rest of v0.6.7 and the archived icons in place; then repeat the same
-save/map test. Do not merge/release. Existing 3-second native HUD
-timing, infection fanout and entity streaming safeguards remain.
-
-## v0.6.6 — faster, neutral-tone NETWORM upload bar (UNVERIFIED)
-
-The player confirmed **v0.6.5 loads and runs without crashes so far**.
-Keep its world-stream safety changes: global NPC/vehicle attach/detach
-wrappers stay removed, and the optional CET crash diagnostics remain.
-
-**HUD feedback from in-game test:** The red triangle and red upload
-display didn't suit the blue cyberdeck; the bar lasted about 70 seconds
-and `DEVICES: 16%` accidentally ran into the native progress percent.
-
-**This source change:**
-- Added a **separate 20-step, 0.15-second HUD timer**, aiming for a
-  smooth ~3-second initial upload (under 5 seconds in normal real-time
-  play). The independent **2-second enemy/device propagation loop is
-  NOT sped up** and may continue after the HUD disappears.
-- Native `UI_HUDProgressBar.MessageType` is set to
-  `SimpleMessageType.Neutral` when NETWORM owns the bar. The game's
-  own controller uses its **Neutral** widget state instead of the red
-  Default alert style; actual shade depends on the user's UI theme.
-  This swaps the warning triangle for **the native neutral icon**,
-  **not** the privately compiled NETWORM quickhack icon.
-- Removed redundant `DEVICES: N` bottom text from the progress widget;
-  the game already displays a percentage in that position. The
-  final result notification still carries device count and earnings.
-- All changes use the existing quest-owned-bar guard, never set global
-  UI colors or hook `HUDProgressBarController`. Stale HUD timer
-  callbacks use the existing wave generation guard.
-- This is an experimental UI style/timing change, not a tested blue
-  custom-icon implementation. **Actual in-game color, fast pacing,
-  quest sharing and sound cleanup still need to be verified.**
-
-**No merge/release yet.** Back up a save. First ensure the same map still
-loads reliably; then upload on a device and gang and confirm (1) blue
-or neutral color, (2) short bar, (3) no triangle, (4) spreading keeps
-working after the bar closes, and (5) other quests' progress bars
-are untouched.
-
-## v0.6.5 — diagnose NetDeck-induced streaming crashes (UNVERIFIED)
-
-The player's repeatable A/B test is now the main evidence: **with NetDeck the
-game crashes during map/world loading, without NetDeck it loads normally**.
-The 17:04:28 crash again reported heap corruption near
-`vehiclePersistentDataPS` and a streamed NPC. Other native reports mention
-NPC stealth mappins and resource streaming. The faulting engine allocator and
-the crash reporter's "unknown culprit" message cannot establish exactly
-which NetDeck operation corrupted memory.
-
-**Source isolation change:** both global `NPCPuppet` and `VehicleObject`
-`OnGameAttached`/`OnDetach` wrappers are now removed. Those hooks previously
-ran while the map streamed and maintained large weak-ref arrays on V.
-Candidates are registered only when their native scanner action is generated
-or a NETWORM upload explicitly starts on them. **Nearby unscanned enemy and
-vehicle propagation may regress** until we develop a safer discovery path.
-
-**Crash diagnostic addon** (included in the test ZIP):
-
-`bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckDiagnostics/init.lua`
-
-This tiny CET mod uses observer-only hooks on *NetDeck methods*, not global
-entity lifecycle methods. It emits `[NetDeck/DIAG v0.6.5]` lines:
-session_start, observer_ready/unavailable, heartbeat every ~15 seconds,
-wave_request (BEFORE upload starts), wave_start (AFTER upload returns),
-wave_infect (max 16 logged per upload), wave_finish,
-hud_request (BEFORE HUD creation), hud_start, and hud_finish. Failing to observe a method is logged and
-must not block gameplay. This does not read world objects during
-the heartbeat. **Advanced Crash Reporter 1.6 already includes
-CET `scripting.log`, so no patch to the crash reporter is needed.**
-
-Read `bin/x64/plugins/cyber_engine_tweaks/scripting.log`, or send the
-next Advanced Crash Reporter `.txt` (it includes the log tail). If it crashes
-**before any `wave_request`**, we know the crashing session did not have a
-logged successful NETWORM upload, though the item/quickhack source can still
-affect the game. If it crashes after wave_start, the last method logs can
-help correlate the crash with an upload or HUD transition. **Logging alone
-is not proof of memory ownership or a definitive crash culprit.**
-
-The previous 16:59:06 report also confirms REDscript compilation succeeded.
-It included a RedHotTools hook and repeated unloaded-resource warnings, but
-those **do not override the user's A/B evidence against NetDeck**.
-
-First test loading the *same save/sector* with the new sources and logger
-installed, **without using NETWORM**. If crashes remain, test script/tweak
-components separately from the local `NetDeck.archive` icon archive. Do
-not remove dependencies or mix source versions during comparisons. Preserve
-a backup save, leave PR #36 in DRAFT, and **do not release** this build.
-
-## v0.6.4 — map-load crash isolation (UNVERIFIED; PR #36 only)
-
-**Player-confirmed isolation:** Cyberpunk 2077 continued crashing during map/world
-loading with both Anywhere to Anywhere 2 and UndiscoverMe Teleporter removed.
-After removing NetDeck, the game loaded successfully. This strongly
-implicates NetDeck or an interaction with another installed mod, but it
-does **not** identify the specific corrupting function.
-
-The second crash report described heap corruption near an Animals NPC's
-`senseComponent.OnSenseInitialize -> CreateSenseMappin`. NetDeck previously
-wrapped **all** NPC `OnGameAttached`/`OnDetach` events to maintain a loaded
-NPC registry. That is an especially risky place to touch player state and
-arrays during streaming; it runs before a NETWORM upload.
-
-**Targeted source change:** removed only the global
-`@wrapMethod(NPCPuppet)` attach/detach wrappers. A target can still be
-registered when the player scans it, or directly when NETWORM uploads to
-that NPC. The targeting-system query, Sonic Shock Tier 5, device network
-infiltration, and experimental native mission upload bar are preserved.
-
-**Tradeoff:** passive discovery of unscanned NPCs no longer uses the
-attach-time registry. Chain-spreading to nearby enemies **must be
-reverified**; it may be less reliable than the previous version. This is
-a crash-isolation patch, **not** a proven crash fix. Vehicle streaming hooks
-remain and should be checked next if loading still crashes.
-
-**Don't merge or release this build.** Back up a save. First establish
-that map/world loading is stable in the same area, then test attacking
-multiple enemies and connected devices. Static tests do not compile
-REDscript or verify memory safety.
-
-## v0.6.3 — optional native upload-bar experiment (UNVERIFIED)
-
-The user requested the game's mission-style transfer bar in place of spammy
-NETWORM HUD feedback. An experimental `UI_HUDProgressBar` implementation
-was committed on **18 Nov 2026 at 16:30:42 Europe/Warsaw**, then reverted
-at 16:31:42 before the user could install and test it. This was premature.
-
-**The reported crash occurred at 16:29:37**, **65 seconds BEFORE** the HUD
-feature was committed. The installed NetDeck version was last modified
-at 16:13. Therefore the crash is **not evidence that this new HUD caused it**.
-The crash report still has no identified culprit.
-
-The HUD code has been restored for testing. It opens a native progress bar,
-shows localized `NETWORM: UPLOADING TO ... TARGETS` and devices affected,
-updates the progress over the bounded wave, and closes at completion or
-unequip. It checks whether another quest's progress bar is active before
-claiming it and verifies ownership by header before updating/closing.
-**Those protections are source-level only and need real in-game testing.**
-
-**Important:** This does not yet replace the separate `EXTRACTED DATA`
-notification in `NetDeckNotify`. A native red completion summary remains
-a planned, unverified follow-up. It also does not prove that the in-game
-progress widget exactly matches the user's red malware-upload screenshot.
-
-Keep PR #36 in DRAFT until game REDscript compilation and a safe in-game
-test of both NETWORM spread and the upload UI. Preserve a save backup.
-The crash investigation remains independent of this feature.
-
-## v0.6.3 — enemy targeting and sound-safety changes (UNVERIFIED)
-
-**Observed in the player's game (v0.6.2):** NETWORM counted 11 targets
-around only a few gang members/cars, did **not** spread Weapon Glitch to
-nearby enemies, and caused a persistent sound requiring mod removal.
-
-Changes committed to PR #36:
-- NPC quickhack now derives from Canto Mk.6's native
-  `QuickHack.BaseBlackWallHack` enemy-targeting record instead of
-  `QuickHack.FreePingHack`. NETWORM's own action/label/icon are retained.
-  Blackwall start/completion effects are cleared. **Requires Phantom Liberty
-  and in-game validation that no native Blackwall effects leak through.**
-- Removed the old **must have Ping action** NPC scanner gate. Quest, dead,
-  companion, crowd and child NPCs remain excluded.
-- Added a bounded loaded-NPC fallback for enemies missed by the targeting
-  system; existing device and vehicle paths are unchanged.
-- Spread attempts happen every **2 seconds**, with a hard maximum of
-  **16 scheduled jumps** per upload.
-- Removed the repeated `PingNetworkGrid_Event` effect and per-hop reward
-  notifications to address the persistent-audio regression. The precise
-  audio source has not yet been proven.
-- Final TARGETS feedback now counts dispatched effects, not all visited
-  relays. The count is not evidence of successful spread in-game.
-
-**Source-only: NOT REDscript-compiler verified. Do not reinstall v0.6.2 or
-publish this test. Leave PR #36 draft until compilation, real enemy
-propagation and normal audio teardown are verified on a backed-up save.**
-
-## Why this rewrite exists
-
-The player's in-game v0.6.0 test showed **no NPC-to-NPC or vehicle
-propagation**, only a sometimes-successful €$ reward from the *one* target,
-and ordinary quickhack tracing. The initial implementation incorrectly ran
-`TargetingSystem.GetTargetParts` from arbitrary hacked devices/NPCs,
-without using a reliable full-area query anchored on V. Pushing the source
-code was NOT proof it functioned.
-
-The user-supplied `HeatSpread Files(1).zip` contained:
-- **HeatSpread_2025:** a CET mod adjusting vanilla Overheat's
-  `spreadCount`, `bonusJumps`, `spreadDistance` in `QuickHack.BaseOverheatHack_inline3`.
-  It does not implement a custom propagation loop.
-- **Echo_EMP v0.2b:** a custom **REDscript delayed event** on `PlayerPuppet`,
-  using `TargetingSet.Complete`, a full-area 3D search from V, infected
-  host positions and a hop/fanout limit. This is the model for the new
-  NETWORM tick scheduling; NETWORM retains its own nonlethal effects.
-
-## v0.6.2: previous vehicle-path experiment (failed in-game)
-
-The game does not define `TSFMV.Obj_Vehicle`, and `Obj_Other`
-is not a reliable way to discover traffic. Vehicles use a separate
-`VehicleComponentPS.GetQuickHackActions` pipeline, which calls the
-shared quickhack finalizer; normal vehicle hacks are unlocked by the
-**Carhacker** Intelligence perk.
-
-The NetDeck source now:
-- Adds a distinct built-in `VehicleQuickHack` action,
-  `DeviceAction.NetDeckVehicleInfiltration`, which shares the
-  existing NETWORM actionName, icon and effects.
-- Offers it only for an equipped NetWatch Σ MK.1 on eligible,
-  hackable, non-player, non-quest vehicles with the Carhacker perk.
-- Uses native `VehicleObject.OnGameAttached` / `OnDetach` events to
-  maintain a bounded weak-reference registry of loaded vehicles.
-  It checks vehicle world positions during each timed wave tick
-  **separately from the TSFMV target search**.
-- Uses native `VehicleObject.ActivateNetrunnerQuickhack(
-  VehicleNetrunnerQuickhackType.ForceBrakes)` on moving vehicles,
-  matching the in-game braking quickhack entry point.
-- Allows parked eligible cars to relay the worm without forcing brakes.
-- Keeps the existing four-hop, four-fanout, 40-target timed wave for
-  NPCs and devices. A registry records loaded cars, but propagation
-  has **not been demonstrated in-game yet**.
-
-These additions do not affect the separate vanilla vehicle quickhacks,
-NetWatch retaliation, normal Ping, or the user's private icon files.
-
-## v0.6.1: previous timed-wave experiment (failed in-game)
-
-- One upload initializes a wave attached to the player and schedules a new
-  step **every 2.0 seconds** in v0.6.3 (no simultaneous instant-burst loop).
-- Each step checks a full-area targeting query **from V**, then selects one
-  candidate within **25 m of a previously infected host**, up to **4 hops**,
-  **4 outgoing links per host**, and **40 affected entities per upload**.
-  The candidates must also be loaded within 55 m of V/root.
-- Real access-point descendants are queued separately and processed one per
-  tick, preserving device-network reach without needing to quickhack a
-  vanilla access point directly.
-- NPCs: hostile gangers/NCPD/NetWatch receive the nonlethal
-  `WeaponMalfunctionLvl2` status one after another. Civilians, quest
-  NPCs, children and companions are excluded from the wave.
-- Vehicles: eligible moving non-quest vehicles get native
-  `ForceBrakesFor(4.0)`; eligible parked vehicles can relay the wave.
-- Devices: use existing native actions for security hardware,
-  `RoadBlockControllerPS` barriers and eligible doors/windows; at most eight
-  native network visual pulses per upload.
-- Hostile netrunners: Synapse Burnout is applied only on device-origin waves
-  near infected device controllers.
-- Trace control: `QuickHackableHelper.WillHackRevealPlayer` is wrapped for
-  **actionName = NetDeckInfiltration only**, returning false for ordinary
-  NETWORM uploads. No other quickhacks' tracing is modified. NETWORM
-  against a NetWatch NPC still issues its separate native five-star
-  pursuit/position-reveal attempt.
-- UI: progress notifications appear each **four newly infected targets**;
-  final notification reports total targets, queued device actions, optional
-  €$ stolen and the number of robbed sources. UI strings localized in all
-  **19** supported interface languages.
-- Money: 65% chance to grant a small virtual €$ siphon reward from each
-  eligible NPC or computer/terminal, capped at €$1,500 per upload. This does
-  NOT deduct money from a real NPC wallet.
-- Random crafting component rewards retained. **Normal Netrunner XP is allowed** when using NETWORM; no XP suppression is required.
-
-This version does not yet render an actual traveling beam between **NPCs**;
-the intended visible changes are staggered native Weapon Glitch effects.
-Network pulses and repeated notifications were removed in v0.6.3. A custom NPC-to-NPC
-beam requires a separate verified VFX implementation.
-
-## Source-only install
-
-Requires Cyberpunk 2077 2.5 **with Phantom Liberty**, RED4ext, REDscript, TweakXL and Codeware.
-Back up the save and close the game before installing.
-
-Replace these three source files from the **GitHub source test**:
-- `r6/scripts/NetDeck/NetDeck.reds`
-- `r6/scripts/NetDeck/Localization.reds`
-- `r6/tweaks/NetDeck/NetDeck.yaml`
-
-Keep the user's privately packed `.archive` with the working icon art.
-**GitHub does not include or publish the user's PNGs, .inkatlas, .xbm,
-.archive, WolvenKit project or raw/ArchiveXL assets.**
-
-## Live checklist — test before any release
-
-1. **Compilation**: check `r6/logs/redscript_rCURRENT.log` and TweakXL
-   logs. The new PlayerPuppet event, GetDeviceLink and targeted trace hook
-   have NOT been compiler-verified on the user's installation.
-2. **One gang upload**: watch 3–5 nearby enemies receive Weapon Glitch
-   in order, spaced approximately 0.45 s apart, without retargeting.
-3. **Sound and count**: no repeating network pulses/notifications; check
-   the one final `TARGETS: <number>`, and ensure all audio stops normally.
-4. **Carhacker perk:** confirm vanilla vehicle quickhacks and NETWORM are
-   both offered on an eligible traffic vehicle. With a different deck,
-   the new vehicle NETWORM must disappear.
-5. **One vehicle upload:** confirm it triggers native Emergency Brake,
-   then infects at least one other nearby car or NPC automatically.
-   A parked car may relay but must not brake.
-6. **One device upload**: confirm new device pulses, linked descendants
-   and enemy-netrunner-only Synapse Burnout.
-7. **Road barrier**: test ordinary blockades alongside a sealed/quest
-   barrier, which must remain protected.
-8. **Tracing**: ordinary gang/NCPD uploads should not trace. NETWORM
-   against a true NetWatch NPC should produce a five-star response.
-9. **€$ siphon**: check displayed credits against V's money before/after.
-10. **Vanilla**: normal Ping, weapon hacking, existing icons, cyberdeck stats
-   and other cyberdecks must continue working.
-11. **XP**: normal Netrunner XP gain is expected and allowed; do not treat it as a bug.
-
-**Keep PR #36 draft. REDscript compilation and gameplay results are
-required before describing this feature as working.**
-
-## Unchanged IDs
-- `Items.NESTCyberdeck`
-- `NetDeckInfiltration`
-- `DeviceAction.NetDeckInfiltration`
-- `QuickHack.NetDeckPuppetInfiltration`
-- `DeviceAction.NetDeckVehicleInfiltration` (new native vehicle record)
+Cyberpunk 2077 2.50 · M1 Arc integration · **1.0.0 release candidate**
+
+The original NetWatch Σ MK.1 cyberdeck uses its existing save-compatible item ID `Items.NESTCyberdeck`. NETWORM is a built-in quickhack for computers, connected devices, eligible hostile NPCs and (with Carhacker) supported vehicles. Does not replace vanilla Ping.
+
+## Requirements
+
+- Cyberpunk 2077 2.50 and **Phantom Liberty**
+- RED4ext and REDscript
+- TweakXL and Codeware
+- [M1 Arc 1.0.0+](https://github.com/m1nsook/m1arc)
+
+**CET is not required.** Remove any previously installed `bin/x64/plugins/cyber_engine_tweaks/mods/NetDeckSettings` and `NetDeckDiagnostics` folders from older test builds. They are not included in the release.
+
+## Installation
+
+Extract the release ZIP into your Cyberpunk 2077 game directory. The ZIP contains `r6/` and `red4ext/` directories. Restart the game and look under **M1 Arc → Infiltration**. The TweakXL vendor records add the deck to 26 known ripperdoc lists without replacing other stock.
+
+If the deck does not appear at a ripperdoc, load a save, open **M1 Arc → Infiltration → Cyberdeck**, then press **Add cyberdeck to V's inventory**. Each press gives **one** NetWatch Σ MK.1. The item is not automatically equipped; visit a ripperdoc to install it. Existing save references remain `Items.NESTCyberdeck`.
+
+## M1 Arc settings
+
+Seven live, persistent controls, identical in range/default to the previous CET test menu:
+
+| Setting | Range | Default |
+| --- | --- | --- |
+| Upload HUD duration | 0.7–4.5 s | 2 s |
+| Pre-scan radius | 30–180 m | 105 m |
+| Relay hop radius | 15–130 m | 75 m |
+| Infection step delay | 0.10–2.50 s | 0.25 s |
+| Maximum steps | 4–150 | 100 |
+| Maximum affected targets | 8–160 | 120 |
+| Relay fanout | 1–16 | 10 |
+
+Use **Club takeover**, **Balanced** or **Performance safe** preset buttons to change all seven controls together. Other mods' M1 Arc settings are left untouched. Changes apply to the loaded player within about half a second, including after loading another save.
+
+## Features
+
+- NETWORM's timed network propagation, shared device network effects and nonlethal communications disruption.
+- A standalone virtual quickhack while the deck is equipped; ordinary Ping and physical quickhack slots remain separate.
+- NetWatch retaliation, small capped €$ siphon and component rewards.
+- NETWORM-only native upload progress and existing blue icon references.
+- NPC eligibility protections for quest characters, children, companions and civilian crowds.
+
+**Vehicle safety:** Automatic vehicle infection and forced braking remain disabled following the November 19 crash-isolation patch. A manually hacked eligible vehicle can act as a NETWORM entry point. Do not restore `VehicleObject.ActivateNetrunnerQuickhack` in the propagation path without specific engine validation.
+
+## Icon artwork
+
+The public source repository and automatic release packager **do not include the author's privately cooked** `NetDeck.archive`, `.inkatlas`, `.xbm` or WolvenKit project. The TweakXL records retain the atlas paths. The private archive must be installed separately for custom art to appear. Publishing a fully self-contained Nexus package requires adding the authorized cooked archive to the release outside this public source workflow.
+
+## Verification
+
+Core NETWORM behavior was tested by the mod author on the previous build. The **M1 Arc integration is new** and needs in-game verification of setting application, the preset buttons and one-click inventory grant. CI checks source invariants, release ZIP contents and REDscript parser syntax; semantic game compilation requires a private 2.50 game script bundle.
+
+**Author:** 민숙 MISO @m1nsook · MIT (repository LICENSE).

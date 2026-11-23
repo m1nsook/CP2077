@@ -1,0 +1,16 @@
+{
+  "name": "Dostosowanie udźwigu",
+  "shortDesc": "Zmieniaj maksymalny udźwig V w czasie rzeczywistym",
+  "settings": {
+    "enabled": {
+      "label": "Własny limit udźwigu",
+      "description": "Włącz lub wyłącz własny limit. Po wyłączeniu zostanie przywrócony udźwig wynikający z gry i innych modów.",
+      "group": "Udźwig"
+    },
+    "limit": {
+      "label": "Maksymalny udźwig (kg)",
+      "description": "Ustaw całkowity udźwig V. Zmiany działają bez ponownego wczytywania zapisu.",
+      "group": "Udźwig"
+    }
+  }
+}

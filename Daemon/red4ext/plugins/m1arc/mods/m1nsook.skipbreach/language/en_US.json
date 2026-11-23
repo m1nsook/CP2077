@@ -1,0 +1,11 @@
+{
+  "name": "Daemon",
+  "shortDesc": "Automatically solve Breach Protocol puzzles",
+  "settings": {
+    "enabled": {
+      "label": "Automatically solve Breach Protocol",
+      "description": "Automatically solve untouched Breach Protocol puzzles. Off by default.",
+      "group": "Breach Protocol"
+    }
+  }
+}

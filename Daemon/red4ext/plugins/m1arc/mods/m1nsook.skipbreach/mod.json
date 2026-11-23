@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "m1nsook.skipbreach",
+  "name": "Daemon",
+  "version": "0.1.0",
+  "author": "민숙 MISO @m1nsook",
+  "scope": "Gameplay",
+  "shortDesc": "Automatically solve Breach Protocol puzzles",
+  "requires": {
+    "m1arc": "1.0.0"
+  }
+}

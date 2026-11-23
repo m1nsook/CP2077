@@ -41,8 +41,16 @@
     "name": "Camera Killer",
     "summary": "Shuts down cameras connected to the same access point or surveillance system when V turns off one camera."
   },
+  "Weight_Customizer": {
+    "name": "Weight Customizer",
+    "summary": "Change V's carry capacity from 50 to 5000 kg through M1 Arc, with live updates and reversible modifiers."
+  },
+  "Daemon": {
+    "name": "Daemon",
+    "summary": "Automatically solves Cyberpunk 2077 Breach Protocol puzzles by selecting valid cells in the original minigame. Requires M1 Arc 1.0.0."
+  },
   "NetDeck": {
     "name": "Infiltration",
-    "summary": "NetWatch Σ MK.1 iconic cyberdeck with the built-in NETWORM network quickhack (gameplay test; unverified)."
+    "summary": "NetWatch Σ MK.1 iconic cyberdeck with built-in NETWORM quickhack. Requires Phantom Liberty, Codeware, TweakXL, REDscript and M1 Arc 1.0.0."
   }
 }
