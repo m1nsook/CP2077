@@ -18,6 +18,36 @@ class SkipBreachSolverTests(unittest.TestCase):
         self.assertTrue(path_is_valid(matrix, result.cells))
         self.assertTrue(result.exhaustive)
 
+    def test_cyberpunk_2x_real_seven_by_seven_matrix(self):
+        # Reconstructed from the user-reported game screenshot before the
+        # first manual selection. Row 0 last cell was already selected:
+        # restore its buffer code "1C" for this independent solver test.
+        matrix = [
+            ["7A", "7A", "E9", "55", "7A", "55", "1C"],
+            ["1C", "7A", "FF", "55", "55", "BD", "55"],
+            ["1C", "E9", "55", "1C", "1C", "FF", "1C"],
+            ["1C", "7A", "E9", "7A", "BD", "7A", "1C"],
+            ["7A", "1C", "7A", "7A", "55", "E9", "1C"],
+            ["55", "7A", "E9", "7A", "7A", "E9", "55"],
+            ["55", "BD", "7A", "55", "1C", "1C", "55"],
+        ]
+        daemons = [["1C", "1C"], ["7A", "1C"], ["7A", "7A", "7A"]]
+        # Known route solves all three programs in five legal selections.
+        path = ((0, 0), (4, 0), (4, 3), (2, 3), (2, 0))
+        self.assertTrue(path_is_valid(matrix, path))
+        codes = tuple(matrix[r][c] for r, c in path)
+        self.assertEqual(codes, ("7A", "7A", "7A", "1C", "1C"))
+        for daemon in daemons:
+            self.assertTrue(any(
+                codes[i:i + len(daemon)] == tuple(daemon)
+                for i in range(len(codes) - len(daemon) + 1)
+            ))
+        result = solve(matrix, daemons, 8, node_budget=50_000)
+        self.assertIsNotNone(result)
+        self.assertTrue(path_is_valid(matrix, result.cells))
+        self.assertEqual(set(result.matched_daemons), {0, 1, 2})
+        self.assertLessEqual(len(result.cells), 8)
+
     def test_first_row_and_alternation(self):
         matrix = [["11", "22", "33"],
                   ["44", "55", "66"],

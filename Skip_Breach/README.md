@@ -75,6 +75,15 @@ normal rewards and game focus/cancellation. Windows CI only compiles
 M1 Arc C++ and verifies Python solver and source/package contracts; it
 does not compile game REDscript.
 
+## Cyberpunk 2.x-compatible solver reference
+
+The [Breach Protocol Autosolver by Marcin Cichocki](https://github.com/marcincichocki/breach-protocol-autosolver)
+is a desktop app, not a RED4ext mod. It uses screenshots and OCR,
+prioritized daemon combinations, BFS/DFS, and configurable keyboard/mouse
+navigation on Cyberpunk 2077 2.x. Its cross-version input does not
+validate our current version-gated selector. See
+[2.x solver/input design notes](docs/2X_SOLVER_REFERENCE.md).
+
 ## Interface design
 
 This feature uses the user-supplied AutoBreach 0.4.0 ZIP as an
