@@ -112,7 +112,23 @@ assert 'this.m_handledCapture = this.m_captureSerial;\n        this.TryStart();'
 assert 'class M1ArcSkipBreachTick extends DelayCallback' not in source, (
     "No DelayCallback game-time pump: first puzzle waits for initial input")
 assert 'GameInstance.GetDelaySystem' not in source, "Use UISystem event updates"
-assert 'if this.m_gameState != 1' not in source, "Do not deadlock before first selection"
+# Real first-open logs: first dispatch during Unknown had no callback, but
+# InProgress arrived 2.355s after OnInitialize. The second puzzle's first
+# cell was dispatched after InProgress and all five callbacks succeeded.
+# Do not regress to dispatching during the opening animation.
+assert 'if this.m_gameState == 0 {' in source
+assert 'Waiting for native minigame InProgress after intro; first board preserved' in source
+assert 'if this.m_gameState != 1 {' in source
+assert 'this.m_gameState != 1' in source, (
+    "An active solver must abort rather than dispatch when the state is no longer interactive")
+assert source.index('if this.m_gameState == 0 {') < source.index('this.m_handledCapture = this.m_captureSerial;'), (
+    "Unknown board must be held pending, not consumed")
+assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source, (
+    "Preserve the current generation while waiting for InProgress")
+assert 'this.m_gameState >= 0 && this.m_gameState <= 1' in source, (
+    "UI event pump must remain alive in Unknown until the first board becomes interactive")
+assert 'Never consume/dispatch a captured' in source, (
+    "First-input state gate must explain the no-ack regression")
 assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
 assert 'RecordUserClick(' not in source, "Only native matrix selection can cancel"
 assert ('this.m_gameState >= 0 && this.m_gameState <= 1\n        && M1Arc_GetBool("m1nsook.skipbreach","enabled")' in source), (
