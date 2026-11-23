@@ -13,7 +13,7 @@ assert manifest["format"] == 1
 assert manifest["id"] == moddir.name
 assert manifest["name"] == "Arc Converter - Automatic Item Processing"
 assert manifest["requires"]["m1arc"] == "1.0.0"
-assert manifest["version"] == "0.3.0"
+assert manifest["version"] == "1.0.0"
 assert manifest["scope"] == "Crafting"
 
 ids = [s["id"] for s in settings]

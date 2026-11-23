@@ -65,13 +65,8 @@ Install into the Cyberpunk 2077 game root:
 
 Open **Arc Converter - Automatic Item Processing** in M1 Arc to configure your settings.
 
-## Testing v0.3.0-dev.1
+## Release 1.0.0 — tested in game
 
-The user verified the original automatic weapon disassembly, ammo crafting and junk processing in game. **The new Sell/Disassemble selection and Clothes processing are development features and still need in-game validation.** Use a backed-up save.
+Arc Converter's weapon and clothes Sell / Disassemble modes, melee weapon support, ammunition crafting and junk conversion have been tested in Cyberpunk 2077 2.50.
 
-1. Keep Weapons and Clothes processing off and confirm no existing item disappears.
-2. Enable Weapons in **Disassemble**, select one tier and acquire a weapon of that tier. Confirm proper materials are returned and protected items remain.
-3. Change Weapons to **Sell** and acquire a different qualifying weapon. Compare received eddies to its selling price.
-4. Also verify non-iconic knives and swords of selected tiers are processed under Weapons.\n5. Enable Clothes, select one tier, and separately test **Sell** and **Disassemble** using newly acquired clothing of that tier. Ensure existing clothes and equipped/quest/iconic pieces remain.
-6. Verify equipment tier selection including + variants, mode changes, settings persistence and silent/menu acquisitions.
-7. Confirm the already-working ammunition and junk features still behave correctly.
+Nexus Mods: https://www.nexusmods.com/games/cyberpunk2077/mods/39454

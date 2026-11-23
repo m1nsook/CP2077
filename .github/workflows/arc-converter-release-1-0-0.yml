@@ -1,0 +1,60 @@
+name: Arc Converter 1.0.0 - one-time publish
+
+# One-time release job. Only reacts to the first Arc Converter merge to main.
+# The regular manual release workflow remains unchanged.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Arc_Converter/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: arc-converter-1-0-0-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate release manifest and contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Arc_Converter/tools/validate_arc_converter.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("Arc_Converter/red4ext/plugins/m1arc/mods/m1nsook.arc-converter/mod.json")
+          assert json.loads(p.read_text("utf-8"))["version"] == "1.0.0"
+          PY
+      - name: Package Arc Converter 1.0.0
+        run: python3 scripts/package_release.py --mod Arc_Converter --tag 1.0.0 --output dist
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="$(cat dist/RELEASE_TAG.txt)"
+          if [[ "$tag" != "arc-converter-v1.0.0" ]]; then
+            echo "Unexpected release tag: $tag" >&2
+            exit 1
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag is already published, no duplicate created."
+            exit 0
+          fi
+          gh release create "$tag" dist/*.zip dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "$(cat dist/RELEASE_TITLE.txt)" \
+            --notes-file dist/RELEASE_NOTES.md
