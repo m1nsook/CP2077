@@ -85,12 +85,21 @@ class InfiltrationSourceTests(unittest.TestCase):
   self.assertNotIn("registerForEvent(",BRIDGE)
   self.assertNotIn("OnGameAttached",BRIDGE)
 
+ def test_cooked_icon_archive_is_packaged_unchanged(self):
+  import hashlib
+  archive=ROOT/"archive/pc/mod/NetDeck.archive"
+  contents=archive.read_bytes()
+  self.assertEqual(contents[:4],b"RDAR")
+  self.assertEqual(len(contents),36864)
+  self.assertEqual(hashlib.sha256(contents).hexdigest(),"eca64a62c8746fc797546182fb50f9ff46fd0741600a9d68dae6896a480ad0d7")
+
  def test_no_cet_files_or_gameplay_changes(self):
   self.assertFalse((ROOT/"bin/x64/plugins/cyber_engine_tweaks").exists())
   from pack_test import FILES
   self.assertTrue(all(not f.startswith("bin/") for f in FILES))
-  self.assertEqual(len(FILES),10)
+  self.assertEqual(len(FILES),11)
   self.assertIn("r6/scripts/NetDeck/NetDeckM1Arc.reds",FILES)
+  self.assertIn("archive/pc/mod/NetDeck.archive",FILES)
   self.assertTrue(all((ROOT/f).exists() for f in FILES))
 
 if __name__=="__main__":

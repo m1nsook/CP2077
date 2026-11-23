@@ -15,7 +15,7 @@ The original NetWatch Σ MK.1 cyberdeck uses its existing save-compatible item I
 
 ## Installation
 
-Extract the release ZIP into your Cyberpunk 2077 game directory. The ZIP contains `r6/` and `red4ext/` directories. Restart the game and look under **M1 Arc → Infiltration**. The TweakXL vendor records add the deck to 26 known ripperdoc lists without replacing other stock.
+Extract the release ZIP into your Cyberpunk 2077 game directory. The ZIP contains `archive/`, `r6/` and `red4ext/` directories, including the bundled `NetDeck.archive` with custom deck and NETWORM icon resources. Restart the game and look under **M1 Arc → Infiltration**. The TweakXL vendor records add the deck to 26 known ripperdoc lists without replacing other stock.
 
 If the deck does not appear at a ripperdoc, load a save, open **M1 Arc → Infiltration → Cyberdeck**, then press **Add cyberdeck to V's inventory**. Each press gives **one** NetWatch Σ MK.1. The item is not automatically equipped; visit a ripperdoc to install it. Existing save references remain `Items.NESTCyberdeck`.
 
@@ -47,7 +47,7 @@ Adjust the seven controls individually through M1 Arc. These advanced values ret
 
 ## Icon artwork
 
-The public source repository and automatic release packager **do not include the author's privately cooked** `NetDeck.archive`, `.inkatlas`, `.xbm` or WolvenKit project. The TweakXL records retain the atlas paths. The private archive must be installed separately for custom art to appear. Publishing a fully self-contained Nexus package requires adding the authorized cooked archive to the release outside this public source workflow.
+The author-supplied cooked `archive/pc/mod/NetDeck.archive` is now included in the public source repository and packaged automatically in both development and release ZIPs. It supplies the custom cyberdeck and NETWORM icon resources referenced by TweakXL and REDscript. The original WolvenKit project, source textures and uncooked assets are not required for installation.
 
 ## Verification
 

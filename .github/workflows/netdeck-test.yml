@@ -30,8 +30,13 @@ jobs:
           with ZipFile(name) as z: files=set(z.namelist())
           assert any(n.endswith('NetDeckM1Arc.reds') for n in files)
           assert any(n.endswith('settings.json') for n in files)
+          assert "archive/pc/mod/NetDeck.archive" in files, files
+          with ZipFile(name) as z:
+            import hashlib
+            asset=z.read("archive/pc/mod/NetDeck.archive")
+          assert hashlib.sha256(asset).hexdigest() == "eca64a62c8746fc797546182fb50f9ff46fd0741600a9d68dae6896a480ad0d7"
           assert not any(n.startswith('bin/') for n in files),files
-          print('PASS: production ZIP is CET-free')
+          print('PASS: production ZIP contains the exact cooked archive and no CET files')
           PY
       - uses: actions/upload-artifact@v4
         with:

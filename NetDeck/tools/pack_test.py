@@ -7,6 +7,7 @@ from zipfile import ZIP_DEFLATED,ZipFile,ZipInfo
 
 ROOT=Path(__file__).resolve().parents[1]
 FILES=(
+ "archive/pc/mod/NetDeck.archive",
  "r6/scripts/NetDeck/NetDeck.reds",
  "r6/scripts/NetDeck/NetDeckM1Arc.reds",
  "r6/scripts/NetDeck/NetDeckHudSkin.reds",
