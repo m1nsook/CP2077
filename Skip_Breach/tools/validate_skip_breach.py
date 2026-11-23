@@ -70,7 +70,7 @@ for required in [
     "this.m_handledCapture = this.m_captureSerial;",
     "this.m_bestScore > 0 && ArraySize(this.m_bestPath) > 0",
     "LogChannel(n\"DEBUG\", \"[Skip Breach] \" + message);",
-    "this.Report(44, \"Native selector unavailable:",
+    "this.Report(44, \"Native input not ready:",
     "this.Report(54, \"No board captured after 120 UI updates;",
 ]:
     assert required in source, f"Missing expected game-side contract: {required}"
