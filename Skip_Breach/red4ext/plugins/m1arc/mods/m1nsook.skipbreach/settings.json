@@ -3,7 +3,7 @@
     "id": "enabled",
     "kind": "boolean",
     "label": "Automatically solve Breach Protocol",
-    "description": "Experimental: requires the exact Cyberpunk 2.5 native selector. Disabled by default until verified in-game.",
+    "description": "Experimental: calls M1 Arc's built-in guarded input only when enabled. OFF by default; not yet verified on the first puzzle.",
     "default": false,
     "group": "Skip Breach"
   }
