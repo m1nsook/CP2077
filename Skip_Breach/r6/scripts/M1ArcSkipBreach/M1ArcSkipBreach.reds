@@ -52,7 +52,6 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private let m_pulseQueued: Bool;
   private let m_pulseCount: Int32;
   private let m_inProgressTicks: Int32;
-  private let m_firstIntroReadyAt: Float;
 
   // Only log transitions. Do not fill REDscript.log every 100ms.
   private func Report(code: Int32, message: String) -> Void {
@@ -145,8 +144,6 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_pulseQueued = false;
     this.m_pulseCount = 0;
     this.m_inProgressTicks = 0;
-    this.m_firstIntroReadyAt = EngineTime.ToFloat(
-      GameInstance.GetEngineTime(this.GetGameInstance())) + 3.0;
     this.m_lastDiagnostic = 0;
     this.Report(10, "Breach controller initialized; waiting for puzzle capture");
     ArrayClear(this.m_grid);
@@ -305,10 +302,6 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_pulseQueued = false;
     this.m_pulseCount = 0;
     this.m_inProgressTicks = 0;
-    // Use engine elapsed time, not N UI pulses: the intro animation
-    // duration must not depend on 60/144Hz or a stalled hacking timer.
-    this.m_firstIntroReadyAt = EngineTime.ToFloat(
-      GameInstance.GetEngineTime(this.GetGameInstance())) + 3.0;
     if this.m_ready {
       this.Report(20, "Puzzle captured; native readiness and solver are next");
       this.ScheduleNext();
@@ -578,6 +571,69 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     ArrayClear(this.m_path);
   }
 
+  // Source: 2.5 hacking_minigame.inkwidget GridContainer/Grid.
+  // Coordinates come from live widgets, never fixed 1080p pixels.
+  private func ResolveClickPoint(row: Int32, col: Int32) -> Vector2 {
+    let invalid: Vector2 = Vector2(-1.0,-1.0);
+    if !IsDefined(this.m_controller) || this.m_dimension < 2
+      || row < 0 || col < 0 ||
+      row >= this.m_dimension || col >= this.m_dimension {
+      return invalid;
+    };
+    let root: wref<inkCompoundWidget> = this.m_controller.GetRootCompoundWidget();
+    if !IsDefined(root) {
+      return invalid;
+    };
+    let grid: wref<inkUniformGrid> = root.GetWidgetByPathName(
+      n"AllParts/Top/NetworkCodeMapAndButton/wrapper/NetworkCodeMap/NetworkCodeMap/ContentWithBorder/ContentContainer/GridContainer/Grid") as inkUniformGrid;
+    if !IsDefined(grid)
+      || grid.GetWrappingWidgetCount() != Cast<Uint32>(this.m_dimension)
+      || grid.GetNumChildren() < this.m_dimension * this.m_dimension {
+      return invalid;
+    };
+    let first: wref<inkWidget> = grid.GetWidgetByIndex(0);
+    let right: wref<inkWidget> = grid.GetWidgetByIndex(1);
+    let down: wref<inkWidget> = grid.GetWidgetByIndex(this.m_dimension);
+    let cell: wref<inkWidget> = grid.GetWidgetByIndex(
+      row * this.m_dimension + col);
+    if !IsDefined(first) || !IsDefined(right) || !IsDefined(down)
+      || !IsDefined(cell) || !cell.IsVisible() ||
+      !first.IsVisible() || !right.IsVisible() || !down.IsVisible() {
+      return invalid;
+    };
+    let rootRect: RectF = GetScreenPosition(root);
+    let firstRect: RectF = GetScreenPosition(first);
+    let rightRect: RectF = GetScreenPosition(right);
+    let downRect: RectF = GetScreenPosition(down);
+    let cellRect: RectF = GetScreenPosition(cell);
+    let width: Float = rootRect.Right - rootRect.Left;
+    let height: Float = rootRect.Bottom - rootRect.Top;
+    let stepX: Float = (rightRect.Left+rightRect.Right -
+      firstRect.Left-firstRect.Right)*0.5;
+    let stepY: Float = (downRect.Top+downRect.Bottom -
+      firstRect.Top-firstRect.Bottom)*0.5;
+    let cellWidth: Float = firstRect.Right - firstRect.Left;
+    let cellHeight: Float = firstRect.Bottom - firstRect.Top;
+    if width < 640.0 || height < 480.0
+      || cellWidth < 8.0 || cellHeight < 8.0
+      || stepX < cellWidth*0.5 || stepY < cellHeight*0.5 {
+      return invalid;
+    };
+    let x: Float = (cellRect.Left+cellRect.Right)*0.5;
+    let y: Float = (cellRect.Top+cellRect.Bottom)*0.5;
+    let expectedX: Float = (firstRect.Left+firstRect.Right)*0.5 +
+      Cast<Float>(col)*stepX;
+    let expectedY: Float = (firstRect.Top+firstRect.Bottom)*0.5 +
+      Cast<Float>(row)*stepY;
+    if x < expectedX-cellWidth*0.4 || x > expectedX+cellWidth*0.4
+      || y < expectedY-cellHeight*0.4 || y > expectedY+cellHeight*0.4
+      || x <= rootRect.Left || x >= rootRect.Right
+      || y <= rootRect.Top || y >= rootRect.Bottom {
+      return invalid;
+    };
+    return Vector2((x-rootRect.Left)/width,(y-rootRect.Top)/height);
+  }
+
   private func TryStart() -> Void {
     if !M1Arc_GetBool("m1nsook.skipbreach","enabled") {
       return;
@@ -586,32 +642,20 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.Report(41, "No captured, usable puzzle data; vanilla puzzle remains playable");
       return;
     };
-    // Vanilla HackingMinigameGameController.OnInitialize explicitly sets
-    // MinigameData.timerWaitsForInteraction = true. Unknown=0 therefore
-    // may persist until the FIRST real cell is accepted. Requiring
-    // InProgress beforehand was a circular wait on the stealth board.
-    // Prior early native dispatch at only 0.587 s after UI init received
-    // no OnPositionSelected; give the first intro a real 3.0 s to finish.
-    // Never retry a TRUE native dispatch without an acknowledgement.
-    if this.m_gameState == 0 {
-      if EngineTime.ToFloat(GameInstance.GetEngineTime(this.GetGameInstance()))
-        < this.m_firstIntroReadyAt {
-        this.Report(42, "First puzzle Unknown; waiting for intro before first native selection");
-        return;
-      };
-      this.Report(60, "Intro elapsed; attempting first native selection while Unknown (vanilla waits for first input)");
-    } else {
-      if this.m_gameState != 1 {
-        this.Report(43, "Breach minigame no longer interactive; leaving manual");
-        return;
-      };
-      // An exit/failure can briefly report InProgress (observed 92ms).
-      // Require a stable 20 UI updates if already InProgress before
-      // the first cell, preventing input during a closing transition.
-      if this.m_inProgressTicks < 20 {
-        this.Report(59, "Waiting for stable InProgress (20 UI updates) before native input");
-        return;
-      };
+    // The FIRST board is still Unknown until its first real click.
+    // No guessed intro timer; require a live, rendered grid before input.
+    if this.m_gameState < 0 || this.m_gameState > 1 {
+      this.Report(43, "Breach is terminal; leaving puzzle manual");
+      return;
+    };
+    if this.m_gameState == 1 && this.m_inProgressTicks < 20 {
+      this.Report(59, "Waiting for stable InProgress before native input");
+      return;
+    };
+    let visual: Vector2 = this.ResolveClickPoint(0,0);
+    if visual.X < 0.0 {
+      this.Report(42, "Waiting for rendered grid cells on FIRST puzzle");
+      return;
     };
     if this.m_cancelled || !IsDefined(this.m_controller) {
       this.Report(48, "Breach controller unavailable or already cancelled");
@@ -650,7 +694,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     // controller is still becoming interactive. The existing DelaySystem
     // tick must continue; only game-acknowledged cell selections advance.
     this.m_active = true;
-    this.Report(46, "Valid path ready; starting native selections with vanilla timer running");
+    this.Report(46, "Valid path ready; starting real grid mouse clicks with vanilla timer running");
   }
 
   public func Tick() -> Void {
@@ -715,7 +759,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
                 this.m_pendingSerial = this.m_selectionSerial;
                 this.m_waiting = true;
                 this.m_waitTicks = 0;
-                if !M1Arc_BreachSelectCell(logic, Vector2(Cast<Float>(row),Cast<Float>(col))) {
+                if !M1Arc_BreachClickAt(logic,this.ResolveClickPoint(row,col)) {
                   this.m_waiting = false;
                   if this.m_nextStep == 0 && this.m_firstCellRejects < 20 {
                     // False means no cell was dispatched, so retry is safe.
@@ -742,10 +786,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
           this.Report(54, "No board captured after 120 UI updates; manual puzzle remains playable");
         };
       };
-      // Preserve the untouched captured board while the first intro
-      // finishes. Unlike our previous broken InProgress-only gate, we
-      // may dispatch ONCE from Unknown after elapsed intro time because
-      // vanilla waits for a real first selection to start the timer.
+      // Preserve the first generated board until ink grid geometry is ready.
+      // A real pointer input starts vanilla interaction (Unknown is valid).
       if this.m_ready && this.m_captureSerial != this.m_handledCapture
         && this.m_gameState >= 0 && this.m_gameState <= 1
         && M1Arc_GetBool("m1nsook.skipbreach","enabled") {
