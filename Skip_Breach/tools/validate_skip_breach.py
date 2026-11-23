@@ -113,9 +113,10 @@ assert 'this.m_handledCapture = this.m_captureSerial;\n        this.TryStart();'
 assert 'class M1ArcSkipBreachTick extends DelayCallback' not in source, (
     "No DelayCallback game-time pump: first puzzle waits for initial input")
 assert 'GameInstance.GetDelaySystem' not in source, "Use UISystem event updates"
-# First board: original native selector was called early during Unknown but
-# wasn't acknowledged; 3-second guess then blocked all first attempts in logs.
-# The restored native selector is gated by actual 2.5 ink geometry.
+# The 09:09 first-board native selector dispatch from Unknown was ignored.
+# Every second-board native dispatch after InProgress was acknowledged.
+# Do not consume the original first capture or fake a state transition.
+# Require sustained engine InProgress and actual 2.5 ink geometry.
 assert 'private let m_firstIntroReadyAt:' not in source, (
     "Never gate the first native selection on a guessed intro timer")
 assert 'this.m_firstIntroReadyAt' not in source
@@ -126,7 +127,10 @@ assert 'grid.GetWrappingWidgetCount() != Cast<Uint32>(this.m_dimension)' in sour
 assert 'grid.GetNumChildren() < this.m_dimension * this.m_dimension' in source
 assert 'AllParts/Top/NetworkCodeMapAndButton/wrapper/NetworkCodeMap/NetworkCodeMap/ContentWithBorder/ContentContainer/GridContainer/Grid' in source
 assert 'this.ResolveClickPoint(0,0)' in source
-assert 'this.m_gameState < 0 || this.m_gameState > 1' in source
+assert 'if this.m_gameState == 0 {' in source
+assert 'First board preserved in Unknown; waiting for native InProgress' in source
+assert 'if this.m_gameState != 1 {' in source
+assert 'if this.m_inProgressTicks < 20 {' in source
 assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source
 assert 'this.m_gameState >= 0 && this.m_gameState <= 1' in source
 assert 'M1Arc_BreachSelectCell(' in source
@@ -156,7 +160,14 @@ assert start_logic.index('this.ResolveClickPoint(0,0)') < start_logic.index(
     "Do not consume the first board until its live grid is visible")
 assert 'private let m_inProgressTicks: Int32;' in source
 assert 'this.m_inProgressTicks += 1;' in source
-assert 'this.m_gameState == 1 && this.m_inProgressTicks < 20' in source
+assert 'this.m_inProgressTicks < 20' in source
+assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source
+assert start_logic.index('if this.m_gameState == 0 {') < start_logic.index(
+    'this.m_handledCapture = this.m_captureSerial;\\n    this.m_firstCellRejects = 0;'), (
+    "Never consume a generated board or dispatch native selection while Unknown")
+assert start_logic.index('if this.m_inProgressTicks < 20 {') < start_logic.index(
+    'this.m_handledCapture = this.m_captureSerial;\\n    this.m_firstCellRejects = 0;'), (
+    "Require a stable engine InProgress state before any automatic selection")
 
 assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
 assert 'RecordUserClick(' not in source, "Only native matrix selection can cancel"
