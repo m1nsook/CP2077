@@ -67,11 +67,16 @@ class BreachSequencer:
     No forced-success actions, daemon modifications or blind click loops.
     """
 
-    def __init__(self, adapter: SelectionAdapter, *, ack_timeout: float = 1.0):
+    def __init__(self, adapter: SelectionAdapter, *, ack_timeout: float = 1.0,
+                 intro_delay: float = 3.0):
         if ack_timeout <= 0:
             raise ValueError("ack_timeout must be positive")
+        if intro_delay <= 0:
+            raise ValueError("intro_delay must be positive")
         self.adapter = adapter
         self.ack_timeout = ack_timeout
+        self.intro_delay = intro_delay
+        self._unknown_since: float | None = None
         self.solution: Solution | None = None
         self._fingerprint: tuple[object, ...] | None = None
         self._confirmed = 0
@@ -130,15 +135,16 @@ class BreachSequencer:
             return self._abort("game UI unavailable, unfocused or overlay active")
         if board.fingerprint() != self._fingerprint:
             return self._abort("puzzle changed or new session started")
-        # Real first-opening log (Nov 23): the native selector was called
-        # while Unknown=0, then never emitted OnPositionSelected. A second
-        # board dispatched after InProgress=1 and acknowledged every cell.
-        # Hold the original captured puzzle through its opening animation.
-        # This state transition is NOT a new board or generation.
-        if board.game_state == 0:
-            if self._pending_time is not None:
-                return self._abort("state returned to Unknown after native dispatch")
-            return StepResult(Step.WAITING, "waiting for native InProgress")
+        # Vanilla minigameData.timerWaitsForInteraction=True: the initial
+        # Unknown=0 state can legitimately persist until first cell click.
+        # Hold the SAME captured board through the initial UI animation,
+        # not indefinitely for InProgress. Native selector dispatch is
+        # still one-shot and must receive real game acknowledgement.
+        if board.game_state == 0 and self._pending_time is None:
+            if self._unknown_since is None:
+                self._unknown_since = now
+            if now - self._unknown_since < self.intro_delay:
+                return StepResult(Step.WAITING, "waiting for first UI intro elapsed")
         cells = self.solution.cells
 
         if self._pending_time is not None:
