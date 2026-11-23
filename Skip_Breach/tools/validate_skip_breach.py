@@ -82,6 +82,19 @@ for forbidden in [
 ]:
     assert forbidden not in source, f"Forbidden legacy/direct-success path: {forbidden}"
 
+# A first-screen no-op cannot be diagnosed from the puzzle screenshot alone.
+# The installed capture-rule and generation callback must each leave a
+# distinct trace, including the null-player and unready-system cases.
+for trace in [
+    "[Skip Breach] Hacking UI OnInitialize entered",
+    "[Skip Breach] Passive capture rule installed on initial board defaults",
+    "[Skip Breach] Passive generation observer invoked",
+    "[Skip Breach] Capture skipped: missing minigame controller",
+    "[Skip Breach] Capture skipped: player object unavailable",
+    "[Skip Breach] Capture skipped: ScriptableSystem unavailable",
+]:
+    assert trace in source, f"Missing first-screen lifecycle diagnostic: {trace}"
+
 # A plain Get(n"SystemName") compiles, but silently returns null if the
 # ScriptableSystem class was declared inside a REDscript module.
 # This was the root cause of the first in-game no-op despite READY selector.
