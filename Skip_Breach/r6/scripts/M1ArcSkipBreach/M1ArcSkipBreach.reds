@@ -646,8 +646,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.Report(41, "No captured, usable puzzle data; vanilla puzzle remains playable");
       return;
     };
-    // The FIRST board is still Unknown until its first real click.
-    // No guessed intro timer; require a live, rendered grid before input.
+    // The FIRST board can stay Unknown until its first accepted grid selection.
+    // No guessed intro timer; use live rendered grid as a readiness guard.
     if this.m_gameState < 0 || this.m_gameState > 1 {
       this.Report(43, "Breach is terminal; leaving puzzle manual");
       return;
@@ -711,7 +711,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     // controller is still becoming interactive. The existing DelaySystem
     // tick must continue; only game-acknowledged cell selections advance.
     this.m_active = true;
-    this.Report(46, "Valid path ready; starting real grid mouse clicks with vanilla timer running");
+    this.Report(46, "Valid path ready; starting native grid selections with vanilla timer running");
   }
 
   public func Tick() -> Void {
@@ -784,17 +784,24 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
                   this.m_pendingSerial = this.m_selectionSerial;
                   this.m_waiting = true;
                   this.m_waitTicks = 0;
-                  if !M1Arc_BreachClickAt(logic,target) {
+                  // Win32 SendInput dispatched but never produced a real
+                  // OnPositionSelected on either board (08:46 user log).
+                  // Restore the game-native selector, which previously
+                  // acknowledged every cell on the SECOND puzzle. Unlike
+                  // that older revision, first-board execution now starts
+                  // from an Unknown state once live grid layout is ready.
+                  if !M1Arc_BreachSelectCell(
+                    logic,Vector2(Cast<Float>(row),Cast<Float>(col))) {
                     this.m_waiting = false;
                     if this.m_nextStep == 0 && this.m_firstCellRejects < 20 {
-                      // FALSE means Win32 rejected the click before dispatch.
+                      // FALSE means native input was rejected before dispatch.
                       // A TRUE dispatch without acknowledgement is NEVER
                       // retried: it might have changed the actual puzzle.
                       this.m_firstCellRejects += 1;
                       this.m_delayTicks = 2;
-                      this.Report(53, "Physical click not submitted; retrying same untouched board");
+                      this.Report(53, "Native grid input not dispatched; retrying same untouched board");
                     } else {
-                      this.Report(56, "Physical grid input rejected; leaving puzzle manual");
+                      this.Report(56, "Native grid selector rejected cell; leaving puzzle manual");
                       this.StopExecution();
                     };
                   };
