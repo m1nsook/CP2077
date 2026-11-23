@@ -33,7 +33,29 @@ controller** and is *not* guaranteed to work with the game's UI.
 Exposing an arbitrary raw-click function is **not** the plan: the mod
 should interact only with a verified active minigame.
 
+## Selection sequencer (development-only)
+
+`dev/selection_sequencer.py` now implements the **event-driven click
+coordination contract** independent of the actual game adapter. A native
+game callback must provide a fresh immutable `BoardSnapshot` and an
+adapter that selects **one real cell**. The coordinator:
+
+- takes a snapshot once at start and locks session ID, matrix,
+  daemon patterns and buffer length
+- rejects existing manual selections, missing game focus or open M1 Arc overlay
+- sends **only one** cell selection at a time
+- waits for the game's selected-cells state to acknowledge the previous cell
+  before sending the next one
+- cancels if the board changes, the player intervenes, focus is lost,
+  selection diverges or the game does not respond within the timeout
+- never reports success just because the game UI vanished before a final
+  acknowledgement
+
+`test_selection_sequencer.py` uses a **fake game adapter** and no OS
+injection. This is logic-level verification, not an installable mod.
+
 ## Remaining steps
+
 
 - Inspect Cyberpunk 2077 2.5 \`HackingMinigameGameController\` and related
   game scripts (REDscript / WolvenKit), and verify the actual member types
