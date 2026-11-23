@@ -574,12 +574,22 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.Report(41, "No captured, usable puzzle data; vanilla puzzle remains playable");
       return;
     };
-    if this.m_gameState < 0 || this.m_gameState > 1 {
-      this.Report(42, "Breach game state terminal or invalid; leaving manual");
+    // Observed on the FIRST stealth puzzle (Nov 23):
+    // OnInitialize 07:34:26.292 -> native selector 07:34:26.879
+    // -> no OnPositionSelected -> InProgress only at 07:34:28.647.
+    // The second puzzle dispatched only AFTER InProgress and every
+    // selection was acknowledged. Never consume/dispatch a captured
+    // board in Unknown=0 while the intro controller is still starting.
+    if this.m_gameState == 0 {
+      this.Report(42, "Waiting for native minigame InProgress after intro; first board preserved");
+      return;
+    };
+    if this.m_gameState != 1 {
+      this.Report(43, "Breach minigame no longer interactive; leaving manual");
       return;
     };
     if this.m_cancelled || !IsDefined(this.m_controller) {
-      this.Report(43, "Breach controller unavailable or already cancelled");
+      this.Report(48, "Breach controller unavailable or already cancelled");
       this.m_handledCapture = this.m_captureSerial;
       return;
     };
@@ -638,7 +648,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       };
     };
     if this.m_active {
-      if !this.m_ready || this.m_cancelled || this.m_gameState > 1
+      if !this.m_ready || this.m_cancelled || this.m_gameState != 1
         || this.m_session != this.m_lockedSession
         || this.m_captureSerial != this.m_lockedCapture
         || !M1Arc_BreachInputAvailable()
@@ -703,9 +713,10 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
           this.Report(54, "No board captured after 120 UI updates; manual puzzle remains playable");
         };
       };
-      // A captured puzzle stays available when a user enables the setting
-      // mid-puzzle. Previously a disabled setting marked the capture as
-      // handled, forcing the player to exit/re-enter (mission failure).
+      // Preserve the untouched captured board throughout Unknown=0 and
+      // keep the event pulse alive while its intro animation finishes.
+      // A user who toggles ON mid-board can still activate on that SAME
+      // puzzle. TryStart() never dispatches/consumes in Unknown=0.
       if this.m_ready && this.m_captureSerial != this.m_handledCapture
         && this.m_gameState >= 0 && this.m_gameState <= 1
         && M1Arc_GetBool("m1nsook.skipbreach","enabled") {
@@ -715,8 +726,9 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
         this.TryStart();
       };
     };
-    // No idle background poller. Deliver one pulse at a time only while
-    // solving or waiting for a captured board to become interactive.
+    // No idle background poller. Deliver one pulse at a time while
+    // waiting for Unknown -> InProgress on the SAME captured board.
+    // Do not stop the pulse or mark the capture handled during intro.
     if this.m_active || (this.m_ready
       && this.m_captureSerial != this.m_handledCapture
       && !this.m_cancelled
