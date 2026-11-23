@@ -1,0 +1,22 @@
+name: Skip Breach solver checks
+
+on:
+  pull_request:
+    paths:
+      - "Skip_Breach/**"
+      - ".github/workflows/skip-breach-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pure-solver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate vanilla-path solver only (no game UI claims)
+        run: python3 -m unittest discover -s Skip_Breach/dev -p "test_*.py" -v

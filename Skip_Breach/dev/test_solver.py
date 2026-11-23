@@ -1,0 +1,67 @@
+"""Unit tests for the Skip Breach *pure path solver*, not game input."""
+import unittest
+from solver import path_is_valid, solve
+
+
+class SkipBreachSolverTests(unittest.TestCase):
+    def test_optimizes_overlapping_daemons(self):
+        matrix = [
+            ["55", "1C", "BD"],
+            ["7A", "E9", "1C"],
+            ["BD", "55", "7A"],
+        ]
+        result = solve(matrix, [["55", "7A"], ["7A", "1C"]], 4)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.matched_daemons, (0, 1))
+        self.assertEqual(result.codes, ("55", "7A", "1C"))
+        self.assertEqual(result.cells, ((0, 0), (1, 0), (1, 2)))
+        self.assertTrue(path_is_valid(matrix, result.cells))
+        self.assertTrue(result.exhaustive)
+
+    def test_first_row_and_alternation(self):
+        matrix = [["11", "22", "33"],
+                  ["44", "55", "66"],
+                  ["77", "88", "99"]]
+        result = solve(matrix, [["22", "55", "44", "11"]], 5)
+        # The desired sequence includes an invalid same-row move; it must
+        # never be submitted simply because the tokens are present.
+        self.assertIsNone(result)
+
+    def test_bridging_cells_and_duplicate_prevention(self):
+        matrix = [["1C", "55"],
+                  ["7A", "BD"]]
+        result = solve(matrix, [["1C", "7A", "BD"]], 3)
+        self.assertEqual(result.cells, ((0, 0), (1, 0), (1, 1)))
+        self.assertTrue(path_is_valid(matrix, result.cells))
+        self.assertEqual(len(set(result.cells)), len(result.cells))
+
+    def test_impossible_reward_does_not_fake_success(self):
+        self.assertIsNone(solve([["1C", "55"], ["BD", "7A"]],
+                                [["FF", "FF"]], 4))
+
+    def test_limits_are_explicit_and_safe(self):
+        with self.assertRaises(ValueError):
+            solve([["1C"]], [["1C"]], 0)
+        with self.assertRaises(ValueError):
+            solve([["1C"], []], [["1C"]], 2)
+        with self.assertRaises(ValueError):
+            solve([["1C"]], [["1C"]], 2, node_budget=0)
+
+    def test_budget_never_mislabels_approximate_result_as_exact(self):
+        matrix = [["55", "7A", "1C"],
+                  ["7A", "55", "1C"],
+                  ["1C", "7A", "BD"]]
+        result = solve(matrix, [["55"]], 7, node_budget=1)
+        self.assertIsNotNone(result)
+        self.assertFalse(result.exhaustive)
+
+    def test_validate_detects_illegal_clicks(self):
+        board = [["11", "22"], ["33", "44"]]
+        self.assertFalse(path_is_valid(board, [(1, 0)]))       # first row only
+        self.assertFalse(path_is_valid(board, [(0, 0), (1, 1)]))
+        self.assertFalse(path_is_valid(board, [(0, 0), (1, 0), (0, 0)]))
+        self.assertTrue(path_is_valid(board, [(0, 0), (1, 0), (1, 1)]))
+
+
+if __name__ == "__main__":
+    unittest.main()
