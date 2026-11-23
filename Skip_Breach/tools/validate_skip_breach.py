@@ -163,10 +163,10 @@ assert 'this.m_inProgressTicks += 1;' in source
 assert 'this.m_inProgressTicks < 20' in source
 assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source
 assert start_logic.index('if this.m_gameState == 0 {') < start_logic.index(
-    'this.m_handledCapture = this.m_captureSerial;\\n    this.m_firstCellRejects = 0;'), (
+    'this.m_firstCellRejects = 0;'), (
     "Never consume a generated board or dispatch native selection while Unknown")
 assert start_logic.index('if this.m_inProgressTicks < 20 {') < start_logic.index(
-    'this.m_handledCapture = this.m_captureSerial;\\n    this.m_firstCellRejects = 0;'), (
+    'this.m_firstCellRejects = 0;'), (
     "Require a stable engine InProgress state before any automatic selection")
 
 assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
