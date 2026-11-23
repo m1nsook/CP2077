@@ -22,9 +22,9 @@ class SkipBreachSolverTests(unittest.TestCase):
         matrix = [["11", "22", "33"],
                   ["44", "55", "66"],
                   ["77", "88", "99"]]
-        result = solve(matrix, [["22", "55", "44", "11"]], 5)
-        # The desired sequence includes an invalid same-row move; it must
-        # never be submitted simply because the tokens are present.
+        result = solve(matrix, [["22", "55", "11", "44"]], 5)
+        # 22(0,1) -> 55(1,1) is valid; 11(0,0) cannot follow because
+        # the next cell MUST be selected from row 1, not row 0.
         self.assertIsNone(result)
 
     def test_bridging_cells_and_duplicate_prevention(self):
