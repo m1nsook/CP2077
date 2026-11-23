@@ -16,12 +16,12 @@ def main():
     for marker in ("class WeightCustomizerSystem extends ScriptableSystem",
                    'M1Arc_GetBool("m1nsook.weight-customizer", "enabled")',
                    'M1Arc_GetInt("m1nsook.weight-customizer", "limit")',
-                   "t\"OutfitSlots.Back\"", "gameEItemIDFlag.Preview",
+                   "t\"OutfitSlots.Back\"", "t\"AttachmentSlots.Torso\"", "gameEItemIDFlag.Preview",
                    'n"ZenitexBackpackCustomMod"', 'n"ZenitexBackpackCustomModIconic"',
                    "this.UpdateZenitex(player, stats, currentEntity)",
                    "this.RemoveZenitexModifier()", "this.m_zenitexBonus"):
         assert marker in patch, marker
-    assert "let wanted = Cast<Float>(target) + this.m_zenitexBonus;" in patch
+    assert "let wanted = Cast<Float>(target) + this.m_zenitexBonus + this.m_zenitexVanillaBonus;" in patch
     assert "RemoveAllModifiers(" not in patch
     assert not any(x in patch for x in (".m1s", ".m1c", "CET"))
     assert len(list(ROOT.glob("r6/**/*.reds"))) == 1, "Only replace the Weight Customizer script"
