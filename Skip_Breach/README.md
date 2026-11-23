@@ -157,6 +157,32 @@ claim. Do not rely on this experimental mod during an irreversible gig.**
 Only advance release testing in a repeatable, non-mission Breach Protocol
 or with a recoverable save, after real REDscript validation.
 
+## RED4ext startup blocker: invalid native definitions
+
+If RED4ext shows `M1ArcBreachNative.reds contains invalid native definitions`,
+the current addon native declarations were not matched by the **loaded**
+`red4ext/plugins/m1arc/m1arc.dll`. In particular, a Skip Breach build
+containing `M1Arc_BreachClickAt` requires an M1 Arc build that registers
+that function. The earlier M1 Arc DLL only exposed the legacy
+`M1Arc_BreachSelectCell` route. **A green CI parser check does not
+guarantee that the game is loading the matching DLL.**
+
+The diagnostic `D:\\a\\RED4ext\\RED4ext\\src\\dll\\Hooks\\ValidateScripts.cpp`
+in RED4ext's popup is a compiler source path embedded into RED4ext,
+**not a directory on the player's PC**. Don't try to create/find it.
+
+Recovery without running the game: remove or rename
+`r6/scripts/M1ArcSkipBreach/` temporarily. Keep your normal
+`red4ext/plugins/m1arc/` settings framework intact.
+
+To reinstall the experimental combination, extract the **latest M1 Arc
+PR #1 native build** into the game root first, **overwriting the old
+`m1arc.dll`**, then extract the matching **Skip Breach PR #46
+game-root artifact**. Both artifacts must be from matching development
+revisions. Do not install only a newer Skip Breach script over an
+older DLL. This is a pre-game native ABI validation failure, **not
+evidence that the solver or game clock is malfunctioning**.
+
 ## Install and test
 
 Install the **matching M1 Arc PR #1 development artifact** first (the
