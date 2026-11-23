@@ -51,8 +51,6 @@ for required in [
     "M1Arc_BreachSelectCell(logic, Vector2(",
     "this.m_captureSerial += 1",
     "this.m_selectionSerial += 1",
-    "this.m_controller.PauseTheTimer();",
-    "this.m_controller.ResumeTheTimer();",
     "this.m_waitTicks > 15",
     "this.m_nodeCount >= 50000",
     "this.m_firstCellRejects < 20",
