@@ -1,0 +1,16 @@
+{
+  "name": "Weight Customizer",
+  "shortDesc": "Set V's carry capacity in real time",
+  "settings": {
+    "enabled": {
+      "label": "Custom carry capacity",
+      "description": "Turn the custom carry capacity on or off. Disabling restores the value from the game and other mods.",
+      "group": "Capacity"
+    },
+    "limit": {
+      "label": "Carry capacity (kg)",
+      "description": "Set V's total carrying capacity. Changes apply without reloading the save.",
+      "group": "Capacity"
+    }
+  }
+}

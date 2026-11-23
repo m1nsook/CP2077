@@ -1,0 +1,59 @@
+name: Weight Customizer — development checks
+
+on:
+  pull_request:
+    paths:
+      - "Weight_Customizer/**"
+      - "scripts/package_release.py"
+      - ".github/mod-descriptions.json"
+      - ".github/workflows/weight-customizer-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Weight Customizer and M1 Arc contracts
+        run: python3 Weight_Customizer/tools/validate_weight_customizer.py
+      - name: Package and check one game-root ZIP
+        run: |
+          python3 scripts/package_release.py --mod Weight_Customizer --tag 0.1.0-dev.1 --output dist
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive = next(Path("dist").glob("*.zip"))
+          mod = "red4ext/plugins/m1arc/mods/m1nsook.weight-customizer/"
+          expected = {
+              "r6/scripts/WeightCustomizer/WeightCustomizer.reds",
+              mod + "mod.json",
+              mod + "settings.json",
+              *(mod + f"language/{locale}.json" for locale in ("en_US", "pl_PL", "ko_KR")),
+          }
+          with ZipFile(archive) as src:
+              names = set(src.namelist())
+              assert names == expected, (names, expected)
+              assert not any("m1arc.dll" in x for x in names)
+              assert not any(x.startswith("Carry_Weight/") for x in names)
+          print(f"PASS: {len(expected)} files, one installable game-root archive")
+          PY
+      - name: Stage game-root artifact for direct installation
+        run: |
+          mkdir -p game-root
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive = next(Path("dist").glob("*.zip"))
+          with ZipFile(archive) as src:
+              src.extractall("game-root")
+          assert Path("game-root/r6/scripts/WeightCustomizer/WeightCustomizer.reds").is_file()
+          assert Path("game-root/red4ext/plugins/m1arc/mods/m1nsook.weight-customizer/mod.json").is_file()
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weight-customizer-game-root
+          path: game-root/
+          if-no-files-found: error

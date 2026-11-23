@@ -40,5 +40,9 @@
   "Camera_Killer": {
     "name": "Camera Killer",
     "summary": "Shuts down cameras connected to the same access point or surveillance system when V turns off one camera."
+  },
+  "Weight_Customizer": {
+    "name": "Weight Customizer",
+    "summary": "Change V's carry capacity from 50 to 5000 kg through M1 Arc, with live updates and reversible modifiers."
   }
 }
