@@ -51,6 +51,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private let m_firstCellRejects: Int32;
   private let m_pulseQueued: Bool;
   private let m_pulseCount: Int32;
+  private let m_inProgressTicks: Int32;
 
   // Only log transitions. Do not fill REDscript.log every 100ms.
   private func Report(code: Int32, message: String) -> Void {
@@ -142,6 +143,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_firstCellRejects = 0;
     this.m_pulseQueued = false;
     this.m_pulseCount = 0;
+    this.m_inProgressTicks = 0;
     this.m_lastDiagnostic = 0;
     this.Report(10, "Breach controller initialized; waiting for puzzle capture");
     ArrayClear(this.m_grid);
@@ -158,6 +160,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_controller = null;
     this.m_ready = false;
     this.m_gameState = 0;
+    this.m_inProgressTicks = 0;
   }
 
   public func RecordGameState(ctrl: wref<HackingMinigameGameController>, state: Int32) -> Void {
@@ -167,6 +170,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     // Event-based trace, not frame polling: identify first-screen Unknown
     // versus interactive/terminal states in the *same* native log file.
     if state != this.m_gameState {
+      this.m_inProgressTicks = 0;
       if state == 0 {
         M1Arc_BreachTrace("Minigame entered Unknown state (first interaction pending)");
       } else {
@@ -297,6 +301,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_captureSerial += 1;
     this.m_pulseQueued = false;
     this.m_pulseCount = 0;
+    this.m_inProgressTicks = 0;
     if this.m_ready {
       this.Report(20, "Puzzle captured; native readiness and solver are next");
       this.ScheduleNext();
@@ -588,6 +593,14 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.Report(43, "Breach minigame no longer interactive; leaving manual");
       return;
     };
+    // On the failed attempt InProgress lasted only 58ms before terminal
+    // failure (07:34:28.647 -> 07:34:28.705); this may be the exit path.
+    // Let the native UI remain InProgress for at least 20 separate event
+    // cycles before we dispatch anything. No game-state writes.
+    if this.m_inProgressTicks < 20 {
+      this.Report(59, "Waiting for stable InProgress (20 UI updates) before native input");
+      return;
+    };
     if this.m_cancelled || !IsDefined(this.m_controller) {
       this.Report(48, "Breach controller unavailable or already cancelled");
       this.m_handledCapture = this.m_captureSerial;
@@ -646,6 +659,9 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
           this.RecordGameState(this.m_controller,observedState);
         };
       };
+    };
+    if this.m_gameState == 1 && this.m_inProgressTicks < 20 {
+      this.m_inProgressTicks += 1;
     };
     if this.m_active {
       if !this.m_ready || this.m_cancelled || this.m_gameState != 1
