@@ -1,4 +1,4 @@
-# Infiltration — NetWatch Σ MK.1 / NETWORM
+# NetWatch Σ MK.1 — NETWORM
 
 Cyberpunk 2077 2.50 · M1 Arc integration · **1.0.0 release candidate**
 
@@ -15,9 +15,9 @@ The original NetWatch Σ MK.1 cyberdeck uses its existing save-compatible item I
 
 ## Installation
 
-Extract the release ZIP into your Cyberpunk 2077 game directory. The ZIP contains `archive/`, `r6/` and `red4ext/` directories, including the bundled `NetDeck.archive` with custom deck and NETWORM icon resources. Restart the game and look under **M1 Arc → Infiltration**. The TweakXL vendor records add the deck to 26 known ripperdoc lists without replacing other stock.
+Extract the release ZIP into your Cyberpunk 2077 game directory. The ZIP contains `archive/`, `r6/` and `red4ext/` directories, including the bundled `NetDeck.archive` with custom deck and NETWORM icon resources. Restart the game and look under **M1 Arc → NetWatch Σ MK.1**. The TweakXL vendor records add the deck to 26 known ripperdoc lists without replacing other stock.
 
-If the deck does not appear at a ripperdoc, load a save, open **M1 Arc → Infiltration → Cyberdeck**, then press **Add cyberdeck to V's inventory**. Each press gives **one** NetWatch Σ MK.1. The item is not automatically equipped; visit a ripperdoc to install it. Existing save references remain `Items.NESTCyberdeck`.
+If the deck does not appear at a ripperdoc, load a save, open **M1 Arc → NetWatch Σ MK.1 → Cyberdeck**, then press **Add cyberdeck to V's inventory**. Each press gives **one** NetWatch Σ MK.1. The item is not automatically equipped; visit a ripperdoc to install it. Existing save references remain `Items.NESTCyberdeck`.
 
 ## M1 Arc settings
 

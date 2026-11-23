@@ -50,7 +50,7 @@ class InfiltrationSourceTests(unittest.TestCase):
  def test_manifest_schema_and_locales(self):
   self.assertEqual(MANIFEST["format"],1)
   self.assertEqual(MANIFEST["id"],M.name)
-  self.assertEqual(MANIFEST["name"],"Infiltration")
+  self.assertEqual(MANIFEST["name"],"NetWatch Σ MK.1")
   self.assertEqual(MANIFEST["scope"],"Weapons")
   self.assertEqual(MANIFEST["requires"],{"m1arc":"1.0.0"})
   self.assertEqual(len(SETTINGS),8)
@@ -64,6 +64,7 @@ class InfiltrationSourceTests(unittest.TestCase):
     self.assertLessEqual(setting["default"],setting["max"])
   for lang in ("en_US","pl_PL","ko_KR"):
    translated=json.loads((M/"language"/(lang+".json")).read_text("utf-8"))
+   self.assertEqual(translated["name"],MANIFEST["name"])
    self.assertEqual(set(translated["settings"]),IDs)
    for row in translated["settings"].values():
     self.assertTrue(row["label"] and row["description"] and row["group"])

@@ -11,7 +11,7 @@ Source code and releases for my Cyberpunk 2077 mods.
 
 | Mod | Nexus | M1ARC | Description | Version | Status |
 | --- |:-:|:-:| --- |:-:| --- |
-| [Infiltration](NetDeck) | — | Required | NetWatch Σ MK.1 iconic cyberdeck with NETWORM quickhack and M1 Arc controls. | 1.0.0 | Release candidate |
+| [NetWatch Σ MK.1](NetDeck) | — | Required | NetWatch Σ MK.1 iconic cyberdeck with NETWORM quickhack and M1 Arc controls. | 1.0.0 | Release candidate |
 | [Daemon](Daemon) | <a href="https://www.nexusmods.com/cyberpunk2077/mods/39379"><img width="16" height="16" src="https://github.com/user-attachments/assets/8fd6966d-74fc-417d-b09f-28bf5a8e0ac9" /></a> | Required | Automatically solves the original Breach Protocol grid through M1 Arc. | 1.0.0 | Released |
 | [Weight Customizer](Weight_Customizer) | <a href="https://www.nexusmods.com/cyberpunk2077/mods/39409"><img width="16" height="16" src="https://github.com/user-attachments/assets/8fd6966d-74fc-417d-b09f-28bf5a8e0ac9" /></a> | Required | Configurable carry capacity (50–5000 kg) with live, reversible M1 Arc settings. | 1.0.0 | Released |
 | [Free Chrome](Free_Chrome) | <a href="https://www.nexusmods.com/cyberpunk2077/mods/38695"><img width="16" height="16" src="https://github.com/user-attachments/assets/8fd6966d-74fc-417d-b09f-28bf5a8e0ac9" /></a> | - |  Sets standard cyberware Humanity/Capacity costs to zero with reversible Mod Settings and NSUI controls. | 1.0.0 | Released |
