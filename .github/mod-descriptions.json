@@ -55,6 +55,6 @@
   },
   "Arc_Converter": {
     "name": "Arc Converter - Automatic Item Processing",
-    "summary": "Automatically disassemble newly acquired weapons by tier and craft ammunition from crafting components. Requires M1 Arc 1.0.0."
+    "summary": "Automatically disassemble newly acquired weapons, craft ammunition from components, and sell junk for eddies. Requires M1 Arc 1.0.0."
   }
 }

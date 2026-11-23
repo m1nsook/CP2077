@@ -42,7 +42,7 @@ jobs:
         run: python3 Arc_Converter/tools/validate_arc_converter.py
       - name: Build installable development ZIP
         run: |
-          python3 scripts/package_release.py --mod Arc_Converter --tag 0.1.0-dev.1 --output dist
+          python3 scripts/package_release.py --mod Arc_Converter --tag 0.2.0-dev.1 --output dist
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
@@ -50,6 +50,7 @@ jobs:
           root = "red4ext/plugins/m1arc/mods/m1nsook.arc-converter/"
           expected = {
               "r6/scripts/ArcConverter/ArcConverter.reds",
+              "r6/scripts/ArcConverter/ArcConverterJunk.reds",
               root + "mod.json",
               root + "settings.json",
               *(root + f"language/{lang}.json" for lang in ("en_US", "pl_PL", "ko_KR")),
@@ -59,7 +60,7 @@ jobs:
               assert names == expected, names ^ expected
               assert not any("m1arc.dll" in n or "cyber_engine_tweaks" in n for n in names)
               z.extractall("game-root")
-          print("PASS: 6 installation files, no additional framework or scripts")
+          print("PASS: 7 installation files, no additional framework or scripts")
           PY
       - uses: actions/upload-artifact@v4
         with:

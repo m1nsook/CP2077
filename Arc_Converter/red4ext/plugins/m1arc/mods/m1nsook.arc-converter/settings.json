@@ -73,5 +73,13 @@
     "step": 5,
     "default": 25,
     "group": "Ammunition"
+  },
+  {
+    "id": "sell_junk",
+    "kind": "boolean",
+    "label": "Automatically sell junk for eddies",
+    "description": "Sell ordinary junk and jewelry anywhere, using normal game selling prices. Includes junk already in the backpack. Quest and protected items are skipped.",
+    "default": false,
+    "group": "Junk"
   }
 ]

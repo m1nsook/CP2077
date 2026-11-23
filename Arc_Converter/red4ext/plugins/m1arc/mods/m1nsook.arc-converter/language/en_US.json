@@ -1,6 +1,6 @@
 {
   "name": "Arc Converter - Automatic Item Processing",
-  "shortDesc": "Automatically disassemble newly acquired weapons and craft ammunition from components",
+  "shortDesc": "Auto-disassemble new weapons, craft ammunition, and convert junk into eddies",
   "settings": {
     "enabled": {
       "label": "Enable Arc Converter",
@@ -46,6 +46,11 @@
       "label": "Craft when reserve below (%)",
       "description": "Trigger crafting when equipped weapon's ammunition is below this percentage of capacity.",
       "group": "Ammunition"
+    },
+    "sell_junk": {
+      "label": "Automatically sell junk for eddies",
+      "description": "Automatically convert ordinary junk and jewelry into eddies at the game's selling prices, including items already in V's backpack. Quest and protected items are skipped.",
+      "group": "Junk"
     }
   }
 }

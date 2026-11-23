@@ -2,10 +2,10 @@
   "format": 1,
   "id": "m1nsook.arc-converter",
   "name": "Arc Converter - Automatic Item Processing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "민숙 MISO @m1nsook",
   "scope": "Weapons",
-  "shortDesc": "Automatically disassemble newly acquired weapons and craft ammunition from components",
+  "shortDesc": "Auto-disassemble new weapons, craft ammunition, and convert junk into eddies",
   "requires": {
     "m1arc": "1.0.0"
   }
