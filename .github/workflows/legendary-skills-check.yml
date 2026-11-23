@@ -1,0 +1,56 @@
+name: Legendary Skills - diagnostic checks
+
+on:
+  pull_request:
+    paths:
+      - "Legendary_Skills/**"
+      - ".github/workflows/legendary-skills-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parser:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: REDscript parser and optional game-aware compilation
+        shell: pwsh
+        env:
+          REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
+          REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Legendary_Skills/r6/scripts")
+          if ($LASTEXITCODE -ne 0) { throw "Legendary Skills REDscript check failed" }
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify read-only contract and package one-file install
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          script = Path('Legendary_Skills/r6/scripts/LegendarySkills/LegendarySkillsPreview.reds')
+          source = script.read_text('utf-8')
+          required = ['@wrapMethod(StatsProgressController)', 'wrappedMethod(proficiency)', 'IntelligenceSkill', 'OnHold', 'GetHoldProgress', 'm_lsOriginalLabelTint']
+          for snippet in required:
+              assert snippet in source, snippet
+          forbidden = ['SetLevel(', 'SetFact(', 'AddExperience(', 'GiveItem(', 'ForceModifier(', 'ApplyEffector(', 'QueueRequest(']
+          for snippet in forbidden:
+              assert snippet not in source, f'Mutating API not permitted in UI-only probe: {snippet}'
+          out = Path('dist'); out.mkdir()
+          target = out / 'Legendary-Skills-Netrunner-UI-Probe-v0.1.0-dev.1.zip'
+          with ZipFile(target, 'w', ZIP_DEFLATED, compresslevel=9) as archive:
+              archive.write(script, 'r6/scripts/LegendarySkills/LegendarySkillsPreview.reds')
+          with ZipFile(target) as archive:
+              assert archive.namelist() == ['r6/scripts/LegendarySkills/LegendarySkillsPreview.reds']
+          print(f'PASS: {target} - one read-only REDscript file')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legendary-skills-netrunner-ui-probe-dev
+          path: dist/*.zip
+          if-no-files-found: error
