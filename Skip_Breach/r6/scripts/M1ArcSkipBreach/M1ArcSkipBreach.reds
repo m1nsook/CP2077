@@ -58,7 +58,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       return;
     };
     this.m_lastDiagnostic = code;
-    LogChannel(n"DEBUG", "[Skip Breach] " + message);
+    M1Arc_BreachTrace(message);
   }
 
   public static func Get(gi: GameInstance) -> ref<M1ArcSkipBreachSystem> {
@@ -72,7 +72,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_running = true;
     this.m_handledCapture = -1;
     this.m_gameState = 0;
-    LogChannel(n"DEBUG", "[Skip Breach] ScriptableSystem attached; UI event driven");
+    M1Arc_BreachTrace("ScriptableSystem attached; UI event driven");
   }
 
   private func OnDetach() -> Void {
@@ -164,6 +164,19 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     if this.m_controller != ctrl {
       return;
     };
+    // Event-based trace, not frame polling: identify first-screen Unknown
+    // versus interactive/terminal states in the *same* native log file.
+    if state != this.m_gameState {
+      if state == 0 {
+        M1Arc_BreachTrace("Minigame entered Unknown state (first interaction pending)");
+      } else {
+        if state == 1 {
+          M1Arc_BreachTrace("Minigame entered InProgress state");
+        } else {
+          M1Arc_BreachTrace("Minigame entered terminal state (success/failure)");
+        };
+      };
+    };
     this.m_gameState = state;
     // Unknown=0 before the first cell may be a valid UI state.
     // 2/3 are terminal Success/Failure and must always abort.
@@ -202,6 +215,9 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.StopExecution();
       return;
     };
+    // Matching OnPositionSelected callback observed for the requested cell.
+    // Record every step, including later puzzles, not only state changes.
+    M1Arc_BreachTrace("Matching OnPositionSelected callback received");
     this.m_waiting = false;
     this.m_nextStep += 1;
     this.m_waitTicks = 0;
@@ -713,22 +729,22 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
 
 public class M1ArcSkipBreachCaptureRule extends MinigameGenerationRule {
   protected func OnProcessRule(size: Uint32, out grid: array<array<GridCell>>) -> Bool {
-    LogChannel(n"DEBUG", "[Skip Breach] Passive generation observer invoked");
+    M1Arc_BreachTrace("Passive generation observer invoked");
     let ctrl: wref<HackingMinigameGameController> = this.minigameController;
     if !IsDefined(ctrl) {
-      LogChannel(n"DEBUG", "[Skip Breach] Capture skipped: missing minigame controller");
+      M1Arc_BreachTrace("Capture skipped: missing minigame controller");
       return true;
     };
     let player: wref<GameObject> = ctrl.GetPlayerControlledObject();
     if !IsDefined(player) {
-      LogChannel(n"DEBUG", "[Skip Breach] Capture skipped: player object unavailable");
+      M1Arc_BreachTrace("Capture skipped: player object unavailable");
       return true;
     };
     let sys: ref<M1ArcSkipBreachSystem> = M1ArcSkipBreachSystem.Get(player.GetGame());
     if IsDefined(sys) {
       sys.Capture(ctrl,size,grid,ctrl.GetProgramsChains(),ctrl.GetUnlockablePrograms());
     } else {
-      LogChannel(n"DEBUG", "[Skip Breach] Capture skipped: ScriptableSystem unavailable");
+      M1Arc_BreachTrace("Capture skipped: ScriptableSystem unavailable");
     };
     return true;
   }
@@ -738,7 +754,7 @@ public class M1ArcSkipBreachCaptureRule extends MinigameGenerationRule {
 protected cb func OnInitialize() -> Bool {
   // First-run diagnostics: differentiate a hook that never ran from
   // a missing ScriptableSystem or a missing generation callback.
-  LogChannel(n"DEBUG", "[Skip Breach] Hacking UI OnInitialize entered");
+  M1Arc_BreachTrace("Hacking UI OnInitialize entered");
   wrappedMethod();
   let player: wref<GameObject> = this.GetPlayerControlledObject();
   let sys: ref<M1ArcSkipBreachSystem>;
@@ -747,7 +763,7 @@ protected cb func OnInitialize() -> Bool {
   };
   let board: ref<IBlackboard> = this.GetBlackboardSystem().Get(GetAllBlackboardDefs().HackingMinigame);
   if !IsDefined(board) {
-    LogChannel(n"DEBUG", "[Skip Breach] No HackingMinigame Blackboard at OnInitialize");
+    M1Arc_BreachTrace("No HackingMinigame Blackboard at OnInitialize");
     return true;
   };
   let data: MinigameData = FromVariant<MinigameData>(
@@ -758,7 +774,7 @@ protected cb func OnInitialize() -> Bool {
   } else {
     // System attachment may lag the FIRST UI initialization. Do not
     // withhold the capture rule merely because Get() was not ready yet.
-    LogChannel(n"DEBUG", "[Skip Breach] System lookup delayed; observer still installed");
+    M1Arc_BreachTrace("System lookup delayed; observer still installed");
   };
   // Install the observer regardless of settings AND system readiness.
   // It never edits grid cells; Capture() can adopt an unowned session.
@@ -766,7 +782,7 @@ protected cb func OnInitialize() -> Bool {
   rule.minigameController = this;
   ArrayPush(data.rules,rule);
   board.SetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults,data,true);
-  LogChannel(n"DEBUG", "[Skip Breach] Passive capture rule installed on initial board defaults");
+  M1Arc_BreachTrace("Passive capture rule installed on initial board defaults");
 }
 
 @wrapMethod(HackingMinigameGameController)
