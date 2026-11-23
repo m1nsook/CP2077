@@ -26,6 +26,7 @@ class BoardSnapshot:
     overlay_open: bool = False
     capture_serial: int = 0  # increments on every generated board
     selection_serial: int = 0  # increments in OnPositionSelected
+    game_state: int = 1  # 0 Unknown (intro), 1 InProgress, 2/3 terminal
 
     def fingerprint(self) -> tuple[object, ...]:
         return (self.session_id, self.capture_serial,
@@ -87,6 +88,7 @@ class BreachSequencer:
             and not board.overlay_open
             and bool(board.session_id)
             and bool(board.matrix)
+            and board.game_state in (0, 1)
         )
 
     def begin(self, *, allow_approximate: bool = False) -> StepResult:
@@ -128,6 +130,15 @@ class BreachSequencer:
             return self._abort("game UI unavailable, unfocused or overlay active")
         if board.fingerprint() != self._fingerprint:
             return self._abort("puzzle changed or new session started")
+        # Real first-opening log (Nov 23): the native selector was called
+        # while Unknown=0, then never emitted OnPositionSelected. A second
+        # board dispatched after InProgress=1 and acknowledged every cell.
+        # Hold the original captured puzzle through its opening animation.
+        # This state transition is NOT a new board or generation.
+        if board.game_state == 0:
+            if self._pending_time is not None:
+                return self._abort("state returned to Unknown after native dispatch")
+            return StepResult(Step.WAITING, "waiting for native InProgress")
         cells = self.solution.cells
 
         if self._pending_time is not None:
