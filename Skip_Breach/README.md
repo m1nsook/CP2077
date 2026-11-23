@@ -1,4 +1,4 @@
-### In-game no-op root cause: module-qualified scriptable system lookup
+### Historical no-op root cause: module-qualified scriptable system lookup
 
 The user supplied RED4ext and REDscript logs from Nov 23, 2026. They
 confirm both the **native selector was READY** and REDscript **compiled
@@ -40,19 +40,22 @@ not yet been verified in-game. The development solver and Python tests under
   timeout stop execution; **the vanilla countdown is never paused or
   overridden by Skip Breach**.
 - Nothing writes daemon status, success facts, rewards or a fake result.
-- Since Cyberpunk 2077 2.01+, the game-native `LogChannel` function has
-  no public REDscript declaration. The development-only
-  `M1ArcBreachNative.reds` now includes the documented declaration to
-  prevent `UNRESOLVED_FN`. This does not require an M1 Arc DLL change.
-  **Before a public release:** consolidate global logging declarations
-  to prevent clashes with any other installed logging-header mod.
-- The mod logs state transitions under `[Skip Breach]` via REDscript's
-  `LogChannel(n"DEBUG", ...)`: controller initialization, capture,
-  native selector compatibility, solving, each aborted selection and completion.
-  M1 Arc logs the **reason** its native selector is disabled at startup
-  through RED4ext's logger (wrong game version, missing signature, etc.).
-  A missing native selector no longer prevents the board capture hook from
-  registering, so the failure is visible.
+- **Runtime diagnostics now appear in M1 Arc's existing log:** 
+  `Cyberpunk 2077/red4ext/logs/m1arc*.log` (choose the newest dated
+  file), under the prefix `[Skip Breach]`. The addon calls its own
+  `M1Arc_BreachTrace(String)` native function in the paired M1 Arc DLL.
+  This replaces `LogChannel(DEBUG)`, whose destination/visibility was
+  not confirmed. `r6/logs/redscript_rCURRENT.log` is chiefly used for
+  REDscript compilation errors, not guaranteed gameplay diagnostics.
+- The unified log traces first UI initialization, passive board capture,
+  state transitions, planner readiness, every attempted native cell,
+  matching selection callbacks and abort/timeouts. Repeated successful
+  cell dispatches are **not** de-duplicated. Only transitions or actual
+  input events are logged to avoid per-frame spam. No game state is written.
+- **Install the matching M1 Arc PR #1 DLL along with this addon.** Older
+  M1 Arc builds do not register `M1Arc_BreachTrace`; mixing builds can
+  trigger invalid native declarations at game startup. A missing selector
+  does not prevent passive board capture from registering.
 
 ## First-puzzle UI event execution (experimental)
 
