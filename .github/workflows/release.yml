@@ -9,6 +9,7 @@ on:
         required: true
         type: choice
         options:
+          - NetDeck
           - Weight_Customizer
           - Daemon
           - No_Tracking_Please

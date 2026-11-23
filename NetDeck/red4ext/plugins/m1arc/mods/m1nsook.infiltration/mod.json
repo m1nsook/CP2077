@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "m1nsook.infiltration",
+  "name": "NetWatch Σ MK.1",
+  "version": "1.0.0",
+  "author": "민숙 MISO @m1nsook",
+  "scope": "Weapons",
+  "shortDesc": "NETWORM configuration and NetWatch Σ MK.1 inventory access",
+  "requires": {
+    "m1arc": "1.0.0"
+  }
+}

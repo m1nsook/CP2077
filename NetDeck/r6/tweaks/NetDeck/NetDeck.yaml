@@ -1,0 +1,150 @@
+# Infiltration — NetWatch Σ MK.1 iconic cyberdeck, TweakXL game-root test build
+# Keep Items.NESTCyberdeck stable for existing saves.
+
+
+# Original icon resources are built privately in WolvenKit and NOT uploaded to GitHub.
+# These TweakXL references contain no texture data.
+Items.NESTCyberdeck:
+  $base: Items.AdvancedNetwatchNetdriverMKLegendaryPlusPlus
+  icon:
+    atlasResourcePath: m1nsook\netdeck\ui\netdeck_icons.inkatlas
+    atlasPartName: cw_m1_netdeck
+
+  friendlyName: "NetWatch Σ MK.1"
+  displayName: l"NetDeckDeckName"
+  localizedDescription: l"NetDeckDeckDescription"
+  quality: Quality.LegendaryPlusPlus
+  blueprint: Items.CyberdeckBlueprint4Slots
+  variants:
+    - Variants.Humanity5Cost
+  nextUpgradeItem: ''
+  OnLooted: []
+  OnEquip:
+    - Items.BaseDeck_inline0
+    - Items.BaseDeck_inline3
+    - NetDeck.RAM15Buffer4
+    - Items.HackDecreasedAwarenessGainAbility
+    - Items.DecreasedHacksCostOnDevicesAbility
+    - Items.IncreaseDamageDealtWhileControllingDeviceAbilityLegendaryPlusPlus
+  objectActions:
+    - !append-once DeviceAction.NetDeckInfiltration
+  tags:
+    - !remove Iconic_Netdriver_Cyberdeck
+    - !append-once NetDeck_Cyberdeck
+
+NetDeck.RAM15Buffer4:
+  $type: gamedataGameplayLogicPackage_Record
+  stats:
+    - $type: gamedataConstantStatModifier_Record
+      statType: BaseStats.Memory
+      modifierType: Additive
+      value: 15
+    - $type: gamedataConstantStatModifier_Record
+      statType: BaseStats.BufferSize
+      modifierType: Additive
+      value: 4
+
+# Virtual built-in quickhacks (ItemID.None) are treated as untraceable
+# by QuickHackableHelper when their awareness cost is zero.
+# NetWatch's separate retaliation is triggered explicitly in NETWORM code.
+NetDeck.ZeroAwareness:
+  $type: gamedataStatModifierGroup_Record
+  statModifiers: []
+
+# NETWORM native device quickhack. Never derive from PingDevice:
+# doing so duplicated Ping UI semantics and broke normal Ping selection.
+DeviceAction.NetDeckInfiltration:
+  $base: DeviceAction.ToggleStateClassHack
+  awarenessCost: NetDeck.ZeroAwareness
+  actionName: NetDeckInfiltration
+  objectActionUI: Interactions.NetDeckInfiltration
+  isQuickHack: true
+  objectActionType: ObjectActionType.DeviceQuickHack
+  startEffects: []
+  completionEffects: []
+  targetPrereqs: []
+  targetActivePrereqs: []
+
+# Dedicated native vehicle quickhack; VehicleComponentPS scanner and the
+# Carhacker perk determine whether vehicle actions are available. No PNG data.
+DeviceAction.NetDeckVehicleInfiltration:
+  $base: DeviceAction.VehicleForceBrakesClassHack
+  awarenessCost: NetDeck.ZeroAwareness
+  actionName: NetDeckInfiltration
+  objectActionUI: Interactions.NetDeckInfiltration
+  isQuickHack: true
+  objectActionType: ObjectActionType.VehicleQuickHack
+  startEffects: []
+  completionEffects: []
+  targetPrereqs: []
+  targetActivePrereqs: []
+
+# Public source-only icon RECORDS: users must install their own cooked atlas.
+UIIcon.NetDeckNetworm:
+  $type: gamedataUIIcon_Record
+  atlasResourcePath: m1nsook\netdeck\ui\networm_icons.inkatlas
+  atlasPartName: networmhack
+
+ChoiceCaptionParts.NetDeckNetwormIcon:
+  $base: ChoiceCaptionParts.OverheatIcon
+  texturePartID: UIIcon.NetDeckNetworm
+
+Interactions.NetDeckInfiltration:
+  $base: Interactions.TakeControlCameraHack
+  caption: l"NetDeckInfiltrationName"
+  description: l"NetDeckInfiltrationDescription"
+  captionIcon: ChoiceCaptionParts.NetDeckNetwormIcon
+
+# Enemy-targeting action derives from the Militech Canto Mk.6's native
+# Blackwall Gateway base, NOT from Ping. This inherits a native hostile
+# quickhack targeting/action classification while keeping a unique record.
+# Native Blackwall visuals and lethal game effects are explicitly cleared;
+# NETWORM applies its own nonlethal script effects after the upload.
+# Requires Phantom Liberty (Canto/Blackwall records).
+QuickHack.NetDeckPuppetInfiltration:
+  $base: QuickHack.BaseBlackWallHack
+  awarenessCost: NetDeck.ZeroAwareness
+  actionName: NetDeckInfiltration
+  objectActionUI: Interactions.NetDeckInfiltration
+  objectActionType: ObjectActionType.PuppetQuickHack
+  isQuickHack: true
+  startEffects: []
+  completionEffects: []
+  targetPrereqs: []
+  targetActivePrereqs: []
+
+# One guaranteed stock record, appended to all known Night City / Dogtown
+# ripperdoc lists. This does not replace any existing stock.
+NetDeck.RipperdocStock:
+  $type: gamedataVendorItem_Record
+  item: Items.NESTCyberdeck
+  quantity:
+    - Vendors.Always_Present
+
+Vendors.AdvancedCollectiveRipperDoc.itemStock: &NetDeckVendor
+  - !append-once NetDeck.RipperdocStock
+Vendors.AdvancedCollectiveRipperDocDogtown.itemStock: *NetDeckVendor
+Vendors.AdvancedCollectiveRipperDocGeneral.itemStock: *NetDeckVendor
+Vendors.AdvancedCollectiveRipperDocVictor.itemStock: *NetDeckVendor
+Vendors.AdvancedOSAndSkeletalRipperDoc.itemStock: *NetDeckVendor
+Vendors.AdvancedSkeletalRipperDoc.itemStock: *NetDeckVendor
+Vendors.bls_ina_se1_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.bls_ina_se1_ripperdoc_02.itemStock: *NetDeckVendor
+Vendors.cz_monument_ripperdoc_anderson.itemStock: *NetDeckVendor
+Vendors.cz_monument_ripperdoc_farida.itemStock: *NetDeckVendor
+Vendors.cz_stadium_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.EarlyGameRipperdoc.itemStock: *NetDeckVendor
+Vendors.EndGameRipperdoc.itemStock: *NetDeckVendor
+Vendors.hey_spr_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.MidGameRipperdoc.itemStock: *NetDeckVendor
+Vendors.pac_wwd_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.Ripperdoc_HUB.itemStock: *NetDeckVendor
+Vendors.std_arr_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.std_rcr_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.wat_kab_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.wat_kab_ripperdoc_02.itemStock: *NetDeckVendor
+Vendors.wat_kab_ripperdoc_03.itemStock: *NetDeckVendor
+Vendors.wat_lch_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.wat_nid_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.wbr_jpn_ripperdoc_01.itemStock: *NetDeckVendor
+Vendors.wbr_jpn_ripperdoc_02.itemStock: *NetDeckVendor

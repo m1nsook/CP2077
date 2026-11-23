@@ -1,0 +1,46 @@
+{
+  "name": "NetWatch Σ MK.1",
+  "shortDesc": "Ustawienia NETWORM i dodawanie NetWatch Σ MK.1 do ekwipunku",
+  "settings": {
+    "uploadSeconds": {
+      "label": "Czas przesyłania (s)",
+      "description": "Czas wyświetlania paska przesyłania NETWORM, niezależny od rozprzestrzeniania.",
+      "group": "Przesyłanie"
+    },
+    "scanRadius": {
+      "label": "Promień skanowania (m)",
+      "description": "Zasięg wstępnego wyszukiwania dostępnych przeciwników.",
+      "group": "Rozprzestrzenianie"
+    },
+    "hopRadius": {
+      "label": "Promień przeskoku (m)",
+      "description": "Maksymalna odległość kolejnego przeskoku.",
+      "group": "Rozprzestrzenianie"
+    },
+    "spreadInterval": {
+      "label": "Odstęp infekcji (s)",
+      "description": "Opóźnienie między krokami rozprzestrzeniania; niższe wartości zwiększają obciążenie.",
+      "group": "Rozprzestrzenianie"
+    },
+    "maxJumps": {
+      "label": "Maksimum kroków infekcji",
+      "description": "Maksymalna liczba kroków podczas jednego użycia NETWORM.",
+      "group": "Rozprzestrzenianie"
+    },
+    "maxTargets": {
+      "label": "Maksimum celów",
+      "description": "Maksymalna liczba celów jednego użycia.",
+      "group": "Rozprzestrzenianie"
+    },
+    "fanout": {
+      "label": "Połączenia na cel",
+      "description": "Maksymalna liczba przeskoków wychodzących z jednego celu.",
+      "group": "Rozprzestrzenianie"
+    },
+    "give_deck": {
+      "label": "Dodaj NetWatch Σ MK.1",
+      "description": "Dodaj jeden cyberdeck do ekwipunku V, gdy nie jest dostępny u ripperdoca.",
+      "group": "Cyberdeck"
+    }
+  }
+}
