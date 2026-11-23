@@ -60,6 +60,49 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
       || Equals(itemType, gamedataItemType.Gen_Jewellery);
   }
 
+  // REDscript has no 'continue' statement. Per-stack guards return from
+  // this helper instead of trying to skip a while-loop iteration.
+  private func SellJunkStack(gi: GameInstance, ts: ref<TransactionSystem>,
+    data: wref<gameItemData>) -> Bool {
+    if !this.IsSellableJunk(data) {
+      return false;
+    };
+
+    let item: ItemID = data.GetID();
+    // Recheck the live stack, not the inventory snapshot.
+    let quantity: Int32 = Min(128, Min(data.GetQuantity(),
+      ts.GetItemQuantity(this.m_player, item)));
+    if quantity <= 0 {
+      return false;
+    };
+
+    // Same native sell-price calculation used by the inventory UI.
+    let price: Int32 = RPGManager.CalculateSellPrice(
+      gi, this.m_player, item);
+    if price <= 0 || price > 1000000000 / quantity {
+      // Never discard junk for free or allow Int32 payout overflow.
+      return false;
+    };
+
+    let payment: Int32 = price * quantity;
+    let moneyID: ItemID = ItemID.CreateQuery(t"Items.money");
+    let moneyBefore: Int32 = ts.GetItemQuantity(this.m_player, moneyID);
+    if moneyBefore > 2000000000 - payment {
+      return false;
+    };
+
+    // Only pay if removal succeeded. Attempt to return the same junk on
+    // the rare failure to grant currency rather than silently losing it.
+    if ts.RemoveItem(this.m_player, item, quantity) {
+      if !ts.GiveItemByTDBID(this.m_player, t"Items.money", payment) {
+        ts.GiveItem(this.m_player, item, quantity);
+        return false;
+      };
+      return true;
+    };
+    return false;
+  }
+
   private func SellJunk() -> Void {
     if !M1Arc_GetBool("m1nsook.arc-converter", "sell_junk")
       || !M1Arc_GetBool("m1nsook.arc-converter", "enabled")
@@ -82,39 +125,7 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
     while i < ArraySize(items) && processed < 12 {
       let data: wref<gameItemData> = items[i];
       i += 1;
-      if !this.IsSellableJunk(data) {
-        continue;
-      };
-
-      let item: ItemID = data.GetID();
-      // Recheck the live stack, not the inventory snapshot.
-      let quantity: Int32 = Min(128, Min(data.GetQuantity(),
-        ts.GetItemQuantity(this.m_player, item)));
-      if quantity <= 0 {
-        continue;
-      };
-
-      // Same native sell-price calculation used by the inventory UI.
-      let price: Int32 = RPGManager.CalculateSellPrice(
-        gi, this.m_player, item);
-      if price <= 0 || price > 1000000000 / quantity {
-        // Never discard junk for free or allow Int32 payout overflow.
-        continue;
-      };
-
-      let payment: Int32 = price * quantity;
-      let moneyID: ItemID = ItemID.CreateQuery(t"Items.money");
-      let moneyBefore: Int32 = ts.GetItemQuantity(this.m_player, moneyID);
-      if moneyBefore > 2000000000 - payment {
-        continue;
-      };
-
-      // Only pay if removal succeeded. Attempt to return the same junk on
-      // the rare failure to grant currency rather than silently losing it.
-      if ts.RemoveItem(this.m_player, item, quantity) {
-        if !ts.GiveItemByTDBID(this.m_player, t"Items.money", payment) {
-          ts.GiveItem(this.m_player, item, quantity);
-        };
+      if this.SellJunkStack(gi, ts, data) {
         processed += 1;
       };
     };

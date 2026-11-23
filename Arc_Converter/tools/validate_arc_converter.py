@@ -86,7 +86,7 @@ junk_checks = [
 for needle in junk_checks:
     assert needle in junk_source, needle
 # Keep junk conversion isolated: the weapon-only source must not contain sales.
-assert 'sell_junk' not in weapon_source
+assert "continue;" not in junk_source, "REDscript has no continue statement"\nassert 'sell_junk' not in weapon_source
 assert 'ts.RemoveItem(' not in weapon_source
 assert not (root / "bin").exists()
 print("PASS: manifest, settings, translations and static safety contracts")
