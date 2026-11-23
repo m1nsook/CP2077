@@ -34,54 +34,63 @@ class FakeGame:
 
 
 class SequencerTests(unittest.TestCase):
-    def test_first_intro_waits_then_dispatches_on_same_board(self):
+    def test_first_board_uses_visible_grid_without_waiting_for_inprogress(self):
         game = FakeGame()
-        game.board = replace(game.board, game_state=0, capture_serial=42)
+        game.board = replace(game.board, game_state=0,
+                             capture_serial=42, grid_click_ready=False)
         seq = BreachSequencer(game, ack_timeout=0.25)
         self.assertEqual(seq.begin().state, Step.IDLE)
-        # Base-game timerWaitsForInteraction=True: game can stay in
-        # Unknown until the first accepted selection. The FIRST board
-        # must become eligible without a synthetic state transition.
-        for t in (0.0, 0.58, 1.02, 1.95, 2.35, 2.99):
+        # The first screen is Unknown. It must wait ONLY for actual ink
+        # cell coordinates, not InProgress or an arbitrary 3-second delay.
+        for t in (0.0, 0.10, 0.30, 0.60):
             result = seq.tick(t)
             self.assertEqual(result.state, Step.WAITING)
-            self.assertIn("intro", result.reason)
+            self.assertIn("geometry", result.reason)
             self.assertEqual(game.requests, [])
-        result = seq.tick(3.01)
+        game.board = replace(game.board, grid_click_ready=True)
+        result = seq.tick(0.61)
         self.assertEqual(result.attempted, (0, 0))
+        self.assertEqual(game.board.game_state, 0)
         self.assertEqual(game.requests, [(0, 0)])
-        self.assertEqual(seq.tick(3.02).state, Step.WAITING)
+        # Sending a Windows mouse event is not proof it was accepted:
+        # no second click may be sent until the game's callback.
+        self.assertEqual(seq.tick(0.62).state, Step.WAITING)
         self.assertEqual(game.requests, [(0, 0)])
-        # Native first cell starts vanilla InProgress, not the reverse.
         game.acknowledge((0, 0))
         game.board = replace(game.board, game_state=1)
-        self.assertEqual(seq.tick(3.05).state, Step.CONFIRMED)
-        self.assertEqual(len(game.requests), 1)
+        self.assertEqual(seq.tick(0.63).state, Step.CONFIRMED)
 
-    def test_initial_unknown_can_continue_without_inprogress_before_first_selection(self):
+    def test_first_unknown_game_may_ack_before_inprogress(self):
         game = FakeGame()
         game.board = replace(game.board, game_state=0)
-        seq = BreachSequencer(game, intro_delay=3.0)
+        seq = BreachSequencer(game)
         seq.begin()
-        self.assertFalse(game.requests)
-        self.assertEqual(seq.tick(0).state, Step.WAITING)
-        self.assertEqual(seq.tick(3.0).attempted, (0, 0))
-        self.assertEqual(game.board.game_state, 0)
-        self.assertEqual(seq.tick(3.1).state, Step.WAITING)
+        self.assertEqual(seq.tick(0.0).attempted, (0, 0))
+        self.assertEqual(seq.tick(0.1).state, Step.WAITING)
         self.assertEqual(game.requests, [(0, 0)])
         game.acknowledge((0, 0))
-        self.assertEqual(seq.tick(3.2).state, Step.CONFIRMED)
+        self.assertEqual(seq.tick(0.2).state, Step.CONFIRMED)
 
-    def test_first_intro_terminal_fails_closed_without_dispatch(self):
+    def test_first_board_terminal_before_visible_never_clicks(self):
         for terminal in (2, 3):
             game = FakeGame()
-            game.board = replace(game.board, game_state=0)
+            game.board = replace(game.board, game_state=0,
+                                 grid_click_ready=False)
             seq = BreachSequencer(game)
             seq.begin()
             self.assertEqual(seq.tick(0).state, Step.WAITING)
             game.board = replace(game.board, game_state=terminal)
             self.assertEqual(seq.tick(1.0).state, Step.ABORTED)
             self.assertEqual(game.requests, [])
+
+    def test_grid_disappears_after_dispatch_aborts_without_retry(self):
+        game = FakeGame()
+        seq = BreachSequencer(game)
+        seq.begin()
+        self.assertEqual(seq.tick(0).attempted, (0, 0))
+        game.board = replace(game.board, grid_click_ready=False)
+        self.assertEqual(seq.tick(.1).state, Step.ABORTED)
+        self.assertEqual(game.requests, [(0, 0)])
 
     def test_no_duplicate_after_dispatched_unknown_transition(self):
         game = FakeGame()
