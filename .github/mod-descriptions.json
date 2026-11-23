@@ -40,5 +40,9 @@
   "Camera_Killer": {
     "name": "Camera Killer",
     "summary": "Shuts down cameras connected to the same access point or surveillance system when V turns off one camera."
+  },
+  "Carry_Weight": {
+    "name": "Carry Weight (M1 Arc)",
+    "summary": "Live, reversible carry-capacity limit using M1 Arc's native manifest and REDscript settings API."
   }
 }

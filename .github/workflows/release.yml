@@ -9,6 +9,7 @@ on:
         required: true
         type: choice
         options:
+          - Carry_Weight
           - No_Tracking_Please
           - Free_Chrome
           - Camera_Killer

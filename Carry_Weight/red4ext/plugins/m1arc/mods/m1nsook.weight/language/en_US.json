@@ -1,0 +1,7 @@
+{
+  "mod.name": "Carry Weight",
+  "enabled.label": "Custom carry capacity",
+  "enabled.description": "Enable the temporary carry capacity modifier. Turning this off restores the capacity supplied by the game and other mods.",
+  "limit.label": "Carry capacity (kg)",
+  "limit.description": "Set the total player carry capacity. Updates in-game without reloading the save."
+}
