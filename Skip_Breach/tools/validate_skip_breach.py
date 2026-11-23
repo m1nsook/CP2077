@@ -102,8 +102,17 @@ assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
 assert 'RecordUserClick(' not in source, "Only native matrix selection can cancel"
 assert ('this.m_gameState >= 0 && this.m_gameState <= 1\n        && M1Arc_GetBool("m1nsook.skipbreach","enabled")' in source), (
     "A mid-puzzle toggle must not mark the capture handled before ON")
-assert 'Always install our passive generation observer' in source, (
-    "Capture must not depend on toggle state")
+assert 'Install the observer regardless of settings AND system readiness' in source, (
+    "The first board must capture even if the ScriptableSystem is still attaching")
+assert source.index('ArrayPush(data.rules,rule);') > source.index('if IsDefined(sys) {\n    sys.BeginSession('), (
+    "The passive observer must be registered outside the system-ready branch")
+assert 'First-board capture initialized its own session' in source
+assert 'if this.m_controller == ctrl {' in source, (
+    "Do not erase a board captured before the initialization handshake")
+assert 'this.RecordGameState(this.m_controller,observedState);' in source, (
+    "Initial Blackboard state must be observed even if the delayed listener misses it")
+assert 'this.m_controller.PauseTheTimer()' not in source, (
+    "Do not pause a one-shot puzzle before dispatch")
 assert '&& M1Arc_BreachInputAvailable() {' not in source, "Don't hide capture behind selector readiness"
 assert "return !this.m_budgetHit && this.m_bestScore > 0" not in source, "Budget must not discard valid paths"
 print("PASS: game-root manifest, opt-in setting, native diagnostics, best-effort solver and no CET dependency")
