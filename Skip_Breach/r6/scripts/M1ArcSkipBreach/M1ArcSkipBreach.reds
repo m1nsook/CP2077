@@ -40,6 +40,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private let m_bestPath: array<Int32>;
   private let m_lastDiagnostic: Int32;
   private let m_waitForBoardTicks: Int32;
+  private let m_firstCellRejects: Int32;
 
   // Only log transitions. Do not fill REDscript.log every 100ms.
   private func Report(code: Int32, message: String) -> Void {
@@ -90,6 +91,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_ready = false;
     this.m_cancelled = false;
     this.m_waitForBoardTicks = 0;
+    this.m_firstCellRejects = 0;
     this.m_lastDiagnostic = 0;
     this.Report(10, "Breach controller initialized; waiting for puzzle capture");
     ArrayClear(this.m_grid);
@@ -329,9 +331,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private func StopExecution() -> Void {
     this.m_active = false;
     this.m_waiting = false;
-    if this.m_paused && IsDefined(this.m_controller) {
-      this.m_controller.ResumeTheTimer();
-    };
+    // No timer pause is introduced by Skip Breach. We intentionally leave
+    // the vanilla countdown untouched, especially during gig stealth.
     this.m_paused = false;
     ArrayClear(this.m_path);
   }
@@ -350,27 +351,42 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     };
     if this.m_cancelled || !IsDefined(this.m_controller) {
       this.Report(43, "Breach controller unavailable or already cancelled");
+      this.m_handledCapture = this.m_captureSerial;
       return;
     };
     if !M1Arc_BreachInputAvailable() {
       this.Report(44, "Native selector unavailable: check m1arc entry in RED4ext log for version/signature reason");
       return;
     };
-    if !this.Plan() {
-      this.Report(45, "No rewarding path found within solver budget; manual puzzle remains playable");
+    // First-time UI controllers can become available AFTER board capture.
+    // Do not consume the only stealth puzzle before there is a place to
+    // submit its first cell. Retry on the SAME board while it is untouched.
+    let logic: wref<inkLogicController> =
+      this.m_controller.GetControllerByType(n"gameuiHackingMinigameLogicController");
+    if !IsDefined(logic) {
+      this.Report(47, "Waiting for hacking UI controller (same puzzle, no exit needed)");
       return;
     };
+    if !this.Plan() {
+      this.Report(45, "No rewarding path found; leaving original puzzle manual");
+      this.m_handledCapture = this.m_captureSerial;
+      return;
+    };
+    this.m_handledCapture = this.m_captureSerial;
+    this.m_firstCellRejects = 0;
     this.m_lockedSession = this.m_session;
     this.m_lockedCapture = this.m_captureSerial;
     this.m_path = this.m_bestPath;
     this.m_nextStep = 0;
     this.m_waiting = false;
     this.m_waitTicks = 0;
-    this.m_delayTicks = 1;
-    this.m_controller.PauseTheTimer();
-    this.m_paused = true;
+    this.m_delayTicks = 0;
+    // Crucial first-attempt safety: DO NOT pause the vanilla timer here.
+    // The first launch can stall between preparation and input while the
+    // controller is still becoming interactive. The existing DelaySystem
+    // tick must continue; only game-acknowledged cell selections advance.
     this.m_active = true;
-    this.Report(46, "Valid path found; timer paused; starting cell selections");
+    this.Report(46, "Valid path ready; starting native selections with vanilla timer running");
   }
 
   public func Tick() -> Void {
@@ -403,15 +419,31 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
               let logic: wref<inkLogicController> =
                 this.m_controller.GetControllerByType(n"gameuiHackingMinigameLogicController");
               if !IsDefined(logic) {
-                this.Report(52, "Hacking logic controller not found; stopping");
-                this.StopExecution();
+                if this.m_nextStep == 0 && this.m_firstCellRejects < 20 {
+                  this.m_firstCellRejects += 1;
+                  this.m_delayTicks = 2;
+                  this.Report(52, "Waiting for first-try hacking UI controller; will retry without exiting puzzle");
+                } else {
+                  this.Report(55, "Hacking UI controller disappeared; leaving manual puzzle");
+                  this.StopExecution();
+                };
               } else {
                 this.m_pendingSerial = this.m_selectionSerial;
                 this.m_waiting = true;
                 this.m_waitTicks = 0;
                 if !M1Arc_BreachSelectCell(logic, Vector2(Cast<Float>(row),Cast<Float>(col))) {
-                  this.Report(53, "Native controller rejected cell selection (focus/type/coordinate check)");
-                  this.StopExecution();
+                  this.m_waiting = false;
+                  if this.m_nextStep == 0 && this.m_firstCellRejects < 20 {
+                    // False means no cell was dispatched, so retry is safe.
+                    // A TRUE dispatch without acknowledgement is NEVER
+                    // retried: it might have actually changed the puzzle.
+                    this.m_firstCellRejects += 1;
+                    this.m_delayTicks = 2;
+                    this.Report(53, "First cell not accepted yet; retrying same board without timer pause");
+                  } else {
+                    this.Report(56, "Native selector rejected cell; leaving puzzle manual");
+                    this.StopExecution();
+                  };
                 };
               };
             };
@@ -432,7 +464,9 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       if this.m_captureSerial != this.m_handledCapture
         && this.m_gameState == 1
         && M1Arc_GetBool("m1nsook.skipbreach","enabled") {
-        this.m_handledCapture = this.m_captureSerial;
+        // TryStart consumes this generation only AFTER controller readiness,
+        // or if it is truly unsolvable/previously touched. Early UI startup
+        // must not cause a permanent skip until the player exits the puzzle.
         this.TryStart();
       };
     };

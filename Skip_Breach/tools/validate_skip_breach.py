@@ -55,6 +55,10 @@ for required in [
     "this.m_controller.ResumeTheTimer();",
     "this.m_waitTicks > 15",
     "this.m_nodeCount >= 50000",
+    "this.m_firstCellRejects < 20",
+    "Waiting for first-try hacking UI controller",
+    "First cell not accepted yet; retrying same board",
+    "this.m_handledCapture = this.m_captureSerial;",
     "this.m_bestScore > 0 && ArraySize(this.m_bestPath) > 0",
     "LogChannel(n\"DEBUG\", \"[Skip Breach] \" + message);",
     "this.Report(44, \"Native selector unavailable:",
@@ -75,6 +79,12 @@ for forbidden in [
 assert 'module MisoSkipBreach' in source
 assert 'Get(n"MisoSkipBreach.M1ArcSkipBreachSystem")' in source
 assert 'Get(n"M1ArcSkipBreachSystem") as M1ArcSkipBreachSystem' not in source
+assert 'this.m_controller.PauseTheTimer()' not in source, (
+    "Never pause a one-shot gig puzzle before first confirmed input")
+assert 'this.m_controller.ResumeTheTimer()' not in source, (
+    "No timer state should be owned when we never pause")
+assert 'this.m_handledCapture = this.m_captureSerial;\n        this.TryStart();' not in source, (
+    "Do not consume the first puzzle before transient UI readiness")
 assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
 assert 'RecordUserClick(' not in source, "Only native matrix selection can cancel"
 assert ('this.m_gameState == 1\n        && M1Arc_GetBool("m1nsook.skipbreach","enabled")' in source), (

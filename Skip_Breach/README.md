@@ -37,7 +37,8 @@ not yet been verified in-game. The development solver and Python tests under
   `HackingMinigameGameController.OnPositionSelected` acknowledgement.
 - Generation/session changes, user input, a different minigame state,
   disabled settings, a missing controller or a 1.5-second acknowledgement
-  timeout stop execution and restore the vanilla timer.
+  timeout stop execution; **the vanilla countdown is never paused or
+  overridden by Skip Breach**.
 - Nothing writes daemon status, success facts, rewards or a fake result.
 - Since Cyberpunk 2077 2.01+, the game-native `LogChannel` function has
   no public REDscript declaration. The development-only
@@ -52,6 +53,29 @@ not yet been verified in-game. The development solver and Python tests under
   through RED4ext's logger (wrong game version, missing signature, etc.).
   A missing native selector no longer prevents the board capture hook from
   registering, so the failure is visible.
+
+## First-attempt initialization and timer safety
+
+In-game observation: the first stealth puzzle can reach the full 30.00
+timer without any automatic input, while the second puzzle after
+detection may solve. Code review found two sources of startup fragility:
+(1) a `GetControllerByType` failure during UI initialization stopped
+execution and marked the current capture handled; (2) the mod called
+`PauseTheTimer()` **before** its first native selection.
+
+The current change waits for a valid logic controller on the SAME puzzle,
+keeps the captured generation pending until it can actually run, and
+retries only when the native call explicitly returns **false** without
+dispatching a cell. If native dispatch returns true but game
+`OnPositionSelected` acknowledgement never arrives, it **does not
+repeat** that selection: repeated clicks could damage the puzzle.
+The mod no longer pauses or resumes the vanilla timer, so failures
+cannot strand its countdown in a mod-owned paused state.
+
+This is a **source-level risk reduction, not a verified fix** for
+first-time game controller initialization. Do not test it by exiting
+a stealth gig or letting it trigger failure; verification should use a
+repeatable non-mission puzzle or a restorable save.
 
 ## First-attempt safety — gig failure is not reversible
 
