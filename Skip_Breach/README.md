@@ -54,6 +54,30 @@ not yet been verified in-game. The development solver and Python tests under
   A missing native selector no longer prevents the board capture hook from
   registering, so the failure is visible.
 
+## First-puzzle UI event execution (experimental)
+
+The working AutoBreach ZIP updates its execution through CET's
+`onUpdate` per-frame callback. Our implementation previously used
+`DelaySystem.DelayCallback` to run the solver, which is a game-time
+scheduler and may not advance while the first hacking UI is waiting
+for a cell selection. This build replaces that periodic scheduler
+with a bounded `UISystem.QueueEvent` pump, delivered to
+`HackingMinigameGameController` via an added REDscript event handler.
+
+Every event carries the exact session and capture serial, stale
+pulses cannot affect a regenerated matrix, and only one outstanding
+event is allowed. Safety stops exist after 1,500 UI updates.
+
+The first screen can report `HackingMinigameState.Unknown = 0`
+before any selection; we now allow the first automated selection once
+the actual hacking UI logic controller is present, instead of waiting
+for `InProgress = 1` (which may itself require a first click).
+Succeeded and Failed states are never automated.
+
+This is a source-level hypothesis informed by vanilla controller and
+the supplied reference. REDscript CLI parser validation is NOT
+semantic game compilation or proof of successful first-screen input.
+
 ## First-attempt initialization and timer safety
 
 In-game observation: the first stealth puzzle can reach the full 30.00

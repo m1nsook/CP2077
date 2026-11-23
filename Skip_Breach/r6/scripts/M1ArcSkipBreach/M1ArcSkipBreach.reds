@@ -4,6 +4,13 @@ module MisoSkipBreach
 // First experimental integration for Cyberpunk 2077 2.5. Disabled by default.
 // Does not use CET, Lua, forced daemon fulfillment or simulated mouse clicks.
 
+// First puzzle UI event pump. Game-time DelayCallback polling could stall
+// while the vanilla hacking clock waits for the first input.
+public class M1ArcSkipBreachPulseEvent extends Event {
+  public let session: Int32;
+  public let captureSerial: Int32;
+}
+
 public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private let m_running: Bool;
   private let m_controller: wref<HackingMinigameGameController>;
@@ -42,6 +49,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private let m_lastDiagnostic: Int32;
   private let m_waitForBoardTicks: Int32;
   private let m_firstCellRejects: Int32;
+  private let m_pulseQueued: Bool;
+  private let m_pulseCount: Int32;
 
   // Only log transitions. Do not fill REDscript.log every 100ms.
   private func Report(code: Int32, message: String) -> Void {
@@ -63,8 +72,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_running = true;
     this.m_handledCapture = -1;
     this.m_gameState = 0;
-    LogChannel(n"DEBUG", "[Skip Breach] ScriptableSystem attached");
-    this.ScheduleNext();
+    LogChannel(n"DEBUG", "[Skip Breach] ScriptableSystem attached; UI event driven");
   }
 
   private func OnDetach() -> Void {
@@ -73,13 +81,41 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_controller = null;
   }
 
+  // UISystem events continue to dispatch when the game's timer waits for
+  // an initial Breach selection. Limit event requests, and tag each one with
+  // the exact session and generation to prevent cross-puzzle input.
   private func ScheduleNext() -> Void {
-    if !this.m_running {
+    if !this.m_running || !IsDefined(this.m_controller) || this.m_pulseQueued {
       return;
     };
-    let tick: ref<M1ArcSkipBreachTick> = new M1ArcSkipBreachTick();
-    tick.owner = this;
-    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(tick, 0.10, false);
+    if this.m_pulseCount >= 1500 {
+      this.Report(57, "UI event safety limit exceeded; leaving puzzle manual");
+      this.StopExecution();
+      this.m_handledCapture = this.m_captureSerial;
+      return;
+    };
+    let ui: ref<UISystem> = GameInstance.GetUISystem(this.GetGameInstance());
+    if !IsDefined(ui) {
+      this.Report(58, "UI event system unavailable; leaving puzzle manual");
+      return;
+    };
+    let event: ref<M1ArcSkipBreachPulseEvent> = new M1ArcSkipBreachPulseEvent();
+    event.session = this.m_session;
+    event.captureSerial = this.m_captureSerial;
+    this.m_pulseQueued = true;
+    this.m_pulseCount += 1;
+    ui.QueueEvent(event);
+  }
+
+  public func ReceivePulse(ctrl: wref<HackingMinigameGameController>,
+                           session: Int32, capture: Int32) -> Void {
+    // Stale events do not clear newer in-flight pulses.
+    if this.m_controller != ctrl || this.m_session != session
+      || this.m_captureSerial != capture {
+      return;
+    };
+    this.m_pulseQueued = false;
+    this.Tick();
   }
 
   public func BeginSession(ctrl: wref<HackingMinigameGameController>, size: Int32, buffer: Int32, gameState: Int32) -> Void {
@@ -93,6 +129,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_cancelled = false;
     this.m_waitForBoardTicks = 0;
     this.m_firstCellRejects = 0;
+    this.m_pulseQueued = false;
+    this.m_pulseCount = 0;
     this.m_lastDiagnostic = 0;
     this.Report(10, "Breach controller initialized; waiting for puzzle capture");
     ArrayClear(this.m_grid);
@@ -116,8 +154,12 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       return;
     };
     this.m_gameState = state;
-    if state != 1 {
+    // Unknown=0 before the first cell may be a valid UI state.
+    // 2/3 are terminal Success/Failure and must always abort.
+    if state > 1 {
       this.StopExecution();
+    } else {
+      this.ScheduleNext();
     };
   }
 
@@ -152,7 +194,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_waiting = false;
     this.m_nextStep += 1;
     this.m_waitTicks = 0;
-    this.m_delayTicks = 1; // allow one frame for animation
+    this.m_delayTicks = 2; // allow a later UI frame for animation
+    this.ScheduleNext();
     if this.m_nextStep >= ArraySize(this.m_path) {
       // Final selection was accepted. The game's original callback must
       // still execute; it is responsible for programs/rewards/closing UI.
@@ -210,8 +253,11 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       && ArraySize(this.m_daemonLengths) > 0;
     // Every generation increments the serial, even if it cannot be solved.
     this.m_captureSerial += 1;
+    this.m_pulseQueued = false;
+    this.m_pulseCount = 0;
     if this.m_ready {
       this.Report(20, "Puzzle captured; native readiness and solver are next");
+      this.ScheduleNext();
     } else {
       this.Report(21, "Puzzle capture incomplete; no valid grid or daemons");
     };
@@ -486,8 +532,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.Report(41, "No captured, usable puzzle data; vanilla puzzle remains playable");
       return;
     };
-    if this.m_gameState != 1 {
-      this.Report(42, "Breach game state is not interactive (expected state 1)");
+    if this.m_gameState < 0 || this.m_gameState > 1 {
+      this.Report(42, "Breach game state terminal or invalid; leaving manual");
       return;
     };
     if this.m_cancelled || !IsDefined(this.m_controller) {
@@ -535,7 +581,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       return;
     };
     if this.m_active {
-      if !this.m_ready || this.m_cancelled || this.m_gameState != 1
+      if !this.m_ready || this.m_cancelled || this.m_gameState > 1
         || this.m_session != this.m_lockedSession
         || this.m_captureSerial != this.m_lockedCapture
         || !M1Arc_BreachInputAvailable()
@@ -544,9 +590,10 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       } else {
         if this.m_waiting {
           this.m_waitTicks += 1;
-          if this.m_waitTicks > 15 {
-            // Never repeat a click without a native selection event.
-            this.Report(51, "Game did not acknowledge selected cell after 1.5s; stopping");
+          if this.m_waitTicks > 120 {
+            // Frame-driven events, not 0.1-second DelayCallback ticks.
+            // Never repeat a dispatched click without native acknowledgement.
+            this.Report(51, "No native selection acknowledgement after 120 UI updates");
             this.StopExecution();
           };
         } else {
@@ -595,15 +642,15 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       if M1Arc_GetBool("m1nsook.skipbreach","enabled")
         && IsDefined(this.m_controller) && !this.m_ready {
         this.m_waitForBoardTicks += 1;
-        if this.m_waitForBoardTicks == 20 {
-          this.Report(54, "No board captured after 2s. Enable Skip Breach BEFORE opening the minigame.");
+        if this.m_waitForBoardTicks == 120 {
+          this.Report(54, "No board captured after 120 UI updates; manual puzzle remains playable");
         };
       };
       // A captured puzzle stays available when a user enables the setting
       // mid-puzzle. Previously a disabled setting marked the capture as
       // handled, forcing the player to exit/re-enter (mission failure).
-      if this.m_captureSerial != this.m_handledCapture
-        && this.m_gameState == 1
+      if this.m_ready && this.m_captureSerial != this.m_handledCapture
+        && this.m_gameState >= 0 && this.m_gameState <= 1
         && M1Arc_GetBool("m1nsook.skipbreach","enabled") {
         // TryStart consumes this generation only AFTER controller readiness,
         // or if it is truly unsolvable/previously touched. Early UI startup
@@ -611,15 +658,14 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
         this.TryStart();
       };
     };
-    this.ScheduleNext();
-  }
-}
-
-public class M1ArcSkipBreachTick extends DelayCallback {
-  public let owner: wref<M1ArcSkipBreachSystem>;
-  public func Call() -> Void {
-    if IsDefined(this.owner) {
-      this.owner.Tick();
+    // No idle background poller. Deliver one pulse at a time only while
+    // solving or waiting for a captured board to become interactive.
+    if this.m_active || (this.m_ready
+      && this.m_captureSerial != this.m_handledCapture
+      && !this.m_cancelled
+      && this.m_gameState >= 0 && this.m_gameState <= 1
+      && M1Arc_GetBool("m1nsook.skipbreach","enabled")) {
+      this.ScheduleNext();
     };
   }
 }
@@ -703,3 +749,16 @@ protected cb func OnGameStateChanged(value: Int32) -> Bool {
 // Do not intercept generic UI click events: they can fire while the
 // puzzle opens and are not proof that a matrix cell was selected.
 // OnPositionSelected is the only reliable manual-selection signal.
+
+@addMethod(HackingMinigameGameController)
+protected cb func OnM1ArcSkipBreachPulseEvent(evt: ref<M1ArcSkipBreachPulseEvent>) -> Bool {
+  let player: wref<GameObject> = this.GetPlayerControlledObject();
+  if !IsDefined(player) || !IsDefined(evt) {
+    return false;
+  };
+  let sys: ref<M1ArcSkipBreachSystem> = M1ArcSkipBreachSystem.Get(player.GetGame());
+  if IsDefined(sys) {
+    sys.ReceivePulse(this,evt.session,evt.captureSerial);
+  };
+  return true;
+}

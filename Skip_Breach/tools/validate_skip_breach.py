@@ -51,7 +51,12 @@ for required in [
     "M1Arc_BreachSelectCell(logic, Vector2(",
     "this.m_captureSerial += 1",
     "this.m_selectionSerial += 1",
-    "this.m_waitTicks > 15",
+    "this.m_waitTicks > 120",
+    "class M1ArcSkipBreachPulseEvent extends Event",
+    "ui.QueueEvent(event);",
+    "sys.ReceivePulse(this,evt.session,evt.captureSerial);",
+    "@addMethod(HackingMinigameGameController)",
+    "this.m_pulseCount >= 1500",
     "this.m_nodeCount >= 50000",
     "private func MatchMask(codes: array<Int32>) -> Int32",
     "private func RankMask(mask: Int32) -> Int32",
@@ -89,9 +94,13 @@ assert 'this.m_controller.ResumeTheTimer()' not in source, (
     "No timer state should be owned when we never pause")
 assert 'this.m_handledCapture = this.m_captureSerial;\n        this.TryStart();' not in source, (
     "Do not consume the first puzzle before transient UI readiness")
+assert 'class M1ArcSkipBreachTick extends DelayCallback' not in source, (
+    "No DelayCallback game-time pump: first puzzle waits for initial input")
+assert 'GameInstance.GetDelaySystem' not in source, "Use UISystem event updates"
+assert 'if this.m_gameState != 1' not in source, "Do not deadlock before first selection"
 assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
 assert 'RecordUserClick(' not in source, "Only native matrix selection can cancel"
-assert ('this.m_gameState == 1\n        && M1Arc_GetBool("m1nsook.skipbreach","enabled")' in source), (
+assert ('this.m_gameState >= 0 && this.m_gameState <= 1\n        && M1Arc_GetBool("m1nsook.skipbreach","enabled")' in source), (
     "A mid-puzzle toggle must not mark the capture handled before ON")
 assert 'Always install our passive generation observer' in source, (
     "Capture must not depend on toggle state")
