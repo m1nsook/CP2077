@@ -77,30 +77,6 @@
     "default": 10
   },
   {
-    "id": "preset_club",
-    "kind": "action",
-    "label": "Club takeover",
-    "buttonLabel": "Apply Club takeover",
-    "description": "Large-area preset: 145m scan, 115m hops, 0.14s steps; higher performance cost.",
-    "group": "Presets"
-  },
-  {
-    "id": "preset_balanced",
-    "kind": "action",
-    "label": "Balanced",
-    "buttonLabel": "Apply Balanced",
-    "description": "Restore the original default spread and upload settings.",
-    "group": "Presets"
-  },
-  {
-    "id": "preset_safe",
-    "kind": "action",
-    "label": "Performance safe",
-    "buttonLabel": "Apply Performance safe",
-    "description": "Lower-load preset: 65m scan, 45m hops and 0.50s infection steps.",
-    "group": "Presets"
-  },
-  {
     "id": "give_deck",
     "kind": "action",
     "label": "Get NetWatch Σ MK.1",

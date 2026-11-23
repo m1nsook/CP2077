@@ -37,21 +37,6 @@
       "description": "Maksymalna liczba przeskoków wychodzących z jednego celu.",
       "group": "Rozprzestrzenianie"
     },
-    "preset_club": {
-      "label": "Przejęcie klubu",
-      "description": "Duży zasięg i szybkie rozprzestrzenianie; większe obciążenie.",
-      "group": "Presety"
-    },
-    "preset_balanced": {
-      "label": "Zrównoważony",
-      "description": "Przywróć domyślne ustawienia NETWORM.",
-      "group": "Presety"
-    },
-    "preset_safe": {
-      "label": "Oszczędzanie wydajności",
-      "description": "Mniejszy zasięg i wolniejsze rozprzestrzenianie.",
-      "group": "Presety"
-    },
     "give_deck": {
       "label": "Dodaj NetWatch Σ MK.1",
       "description": "Dodaj jeden cyberdeck do ekwipunku V, gdy nie jest dostępny u ripperdoca.",

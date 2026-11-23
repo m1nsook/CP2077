@@ -33,7 +33,7 @@ Seven live, persistent controls, identical in range/default to the previous CET 
 | Maximum affected targets | 8–160 | 120 |
 | Relay fanout | 1–16 | 10 |
 
-Use **Club takeover**, **Balanced** or **Performance safe** preset buttons to change all seven controls together. Other mods' M1 Arc settings are left untouched. Changes apply to the loaded player within about half a second, including after loading another save.
+Adjust the seven controls individually through M1 Arc. These advanced values retain the existing NETWORM defaults; changes apply to the loaded player within about half a second, including after loading another save.
 
 ## Features
 
@@ -51,6 +51,6 @@ The public source repository and automatic release packager **do not include the
 
 ## Verification
 
-Core NETWORM behavior was tested by the mod author on the previous build. The **M1 Arc integration is new** and needs in-game verification of setting application, the preset buttons and one-click inventory grant. CI checks source invariants, release ZIP contents and REDscript parser syntax; semantic game compilation requires a private 2.50 game script bundle.
+Core NETWORM behavior was tested by the mod author on the previous build. The **M1 Arc integration is new** and needs in-game verification of setting application and the one-click inventory grant. CI checks source invariants, release ZIP contents and REDscript parser syntax; semantic game compilation requires a private 2.50 game script bundle.
 
 **Author:** 민숙 MISO @m1nsook · MIT (repository LICENSE).

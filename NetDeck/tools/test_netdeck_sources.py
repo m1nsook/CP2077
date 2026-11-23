@@ -53,8 +53,8 @@ class InfiltrationSourceTests(unittest.TestCase):
   self.assertEqual(MANIFEST["name"],"Infiltration")
   self.assertEqual(MANIFEST["scope"],"Weapons")
   self.assertEqual(MANIFEST["requires"],{"m1arc":"1.0.0"})
-  self.assertEqual(len(SETTINGS),11)
-  self.assertEqual(len(IDs),11)
+  self.assertEqual(len(SETTINGS),8)
+  self.assertEqual(len(IDs),8)
   for setting in SETTINGS:
    self.assertTrue(setting["label"] and setting["group"])
    if setting["kind"]=="action":
@@ -79,8 +79,9 @@ class InfiltrationSourceTests(unittest.TestCase):
   self.assertIn("player.NetDeckConfigure(",BRIDGE)
   self.assertIn("m_lastRevision",BRIDGE)
   self.assertIn("M1Arc_Revision()",BRIDGE)
-  self.assertIn("M1Arc_SetFloat(",BRIDGE)
-  self.assertIn("M1Arc_SetInt(",BRIDGE)
+  self.assertEqual({s["id"] for s in SETTINGS if s["kind"]=="action"},{"give_deck"})
+  for old in ("preset_club","preset_balanced","preset_safe","ApplyPreset","M1Arc_SetFloat(","M1Arc_SetInt("):
+   self.assertNotIn(old,BRIDGE)
   self.assertNotIn("registerForEvent(",BRIDGE)
   self.assertNotIn("OnGameAttached",BRIDGE)
 

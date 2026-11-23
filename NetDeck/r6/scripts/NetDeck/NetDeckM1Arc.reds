@@ -27,17 +27,7 @@ public class NetDeckM1ArcSystem extends ScriptableSystem {
 
   public func Tick() -> Void {
     if !this.m_running { return; }
-    // Consume actions only once, including if there is no loaded player.
-    // Presets persist through M1 Arc and can be selected in the main menu.
-    if M1Arc_ConsumeAction("m1nsook.infiltration", "preset_club") {
-      this.ApplyPreset(1);
-    }
-    if M1Arc_ConsumeAction("m1nsook.infiltration", "preset_balanced") {
-      this.ApplyPreset(2);
-    }
-    if M1Arc_ConsumeAction("m1nsook.infiltration", "preset_safe") {
-      this.ApplyPreset(3);
-    }
+    // Consume inventory action once; never replay on later save loads.
     let giveDeck = M1Arc_ConsumeAction("m1nsook.infiltration", "give_deck");
     let player = GetPlayer(this.GetGameInstance()) as PlayerPuppet;
     if IsDefined(player) {
@@ -75,37 +65,6 @@ public class NetDeckM1ArcSystem extends ScriptableSystem {
     this.ScheduleNext();
   }
 
-  private func ApplyPreset(preset: Int32) -> Void {
-    if preset == 1 {
-      M1Arc_SetFloat("m1nsook.infiltration", "uploadSeconds", 1.6);
-      M1Arc_SetFloat("m1nsook.infiltration", "scanRadius", 145.0);
-      M1Arc_SetFloat("m1nsook.infiltration", "hopRadius", 115.0);
-      M1Arc_SetFloat("m1nsook.infiltration", "spreadInterval", 0.14);
-      M1Arc_SetInt("m1nsook.infiltration", "maxJumps", 140);
-      M1Arc_SetInt("m1nsook.infiltration", "maxTargets", 150);
-      M1Arc_SetInt("m1nsook.infiltration", "fanout", 14);
-    } else {
-      if preset == 2 {
-        M1Arc_SetFloat("m1nsook.infiltration", "uploadSeconds", 2.0);
-        M1Arc_SetFloat("m1nsook.infiltration", "scanRadius", 105.0);
-        M1Arc_SetFloat("m1nsook.infiltration", "hopRadius", 75.0);
-        M1Arc_SetFloat("m1nsook.infiltration", "spreadInterval", 0.25);
-        M1Arc_SetInt("m1nsook.infiltration", "maxJumps", 100);
-        M1Arc_SetInt("m1nsook.infiltration", "maxTargets", 120);
-        M1Arc_SetInt("m1nsook.infiltration", "fanout", 10);
-      } else {
-        if preset == 3 {
-          M1Arc_SetFloat("m1nsook.infiltration", "uploadSeconds", 2.0);
-          M1Arc_SetFloat("m1nsook.infiltration", "scanRadius", 65.0);
-          M1Arc_SetFloat("m1nsook.infiltration", "hopRadius", 45.0);
-          M1Arc_SetFloat("m1nsook.infiltration", "spreadInterval", 0.50);
-          M1Arc_SetInt("m1nsook.infiltration", "maxJumps", 60);
-          M1Arc_SetInt("m1nsook.infiltration", "maxTargets", 60);
-          M1Arc_SetInt("m1nsook.infiltration", "fanout", 6);
-        }
-      }
-    }
-  }
 }
 
 public class NetDeckM1ArcTick extends DelayCallback {

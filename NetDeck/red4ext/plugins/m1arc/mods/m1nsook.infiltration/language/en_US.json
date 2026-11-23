@@ -37,21 +37,6 @@
       "description": "Upper bound on how many relay connections one host may create.",
       "group": "Network propagation"
     },
-    "preset_club": {
-      "label": "Club takeover",
-      "description": "Large-area preset: 145m scan, 115m hops, 0.14s steps; higher performance cost.",
-      "group": "Presets"
-    },
-    "preset_balanced": {
-      "label": "Balanced",
-      "description": "Restore the original default spread and upload settings.",
-      "group": "Presets"
-    },
-    "preset_safe": {
-      "label": "Performance safe",
-      "description": "Lower-load preset: 65m scan, 45m hops and 0.50s infection steps.",
-      "group": "Presets"
-    },
     "give_deck": {
       "label": "Get NetWatch Σ MK.1",
       "description": "Grants one Items.NESTCyberdeck each click. For use when a ripperdoc does not stock it. Make sure a save is loaded.",

@@ -37,21 +37,6 @@
       "description": "한 대상에서 이어지는 최대 연결 수입니다.",
       "group": "네트워크 전파"
     },
-    "preset_club": {
-      "label": "클럽 장악",
-      "description": "넓은 범위와 빠른 전파를 사용합니다. 성능 부하가 높습니다.",
-      "group": "프리셋"
-    },
-    "preset_balanced": {
-      "label": "균형",
-      "description": "NETWORM 기본 설정으로 되돌립니다.",
-      "group": "프리셋"
-    },
-    "preset_safe": {
-      "label": "성능 우선",
-      "description": "더 좁은 범위와 느린 전파로 부하를 낮춥니다.",
-      "group": "프리셋"
-    },
     "give_deck": {
       "label": "NetWatch Σ MK.1 받기",
       "description": "리퍼닥에서 찾을 수 없을 때 V의 인벤토리에 사이버덱 한 개를 추가합니다.",
