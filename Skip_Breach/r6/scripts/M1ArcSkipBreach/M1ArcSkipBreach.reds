@@ -51,7 +51,10 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   }
 
   public static func Get(gi: GameInstance) -> ref<M1ArcSkipBreachSystem> {
-    return GameInstance.GetScriptableSystemsContainer(gi).Get(n"M1ArcSkipBreachSystem") as M1ArcSkipBreachSystem;
+    // REDscript module classes have fully qualified RTTI names. An
+    // unqualified Get(n"M1ArcSkipBreachSystem") resolves to no system,
+    // preventing ALL controller hooks, capture, solver and input.
+    return GameInstance.GetScriptableSystemsContainer(gi).Get(n"MisoSkipBreach.M1ArcSkipBreachSystem") as M1ArcSkipBreachSystem;
   }
 
   private func OnAttach() -> Void {

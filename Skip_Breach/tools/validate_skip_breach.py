@@ -37,6 +37,7 @@ assert {"mod.name","enabled.label","enabled.description"} == set(english)
 for required in [
     "module MisoSkipBreach",
     "class M1ArcSkipBreachSystem extends ScriptableSystem",
+    'Get(n"MisoSkipBreach.M1ArcSkipBreachSystem")',
     "class M1ArcSkipBreachCaptureRule extends MinigameGenerationRule",
     "OnProcessRule(size: Uint32",
     "grid[row][col].rarityValue",
@@ -69,6 +70,12 @@ for forbidden in [
 ]:
     assert forbidden not in source, f"Forbidden legacy/direct-success path: {forbidden}"
 
+# A plain Get(n"SystemName") compiles, but silently returns null if the
+# ScriptableSystem class was declared inside a REDscript module.
+# This was the root cause of the first in-game no-op despite READY selector.
+assert 'module MisoSkipBreach' in source
+assert 'Get(n"MisoSkipBreach.M1ArcSkipBreachSystem")' in source
+assert 'Get(n"M1ArcSkipBreachSystem") as M1ArcSkipBreachSystem' not in source
 assert '&& M1Arc_BreachInputAvailable() {' not in source, "Don't hide capture behind selector readiness"
 assert "return !this.m_budgetHit && this.m_bestScore > 0" not in source, "Budget must not discard valid paths"
 print("PASS: game-root manifest, opt-in setting, native diagnostics, best-effort solver and no CET dependency")

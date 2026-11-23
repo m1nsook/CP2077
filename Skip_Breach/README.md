@@ -1,3 +1,19 @@
+### In-game no-op root cause: module-qualified scriptable system lookup
+
+The user supplied RED4ext and REDscript logs from Nov 23, 2026. They
+confirm both the **native selector was READY** and REDscript **compiled
+without errors**. The actual REDscript code still retrieved
+`M1ArcSkipBreachSystem` using an **unqualified CName** despite defining
+its class inside `module MisoSkipBreach`. REDscript's ScriptableSystems
+container expects the full `MisoSkipBreach.M1ArcSkipBreachSystem` name.
+The old lookup can return null; all controller hooks were guarded by
+`IsDefined(sys)`, so capture and automatic solving were skipped silently.
+
+This patch fixes that lookup and adds a contract test for fully qualified
+module-name lookups. **The game still needs one end-to-end test** of the
+actual native cell selection path; startup and script compilation alone
+do not establish gameplay success.
+
 # Skip Breach — experimental native M1 Arc integration
 
 **Status:** buildable source and game-root ZIP for supervised in-game testing,
