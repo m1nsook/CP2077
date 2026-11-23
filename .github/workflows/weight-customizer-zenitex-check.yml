@@ -1,0 +1,45 @@
+name: Weight Customizer Zenitex — development checks
+
+on:
+  pull_request:
+    paths:
+      - "Weight_Customizer_Zenitex/**"
+      - "Weight_Customizer/r6/scripts/WeightCustomizer/WeightCustomizer.reds"
+      - "scripts/package_release.py"
+      - ".github/mod-descriptions.json"
+      - ".github/workflows/weight-customizer-zenitex-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate separate addon and Weight Customizer dependency
+        run: |
+          python3 Weight_Customizer_Zenitex/tools/validate_zenitex.py
+          python3 - <<'PY'
+          import json
+          meta = json.load(open(".github/mod-descriptions.json"))
+          assert meta["Weight_Customizer_Zenitex"]["requires"] == ["Weight_Customizer"]
+          PY
+      - name: Package optional game-root replacement ZIP
+        run: |
+          python3 scripts/package_release.py --mod Weight_Customizer_Zenitex --tag 0.1.0-dev.1 --output dist
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          p = next(Path("dist").glob("*.zip"))
+          with ZipFile(p) as archive:
+              names = archive.namelist()
+              assert names == ["r6/scripts/WeightCustomizer/WeightCustomizer.reds"], names
+              archive.extractall("game-root")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weight-customizer-zenitex-game-root
+          path: game-root/
+          if-no-files-found: error
