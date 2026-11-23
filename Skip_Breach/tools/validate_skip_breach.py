@@ -121,8 +121,11 @@ assert 'Waiting for native minigame InProgress after intro; first board preserve
 assert 'if this.m_gameState != 1 {' in source
 assert 'this.m_gameState != 1' in source, (
     "An active solver must abort rather than dispatch when the state is no longer interactive")
-assert source.index('if this.m_gameState == 0 {') < source.index('this.m_handledCapture = this.m_captureSerial;'), (
-    "Unknown board must be held pending, not consumed")
+start_logic = source.split('private func TryStart() -> Void {', 1)[1].split(
+    'public func Tick() -> Void {', 1)[0]
+assert start_logic.index('if this.m_gameState == 0 {') < start_logic.index(
+    'this.m_handledCapture = this.m_captureSerial;'), (
+    "Unknown board must be held pending inside TryStart, not consumed")
 assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source, (
     "Preserve the current generation while waiting for InProgress")
 assert 'this.m_gameState >= 0 && this.m_gameState <= 1' in source, (
