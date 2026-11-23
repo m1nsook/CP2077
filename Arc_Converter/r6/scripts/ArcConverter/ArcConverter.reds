@@ -2,7 +2,7 @@ module MisoArcConverter
 
 // Arc Converter - Automatic Item Processing
 // Gameplay: REDscript. Settings: M1 Arc. No CET hooks.
-// A new weapon must pass all safety checks twice before disassembly.
+// Newly acquired weapons or clothes must pass safety checks before processing.
 
 public class ArcConverterSystem extends ScriptableSystem {
   private let m_running: Bool;
@@ -12,6 +12,7 @@ public class ArcConverterSystem extends ScriptableSystem {
   private let m_warmupTicks: Int32;
   private let m_pending: array<ItemID>;
   private let m_ammoCooldown: Int32;
+  private let m_processingSale: Bool;
 
   private func OnAttach() -> Void {
     this.m_running = true;
@@ -44,6 +45,7 @@ public class ArcConverterSystem extends ScriptableSystem {
     this.m_player = null;
     this.m_warmupTicks = 0;
     this.m_ammoCooldown = 0;
+    this.m_processingSale = false;
     ArrayClear(this.m_pending);
   }
 
@@ -87,67 +89,164 @@ public class ArcConverterSystem extends ScriptableSystem {
     return bb.GetBool(GetAllBlackboardDefs().UI_System.IsInMenu);
   }
 
+  private func IsWeapon(item: ItemID) -> Bool {
+    // Some melee/throwing weapon records are not reported under the
+    // generic Weapon category. Detect the actual vanilla item types too.
+    let itemType: gamedataItemType = RPGManager.GetItemType(item);
+    return RPGManager.IsItemWeapon(item)
+      || UIInventoryItemsManager.IsItemTypeMeleeWeapon(itemType)
+      || UIInventoryItemsManager.IsItemTypeRangedWeapon(itemType);
+  }
+
+  private func IsClothes(item: ItemID) -> Bool {
+    let itemType: gamedataItemType = RPGManager.GetItemType(item);
+    return RPGManager.IsItemClothing(item)
+      || UIInventoryItemsManager.IsItemTypeCloting(itemType);
+  }
+
+  private func IsEquipmentType(item: ItemID) -> Bool {
+    return this.IsWeapon(item) || this.IsClothes(item);
+  }
+
+  private func IsProcessingEnabled(item: ItemID) -> Bool {
+    if this.IsWeapon(item) {
+      // Keep the existing setting ID so weapon preferences survive upgrades.
+      return M1Arc_GetBool("m1nsook.arc-converter", "disassemble");
+    };
+    if this.IsClothes(item) {
+      return M1Arc_GetBool("m1nsook.arc-converter", "clothes_enabled");
+    };
+    return false;
+  }
+
+  private func WantsSell(item: ItemID) -> Bool {
+    if this.IsWeapon(item) {
+      return Equals(M1Arc_GetString("m1nsook.arc-converter", "weapon_action"), "Sell");
+    };
+    if this.IsClothes(item) {
+      return Equals(M1Arc_GetString("m1nsook.arc-converter", "clothes_action"), "Sell");
+    };
+    return false;
+  }
+
   public func OnItemAdded(item: ItemID, data: wref<gameItemData>, silent: Bool) -> Void {
-    // Register only newly added individual weapons, never existing inventory.
-    // Skip silent internal grants and acquisitions while a menu/shop is open.
-    if !this.m_running || this.m_warmupTicks > 0 || silent || this.IsMenuOpen()
-      || !M1Arc_GetBool("m1nsook.arc-converter", "enabled")
-      || !M1Arc_GetBool("m1nsook.arc-converter", "disassemble")
+    // Watch new individual weapon/clothing acquisitions only. Never scan
+    // existing equipment. Ignore internal grants and vendor/menu activity.
+    if !this.m_running || this.m_warmupTicks > 0 || silent || this.m_processingSale
+      || this.IsMenuOpen() || !M1Arc_GetBool("m1nsook.arc-converter", "enabled")
       || !ItemID.IsValid(item) || !IsDefined(data)
-      || !RPGManager.IsItemWeapon(item) {
+      || !this.IsEquipmentType(item) || !this.IsProcessingEnabled(item) {
       return;
     };
-    if !this.IsSafeWeapon(item, data) {
+    if !this.IsSafeEquipment(item, data) {
       return;
     };
-    // Never disassemble within the transaction callback.
+    // No inventory mutation inside the transaction's inventory callback.
     if !ArrayContains(this.m_pending, item) && ArraySize(this.m_pending) < 64 {
       ArrayPush(this.m_pending, item);
     };
   }
 
-  private func SelectedTier(quality: gamedataQuality) -> Bool {
-    switch quality {
-      case gamedataQuality.Common:
-      case gamedataQuality.CommonPlus:
-        return M1Arc_GetBool("m1nsook.arc-converter", "tier1");
-      case gamedataQuality.Uncommon:
-      case gamedataQuality.UncommonPlus:
-        return M1Arc_GetBool("m1nsook.arc-converter", "tier2");
-      case gamedataQuality.Rare:
-      case gamedataQuality.RarePlus:
-        return M1Arc_GetBool("m1nsook.arc-converter", "tier3");
-      case gamedataQuality.Epic:
-      case gamedataQuality.EpicPlus:
-        return M1Arc_GetBool("m1nsook.arc-converter", "tier4");
-      case gamedataQuality.Legendary:
-      case gamedataQuality.LegendaryPlus:
-      case gamedataQuality.LegendaryPlusPlus:
-        return M1Arc_GetBool("m1nsook.arc-converter", "tier5");
-      default:
-        return false;
+  private func SelectedTier(item: ItemID, quality: gamedataQuality) -> Bool {
+    if this.IsWeapon(item) {
+      switch quality {
+        case gamedataQuality.Common:
+        case gamedataQuality.CommonPlus:
+          return M1Arc_GetBool("m1nsook.arc-converter", "tier1");
+        case gamedataQuality.Uncommon:
+        case gamedataQuality.UncommonPlus:
+          return M1Arc_GetBool("m1nsook.arc-converter", "tier2");
+        case gamedataQuality.Rare:
+        case gamedataQuality.RarePlus:
+          return M1Arc_GetBool("m1nsook.arc-converter", "tier3");
+        case gamedataQuality.Epic:
+        case gamedataQuality.EpicPlus:
+          return M1Arc_GetBool("m1nsook.arc-converter", "tier4");
+        case gamedataQuality.Legendary:
+        case gamedataQuality.LegendaryPlus:
+        case gamedataQuality.LegendaryPlusPlus:
+          return M1Arc_GetBool("m1nsook.arc-converter", "tier5");
+        default:
+          return false;
+      };
     };
+    if this.IsClothes(item) {
+      switch quality {
+        case gamedataQuality.Common:
+        case gamedataQuality.CommonPlus:
+          return M1Arc_GetBool("m1nsook.arc-converter", "clothes_tier1");
+        case gamedataQuality.Uncommon:
+        case gamedataQuality.UncommonPlus:
+          return M1Arc_GetBool("m1nsook.arc-converter", "clothes_tier2");
+        case gamedataQuality.Rare:
+        case gamedataQuality.RarePlus:
+          return M1Arc_GetBool("m1nsook.arc-converter", "clothes_tier3");
+        case gamedataQuality.Epic:
+        case gamedataQuality.EpicPlus:
+          return M1Arc_GetBool("m1nsook.arc-converter", "clothes_tier4");
+        case gamedataQuality.Legendary:
+        case gamedataQuality.LegendaryPlus:
+        case gamedataQuality.LegendaryPlusPlus:
+          return M1Arc_GetBool("m1nsook.arc-converter", "clothes_tier5");
+        default:
+          return false;
+      };
+    };
+    return false;
   }
 
-  private func IsSafeWeapon(item: ItemID, data: wref<gameItemData>) -> Bool {
-    if !IsDefined(this.m_player) || !IsDefined(data)
-      || !RPGManager.IsItemWeapon(item)
+  private func IsSafeEquipment(item: ItemID, data: wref<gameItemData>) -> Bool {
+    if !ItemID.IsValid(item) || !IsDefined(this.m_player) || !IsDefined(data)
+      || !this.IsEquipmentType(item) || !this.IsProcessingEnabled(item)
       || RPGManager.IsItemIconic(data) || RPGManager.IsItemCrafted(data)
       || data.HasTag(n"IconicWeapon") || data.HasTag(n"Quest")
       || data.HasTag(n"UnequipBlocked") || data.HasTag(n"LongLasting")
+      || data.HasTag(n"base_fists")
       || RPGManager.IsItemEquipped(this.m_player, item)
-      || !this.SelectedTier(RPGManager.GetItemQuality(data)) {
+      || !this.SelectedTier(item, RPGManager.GetItemQuality(data)) {
       return false;
+    };
+    if this.WantsSell(item) {
+      // Do not send unpriced equipment through the conversion path.
+      return RPGManager.CalculateSellPrice(this.GetGameInstance(),
+        this.m_player, item) > 0;
     };
     let crafting: ref<CraftingSystem> = CraftingSystem.GetInstance(this.GetGameInstance());
     return IsDefined(crafting) && crafting.CanItemBeDisassembled(this.m_player, item);
   }
 
-  private func ProcessDisassembly() -> Void {
+  private func SellEquipment(item: ItemID, data: wref<gameItemData>,
+    ts: ref<TransactionSystem>) -> Void {
+    // A vendor-free conversion matching Arc Converter's existing junk sales.
+    // Item removal must succeed before eddies are credited.
+    let price: Int32 = RPGManager.CalculateSellPrice(this.GetGameInstance(),
+      this.m_player, item);
+    if price <= 0 || price > 1000000000 {
+      return;
+    };
+    if ts.GetItemQuantity(this.m_player, item) <= 0 {
+      return;
+    };
+    let moneyID: ItemID = ItemID.CreateQuery(t"Items.money");
+    let moneyBefore: Int32 = ts.GetItemQuantity(this.m_player, moneyID);
+    if moneyBefore > 2000000000 - price {
+      return;
+    };
+
+    // Ignore our own potential rollback inventory event.
+    this.m_processingSale = true;
+    if ts.RemoveItem(this.m_player, item, 1) {
+      if !ts.GiveItemByTDBID(this.m_player, t"Items.money", price) {
+        ts.GiveItem(this.m_player, item, 1);
+      };
+    };
+    this.m_processingSale = false;
+  }
+
+  private func ProcessEquipment() -> Void {
     let items: array<ItemID> = this.m_pending;
     ArrayClear(this.m_pending);
     if !M1Arc_GetBool("m1nsook.arc-converter", "enabled")
-      || !M1Arc_GetBool("m1nsook.arc-converter", "disassemble")
       || this.IsMenuOpen() {
       return;
     };
@@ -160,12 +259,18 @@ public class ArcConverterSystem extends ScriptableSystem {
     while i < ArraySize(items) {
       let item: ItemID = items[i];
       let data: wref<gameItemData> = ts.GetItemData(this.m_player, item);
-      if this.IsSafeWeapon(item, data) {
-        let request: ref<DisassembleItemRequest> = new DisassembleItemRequest();
-        request.target = this.m_player;
-        request.itemID = item;
-        request.amount = 1;
-        crafting.QueueRequest(request);
+      // Re-check live item, selected tier and action immediately before
+      // any modification; items can become equipped or protected meanwhile.
+      if this.IsSafeEquipment(item, data) {
+        if this.WantsSell(item) {
+          this.SellEquipment(item, data, ts);
+        } else {
+          let request: ref<DisassembleItemRequest> = new DisassembleItemRequest();
+          request.target = this.m_player;
+          request.itemID = item;
+          request.amount = 1;
+          crafting.QueueRequest(request);
+        };
       };
       i += 1;
     };
@@ -265,7 +370,7 @@ public class ArcConverterSystem extends ScriptableSystem {
       if this.m_warmupTicks > 0 {
         this.m_warmupTicks -= 1;
       } else {
-        this.ProcessDisassembly();
+        this.ProcessEquipment();
         this.CraftEquippedAmmo();
       };
     };

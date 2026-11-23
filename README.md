@@ -11,7 +11,7 @@ Source code and releases for my Cyberpunk 2077 mods.
 
 | Mod | Nexus | M1ARC | Description | Version | Status |
 | --- |:-:|:-:| --- |:-:| --- |
-| [Arc Converter - Automatic Item Processing](Arc_Converter) | — | Required | Disassembles newly acquired weapons by tier, crafts ammunition, and converts junk into eddies. | 0.2.0-dev | Development |
+| [Arc Converter - Automatic Item Processing](Arc_Converter) | — | Required | Processes new weapons and clothes by tier (sell or disassemble), crafts ammunition and sells junk. | 0.3.0-dev | Development |
 | [NetWatch Σ MK.1](NetDeck) | <a href="https://www.nexusmods.com/cyberpunk2077/mods/39422"><img width="16" height="16" src="https://github.com/user-attachments/assets/8fd6966d-74fc-417d-b09f-28bf5a8e0ac9" /></a> | Required | NetWatch Σ MK.1 iconic cyberdeck with NETWORM quickhack and M1 Arc controls. | 1.0.0 | Released |
 | [Daemon](Daemon) | <a href="https://www.nexusmods.com/cyberpunk2077/mods/39379"><img width="16" height="16" src="https://github.com/user-attachments/assets/8fd6966d-74fc-417d-b09f-28bf5a8e0ac9" /></a> | Required | Automatically solves the original Breach Protocol grid through M1 Arc. | 1.0.0 | Released |
 | [Weight Customizer](Weight_Customizer) | <a href="https://www.nexusmods.com/cyberpunk2077/mods/39409"><img width="16" height="16" src="https://github.com/user-attachments/assets/8fd6966d-74fc-417d-b09f-28bf5a8e0ac9" /></a> | Required | Configurable carry capacity (50–5000 kg) with live, reversible M1 Arc settings. | 1.0.0 | Released |

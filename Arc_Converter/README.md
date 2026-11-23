@@ -1,45 +1,77 @@
 # Arc Converter - Automatic Item Processing
 
-Cyberpunk 2077 2.50 mod. Requires RED4ext, redscript and M1 Arc 1.0.0. No CET.
+Cyberpunk 2077 2.50 mod using RED4ext, redscript and M1 Arc 1.0.0. No CET dependency.
 
-## What it does
+## Features
 
-- **Auto disassembly:** Watches *new* additions to V's inventory and disassembles qualifying weapons at selected tiers. Never scans or disassembles weapons already in V's backpack when installed/enabled.
-- **Auto junk selling:** Optionally convert junk and jewelry into eddies automatically at the game's regular selling prices, anywhere (no vendor needed). When enabled, this includes eligible junk already in the backpack, not just new pickups. Disabled by default. Quest, iconic, protected and non-junk items are skipped.
-- **Auto ammunition crafting:** When the equipped weapon's reserve ammunition is below a configurable percentage, crafts one batch using the vanilla ammunition recipe and the player's real components. Rechecks resources and ammo capacity before further crafting.
+**Weapons (independent on/off)**
 
-All three features can be enabled separately from M1 Arc. Disassembly and every tier selector default to **off**, so nothing is destroyed on installation. Ammo crafting defaults to **on**. Automatic junk selling defaults to **off**.
+- Decide how to process newly acquired weapons: **Sell** (for eddies) or **Disassemble** (for components).
+- Select exactly which tiers to process, Tier 1–5 including their + variants. Includes ranged weapons and melee weapons (knives, katanas, swords, axes and blunt weapons).
+- Previously acquired weapons are never scanned or automatically processed.
+- Equipped, iconic, quest, crafted, locked and otherwise protected weapons are kept.
 
-## Item safety
+**Clothes (independent on/off)**
 
-Only newly acquired, non-silent weapon additions outside game menus can be processed. Before requesting any disassembly, the mod checks the item again and refuses equipped, iconic, quest, unequip-blocked, long-lasting or crafted weapons. The game's own `CraftingSystem.CanItemBeDisassembled` also has to accept the item. Disassembly is queued through the **normal game crafting system**, not by deleting the item and granting arbitrary components.
+- Select **Sell** or **Disassemble** and individual Tier 1–5 checkboxes.
+- Only newly acquired clothing is eligible; the existing wardrobe/inventory is not scanned.
+- Equipped, iconic, quest, crafted, locked and otherwise protected items are kept.
+- Disassembly uses the game's original crafting/disassembly request.
 
-Note: The inventory callback reports *an addition*, not specifically whether the source was loot. Acquisitions during menus and silent internal additions are ignored, but other newly acquired eligible weapons outside menus can qualify. This should be tested in game before release.
+**Ammunition**
 
-## Ammunition
+- Auto-crafts vanilla handgun, rifle, shotgun and sniper ammunition for the equipped weapon when ammunition falls below a configurable percentage.
+- Uses real crafting components, the game recipes and vanilla capacity limits.
 
-The first version supports the game's four vanilla ammunition types: handgun, rifle, shotgun and sniper. Only the actively used weapon's ammunition is replenished. Vanilla recipe batch amounts, costs and crafting effects are used, and processing stops when components are insufficient. The mod never grants free bullets. If the player lacks components, the normal ammunition shortage remains.
+**Junk**
 
-## Junk to eddies
+- Optionally exchanges regular junk and jewelry for eddies at the game's selling prices without a vendor.
+- Unlike the Weapons and Clothes processors, it **does** handle junk already in V's inventory.
 
-The game classifies both `Gen_Junk` and `Gen_Jewellery` as junk in its own Sell Junk action. When **Automatically sell junk for eddies** is enabled, the separate junk processor scans V's inventory outside menus and gradually exchanges eligible stacks for eddies. It uses `RPGManager.CalculateSellPrice` rather than an invented price or vendor buyback.
+## M1 Arc settings and upgrades
 
-- Selling is a **vendor-free exchange**: removed junk is credited as `Items.money`. No buyback stock or vendor wallet is involved.
-- Junk that was **already in the backpack** is also eligible when this setting is enabled. **Unlike weapon disassembly**, the junk feature is not new-pickups-only.
-- Quest, iconic, locked and other protected items are never processed; items with no positive selling price remain in the backpack.
-- The conversion only pays after successful removal; on a failed currency grant it attempts to restore the removed junk.
-- A processing delay guards save/player initialization, and item processing pauses while game menus are open.
+| Section | Settings | Default |
+| --- | --- | --- |
+| General | Enable Arc Converter | On |
+| Weapons | Weapons on/off | Off (saved setting ID `disassemble`) |
+| Weapons | Weapon action: Disassemble / Sell | Disassemble |
+| Weapons | Tier 1, 2, 3, 4, 5 | Off each |
+| Clothes | Clothes on/off | Off |
+| Clothes | Clothes action: Disassemble / Sell | Disassemble |
+| Clothes | Tier 1, 2, 3, 4, 5 | Off each |
+| Ammunition | Auto craft; threshold | On; 25% |
+| Junk | Automatically sell junk | Off |
+
+The original Weapons toggle (stored as `disassemble`) and existing `tier1`–`tier5` IDs are **preserved** so upgrading does not reset your selections. New modes and clothing controls start at safe defaults. English, Polish and Korean UI strings are provided.
+
+## How processing works
+
+- A weapon or clothing item is registered when the inventory callback reports a **new addition** outside the game menus. No old-item or backpack sweep takes place.
+- Melee weapons are recognized by their actual game item type as well as the Weapon category, so knives and swords are not skipped by generic category classification.\n- The mod checks its tier and protection status again before doing anything.
+- **Disassemble** uses `CraftingSystem.CanItemBeDisassembled` and the vanilla `DisassembleItemRequest` so materials come from the normal game recipe.
+- **Sell** uses `RPGManager.CalculateSellPrice` and exchanges the item for `Items.money` only if removal succeeds. It does not visit a vendor, consume vendor funds, or add items to a vendor's buyback stock.
+- Silent internal item grants and acquisitions while game menus are open are skipped. The inventory callback does not identify the precise source (e.g. enemy loot versus other inventory grants).
+- Changing a switch or selected tiers takes effect on the next eligible processing check.
+
+The independent junk processor scans junk and jewelry in V's backpack (including old stacks), up to a bounded number per tick. It skips items with no positive selling price, avoids protected items, and attempts to restore an item if crediting currency fails.
 
 ## Installation
 
-Copy the `r6/` and `red4ext/` folders into the Cyberpunk 2077 installation root. Configure **Arc Converter - Automatic Item Processing** inside M1 Arc.
+Install into the Cyberpunk 2077 game root:
 
-## Development
+- `r6/scripts/ArcConverter/ArcConverter.reds`
+- `r6/scripts/ArcConverter/ArcConverterJunk.reds`
+- `red4ext/plugins/m1arc/mods/m1nsook.arc-converter/`
 
-The original disassembly and ammunition features were reported working in-game. **The new automatic junk-selling feature has not yet been verified in Cyberpunk 2077 2.50.** Back up the save before testing:
+Open **Arc Converter - Automatic Item Processing** in M1 Arc to configure your settings.
 
-1. Launch a save with old low-tier weapons and verify they remain untouched.
-2. Enable auto-disassembly and one tier, loot a non-iconic weapon of that tier; verify only that weapon is disassembled and components are awarded.
-3. Loot an iconic, quest, equipped, or crafted weapon and verify it is kept.
-4. Fire a supported weapon to reach the ammo threshold; verify one vanilla batch is crafted, components decrease, and ammo limits are honored.
-5. Enable auto-sell junk with several ordinary junk and jewelry items, check the exact eddies received against inventory sell prices. Confirm both existing and newly picked-up junk are handled.\n6. Confirm quest/protected items, ammunition, components and weapons are not sold. Disable auto-sell and verify remaining junk is untouched.\n7. Reload, change saves, toggle settings, open shops/crafting menus, and switch weapons while testing for no unexpected processing.
+## Testing v0.3.0-dev.1
+
+The user verified the original automatic weapon disassembly, ammo crafting and junk processing in game. **The new Sell/Disassemble selection and Clothes processing are development features and still need in-game validation.** Use a backed-up save.
+
+1. Keep Weapons and Clothes processing off and confirm no existing item disappears.
+2. Enable Weapons in **Disassemble**, select one tier and acquire a weapon of that tier. Confirm proper materials are returned and protected items remain.
+3. Change Weapons to **Sell** and acquire a different qualifying weapon. Compare received eddies to its selling price.
+4. Also verify non-iconic knives and swords of selected tiers are processed under Weapons.\n5. Enable Clothes, select one tier, and separately test **Sell** and **Disassemble** using newly acquired clothing of that tier. Ensure existing clothes and equipped/quest/iconic pieces remain.
+6. Verify equipment tier selection including + variants, mode changes, settings persistence and silent/menu acquisitions.
+7. Confirm the already-working ammunition and junk features still behave correctly.

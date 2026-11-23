@@ -42,7 +42,7 @@ jobs:
         run: python3 Arc_Converter/tools/validate_arc_converter.py
       - name: Build installable development ZIP
         run: |
-          python3 scripts/package_release.py --mod Arc_Converter --tag 0.2.0-dev.1 --output dist
+          python3 scripts/package_release.py --mod Arc_Converter --tag 0.3.0-dev.1 --output dist
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile

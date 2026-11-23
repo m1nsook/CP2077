@@ -5,55 +5,140 @@
     "label": "Enable Arc Converter",
     "description": "Master switch for automatic item processing.",
     "default": true,
-    "group": "General"
+    "group": "General",
+    "presentation": "switch"
   },
   {
     "id": "disassemble",
     "kind": "boolean",
-    "label": "Auto-disassemble new weapons",
-    "description": "Only process weapons newly added to V's inventory. Existing weapons are never scanned.",
+    "label": "Weapons",
+    "description": "Automatically process only newly acquired weapons at the selected tiers. Existing weapons are not scanned.",
     "default": false,
-    "group": "Disassembly"
+    "group": "Weapons",
+    "presentation": "switch"
+  },
+  {
+    "id": "weapon_action",
+    "kind": "choice",
+    "label": "Weapon action",
+    "description": "Choose whether eligible newly acquired weapons are sold for eddies or disassembled into components.",
+    "choices": [
+      "Disassemble",
+      "Sell"
+    ],
+    "default": "Disassemble",
+    "group": "Weapons"
   },
   {
     "id": "tier1",
     "kind": "boolean",
-    "label": "Tier 1 (including + variants)",
-    "description": "Automatically dismantle newly acquired, eligible Tier 1 weapons. Iconic, quest, equipped and crafted weapons remain protected.",
+    "label": "Tier 1 (+ variants)",
+    "description": "Process eligible Tier 1 weapons acquired after enabling the mod.",
     "default": false,
-    "group": "Disassembly"
+    "group": "Weapons",
+    "presentation": "checkbox"
   },
   {
     "id": "tier2",
     "kind": "boolean",
-    "label": "Tier 2 (including + variants)",
-    "description": "Automatically dismantle newly acquired, eligible Tier 2 weapons. Iconic, quest, equipped and crafted weapons remain protected.",
+    "label": "Tier 2 (+ variants)",
+    "description": "Process eligible Tier 2 weapons acquired after enabling the mod.",
     "default": false,
-    "group": "Disassembly"
+    "group": "Weapons",
+    "presentation": "checkbox"
   },
   {
     "id": "tier3",
     "kind": "boolean",
-    "label": "Tier 3 (including + variants)",
-    "description": "Automatically dismantle newly acquired, eligible Tier 3 weapons. Iconic, quest, equipped and crafted weapons remain protected.",
+    "label": "Tier 3 (+ variants)",
+    "description": "Process eligible Tier 3 weapons acquired after enabling the mod.",
     "default": false,
-    "group": "Disassembly"
+    "group": "Weapons",
+    "presentation": "checkbox"
   },
   {
     "id": "tier4",
     "kind": "boolean",
-    "label": "Tier 4 (including + variants)",
-    "description": "Automatically dismantle newly acquired, eligible Tier 4 weapons. Iconic, quest, equipped and crafted weapons remain protected.",
+    "label": "Tier 4 (+ variants)",
+    "description": "Process eligible Tier 4 weapons acquired after enabling the mod.",
     "default": false,
-    "group": "Disassembly"
+    "group": "Weapons",
+    "presentation": "checkbox"
   },
   {
     "id": "tier5",
     "kind": "boolean",
-    "label": "Tier 5 (including + variants)",
-    "description": "Automatically dismantle newly acquired, eligible Tier 5 weapons. Iconic, quest, equipped and crafted weapons remain protected.",
+    "label": "Tier 5 (+ variants)",
+    "description": "Process eligible Tier 5 weapons acquired after enabling the mod.",
     "default": false,
-    "group": "Disassembly"
+    "group": "Weapons",
+    "presentation": "checkbox"
+  },
+  {
+    "id": "clothes_enabled",
+    "kind": "boolean",
+    "label": "Clothes",
+    "description": "Automatically process only newly acquired clothing at selected tiers. Existing clothing is not scanned.",
+    "default": false,
+    "presentation": "switch",
+    "group": "Clothes"
+  },
+  {
+    "id": "clothes_action",
+    "kind": "choice",
+    "label": "Clothes action",
+    "description": "Choose whether eligible newly acquired clothes are sold for eddies or disassembled into components.",
+    "choices": [
+      "Disassemble",
+      "Sell"
+    ],
+    "default": "Disassemble",
+    "group": "Clothes"
+  },
+  {
+    "id": "clothes_tier1",
+    "kind": "boolean",
+    "label": "Tier 1 (+ variants)",
+    "description": "Process eligible Tier 1 clothes acquired after enabling the mod.",
+    "default": false,
+    "presentation": "checkbox",
+    "group": "Clothes"
+  },
+  {
+    "id": "clothes_tier2",
+    "kind": "boolean",
+    "label": "Tier 2 (+ variants)",
+    "description": "Process eligible Tier 2 clothes acquired after enabling the mod.",
+    "default": false,
+    "presentation": "checkbox",
+    "group": "Clothes"
+  },
+  {
+    "id": "clothes_tier3",
+    "kind": "boolean",
+    "label": "Tier 3 (+ variants)",
+    "description": "Process eligible Tier 3 clothes acquired after enabling the mod.",
+    "default": false,
+    "presentation": "checkbox",
+    "group": "Clothes"
+  },
+  {
+    "id": "clothes_tier4",
+    "kind": "boolean",
+    "label": "Tier 4 (+ variants)",
+    "description": "Process eligible Tier 4 clothes acquired after enabling the mod.",
+    "default": false,
+    "presentation": "checkbox",
+    "group": "Clothes"
+  },
+  {
+    "id": "clothes_tier5",
+    "kind": "boolean",
+    "label": "Tier 5 (+ variants)",
+    "description": "Process eligible Tier 5 clothes acquired after enabling the mod.",
+    "default": false,
+    "presentation": "checkbox",
+    "group": "Clothes"
   },
   {
     "id": "ammo",
@@ -61,7 +146,8 @@
     "label": "Automatically craft ammunition",
     "description": "Use vanilla crafting and components to replenish ammunition for the currently equipped weapon.",
     "default": true,
-    "group": "Ammunition"
+    "group": "Ammunition",
+    "presentation": "switch"
   },
   {
     "id": "threshold",
@@ -80,6 +166,7 @@
     "label": "Automatically sell junk for eddies",
     "description": "Sell ordinary junk and jewelry anywhere, using normal game selling prices. Includes junk already in the backpack. Quest and protected items are skipped.",
     "default": false,
-    "group": "Junk"
+    "group": "Junk",
+    "presentation": "switch"
   }
 ]
