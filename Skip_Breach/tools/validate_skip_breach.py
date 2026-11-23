@@ -20,6 +20,8 @@ native_source = native_file.read_text(encoding="utf8")
 assert 'native func M1Arc_BreachInputAvailable() -> Bool;' in native_source
 assert ('native func M1Arc_BreachSelectCell(controller: wref<inkLogicController>, '
         'position: Vector2) -> Bool;') in native_source
+assert ('native func LogChannel(channel: CName, const text: script_ref<String>);' in native_source), (    'Cyberpunk 2.01+ omits the LogChannel script declaration; keep the logging header installed')
+assert native_source.count('native func LogChannel(') == 1
 assert "@addMethod(inkLogicController)" not in native_source
 assert "native func M1Arc_Breach" not in source  # contained in the optional API only
 

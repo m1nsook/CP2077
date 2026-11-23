@@ -23,6 +23,12 @@ not yet been verified in-game. The development solver and Python tests under
   disabled settings, a missing controller or a 1.5-second acknowledgement
   timeout stop execution and restore the vanilla timer.
 - Nothing writes daemon status, success facts, rewards or a fake result.
+- Since Cyberpunk 2077 2.01+, the game-native `LogChannel` function has
+  no public REDscript declaration. The development-only
+  `M1ArcBreachNative.reds` now includes the documented declaration to
+  prevent `UNRESOLVED_FN`. This does not require an M1 Arc DLL change.
+  **Before a public release:** consolidate global logging declarations
+  to prevent clashes with any other installed logging-header mod.
 - The mod logs state transitions under `[Skip Breach]` via REDscript's
   `LogChannel(n"DEBUG", ...)`: controller initialization, capture,
   native selector compatibility, solving, each aborted selection and completion.
