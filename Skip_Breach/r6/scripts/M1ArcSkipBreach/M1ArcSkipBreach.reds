@@ -52,6 +52,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private let m_pulseQueued: Bool;
   private let m_pulseCount: Int32;
   private let m_inProgressTicks: Int32;
+  private let m_firstIntroReadyAt: Float;
 
   // Only log transitions. Do not fill REDscript.log every 100ms.
   private func Report(code: Int32, message: String) -> Void {
@@ -144,6 +145,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_pulseQueued = false;
     this.m_pulseCount = 0;
     this.m_inProgressTicks = 0;
+    this.m_firstIntroReadyAt = EngineTime.ToFloat(
+      GameInstance.GetEngineTime(this.GetGameInstance())) + 3.0;
     this.m_lastDiagnostic = 0;
     this.Report(10, "Breach controller initialized; waiting for puzzle capture");
     ArrayClear(this.m_grid);
@@ -302,6 +305,10 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_pulseQueued = false;
     this.m_pulseCount = 0;
     this.m_inProgressTicks = 0;
+    // Use engine elapsed time, not N UI pulses: the intro animation
+    // duration must not depend on 60/144Hz or a stalled hacking timer.
+    this.m_firstIntroReadyAt = EngineTime.ToFloat(
+      GameInstance.GetEngineTime(this.GetGameInstance())) + 3.0;
     if this.m_ready {
       this.Report(20, "Puzzle captured; native readiness and solver are next");
       this.ScheduleNext();
@@ -579,27 +586,32 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.Report(41, "No captured, usable puzzle data; vanilla puzzle remains playable");
       return;
     };
-    // Observed on the FIRST stealth puzzle (Nov 23):
-    // OnInitialize 07:34:26.292 -> native selector 07:34:26.879
-    // -> no OnPositionSelected -> InProgress only at 07:34:28.647.
-    // The second puzzle dispatched only AFTER InProgress and every
-    // selection was acknowledged. Never consume/dispatch a captured
-    // board in Unknown=0 while the intro controller is still starting.
+    // Vanilla HackingMinigameGameController.OnInitialize explicitly sets
+    // MinigameData.timerWaitsForInteraction = true. Unknown=0 therefore
+    // may persist until the FIRST real cell is accepted. Requiring
+    // InProgress beforehand was a circular wait on the stealth board.
+    // Prior early native dispatch at only 0.587 s after UI init received
+    // no OnPositionSelected; give the first intro a real 3.0 s to finish.
+    // Never retry a TRUE native dispatch without an acknowledgement.
     if this.m_gameState == 0 {
-      this.Report(42, "Waiting for native minigame InProgress after intro; first board preserved");
-      return;
-    };
-    if this.m_gameState != 1 {
-      this.Report(43, "Breach minigame no longer interactive; leaving manual");
-      return;
-    };
-    // On the failed attempt InProgress lasted only 58ms before terminal
-    // failure (07:34:28.647 -> 07:34:28.705); this may be the exit path.
-    // Let the native UI remain InProgress for at least 20 separate event
-    // cycles before we dispatch anything. No game-state writes.
-    if this.m_inProgressTicks < 20 {
-      this.Report(59, "Waiting for stable InProgress (20 UI updates) before native input");
-      return;
+      if EngineTime.ToFloat(GameInstance.GetEngineTime(this.GetGameInstance()))
+        < this.m_firstIntroReadyAt {
+        this.Report(42, "First puzzle Unknown; waiting for intro before first native selection");
+        return;
+      };
+      this.Report(60, "Intro elapsed; attempting first native selection while Unknown (vanilla waits for first input)");
+    } else {
+      if this.m_gameState != 1 {
+        this.Report(43, "Breach minigame no longer interactive; leaving manual");
+        return;
+      };
+      // An exit/failure can briefly report InProgress (observed 92ms).
+      // Require a stable 20 UI updates if already InProgress before
+      // the first cell, preventing input during a closing transition.
+      if this.m_inProgressTicks < 20 {
+        this.Report(59, "Waiting for stable InProgress (20 UI updates) before native input");
+        return;
+      };
     };
     if this.m_cancelled || !IsDefined(this.m_controller) {
       this.Report(48, "Breach controller unavailable or already cancelled");
@@ -664,7 +676,8 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.m_inProgressTicks += 1;
     };
     if this.m_active {
-      if !this.m_ready || this.m_cancelled || this.m_gameState != 1
+      if !this.m_ready || this.m_cancelled
+        || this.m_gameState < 0 || this.m_gameState > 1
         || this.m_session != this.m_lockedSession
         || this.m_captureSerial != this.m_lockedCapture
         || !M1Arc_BreachInputAvailable()
@@ -729,10 +742,10 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
           this.Report(54, "No board captured after 120 UI updates; manual puzzle remains playable");
         };
       };
-      // Preserve the untouched captured board throughout Unknown=0 and
-      // keep the event pulse alive while its intro animation finishes.
-      // A user who toggles ON mid-board can still activate on that SAME
-      // puzzle. TryStart() never dispatches/consumes in Unknown=0.
+      // Preserve the untouched captured board while the first intro
+      // finishes. Unlike our previous broken InProgress-only gate, we
+      // may dispatch ONCE from Unknown after elapsed intro time because
+      // vanilla waits for a real first selection to start the timer.
       if this.m_ready && this.m_captureSerial != this.m_handledCapture
         && this.m_gameState >= 0 && this.m_gameState <= 1
         && M1Arc_GetBool("m1nsook.skipbreach","enabled") {
