@@ -39,21 +39,38 @@ class SequencerTests(unittest.TestCase):
         game.board = replace(game.board, game_state=0, capture_serial=42)
         seq = BreachSequencer(game, ack_timeout=0.25)
         self.assertEqual(seq.begin().state, Step.IDLE)
-        # First screen takes ~2.355s to report InProgress, longer than the
-        # old 120-UI-update acknowledgement timeout. No native dispatch
-        # should occur at all during Unknown.
-        for t in (0.0, 0.58, 1.02, 1.95, 2.35):
+        # Base-game timerWaitsForInteraction=True: game can stay in
+        # Unknown until the first accepted selection. The FIRST board
+        # must become eligible without a synthetic state transition.
+        for t in (0.0, 0.58, 1.02, 1.95, 2.35, 2.99):
             result = seq.tick(t)
             self.assertEqual(result.state, Step.WAITING)
-            self.assertIn("InProgress", result.reason)
+            self.assertIn("intro", result.reason)
             self.assertEqual(game.requests, [])
-        game.board = replace(game.board, game_state=1)
-        result = seq.tick(2.36)
+        result = seq.tick(3.01)
         self.assertEqual(result.attempted, (0, 0))
         self.assertEqual(game.requests, [(0, 0)])
+        self.assertEqual(seq.tick(3.02).state, Step.WAITING)
+        self.assertEqual(game.requests, [(0, 0)])
+        # Native first cell starts vanilla InProgress, not the reverse.
         game.acknowledge((0, 0))
-        self.assertEqual(seq.tick(2.4).state, Step.CONFIRMED)
+        game.board = replace(game.board, game_state=1)
+        self.assertEqual(seq.tick(3.05).state, Step.CONFIRMED)
         self.assertEqual(len(game.requests), 1)
+
+    def test_initial_unknown_can_continue_without_inprogress_before_first_selection(self):
+        game = FakeGame()
+        game.board = replace(game.board, game_state=0)
+        seq = BreachSequencer(game, intro_delay=3.0)
+        seq.begin()
+        self.assertFalse(game.requests)
+        self.assertEqual(seq.tick(0).state, Step.WAITING)
+        self.assertEqual(seq.tick(3.0).attempted, (0, 0))
+        self.assertEqual(game.board.game_state, 0)
+        self.assertEqual(seq.tick(3.1).state, Step.WAITING)
+        self.assertEqual(game.requests, [(0, 0)])
+        game.acknowledge((0, 0))
+        self.assertEqual(seq.tick(3.2).state, Step.CONFIRMED)
 
     def test_first_intro_terminal_fails_closed_without_dispatch(self):
         for terminal in (2, 3):
