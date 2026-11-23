@@ -1,6 +1,6 @@
-// Skip Breach ONLY: optional game-version-gated RED4ext native functions.
+// Skip Breach ONLY: native functions are implemented INSIDE m1arc.dll.
 // All four symbols are registered by the matching M1 Arc PR #1 DLL.
-// Keep the experimental declarations in this addon, NOT in the stable
+// Without this mod installed and enabled, the native input bridge is inert.\n// Keep the experimental declarations in this addon, NOT in the stable
 // r6/scripts/m1arc/M1Arc.reds core. Install both matching builds together.
 // If the game updates and native validation fails, remove this addon folder.
 native func M1Arc_BreachInputAvailable() -> Bool;
