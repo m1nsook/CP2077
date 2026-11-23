@@ -9,10 +9,10 @@ container expects the full `MisoSkipBreach.M1ArcSkipBreachSystem` name.
 The old lookup can return null; all controller hooks were guarded by
 `IsDefined(sys)`, so capture and automatic solving were skipped silently.
 
-This patch fixes that lookup and adds a contract test for fully qualified
-module-name lookups. **The game still needs one end-to-end test** of the
-actual native cell selection path; startup and script compilation alone
-do not establish gameplay success.
+This lookup is fixed, but newer logs proved another separate bug:
+the first board was captured without any successful input, whereas the
+second puzzle accepted every native selection. Source and CI alone do
+not establish first-puzzle gameplay success.
 
 # Skip Breach — experimental native M1 Arc integration
 
@@ -31,9 +31,12 @@ not yet been verified in-game. The development solver and Python tests under
   breaking ties in favor of shorter paths. If the search budget is reached,
   it now executes a **verified legal, rewarding best-found path**, reporting
   that it may not be globally optimal instead of silently doing nothing.
-- A game-system update every 0.1 seconds sends one action at a time through
-  M1 Arc's `M1Arc_BreachSelectCell(wref<inkLogicController>, Vector2)`. The
-  next cell is submitted **only after** the game's
+- A session-tagged **UI event pump** uses
+  `M1Arc_BreachClickAt(wref<inkLogicController>, Vector2)` to send real
+  Win32 mouse input at the centre of a **live** ink grid cell. The point
+  comes from `GetScreenPosition` and the game's actual Grid widget;
+  no fixed pixel coordinates, OCR, CMD app or external solver.
+  The next cell is submitted **only after** the game's
   `HackingMinigameGameController.OnPositionSelected` acknowledgement.
 - Generation/session changes, user input, a different minigame state,
   disabled settings, a missing controller or a 1.5-second acknowledgement
@@ -86,28 +89,29 @@ produce an `OnPositionSelected` acknowledgement, and stopped. Subsequent
 on the first screen: these are not reliable readiness signals. The
 second board entered InProgress, then accepted all native selections.
 
-**Updated source behavior:** capture the first generated matrix as
-before, allow the REDscript event pump to run while in Unknown, and use
-`EngineTime.ToFloat(GameInstance.GetEngineTime(...))` to wait
-**three seconds after capture** for the opening animation/UI to settle
-(regardless of frame rate or the deliberately stationary hacking timer).
-At that point, if the same board remains untouched, Skip Breach can
-request the first native cell **while still Unknown**; that real
-selection is expected to let vanilla transition into InProgress.
-For a board already InProgress, the existing 20-update stability guard
-avoids dispatch during a transient closing/failure transition.
+**Updated source behavior:** never require the first board to become
+InProgress by itself and **do not wait three arbitrary seconds**.
+Skip Breach preserves its original capture until the real game UI grid
+has a valid rendered layout. It resolves each cell from the
+`AllParts/Top/.../ContentContainer/GridContainer/Grid` ink widget path,
+checks current wrapping width equals the captured matrix dimension,
+and validates row/column positions against the visible first/right/down
+cells. Only then does M1 Arc's guarded `SetCursorPos` + `SendInput`
+helper send a normal left mouse click.
 
-The first native call is still ONE-SHOT: it waits for the original
-`OnPositionSelected` event before advancing and never blindly repeats
-an unacknowledged call. Terminal states, player touches, focus/overlay
-loss or missing native input stop execution. There are no fake rewards,
-timer modifications, mission-fact changes, synthetic state transitions,
-CET dependencies or extra scripting runtimes.
+The underlying C++ method enforces the actual Cyberpunk window as the
+foreground target and refuses clicks while M1 Arc is open/recording.
+The game's `OnPositionSelected` must acknowledge every click;
+a submitted Win32 event alone is **never counted as success**.
+No unacknowledged click is blindly repeated. The first untouched board
+can be in Unknown=0 when this starts; the C++/REDscript path never
+changes any quest facts, puzzle state, rewards or timers.
 
-**Validation scope:** offline source/solver/sequence checks are useful
-regression protection but cannot guarantee the 2.5 UI accepts the
-first click after the elapsed intro time. The PR stays draft and we
-are not requesting another repeat of the user's high-risk gig.
+**Validation:** native M1 Arc compilation, REDscript **syntax/parser**
+checks, and offline sequencing/unit tests are separate from actual
+first-puzzle gameplay. This is an experimental draft, not a proven fix.
+The user has already repeated a mission-failing test many times:
+**do not request another run of the same stealth gig**.
 
 ## First-attempt initialization and timer safety
 
@@ -118,10 +122,10 @@ detection may solve. Code review found two sources of startup fragility:
 execution and marked the current capture handled; (2) the mod called
 `PauseTheTimer()` **before** its first native selection.
 
-The current change waits for a valid logic controller on the SAME puzzle,
-keeps the captured generation pending until it can actually run, and
-retries only when the native call explicitly returns **false** without
-dispatching a cell. If native dispatch returns true but game
+The current change waits for a valid logic controller and rendered grid
+on the SAME puzzle, keeps the captured generation pending until it can
+actually run, and retries only when the Win32 input method explicitly
+returns **false** without dispatching a click. If native dispatch returns true but game
 `OnPositionSelected` acknowledgement never arrives, it **does not
 repeat** that selection: repeated clicks could damage the puzzle.
 The mod no longer pauses or resumes the vanilla timer, so failures
@@ -234,7 +238,11 @@ This feature uses the user-supplied AutoBreach 0.4.0 ZIP as an
 interoperability reference for controller type names, callbacks,
 `Vector2(row,column)` positions and native game version. We do **not**
 redistribute its `AutoBreachInput.dll`, CET Lua implementation or solver
-source. M1 Arc's version-verified selector is written independently.
+source. The original version-verified internal selector remains in M1 Arc
+for compatibility, but Skip Breach now uses the independent guarded
+Win32 mouse-input bridge instead, informed by the openly published
+C++ `yuri-sevatz/cyber_breach` implementation (without copying its
+hardcoded 1080p coordinates or using its separate OCR application).
 
 The offline proof tools under `Skip_Breach/dev/` remain available to
 validate puzzle path legality, input capture conventions and state
