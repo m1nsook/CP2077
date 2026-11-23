@@ -412,24 +412,23 @@ public class M1ArcSkipBreachCaptureRule extends MinigameGenerationRule {
 protected cb func OnInitialize() -> Bool {
   wrappedMethod();
   let player: wref<GameObject> = this.GetPlayerControlledObject();
-  if !IsDefined(player) {
-    return;
+  let sys: ref<M1ArcSkipBreachSystem>;
+  if IsDefined(player) {
+    sys = M1ArcSkipBreachSystem.Get(player.GetGame());
   };
-  let sys: ref<M1ArcSkipBreachSystem> = M1ArcSkipBreachSystem.Get(player.GetGame());
-  if !IsDefined(sys) {
-    return;
-  };
-  let board: ref<IBlackboard> = this.GetBlackboardSystem().Get(GetAllBlackboardDefs().HackingMinigame);
-  let data: MinigameData = FromVariant<MinigameData>(
-    board.GetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults));
-  sys.BeginSession(this,Cast<Int32>(data.gridSize),Cast<Int32>(data.bufferSize),
-                   board.GetInt(GetAllBlackboardDefs().HackingMinigame.State));
-  if M1Arc_GetBool("m1nsook.skipbreach","enabled")
-    && M1Arc_BreachInputAvailable() {
-    let rule: ref<M1ArcSkipBreachCaptureRule> = new M1ArcSkipBreachCaptureRule();
-    rule.minigameController = this;
-    ArrayPush(data.rules,rule);
-    board.SetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults,data,true);
+  if IsDefined(sys) {
+    let board: ref<IBlackboard> = this.GetBlackboardSystem().Get(GetAllBlackboardDefs().HackingMinigame);
+    let data: MinigameData = FromVariant<MinigameData>(
+      board.GetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults));
+    sys.BeginSession(this,Cast<Int32>(data.gridSize),Cast<Int32>(data.bufferSize),
+                     board.GetInt(GetAllBlackboardDefs().HackingMinigame.State));
+    if M1Arc_GetBool("m1nsook.skipbreach","enabled")
+      && M1Arc_BreachInputAvailable() {
+      let rule: ref<M1ArcSkipBreachCaptureRule> = new M1ArcSkipBreachCaptureRule();
+      rule.minigameController = this;
+      ArrayPush(data.rules,rule);
+      board.SetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults,data,true);
+    };
   };
 }
 
