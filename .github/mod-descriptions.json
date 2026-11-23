@@ -48,5 +48,12 @@
   "Daemon": {
     "name": "Daemon",
     "summary": "Automatically solves Cyberpunk 2077 Breach Protocol puzzles by selecting valid cells in the original minigame. Requires M1 Arc 1.0.0."
+  },
+  "Weight_Customizer_Zenitex": {
+    "name": "Weight Customizer — Zenitex Compatibility",
+    "summary": "Restores Zenitex backpack carry-capacity bonuses in Equipment-EX while preserving Weight Customizer's total-capacity settings.",
+    "requires": [
+      "Weight_Customizer"
+    ]
   }
 }
