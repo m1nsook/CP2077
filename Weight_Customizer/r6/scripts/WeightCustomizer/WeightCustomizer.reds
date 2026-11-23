@@ -1,11 +1,10 @@
-module MisoCarryWeight
+module MisoWeightCustomizer
 
-// Native REDscript consumer of the M1 Arc manifest settings registry.
-// M1 Arc is required, and CET / Lua are not used by this mod.
+// Live carry-capacity configuration from M1 Arc's native registry.
 //
 // Only the temporary additive modifier created by this system is removed.
 // Never remove all modifiers: cyberware, perks, and other mods own theirs.
-public class M1ArcCarryWeightSystem extends ScriptableSystem {
+public class WeightCustomizerSystem extends ScriptableSystem {
   private let m_running: Bool;
   private let m_hasModifier: Bool;
   private let m_ownerEntity: EntityID;
@@ -26,7 +25,7 @@ public class M1ArcCarryWeightSystem extends ScriptableSystem {
     if !this.m_running {
       return;
     }
-    let callback = new M1ArcCarryWeightTick();
+    let callback = new WeightCustomizerTick();
     callback.owner = this;
     GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(callback, 0.50, false);
   }
@@ -73,8 +72,8 @@ public class M1ArcCarryWeightSystem extends ScriptableSystem {
     }
 
     // Missing manifest/settings produces false/0, so the mod fails closed.
-    let enabled = M1Arc_GetBool("m1nsook.weight", "enabled");
-    let target = M1Arc_GetInt("m1nsook.weight", "limit");
+    let enabled = M1Arc_GetBool("m1nsook.weight-customizer", "enabled");
+    let target = M1Arc_GetInt("m1nsook.weight-customizer", "limit");
     if !enabled || target < 50 {
       this.RemoveOwnedModifier();
       return;
@@ -114,9 +113,9 @@ public class M1ArcCarryWeightSystem extends ScriptableSystem {
   }
 }
 
-// Uses the ordinary REDscript DelaySystem, not a CET onUpdate handler.
-public class M1ArcCarryWeightTick extends DelayCallback {
-  public let owner: wref<M1ArcCarryWeightSystem>;
+// Queue the next stat refresh through the game's DelaySystem.
+public class WeightCustomizerTick extends DelayCallback {
+  public let owner: wref<WeightCustomizerSystem>;
 
   public func Call() -> Void {
     if IsDefined(this.owner) {

@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "m1nsook.weight-customizer",
+  "name": "Weight Customizer",
+  "version": "0.1.0",
+  "author": "민숙 MISO @m1nsook",
+  "scope": "Gameplay",
+  "shortDesc": "Set V's carry capacity in real time",
+  "requires": {
+    "m1arc": "1.0.0"
+  }
+}

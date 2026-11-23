@@ -41,8 +41,8 @@
     "name": "Camera Killer",
     "summary": "Shuts down cameras connected to the same access point or surveillance system when V turns off one camera."
   },
-  "Carry_Weight": {
-    "name": "Carry Weight (M1 Arc)",
-    "summary": "Live, reversible carry-capacity limit using M1 Arc's native manifest and REDscript settings API."
+  "Weight_Customizer": {
+    "name": "Weight Customizer",
+    "summary": "Change V's carry capacity from 50 to 5000 kg through M1 Arc, with live updates and reversible modifiers."
   }
 }
