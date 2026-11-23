@@ -19,7 +19,7 @@ The optional patch's release dependency metadata intentionally lists **Weight Cu
 - Adjusts the same 0.5-second Weight Customizer stat cycle so the backpack bonus is **added on top of** the M1 Arc limit, instead of being immediately canceled.
 - Also grants the backpack bonus when **Custom carry capacity** is disabled; the configured Weight Customizer total is then not enforced.
 - Removes only this add-on's owned temporary modifier when the backpack is unequipped.
-- Never double-applies the bonus to a vanilla equipped backpack; Zenitex's original intrinsic modifier is responsible for vanilla equipment slots.
+- For a backpack equipped in the **vanilla Outer Chest/Torso slot**, counts its original Zenitex bonus **on top of** Weight Customizer's configured total without adding a second stat modifier. With Weight Customizer disabled, the vanilla bonus is left to Zenitex's intrinsic modifier (so missing intrinsic bonuses in 2.5 still require an in-game check).
 - Does not redistribute Zenitex assets, add CET functionality, or change Weight Customizer's M1 Arc UI.
 
 ## Installation
