@@ -113,13 +113,38 @@ assert 'this.m_handledCapture = this.m_captureSerial;\n        this.TryStart();'
 assert 'class M1ArcSkipBreachTick extends DelayCallback' not in source, (
     "No DelayCallback game-time pump: first puzzle waits for initial input")
 assert 'GameInstance.GetDelaySystem' not in source, "Use UISystem event updates"
-# The 09:09 first-board native selector dispatch from Unknown was ignored.
-# Every second-board native dispatch after InProgress was acknowledged.
-# Do not consume the original first capture or fake a state transition.
-# Require sustained engine InProgress and actual 2.5 ink geometry.
-assert 'private let m_firstIntroReadyAt:' not in source, (
-    "Never gate the first native selection on a guessed intro timer")
+# Verified cold-launch first-puzzle regression fixes (user-provided REDscript).
+# The old validator insisted on a strict terminal-state and InProgress gate:
+# those assumptions were wrong, and the uploaded script passed seven genuine
+# cold-launch first attempts. Preserve its observed behavior, not our guess.
+assert 'private let m_firstIntroReadyAt:' not in source
 assert 'this.m_firstIntroReadyAt' not in source
+assert 'private let m_unknownTicks: Int32;' in source
+assert 'private let m_terminalTicks: Int32;' in source
+assert 'private let m_ackRetries: Int32;' in source
+assert 'private let m_earlyTwoLogged: Bool;' in source
+assert 'this.m_unknownTicks = 0;' in source
+assert 'this.m_terminalTicks = 0;' in source
+assert 'this.m_earlyTwoLogged = false;' in source
+assert 'this.m_selectionSerial = 0;' in source
+assert 'this.m_pendingSerial = 0;' in source
+assert 'private func LiveState() -> Int32' in source
+assert 'live blackboard=' in source
+assert 'Minigame entered terminal state (success/failure), raw=' in source
+
+start_logic = source.split('private func TryStart() -> Void {', 1)[1].split(
+    'public func Tick() -> Void {', 1)[0]
+state_logic = source.split('public func RecordGameState(', 1)[1].split(
+    'public func RecordSelection(', 1)[0]
+tick_logic = source.split('public func Tick() -> Void {', 1)[1].split(
+    'public class M1ArcSkipBreachCaptureRule', 1)[0]
+
+assert 'this.m_gameState == 0 && this.m_unknownTicks < 600' in start_logic
+assert 'Waiting for InProgress; grid is visible but intro is still running' in source
+assert 'this.m_gameState == 1 && this.m_inProgressTicks < 20' in start_logic
+assert start_logic.index('this.m_unknownTicks < 600') < start_logic.index(
+    'this.m_handledCapture = this.m_captureSerial;\\n    this.m_firstCellRejects = 0;'.replace('\\n','\n')
+)  # first captured board is not consumed by the opening intro
 assert 'private func ResolveClickPoint(row: Int32, col: Int32) -> Vector2' in source
 assert 'GetScreenPosition(root)' in source
 assert 'GetScreenPosition(cell)' in source
@@ -127,47 +152,46 @@ assert 'grid.GetWrappingWidgetCount() != Cast<Uint32>(this.m_dimension)' in sour
 assert 'grid.GetNumChildren() < this.m_dimension * this.m_dimension' in source
 assert 'AllParts/Top/NetworkCodeMapAndButton/wrapper/NetworkCodeMap/NetworkCodeMap/ContentWithBorder/ContentContainer/GridContainer/Grid' in source
 assert 'this.ResolveClickPoint(0,0)' in source
-assert 'if this.m_gameState == 0 {' in source
-assert 'First board preserved in Unknown; waiting for native InProgress' in source
-assert 'if this.m_gameState != 1 {' in source
-assert 'if this.m_inProgressTicks < 20 {' in source
 assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source
-assert 'this.m_gameState >= 0 && this.m_gameState <= 1' in source
-assert 'M1Arc_BreachSelectCell(' in source
 assert 'let target: Vector2 = this.ResolveClickPoint(row,col);' in source
 assert 'if target.X < 0.0 {' in source
 assert source.index('if target.X < 0.0 {') < source.index(
-    'M1Arc_BreachSelectCell('), (
-    "Never dispatch native selector while the chosen cell geometry is missing")
+    'M1Arc_BreachSelectCell('), 'Do not dispatch with invalid cell geometry'
 assert 'private let m_plannedCapture: Int32;' in source
 assert 'this.m_plannedCapture = this.m_captureSerial;' in source
 assert 'let firstIndex: Int32 = this.m_bestPath[0];' in source
 assert 'firstIndex / this.m_dimension, firstIndex % this.m_dimension' in source
-assert 'if actualFirst.X < 0.0 {' in source, (
-    "A visible cell (0,0) does not prove the solver-chosen first cell is clickable")
-start_logic = source.split('private func TryStart() -> Void {', 1)[1].split(
-    'public func Tick() -> Void {', 1)[0]
+assert 'if actualFirst.X < 0.0 {' in source
 assert start_logic.index('if actualFirst.X < 0.0 {') < start_logic.index(
-    'this.m_handledCapture = this.m_captureSerial;\n    this.m_firstCellRejects = 0;'), (
-    "Do not consume a solvable first board before its planned first cell is ready")
-assert 'this.m_delayTicks = 2;' in source
-assert 'M1Arc_BreachClickAt(logic,' not in source, (
-    "Do not re-enable Win32 clicks: the game never acknowledged either board")
-start_logic = source.split('private func TryStart() -> Void {', 1)[1].split(
-    'public func Tick() -> Void {', 1)[0]
-assert start_logic.index('this.ResolveClickPoint(0,0)') < start_logic.index(
-    'this.m_handledCapture = this.m_captureSerial;'), (
-    "Do not consume the first board until its live grid is visible")
-assert 'private let m_inProgressTicks: Int32;' in source
-assert 'this.m_inProgressTicks += 1;' in source
-assert 'this.m_inProgressTicks < 20' in source
-assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source
-assert start_logic.index('if this.m_gameState == 0 {') < start_logic.index(
-    'this.m_firstCellRejects = 0;'), (
-    "Never consume a generated board or dispatch native selection while Unknown")
-assert start_logic.index('if this.m_inProgressTicks < 20 {') < start_logic.index(
-    'this.m_firstCellRejects = 0;'), (
-    "Require a stable engine InProgress state before any automatic selection")
+    'this.m_firstCellRejects = 0;'), 'Actual planned first cell must be ready'
+assert 'M1Arc_BreachSelectCell(' in source
+assert 'M1Arc_BreachClickAt(logic,' not in source
+
+# The first game's Blackboard can report Succeeded(2) while the puzzle
+# continues accepting cells. The script MUST disregard that early value.
+assert 'state == 2 && (this.m_selectionSerial == 0' in state_logic
+assert 'this.m_active && this.m_nextStep < ArraySize(this.m_path)' in state_logic
+assert '[diag] ignoring Succeeded(2)' in state_logic
+assert state_logic.index('state == 2 &&') < state_logic.index(
+    'this.m_gameState = state;'), 'Ignore early 2 before caching terminal'
+assert state_logic.index('this.ScheduleNext();\n      return;') < state_logic.index(
+    'this.m_gameState = state;')
+assert 'if state > 1 {' in state_logic
+assert state_logic.rstrip().endswith('this.ScheduleNext();\n  }'), (
+    'Terminal state must not permanently kill UI event pump')
+assert 'this.m_gameState > 1 && this.m_terminalTicks < 300' in tick_logic
+assert 'this.m_gameState == 0 && this.m_unknownTicks < 1000' in tick_logic
+
+# Only the first cell, and only with unchanged acknowledgement serial,
+# may be retried after a native dispatch failed to reach game callbacks.
+assert 'this.m_waitTicks > 120' in tick_logic
+assert 'this.m_nextStep == 0 && this.m_selectionSerial == this.m_pendingSerial' in tick_logic
+assert 'this.m_ackRetries < 3' in tick_logic
+assert 'this.m_ackRetries += 1;' in tick_logic
+assert 'this.m_delayTicks = 30;' in tick_logic
+assert 'this.Report(63, "No acknowledgement for first cell; board untouched, retrying")' in tick_logic
+assert 'this.m_nextStep += 1;' in source
+assert 'Matching OnPositionSelected callback received' in source
 
 assert 'OnHandleInput(evt:' not in source, "Do not cancel on generic UI click"
 assert 'RecordUserClick(' not in source, "Only native matrix selection can cancel"
