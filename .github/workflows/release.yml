@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - Weight_Customizer
+          - Weight_Customizer_Zenitex
           - Daemon
           - No_Tracking_Please
           - Free_Chrome
