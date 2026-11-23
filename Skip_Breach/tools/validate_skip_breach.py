@@ -50,7 +50,7 @@ for required in [
     "OnGameStateChanged(value: Int32)",
     "M1Arc_GetBool(\"m1nsook.skipbreach\",\"enabled\")",
     "M1Arc_BreachInputAvailable()",
-    "M1Arc_BreachClickAt(logic,this.ResolveClickPoint(row,col))",
+    "M1Arc_BreachClickAt(logic,target)",
     "this.m_captureSerial += 1",
     "this.m_selectionSerial += 1",
     "this.m_waitTicks > 120",
@@ -68,7 +68,7 @@ for required in [
     "let maxDepth: Int32 = Min(this.m_bufferSize,ArraySize(this.m_grid));",
     "this.m_firstCellRejects < 20",
     "Waiting for first-try hacking UI controller",
-    "First cell not accepted yet; retrying same board",
+    "Physical click not submitted; retrying same untouched board",
     "this.m_handledCapture = this.m_captureSerial;",
     "this.m_bestScore > 0 && ArraySize(this.m_bestPath) > 0",
     "M1Arc_BreachTrace(message);",
@@ -129,7 +129,23 @@ assert 'this.ResolveClickPoint(0,0)' in source
 assert 'this.m_gameState < 0 || this.m_gameState > 1' in source
 assert 'this.m_ready && this.m_captureSerial != this.m_handledCapture' in source
 assert 'this.m_gameState >= 0 && this.m_gameState <= 1' in source
-assert 'M1Arc_BreachClickAt(logic,this.ResolveClickPoint(row,col))' in source
+assert 'M1Arc_BreachClickAt(logic,target)' in source
+assert 'let target: Vector2 = this.ResolveClickPoint(row,col);' in source
+assert 'if target.X < 0.0 {' in source
+assert source.index('if target.X < 0.0 {') < source.index(
+    'M1Arc_BreachClickAt(logic,target)'), (
+    "Never call native mouse input when the chosen live widget has no valid geometry")
+assert 'private let m_plannedCapture: Int32;' in source
+assert 'this.m_plannedCapture = this.m_captureSerial;' in source
+assert 'let firstIndex: Int32 = this.m_bestPath[0];' in source
+assert 'firstIndex / this.m_dimension, firstIndex % this.m_dimension' in source
+assert 'if actualFirst.X < 0.0 {' in source, (
+    "A visible cell (0,0) does not prove the solver-chosen first cell is clickable")
+assert source.index('if actualFirst.X < 0.0 {') < source.index(
+    'this.m_handledCapture = this.m_captureSerial;', source.index(
+        'private func TryStart()')), (
+    "Do not consume the one-shot first capture before its actual first cell is ready")
+assert 'this.m_delayTicks = 2;' in source
 assert 'M1Arc_BreachSelectCell(logic,' not in source, (
     "Do not regress to the game-internal selector that ignored first board")
 start_logic = source.split('private func TryStart() -> Void {', 1)[1].split(
