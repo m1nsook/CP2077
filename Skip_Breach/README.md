@@ -1,72 +1,64 @@
-### Historical no-op root cause: module-qualified scriptable system lookup
+# Skip Breach — M1 Arc-native Breach Protocol autosolver
 
-The user supplied RED4ext and REDscript logs from Nov 23, 2026. They
-confirm both the **native selector was READY** and REDscript **compiled
-without errors**. The actual REDscript code still retrieved
-`M1ArcSkipBreachSystem` using an **unqualified CName** despite defining
-its class inside `module MisoSkipBreach`. REDscript's ScriptableSystems
-container expects the full `MisoSkipBreach.M1ArcSkipBreachSystem` name.
-The old lookup can return null; all controller hooks were guarded by
-`IsDefined(sys)`, so capture and automatic solving were skipped silently.
+**Current status (23 November 2026):** the uploaded
+`M1ArcSkipBreach.reds` fixes the first-puzzle cold-launch failure.
+The user confirmed **seven successful cold launches**, including a
+five-cell first puzzle with all five `OnPositionSelected` callbacks
+acknowledged. The native M1 Arc C++ DLL and `M1ArcBreachNative.reds`
+did **not** need modification. This is an opt-in development build,
+not a general compatibility guarantee or public release.
 
-This lookup is fixed, but newer logs proved another separate bug:
-the first board was captured without any successful input, whereas the
-second puzzle accepted every native selection. Source and CI alone do
-not establish first-puzzle gameplay success.
+## Cold-launch first-puzzle fix (confirmed in-game)
 
-# Skip Breach — experimental native M1 Arc integration
+The original native input failed on the first board because three
+script-side lifecycle bugs hid each other:
 
-**Status:** buildable source and game-root ZIP for supervised in-game testing,
-**not released**. REDscript game compilation and real selector behavior have
-not yet been verified in-game. The development solver and Python tests under
-`dev/` are not packaged.
+1. **Intro animation:** on initial launch the grid was already drawn
+   while state was still `Unknown=0`. Previously `TryStart()` could
+   dispatch before the game accepted input. Now it waits for genuine
+   `InProgress=1`, stabilized for 20 UI updates. If a game build never
+   transitions, a bounded 600-update Unknown fallback remains.
+2. **Pulse pump termination:** a terminal Blackboard state stopped
+   scheduling UI events, preventing the script from re-reading live
+   state. The pump now continues through a bounded 300-update
+   terminal window rather than going silent.
+3. **Spurious early success:** the first game after launch reports
+   `Succeeded=2` while the hacking UI still accepts input and before
+   the solution is complete. `RecordGameState` ignores that premature
+   value while no cells have been selected or a planned path is still
+   active and incomplete. `Failed=3` is **never** ignored.
 
-## November 23 09:09 first-board state gating
+If a first-cell dispatch has no acknowledgement after 120 UI updates,
+the script may retry it at most three times, **only when the
+selection serial is unchanged**. Subsequent cells are never retried
+without acknowledgement. It does not change game facts, mark daemon
+rewards complete, pause the vanilla timer, or exit/reopen the puzzle.
 
-New game log: the first board initialized at 09:09:29.383 and the
-game-native selector was called at 09:09:30.391 while state was still
-`Unknown`. No `OnPositionSelected` ever acknowledged that dispatch.
-At 09:09:31.403 it briefly reported `InProgress` and entered a
-terminal state 26 ms later. The second board, by contrast, reached
-`InProgress` **before** dispatch (09:10:35.758) and acknowledged all six
-selections between 09:10:36.006 and 09:10:36.135.
+The diagnostic log deliberately retains the raw Blackboard transition
+value, including `[diag] state A -> B, live blackboard=C` and
+`[diag] ignoring Succeeded(2)`. The cause of the premature `2`
+is unknown, so these checks and diagnostics remain for future game
+versions. The 600- and 300-update limits are frame/update counts,
+not guaranteed wall-clock durations.
 
-The source supplied by the AutoBreach author also requires
-`HackingMinigameState.InProgress` before selecting anything. Its
-native DLL's input handler calls a game selection function; static
-analysis does not establish a separate first-board activation step.
-Thus the current build **never dispatches from Unknown**. It leaves the
-first capture pending until the game reports **20 sustained UI
-updates of InProgress** and the *actual planned first cell* has live
-grid geometry. No 3-second delay, synthetic Blackboard mutation,
-blind input retries, or cancellation/reopening workaround.
+**User-supplied cold-launch verification:**
 
-**Important limitation:** the first InProgress signal occurred immediately
-before a terminal event. This may be a cancellation transition, not
-normal readiness. If the game never reaches sustained InProgress on an
-untouched first board, this implementation will safely leave that board
-manual. That means it has **not** solved the original first-screen bug.
-Do not ask the player to repeat the mission that fails on cancellation.
+```text
+09:38:08.816  state 0 -> 1 (InProgress)
+09:38:08.909  [diag] ignoring Succeeded(2) ... puzzle still live
+09:38:09.023  Valid path ready
+09:38:09.361  five native cell dispatches, each acknowledged
+09:38:09.472  All planned cells acknowledged; game applies rewards
+```
 
-## November 23 08:46 game log: Win32 pointer path failed
+## History (superseded)
 
-User-provided M1 Arc log showed Skip Breach captured/planned both
-the first and second puzzle, and the native Win32 helper reported
-`Physical grid click sent` each time. **Neither produced an
-`OnPositionSelected` acknowledgement.** A later manual grid
-selection did produce the game's callback. This is why the current
-revision **no longer uses the Win32 `SendInput` route**.
-
-We restored M1 Arc's version-verified internal grid selector, which
-previously acknowledged all cells on the second puzzle, while keeping
-first-board capture, live-grid readiness, cached planning, session
-locking, and one-dispatch/one-ack safety. This is a source-level
-correction only, **not** a claim that first-board behavior is fixed.
-No repeat test of the user's mission is requested.
-
-The author's mention of **Microsoft Visual C++ Redistributable**
-identifies standard native C++ runtime dependencies; it does **not**
-explain the game selection ABI or demonstrate any cryptocurrency miner.
+Earlier approaches included a premature `Unknown` selector call,
+an over-strict terminal-state abort, and Win32 `SendInput` clicks that
+produced **no** `OnPositionSelected` callbacks on either board.
+The working fix is entirely inside REDscript. The original
+`M1Arc_BreachSelectCell` native selector continues to provide the
+game input; no separate closed-source DLL, CET, or CMD tool is used.
 
 ## What has been implemented
 
@@ -84,10 +76,12 @@ explain the game selection ABI or demonstrate any cryptocurrency miner.
   There is no separate DLL, OCR, CMD app or external solver. The next
   cell is submitted **only after** the game's
   `HackingMinigameGameController.OnPositionSelected` acknowledgement.
-- Generation/session changes, user input, a different minigame state,
-  disabled settings, a missing controller or a 1.5-second acknowledgement
-  timeout stop execution; **the vanilla countdown is never paused or
-  overridden by Skip Breach**.
+- A session or generation change, confirmed manual input, disabled
+  settings, missing controller or `Failed=3` stop execution.
+  First-cell timeout may trigger up to three guarded retries if the
+  acknowledgement serial has **not** changed; later selections are
+  never resent without acknowledgement. **The vanilla countdown is
+  never paused or overridden by Skip Breach**.
 - Nothing writes daemon status, success facts, rewards or a fake result.
 - **Runtime diagnostics now appear in M1 Arc's existing log:** 
   `Cyberpunk 2077/red4ext/logs/m1arc*.log` (choose the newest dated
@@ -106,81 +100,26 @@ explain the game selection ABI or demonstrate any cryptocurrency miner.
   trigger invalid native declarations at game startup. A missing selector
   does not prevent passive board capture from registering.
 
-## First-puzzle UI event execution (experimental)
+## Game UI event pump and first-attempt safety
 
-The working AutoBreach ZIP updates its execution through CET's
-`onUpdate` per-frame callback. Our implementation previously used
-`DelaySystem.DelayCallback` to run the solver, which is a game-time
-scheduler and may not advance while the first hacking UI is waiting
-for a cell selection. This build replaces that periodic scheduler
-with a bounded `UISystem.QueueEvent` pump, delivered to
-`HackingMinigameGameController` via an added REDscript event handler.
+The addon captures each puzzle through a passive
+`MinigameGenerationRule.OnProcessRule` observer, then uses a
+session/capture-tagged `UISystem.QueueEvent` pump rather than a
+game-time `DelayCallback`, which can stall during first-interaction
+startup. There is never more than one outstanding cell selection.
+The current planned first cell must have valid live grid geometry
+before the capture is marked handled.
 
-Every event carries the exact session and capture serial, stale
-pulses cannot affect a regenerated matrix, and only one outstanding
-event is allowed. Safety stops exist after 1,500 UI updates.
+The script waits for `InProgress` during the opening animation
+rather than confusing **drawn cells** with **interactive cells**.
+The early `Succeeded=2` exception is limited to no-selection or
+incomplete active-path cases; a real `Failed=3`, regenerated
+session, manual first cell, lost controller, focus change, or disabled
+setting still prevents further automatic input.
 
-**Base-game first-input lifecycle, sourced from the vanilla controller:**
-`HackingMinigameGameController.OnInitialize` explicitly sets
-`minigameData.timerWaitsForInteraction = true`. The timer does not
-start until the player's first accepted matrix selection. The minigame
-can remain in `HackingMinigameState.Unknown=0` before that selection.
-Our previous rule demanding `InProgress=1` before sending any native
-cell introduced a circular dependency on the **first** puzzle.
-
-The user's Nov 23 log also shows the earlier native dispatch happened
-only **0.587 seconds** after the first UI initialization, failed to
-produce an `OnPositionSelected` acknowledgement, and stopped. Subsequent
-`InProgress` transitions happened **92 ms before terminal failure**
-on the first screen: these are not reliable readiness signals. The
-second board entered InProgress, then accepted all native selections.
-
-**Updated source behavior:** require an actual sustained
-`InProgress` state, without inventing a fixed intro delay or changing
-game facts. Skip Breach preserves its original captured board while
-`Unknown`; nothing is dispatched in that state. It resolves the planned
-first cell from the live
-`AllParts/Top/.../ContentContainer/GridContainer/Grid` ink widget path,
-checks the wrapping width against the captured matrix, and validates
-row/column positions against the visible first/right/down cells. Only
-after both the state and geometry are ready does M1 Arc's internal
-game-native selector receive a row and column. Its C++ bridge validates
-game version, signature, window focus and overlay state.
-The game's `OnPositionSelected` must acknowledge every selection;
-a dispatched native action alone is **never counted as success**.
-No unacknowledged native input is blindly repeated. The first
-untouched board remains captured while Unknown=0 and native selection
-begins only at sustained InProgress=1; C++/REDscript never changes
-quest facts, puzzle state, rewards or timers.
-
-**Validation:** native M1 Arc compilation, REDscript **syntax/parser**
-checks, and offline sequencing/unit tests are separate from actual
-first-puzzle gameplay. This is an experimental draft, not a proven fix.
-The user has already repeated a mission-failing test many times:
-**do not request another run of the same stealth gig**.
-
-## First-attempt initialization and timer safety
-
-In-game observation: the first stealth puzzle can reach the full 30.00
-timer without any automatic input, while the second puzzle after
-detection may solve. Code review found two sources of startup fragility:
-(1) a `GetControllerByType` failure during UI initialization stopped
-execution and marked the current capture handled; (2) the mod called
-`PauseTheTimer()` **before** its first native selection.
-
-The current change waits for a valid logic controller and rendered grid
-on the SAME puzzle, keeps the captured generation pending until it can
-actually run, and retries only when the native selector explicitly
-returns **false** before dispatching a cell. If native dispatch returns true but game
-`OnPositionSelected` acknowledgement never arrives, it **does not
-repeat** that selection: repeated clicks could damage the puzzle.
-The mod no longer pauses or resumes the vanilla timer, so failures
-cannot strand its countdown in a mod-owned paused state.
-
-This is a **source-level risk reduction, not a verified fix** for
-first-time game controller initialization. Do not test it by exiting
-a stealth gig or letting it trigger failure; verification should use a
-repeatable non-mission puzzle or a restorable save.
+There is a bounded, serial-guarded retry for the **first cell only**.
+The game still owns puzzle completion and rewards. No synthetic
+Blackboard state transition or quest-fact edit is performed.
 
 ## First-attempt safety — gig failure is not reversible
 
@@ -198,10 +137,9 @@ The previous generic `OnHandleInput(n"click")` cancellation hook could
 react to a non-matrix UI click during opening and was removed. Only a
 confirmed `OnPositionSelected` event counts as a manual cell selection.
 
-**This is a source-level lifecycle correction, NOT an in-game working
-claim. Do not rely on this experimental mod during an irreversible gig.**
-Only advance release testing in a repeatable, non-mission Breach Protocol
-or with a recoverable save, after real REDscript validation.
+The current uploaded script has been verified in seven successful
+cold launches. For future versions, verify any additional changes using
+a recoverable save; a failed stealth Breach can permanently fail a gig.
 
 ## RED4ext startup blocker: invalid native definitions
 
@@ -267,11 +205,11 @@ The English localization templates are supplied for translators. The
 M1 Arc language switcher is a **separate upcoming milestone**; the schema
 English labels are currently the displayed strings.
 
-**Before release:** confirm REDscript compilation, automatic appearance
-in M1 Arc, opening a real Breach Protocol board, valid cell selections,
-normal rewards and game focus/cancellation. Windows CI only compiles
-M1 Arc C++ and verifies Python solver and source/package contracts; it
-does not compile game REDscript.
+**Before a public release:** preserve the seven cold-launch successes
+while checking additional puzzle types and game settings against
+recoverable saves. Windows CI parses REDscript with the upstream CLI,
+runs solver/lifecycle checks and builds the package; optional semantic
+compilation requires a private game-script bundle.
 
 ## Official REDscript CLI validation (GitHub Actions)
 
