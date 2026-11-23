@@ -38,6 +38,17 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private let m_budgetHit: Bool;
   private let m_bestScore: Int32;
   private let m_bestPath: array<Int32>;
+  private let m_lastDiagnostic: Int32;
+  private let m_waitForBoardTicks: Int32;
+
+  // Only log transitions. Do not fill REDscript.log every 100ms.
+  private func Report(code: Int32, message: String) -> Void {
+    if this.m_lastDiagnostic == code {
+      return;
+    };
+    this.m_lastDiagnostic = code;
+    LogChannel(n"DEBUG", "[Skip Breach] " + message);
+  }
 
   public static func Get(gi: GameInstance) -> ref<M1ArcSkipBreachSystem> {
     return GameInstance.GetScriptableSystemsContainer(gi).Get(n"M1ArcSkipBreachSystem") as M1ArcSkipBreachSystem;
@@ -47,6 +58,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_running = true;
     this.m_handledCapture = -1;
     this.m_gameState = 0;
+    LogChannel(n"DEBUG", "[Skip Breach] ScriptableSystem attached");
     this.ScheduleNext();
   }
 
@@ -74,6 +86,9 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_gameState = gameState;
     this.m_ready = false;
     this.m_cancelled = false;
+    this.m_waitForBoardTicks = 0;
+    this.m_lastDiagnostic = 0;
+    this.Report(10, "Breach controller initialized; waiting for puzzle capture");
     ArrayClear(this.m_grid);
     ArrayClear(this.m_daemonOffsets);
     ArrayClear(this.m_daemonLengths);
@@ -105,6 +120,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       return;
     };
     this.m_cancelled = true;
+    this.Report(11, "Manual click detected: automation cancelled for this board");
     this.StopExecution();
   }
 
@@ -119,6 +135,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       return;
     };
     if !this.m_waiting || this.m_nextStep >= ArraySize(this.m_path) {
+      this.Report(12, "Selection event arrived out of order; stopping");
       this.StopExecution();
       return;
     };
@@ -126,6 +143,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     if this.m_selectionSerial <= this.m_pendingSerial
       || this.m_lastRow != expected / this.m_dimension
       || this.m_lastColumn != expected % this.m_dimension {
+      this.Report(13, "Selection acknowledgement mismatch; stopping");
       this.StopExecution();
       return;
     };
@@ -136,6 +154,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     if this.m_nextStep >= ArraySize(this.m_path) {
       // Final selection was accepted. The game's original callback must
       // still execute; it is responsible for programs/rewards/closing UI.
+      this.Report(14, "All planned cells acknowledged; game applies rewards");
       this.StopExecution();
     };
   }
@@ -189,6 +208,11 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       && ArraySize(this.m_daemonLengths) > 0;
     // Every generation increments the serial, even if it cannot be solved.
     this.m_captureSerial += 1;
+    if this.m_ready {
+      this.Report(20, "Puzzle captured; native readiness and solver are next");
+    } else {
+      this.Report(21, "Puzzle capture incomplete; no valid grid or daemons");
+    };
   }
 
   private func FindChainForOwner(chains: array<CharactersChain>, owner: Int32) -> Int32 {
@@ -294,9 +318,13 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.Search(path,codes,0,col,true);
       col += 1;
     };
-    // A truncated search result is not certified optimal; fail closed.
-    return !this.m_budgetHit && this.m_bestScore > 0
-      && ArraySize(this.m_bestPath) > 0;
+    // Every candidate is a legal native row/column path. If the search
+    // budget expires, prefer a VERIFIED, rewarding best-found path over
+    // silently discarding every successful candidate. It may not be optimal.
+    if this.m_budgetHit && this.m_bestScore > 0 {
+      this.Report(31, "Search budget reached; executing best legal path found (not guaranteed optimal)");
+    };
+    return this.m_bestScore > 0 && ArraySize(this.m_bestPath) > 0;
   }
 
   private func StopExecution() -> Void {
@@ -310,14 +338,28 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   }
 
   private func TryStart() -> Void {
-    if !this.m_ready || this.m_gameState != 1 || this.m_cancelled
-      || !IsDefined(this.m_controller)
-      || !M1Arc_BreachInputAvailable()
-      || !M1Arc_GetBool("m1nsook.skipbreach","enabled") {
+    if !M1Arc_GetBool("m1nsook.skipbreach","enabled") {
+      return;
+    };
+    if !this.m_ready {
+      this.Report(41, "No captured, usable puzzle data; vanilla puzzle remains playable");
+      return;
+    };
+    if this.m_gameState != 1 {
+      this.Report(42, "Breach game state is not interactive (expected state 1)");
+      return;
+    };
+    if this.m_cancelled || !IsDefined(this.m_controller) {
+      this.Report(43, "Breach controller unavailable or already cancelled");
+      return;
+    };
+    if !M1Arc_BreachInputAvailable() {
+      this.Report(44, "Native selector unavailable: check m1arc entry in RED4ext log for version/signature reason");
       return;
     };
     if !this.Plan() {
-      return; // leave the normal manual puzzle untouched
+      this.Report(45, "No rewarding path found within solver budget; manual puzzle remains playable");
+      return;
     };
     this.m_lockedSession = this.m_session;
     this.m_lockedCapture = this.m_captureSerial;
@@ -329,6 +371,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_controller.PauseTheTimer();
     this.m_paused = true;
     this.m_active = true;
+    this.Report(46, "Valid path found; timer paused; starting cell selections");
   }
 
   public func Tick() -> Void {
@@ -347,6 +390,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
           this.m_waitTicks += 1;
           if this.m_waitTicks > 15 {
             // Never repeat a click without a native selection event.
+            this.Report(51, "Game did not acknowledge selected cell after 1.5s; stopping");
             this.StopExecution();
           };
         } else {
@@ -360,12 +404,14 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
               let logic: wref<inkLogicController> =
                 this.m_controller.GetControllerByType(n"gameuiHackingMinigameLogicController");
               if !IsDefined(logic) {
+                this.Report(52, "Hacking logic controller not found; stopping");
                 this.StopExecution();
               } else {
                 this.m_pendingSerial = this.m_selectionSerial;
                 this.m_waiting = true;
                 this.m_waitTicks = 0;
                 if !M1Arc_BreachSelectCell(logic, Vector2(Cast<Float>(row),Cast<Float>(col))) {
+                  this.Report(53, "Native controller rejected cell selection (focus/type/coordinate check)");
                   this.StopExecution();
                 };
               };
@@ -374,7 +420,14 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
         };
       };
     } else {
-      if this.m_ready && this.m_captureSerial != this.m_handledCapture
+      if M1Arc_GetBool("m1nsook.skipbreach","enabled")
+        && IsDefined(this.m_controller) && !this.m_ready {
+        this.m_waitForBoardTicks += 1;
+        if this.m_waitForBoardTicks == 20 {
+          this.Report(54, "No board captured after 2s. Enable Skip Breach BEFORE opening the minigame.");
+        };
+      };
+      if this.m_captureSerial != this.m_handledCapture
         && this.m_gameState == 1 {
         this.m_handledCapture = this.m_captureSerial;
         this.TryStart();
@@ -422,8 +475,10 @@ protected cb func OnInitialize() -> Bool {
       board.GetVariant(GetAllBlackboardDefs().HackingMinigame.MinigameDefaults));
     sys.BeginSession(this,Cast<Int32>(data.gridSize),Cast<Int32>(data.bufferSize),
                      board.GetInt(GetAllBlackboardDefs().HackingMinigame.State));
-    if M1Arc_GetBool("m1nsook.skipbreach","enabled")
-      && M1Arc_BreachInputAvailable() {
+    if M1Arc_GetBool("m1nsook.skipbreach","enabled") {
+      // Always capture first: input compatibility is checked separately
+      // and logged after capture. Do not silently skip board discovery
+      // just because the native selector is unsupported on this build.
       let rule: ref<M1ArcSkipBreachCaptureRule> = new M1ArcSkipBreachCaptureRule();
       rule.minigameController = this;
       ArrayPush(data.rules,rule);

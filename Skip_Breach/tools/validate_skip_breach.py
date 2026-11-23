@@ -53,6 +53,10 @@ for required in [
     "this.m_controller.ResumeTheTimer();",
     "this.m_waitTicks > 15",
     "this.m_nodeCount >= 50000",
+    "this.m_bestScore > 0 && ArraySize(this.m_bestPath) > 0",
+    "LogChannel(n\"DEBUG\", \"[Skip Breach] \" + message);",
+    "this.Report(44, \"Native selector unavailable:",
+    "this.Report(54, \"No board captured after 2s.",
 ]:
     assert required in source, f"Missing expected game-side contract: {required}"
 for forbidden in [
@@ -63,4 +67,6 @@ for forbidden in [
 ]:
     assert forbidden not in source, f"Forbidden legacy/direct-success path: {forbidden}"
 
-print("PASS: game-root manifest, opt-in setting, native integration contract and no CET dependency")
+assert '&& M1Arc_BreachInputAvailable() {' not in source, "Don't hide capture behind selector readiness"
+assert "return !this.m_budgetHit && this.m_bestScore > 0" not in source, "Budget must not discard valid paths"
+print("PASS: game-root manifest, opt-in setting, native diagnostics, best-effort solver and no CET dependency")

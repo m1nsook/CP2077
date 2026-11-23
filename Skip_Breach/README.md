@@ -11,9 +11,10 @@ not yet been verified in-game. The development solver and Python tests under
   generated matrix via `MinigameGenerationRule.OnProcessRule`, finds the
   current visible/unfulfilled daemon sequences by owner ID, and runs an
   original REDscript row-first, alternating-column/row depth-first solver.
-- A bounded 50,000-node search selects the highest number of matching
-  daemon sequences, breaking ties in favor of shorter paths. If the budget
-  is reached, it **does not execute** the possibly suboptimal result.
+- A bounded 50,000-node search selects the best matching daemon path found,
+  breaking ties in favor of shorter paths. If the search budget is reached,
+  it now executes a **verified legal, rewarding best-found path**, reporting
+  that it may not be globally optimal instead of silently doing nothing.
 - A game-system update every 0.1 seconds sends one action at a time through
   M1 Arc's `M1Arc_BreachSelectCell(wref<inkLogicController>, Vector2)`. The
   next cell is submitted **only after** the game's
@@ -22,6 +23,13 @@ not yet been verified in-game. The development solver and Python tests under
   disabled settings, a missing controller or a 1.5-second acknowledgement
   timeout stop execution and restore the vanilla timer.
 - Nothing writes daemon status, success facts, rewards or a fake result.
+- The mod logs state transitions under `[Skip Breach]` via REDscript's
+  `LogChannel(n"DEBUG", ...)`: controller initialization, capture,
+  native selector compatibility, solving, each aborted selection and completion.
+  M1 Arc logs the **reason** its native selector is disabled at startup
+  through RED4ext's logger (wrong game version, missing signature, etc.).
+  A missing native selector no longer prevents the board capture hook from
+  registering, so the failure is visible.
 
 ## Install and test
 
