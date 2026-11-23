@@ -17,6 +17,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private let m_session: Int32;
   private let m_captureSerial: Int32;
   private let m_handledCapture: Int32;
+  private let m_plannedCapture: Int32;
   private let m_selectionSerial: Int32;
   private let m_lastRow: Int32;
   private let m_lastColumn: Int32;
@@ -72,6 +73,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
   private func OnAttach() -> Void {
     this.m_running = true;
     this.m_handledCapture = -1;
+    this.m_plannedCapture = -1;
     this.m_gameState = 0;
     M1Arc_BreachTrace("ScriptableSystem attached; UI event driven");
   }
@@ -138,6 +140,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_bufferSize = buffer;
     this.m_gameState = gameState;
     this.m_ready = false;
+    this.m_plannedCapture = -1;
     this.m_cancelled = false;
     this.m_waitForBoardTicks = 0;
     this.m_firstCellRejects = 0;
@@ -302,6 +305,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
     this.m_pulseQueued = false;
     this.m_pulseCount = 0;
     this.m_inProgressTicks = 0;
+    this.m_plannedCapture = -1;
     if this.m_ready {
       this.Report(20, "Puzzle captured; native readiness and solver are next");
       this.ScheduleNext();
@@ -675,9 +679,22 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
       this.Report(47, "Waiting for hacking UI controller (same puzzle, no exit needed)");
       return;
     };
-    if !this.Plan() {
-      this.Report(45, "No rewarding path found; leaving original puzzle manual");
-      this.m_handledCapture = this.m_captureSerial;
+    // Solve exactly once per generated puzzle, even if the selected
+    // first cell needs more UI layout time than cell (0,0). Replanning on
+    // every UI pulse can consume the entire initial input window.
+    if this.m_plannedCapture != this.m_captureSerial {
+      if !this.Plan() {
+        this.Report(45, "No rewarding path found; leaving original puzzle manual");
+        this.m_handledCapture = this.m_captureSerial;
+        return;
+      };
+      this.m_plannedCapture = this.m_captureSerial;
+    };
+    let firstIndex: Int32 = this.m_bestPath[0];
+    let actualFirst: Vector2 = this.ResolveClickPoint(
+      firstIndex / this.m_dimension, firstIndex % this.m_dimension);
+    if actualFirst.X < 0.0 {
+      this.Report(62, "Waiting for the SOLVER'S first cell to have valid live grid coordinates");
       return;
     };
     this.m_handledCapture = this.m_captureSerial;
@@ -756,21 +773,30 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
                   this.StopExecution();
                 };
               } else {
-                this.m_pendingSerial = this.m_selectionSerial;
-                this.m_waiting = true;
-                this.m_waitTicks = 0;
-                if !M1Arc_BreachClickAt(logic,this.ResolveClickPoint(row,col)) {
-                  this.m_waiting = false;
-                  if this.m_nextStep == 0 && this.m_firstCellRejects < 20 {
-                    // False means no cell was dispatched, so retry is safe.
-                    // A TRUE dispatch without acknowledgement is NEVER
-                    // retried: it might have actually changed the puzzle.
-                    this.m_firstCellRejects += 1;
-                    this.m_delayTicks = 2;
-                    this.Report(53, "First cell not accepted yet; retrying same board without timer pause");
-                  } else {
-                    this.Report(56, "Native selector rejected cell; leaving puzzle manual");
-                    this.StopExecution();
+                let target: Vector2 = this.ResolveClickPoint(row,col);
+                if target.X < 0.0 {
+                  // Layout is transient, NOT a native click rejection.
+                  // Do not send (-1,-1) to M1 Arc or spend the first-cell
+                  // retry allowance before any input has been attempted.
+                  this.m_delayTicks = 2;
+                  this.Report(61, "Waiting for the exact next grid cell to be visible; no click sent");
+                } else {
+                  this.m_pendingSerial = this.m_selectionSerial;
+                  this.m_waiting = true;
+                  this.m_waitTicks = 0;
+                  if !M1Arc_BreachClickAt(logic,target) {
+                    this.m_waiting = false;
+                    if this.m_nextStep == 0 && this.m_firstCellRejects < 20 {
+                      // FALSE means Win32 rejected the click before dispatch.
+                      // A TRUE dispatch without acknowledgement is NEVER
+                      // retried: it might have changed the actual puzzle.
+                      this.m_firstCellRejects += 1;
+                      this.m_delayTicks = 2;
+                      this.Report(53, "Physical click not submitted; retrying same untouched board");
+                    } else {
+                      this.Report(56, "Physical grid input rejected; leaving puzzle manual");
+                      this.StopExecution();
+                    };
                   };
                 };
               };
