@@ -39,7 +39,7 @@ for required in [
     "OnHandleInput(evt: ref<inkPointerEvent>)",
     "M1Arc_GetBool(\"m1nsook.skipbreach\",\"enabled\")",
     "M1Arc_BreachInputAvailable()",
-    "logic.M1Arc_BreachSelectCell(Vector2(",
+    "M1Arc_BreachSelectCell(logic, Vector2(",
     "this.m_captureSerial += 1",
     "this.m_selectionSerial += 1",
     "this.m_controller.PauseTheTimer();",

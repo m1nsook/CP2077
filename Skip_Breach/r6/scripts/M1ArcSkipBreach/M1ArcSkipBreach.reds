@@ -365,7 +365,7 @@ public class M1ArcSkipBreachSystem extends ScriptableSystem {
                 this.m_pendingSerial = this.m_selectionSerial;
                 this.m_waiting = true;
                 this.m_waitTicks = 0;
-                if !logic.M1Arc_BreachSelectCell(Vector2(Cast<Float>(row),Cast<Float>(col))) {
+                if !M1Arc_BreachSelectCell(logic, Vector2(Cast<Float>(row),Cast<Float>(col))) {
                   this.StopExecution();
                 };
               };

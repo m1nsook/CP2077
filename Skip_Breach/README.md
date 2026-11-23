@@ -15,7 +15,7 @@ not yet been verified in-game. The development solver and Python tests under
   daemon sequences, breaking ties in favor of shorter paths. If the budget
   is reached, it **does not execute** the possibly suboptimal result.
 - A game-system update every 0.1 seconds sends one action at a time through
-  M1 Arc's `inkLogicController.M1Arc_BreachSelectCell(Vector2)`. The
+  M1 Arc's `M1Arc_BreachSelectCell(wref<inkLogicController>, Vector2)`. The
   next cell is submitted **only after** the game's
   `HackingMinigameGameController.OnPositionSelected` acknowledgement.
 - Generation/session changes, user input, a different minigame state,
