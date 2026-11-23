@@ -1,5 +1,0 @@
-{
-  "mod.name": "Skip Breach",
-  "enabled.label": "Automatically solve Breach Protocol",
-  "enabled.description": "Experimental: requires a verified Cyberpunk 2.5 native selector. Disabled by default."
-}

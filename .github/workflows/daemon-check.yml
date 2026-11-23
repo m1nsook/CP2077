@@ -1,20 +1,20 @@
-name: Skip Breach development checks
+name: Daemon development checks
 
 on:
   push:
     branches:
       - "feat/skip-breach-solver-foundation"
     paths:
-      - "Skip_Breach/**"
+      - "Daemon/**"
       - "scripts/package_release.py"
       - ".github/mod-descriptions.json"
-      - ".github/workflows/skip-breach-check.yml"
+      - ".github/workflows/daemon-check.yml"
   pull_request:
     paths:
-      - "Skip_Breach/**"
+      - "Daemon/**"
       - "scripts/package_release.py"
       - ".github/mod-descriptions.json"
-      - ".github/workflows/skip-breach-check.yml"
+      - ".github/workflows/daemon-check.yml"
   workflow_dispatch:
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
           New-Item -ItemType Directory -Path ".ci/m1arc-api" -Force | Out-Null
           # This API comes from an already tested pre-Breach declaration
           # set and is pinned to an immutable commit, not a moving branch.
-          $commit = "dcc7fc402368a886ca3812e6deb539a341602f97"
+          $commit = "94b2484c54813fb2f1ed9be4d333c6e26fea1dc4"
           $url = "https://raw.githubusercontent.com/m1nsook/m1arc/$commit/r6/scripts/m1arc/M1Arc.reds"
           Invoke-WebRequest -Uri $url -OutFile ".ci/m1arc-api/M1Arc.reds"
           if (!(Test-Path ".ci/m1arc-api/M1Arc.reds")) {
@@ -46,7 +46,7 @@ jobs:
           REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
           REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
         run: |
-          ./Skip_Breach/tools/check_redscript_cli.ps1 -SourceRoots @("Skip_Breach/r6/scripts", ".ci/m1arc-api")
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Daemon/r6/scripts", ".ci/m1arc-api")
           if ($LASTEXITCODE -ne 0) { throw "REDscript CLI validation failed" }
 
   test-and-package:
@@ -57,12 +57,12 @@ jobs:
         with:
           python-version: "3.12"
       - name: Test legal solver, capture and selection sequencing
-        run: python3 -m unittest discover -s Skip_Breach/dev -p "test_*.py" -v
+        run: python3 -m unittest discover -s Daemon/dev -p "test_*.py" -v
       - name: Validate experimental REDscript/M1 Arc manifest contract
-        run: python3 Skip_Breach/tools/validate_skip_breach.py
+        run: python3 Daemon/tools/validate_skip_breach.py
       - name: Build standalone game-root ZIP
         run: |
-          python3 scripts/package_release.py --mod Skip_Breach --tag 0.1.0-dev.1 --output dist
+          python3 scripts/package_release.py --mod Daemon --tag 0.1.0-dev.1 --output dist
           mkdir -p game-root
           python3 - <<'PY'
           from pathlib import Path
@@ -76,7 +76,8 @@ jobs:
                   "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/mod.json",
                   "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/settings.json",
                   "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/language/en_US.json",
-                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/language/en_US.json.example",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/language/pl_PL.json",
+                  "red4ext/plugins/m1arc/mods/m1nsook.skipbreach/language/ko_KR.json",
               }
               assert files == required, f"Wrong game-root content: {files ^ required}"
               z.extractall("game-root")
@@ -84,7 +85,7 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: skip-breach-m1arc-game-root-dev
+          name: daemon-m1arc-game-root-dev
           path: |
             game-root/red4ext/
             game-root/r6/

@@ -1,4 +1,4 @@
-"""Offline validation of the installable Skip Breach development package.
+"""Offline validation of the installable Daemon development package.
 
 This is NOT a REDscript compiler and does NOT prove live game behavior.
 """
@@ -13,7 +13,10 @@ reds = root / "r6/scripts/M1ArcSkipBreach/M1ArcSkipBreach.reds"
 manifest = json.loads((mod/"mod.json").read_text(encoding="utf8"))
 schema = json.loads((mod/"settings.json").read_text(encoding="utf8"))
 english = json.loads((mod/"language/en_US.json").read_text(encoding="utf8"))
-template = json.loads((mod/"language/en_US.json.example").read_text(encoding="utf8"))
+translations = {
+    locale: json.loads((mod/f"language/{locale}.json").read_text(encoding="utf8"))
+    for locale in ("en_US", "pl_PL", "ko_KR")
+}
 source = reds.read_text(encoding="utf8")
 native_file = root / "r6/scripts/M1ArcSkipBreach/M1ArcBreachNative.reds"
 native_source = native_file.read_text(encoding="utf8")
@@ -29,13 +32,21 @@ assert "native func M1Arc_Breach" not in source  # contained in the optional API
 
 assert manifest["format"] == 1
 assert manifest["id"] == mod.name
-assert manifest["requires"]["m1arc"] == "0.1.0"
+assert manifest["requires"]["m1arc"] == "1.0.0"
 assert re.fullmatch(r"\d+\.\d+\.\d+", manifest["version"])
 assert len(schema) == 1 and schema[0]["id"] == "enabled"
 assert schema[0]["kind"] == "boolean"
 assert schema[0]["default"] is False, "Unsafe: first-run auto breach must be opt-in"
-assert english == template
-assert {"mod.name","enabled.label","enabled.description"} == set(english)
+assert manifest["name"] == "Daemon"
+assert manifest["scope"] == "Gameplay"
+assert manifest["shortDesc"] == "Automatically solve Breach Protocol puzzles"
+assert english == translations["en_US"]
+for locale, entry in translations.items():
+    assert entry["name"] == "Daemon", locale
+    assert entry["shortDesc"], locale
+    assert set(entry["settings"]) == {"enabled"}, locale
+    assert set(entry["settings"]["enabled"]) == {"label", "description", "group"}, locale
+    assert all(entry["settings"]["enabled"].values()), locale
 for required in [
     "module MisoSkipBreach",
     "class M1ArcSkipBreachSystem extends ScriptableSystem",
@@ -212,4 +223,4 @@ assert 'LogChannel(' not in source, (
     "All runtime lifecycle diagnostics must reach red4ext/logs/m1arc*.log via the bridge")
 assert '&& M1Arc_BreachInputAvailable() {' not in source, "Don't hide capture behind selector readiness"
 assert "return !this.m_budgetHit && this.m_bestScore > 0" not in source, "Budget must not discard valid paths"
-print("PASS: game-root manifest, opt-in setting, native diagnostics, best-effort solver and no CET dependency")
+print("PASS: Daemon manifest, three locales, opt-in native guard, first-puzzle solver regressions")

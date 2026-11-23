@@ -1,0 +1,10 @@
+[
+  {
+    "id": "enabled",
+    "kind": "boolean",
+    "label": "Automatically solve Breach Protocol",
+    "description": "When enabled, automatically solve untouched Breach Protocol puzzles using the game's cell-selection system. Off by default.",
+    "default": false,
+    "group": "Breach Protocol"
+  }
+]

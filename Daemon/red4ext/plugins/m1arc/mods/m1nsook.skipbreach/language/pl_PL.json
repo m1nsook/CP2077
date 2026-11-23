@@ -1,0 +1,11 @@
+{
+  "name": "Daemon",
+  "shortDesc": "Automatyczne rozwiązywanie minigry Breach Protocol",
+  "settings": {
+    "enabled": {
+      "label": "Automatycznie rozwiązuj Breach Protocol",
+      "description": "Automatycznie rozwiązuje nietknięte łamigłówki Breach Protocol. Domyślnie wyłączone.",
+      "group": "Breach Protocol"
+    }
+  }
+}

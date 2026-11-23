@@ -41,8 +41,12 @@
     "name": "Camera Killer",
     "summary": "Shuts down cameras connected to the same access point or surveillance system when V turns off one camera."
   },
-  "Skip_Breach": {
-    "name": "Skip Breach (M1 Arc)",
-    "summary": "Automatically solve and submit Breach Protocol cell selections using M1 Arc's version-checked native bridge. Experimental, disabled by default."
+  "Weight_Customizer": {
+    "name": "Weight Customizer",
+    "summary": "Change V's carry capacity from 50 to 5000 kg through M1 Arc, with live updates and reversible modifiers."
+  },
+  "Daemon": {
+    "name": "Daemon",
+    "summary": "Automatically solves Cyberpunk 2077 Breach Protocol puzzles by selecting valid cells in the original minigame. Requires M1 Arc 1.0.0."
   }
 }
