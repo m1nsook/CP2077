@@ -26,7 +26,8 @@ class BoardSnapshot:
     overlay_open: bool = False
     capture_serial: int = 0  # increments on every generated board
     selection_serial: int = 0  # increments in OnPositionSelected
-    game_state: int = 1  # 0 Unknown (before first click), 1 InProgress, 2/3 terminal
+    game_state: int = 1  # 0 Unknown (opening), 1 InProgress, 2/3 terminal
+    in_progress_updates: int = 20  # model REDscript stable-state gate
     grid_click_ready: bool = True  # live ink cells have valid geometry
 
     def fingerprint(self) -> tuple[object, ...]:
@@ -73,7 +74,6 @@ class BreachSequencer:
             raise ValueError("ack_timeout must be positive")
         self.adapter = adapter
         self.ack_timeout = ack_timeout
-        self._sent_in_unknown = False
         self.solution: Solution | None = None
         self._fingerprint: tuple[object, ...] | None = None
         self._confirmed = 0
@@ -132,12 +132,19 @@ class BreachSequencer:
             return self._abort("game UI unavailable, unfocused or overlay active")
         if board.fingerprint() != self._fingerprint:
             return self._abort("puzzle changed or new session started")
-        # The first game board remains Unknown until its first real pointer
-        # selection. Never wait for InProgress or a fixed 3s intro timeout.
-        # An adapter must report that the *live rendered cell geometry* is
-        # usable before any click. If it is unavailable, preserve the board.
-        if board.game_state == 0 and self._pending_time is not None and not self._sent_in_unknown:
-            return self._abort("native state regressed to Unknown after dispatch")
+        # Nov 23 logs: native dispatch from Unknown was ignored, while
+        # second-board input after sustained InProgress was acknowledged.
+        # Hold the *same* captured first puzzle without any input while
+        # Unknown. If the game only enters InProgress during cancellation,
+        # we must fail closed rather than force that transition ourselves.
+        if board.game_state == 0:
+            if self._pending_time is not None:
+                return self._abort("game returned to Unknown after dispatch")
+            return StepResult(Step.WAITING, "waiting for native InProgress")
+        if board.in_progress_updates < 20:
+            if self._pending_time is not None:
+                return self._abort("game lost stable InProgress during input")
+            return StepResult(Step.WAITING, "waiting for stable InProgress")
         if not board.grid_click_ready:
             if self._pending_time is not None:
                 return self._abort("hacking grid disappeared during input")
@@ -174,12 +181,11 @@ class BreachSequencer:
             self._ended = True
             return StepResult(Step.COMPLETE, "all cells acknowledged")
         position = cells[self._confirmed]
-        # The adapter is expected to check game focus/UI again immediately
-        # before the physical click or in-game widget event.
+        # The adapter validates the current game focus and actual grid cell
+        # before the native in-game selection (never a Win32 mouse event).
         if not self.adapter.select_cell(position):
             return self._abort("selection adapter rejected click")
         self._pending_serial = board.selection_serial
-        self._sent_in_unknown = board.game_state == 0
         self._pending_time = now
         return StepResult(Step.WAITING, "selection requested", position)
 
