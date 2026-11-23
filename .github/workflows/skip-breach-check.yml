@@ -1,6 +1,14 @@
 name: Skip Breach development checks
 
 on:
+  push:
+    branches:
+      - "feat/skip-breach-solver-foundation"
+    paths:
+      - "Skip_Breach/**"
+      - "scripts/package_release.py"
+      - ".github/mod-descriptions.json"
+      - ".github/workflows/skip-breach-check.yml"
   pull_request:
     paths:
       - "Skip_Breach/**"
