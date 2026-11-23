@@ -1,0 +1,10 @@
+[
+  {
+    "id": "enabled",
+    "kind": "boolean",
+    "label": "Automatically solve Breach Protocol",
+    "description": "Experimental: requires the exact Cyberpunk 2.5 native selector. Disabled by default until verified in-game.",
+    "default": false,
+    "group": "Skip Breach"
+  }
+]
