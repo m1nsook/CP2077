@@ -39,10 +39,23 @@ jobs:
               assert not any("/m1arc.dll" in x for x in names), "M1 Arc is a separate dependency"
           print("PASS: single game-root mod package with exactly five files")
           PY
+      - name: Prepare direct-to-game development artifact
+        run: |
+          mkdir -p game-root
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive=next(Path("dist").glob("*.zip"))
+          with ZipFile(archive) as src:
+              src.extractall("game-root")
+          assert Path("game-root/red4ext/plugins/m1arc/mods/m1nsook.weight/mod.json").is_file()
+          assert Path("game-root/r6/scripts/M1ArcCarryWeight/M1ArcCarryWeight.reds").is_file()
+          print("One ZIP download, game-root folders at archive top level")
+          PY
       - uses: actions/upload-artifact@v4
         with:
-          name: carry-weight-m1arc-dev
+          name: carry-weight-m1arc-game-root
           path: |
-            dist/*.zip
-            dist/SHA256SUMS.txt
+            game-root/red4ext/
+            game-root/r6/
           if-no-files-found: error
