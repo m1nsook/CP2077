@@ -83,9 +83,15 @@ acknowledged all five selections.
 
 **New behavior:** the untouched capture remains pending through Unknown;
 the session-tagged UI event pump continues without invoking the native
-selector. Once the actual game Blackboard reports InProgress, Skip Breach
-plans and submits the first cell, still requiring each game's native
-`OnPositionSelected` acknowledgement. It never forces a Blackboard
+selector. Once the actual game Blackboard reports InProgress and stays there
+for 20 UI event updates, Skip Breach plans and submits the first cell,
+still requiring each game's native `OnPositionSelected` acknowledgement.
+This short stability gate is important because the **failed** first attempt
+reported InProgress only **58 ms before the terminal state**: that transition
+could have been caused by cancelling the puzzle rather than the intro
+finishing. It must not trigger native input into an exiting board.
+The counter resets on a new board or state change; no actual timer is
+paused or reset. It never forces a Blackboard
 state change, resets a puzzle, repeats a dispatched but unacknowledged
 cell, modifies mission facts or pauses the vanilla timer. Terminal
 states are never automated. This specifically removes the premature
