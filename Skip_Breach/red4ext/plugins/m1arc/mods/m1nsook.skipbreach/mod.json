@@ -7,5 +7,5 @@
   "requires": {
     "m1arc": "0.1.0"
   },
-  "description": "Automatically solve and select Breach Protocol cells through a native game controller."
+  "description": "Opt-in Breach Protocol solver; uses M1 Arc's built-in guarded native grid input only when enabled."
 }
