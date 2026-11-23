@@ -1,0 +1,104 @@
+{
+  "name": "Arc Converter - Automatic Item Processing",
+  "shortDesc": "Auto-disassemble new weapons, craft ammunition, and convert junk into eddies",
+  "settings": {
+    "enabled": {
+      "label": "Enable Arc Converter",
+      "description": "Master switch for automatic item processing.",
+      "group": "General"
+    },
+    "disassemble": {
+      "label": "Weapons",
+      "description": "Process only newly acquired weapons. Existing weapons remain untouched.",
+      "group": "Weapons"
+    },
+    "tier1": {
+      "label": "Tier 1 (+ variants)",
+      "description": "Disassemble eligible newly acquired Tier 1 weapons.",
+      "group": "Weapons"
+    },
+    "tier2": {
+      "label": "Tier 2 (+ variants)",
+      "description": "Disassemble eligible newly acquired Tier 2 weapons.",
+      "group": "Weapons"
+    },
+    "tier3": {
+      "label": "Tier 3 (+ variants)",
+      "description": "Disassemble eligible newly acquired Tier 3 weapons.",
+      "group": "Weapons"
+    },
+    "tier4": {
+      "label": "Tier 4 (+ variants)",
+      "description": "Disassemble eligible newly acquired Tier 4 weapons.",
+      "group": "Weapons"
+    },
+    "tier5": {
+      "label": "Tier 5 (+ variants)",
+      "description": "Disassemble eligible newly acquired Tier 5 weapons.",
+      "group": "Weapons"
+    },
+    "ammo": {
+      "label": "Automatically craft ammunition",
+      "description": "Craft vanilla ammo for the equipped weapon using real components.",
+      "group": "Ammunition"
+    },
+    "threshold": {
+      "label": "Craft when reserve below (%)",
+      "description": "Trigger crafting when equipped weapon's ammunition is below this percentage of capacity.",
+      "group": "Ammunition"
+    },
+    "sell_junk": {
+      "label": "Automatically sell junk for eddies",
+      "description": "Automatically convert ordinary junk and jewelry into eddies at the game's selling prices, including items already in V's backpack. Quest and protected items are skipped.",
+      "group": "Junk"
+    },
+    "weapon_action": {
+      "label": "Weapon action",
+      "description": "Sell eligible new weapons for eddies or disassemble them into components.",
+      "group": "Weapons",
+      "choices": {
+        "Disassemble": "Disassemble",
+        "Sell": "Sell"
+      }
+    },
+    "clothes_enabled": {
+      "label": "Clothes",
+      "description": "Process only newly acquired clothing. Existing clothes remain untouched.",
+      "group": "Clothes"
+    },
+    "clothes_action": {
+      "label": "Clothes action",
+      "description": "Sell eligible new clothes for eddies or disassemble them into components.",
+      "group": "Clothes",
+      "choices": {
+        "Disassemble": "Disassemble",
+        "Sell": "Sell"
+      }
+    },
+    "clothes_tier1": {
+      "label": "Tier 1 (+ variants)",
+      "description": "Process newly acquired Tier 1 clothing.",
+      "group": "Clothes"
+    },
+    "clothes_tier2": {
+      "label": "Tier 2 (+ variants)",
+      "description": "Process newly acquired Tier 2 clothing.",
+      "group": "Clothes"
+    },
+    "clothes_tier3": {
+      "label": "Tier 3 (+ variants)",
+      "description": "Process newly acquired Tier 3 clothing.",
+      "group": "Clothes"
+    },
+    "clothes_tier4": {
+      "label": "Tier 4 (+ variants)",
+      "description": "Process newly acquired Tier 4 clothing.",
+      "group": "Clothes"
+    },
+    "clothes_tier5": {
+      "label": "Tier 5 (+ variants)",
+      "description": "Process newly acquired Tier 5 clothing.",
+      "group": "Clothes"
+    }
+  }
+}

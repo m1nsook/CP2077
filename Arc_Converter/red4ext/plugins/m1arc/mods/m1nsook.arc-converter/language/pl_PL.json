@@ -1,0 +1,104 @@
+{
+  "name": "Arc Converter - Automatyczne przetwarzanie przedmiotów",
+  "shortDesc": "Automatycznie rozmontowuje nowe bronie, wytwarza amunicję i zamienia śmieci na eurodolary",
+  "settings": {
+    "enabled": {
+      "label": "Włącz Arc Converter",
+      "description": "Główny przełącznik automatycznego przetwarzania przedmiotów.",
+      "group": "Ogólne"
+    },
+    "disassemble": {
+      "label": "Broń",
+      "description": "Przetwarza tylko nowo zdobyte bronie. Istniejące egzemplarze pozostają nietknięte.",
+      "group": "Broń"
+    },
+    "tier1": {
+      "label": "Poziom 1 (+ warianty)",
+      "description": "Demontuje odpowiednie nowo zdobyte bronie poziomu 1.",
+      "group": "Broń"
+    },
+    "tier2": {
+      "label": "Poziom 2 (+ warianty)",
+      "description": "Demontuje odpowiednie nowo zdobyte bronie poziomu 2.",
+      "group": "Broń"
+    },
+    "tier3": {
+      "label": "Poziom 3 (+ warianty)",
+      "description": "Demontuje odpowiednie nowo zdobyte bronie poziomu 3.",
+      "group": "Broń"
+    },
+    "tier4": {
+      "label": "Poziom 4 (+ warianty)",
+      "description": "Demontuje odpowiednie nowo zdobyte bronie poziomu 4.",
+      "group": "Broń"
+    },
+    "tier5": {
+      "label": "Poziom 5 (+ warianty)",
+      "description": "Demontuje odpowiednie nowo zdobyte bronie poziomu 5.",
+      "group": "Broń"
+    },
+    "ammo": {
+      "label": "Automatyczne wytwarzanie amunicji",
+      "description": "Wytwarza amunicję do aktywnej broni z posiadanych komponentów według receptur gry.",
+      "group": "Amunicja"
+    },
+    "threshold": {
+      "label": "Wytwarzaj poniżej (%)",
+      "description": "Rozpoczyna wytwarzanie, gdy zapas amunicji spadnie poniżej tego procentu pojemności.",
+      "group": "Amunicja"
+    },
+    "sell_junk": {
+      "label": "Automatyczna sprzedaż śmieci za eurodolary",
+      "description": "Automatycznie sprzedaje śmieci i biżuterię po cenach gry, także te już znajdujące się w ekwipunku. Przedmioty misji i chronione pozostają nietknięte.",
+      "group": "Śmieci"
+    },
+    "weapon_action": {
+      "label": "Działanie dla broni",
+      "description": "Sprzedawaj nowe bronie za eurodolary lub demontuj je na komponenty.",
+      "group": "Broń",
+      "choices": {
+        "Disassemble": "Rozmontuj",
+        "Sell": "Sprzedaj"
+      }
+    },
+    "clothes_enabled": {
+      "label": "Ubrania",
+      "description": "Przetwarza tylko nowo zdobyte ubrania. Istniejące ubrania pozostają nietknięte.",
+      "group": "Ubrania"
+    },
+    "clothes_action": {
+      "label": "Działanie dla ubrań",
+      "description": "Sprzedawaj nowe ubrania za eurodolary lub demontuj je na komponenty.",
+      "group": "Ubrania",
+      "choices": {
+        "Disassemble": "Rozmontuj",
+        "Sell": "Sprzedaj"
+      }
+    },
+    "clothes_tier1": {
+      "label": "Poziom 1 (+ warianty)",
+      "description": "Przetwarza nowo zdobyte ubrania poziomu 1.",
+      "group": "Ubrania"
+    },
+    "clothes_tier2": {
+      "label": "Poziom 2 (+ warianty)",
+      "description": "Przetwarza nowo zdobyte ubrania poziomu 2.",
+      "group": "Ubrania"
+    },
+    "clothes_tier3": {
+      "label": "Poziom 3 (+ warianty)",
+      "description": "Przetwarza nowo zdobyte ubrania poziomu 3.",
+      "group": "Ubrania"
+    },
+    "clothes_tier4": {
+      "label": "Poziom 4 (+ warianty)",
+      "description": "Przetwarza nowo zdobyte ubrania poziomu 4.",
+      "group": "Ubrania"
+    },
+    "clothes_tier5": {
+      "label": "Poziom 5 (+ warianty)",
+      "description": "Przetwarza nowo zdobyte ubrania poziomu 5.",
+      "group": "Ubrania"
+    }
+  }
+}
