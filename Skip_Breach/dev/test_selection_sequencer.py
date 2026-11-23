@@ -34,6 +34,49 @@ class FakeGame:
 
 
 class SequencerTests(unittest.TestCase):
+    def test_first_intro_waits_then_dispatches_on_same_board(self):
+        game = FakeGame()
+        game.board = replace(game.board, game_state=0, capture_serial=42)
+        seq = BreachSequencer(game, ack_timeout=0.25)
+        self.assertEqual(seq.begin().state, Step.IDLE)
+        # First screen takes ~2.355s to report InProgress, longer than the
+        # old 120-UI-update acknowledgement timeout. No native dispatch
+        # should occur at all during Unknown.
+        for t in (0.0, 0.58, 1.02, 1.95, 2.35):
+            result = seq.tick(t)
+            self.assertEqual(result.state, Step.WAITING)
+            self.assertIn("InProgress", result.reason)
+            self.assertEqual(game.requests, [])
+        game.board = replace(game.board, game_state=1)
+        result = seq.tick(2.36)
+        self.assertEqual(result.attempted, (0, 0))
+        self.assertEqual(game.requests, [(0, 0)])
+        game.acknowledge((0, 0))
+        self.assertEqual(seq.tick(2.4).state, Step.CONFIRMED)
+        self.assertEqual(len(game.requests), 1)
+
+    def test_first_intro_terminal_fails_closed_without_dispatch(self):
+        for terminal in (2, 3):
+            game = FakeGame()
+            game.board = replace(game.board, game_state=0)
+            seq = BreachSequencer(game)
+            seq.begin()
+            self.assertEqual(seq.tick(0).state, Step.WAITING)
+            game.board = replace(game.board, game_state=terminal)
+            self.assertEqual(seq.tick(1.0).state, Step.ABORTED)
+            self.assertEqual(game.requests, [])
+
+    def test_no_duplicate_after_dispatched_unknown_transition(self):
+        game = FakeGame()
+        seq = BreachSequencer(game, ack_timeout=0.1)
+        seq.begin()
+        self.assertEqual(seq.tick(0).attempted, (0, 0))
+        game.board = replace(game.board, game_state=0)
+        self.assertEqual(seq.tick(.01).state, Step.ABORTED)
+        game.board = replace(game.board, game_state=1)
+        self.assertEqual(seq.tick(.20).state, Step.ABORTED)
+        self.assertEqual(game.requests, [(0, 0)])
+
     def test_clicks_exactly_one_node_then_waits_for_ack(self):
         game = FakeGame()
         seq = BreachSequencer(game)
