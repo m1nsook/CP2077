@@ -10,7 +10,7 @@ settings = json.loads((manifest_dir / "settings.json").read_text(encoding="utf-8
 assert manifest["id"] == "m1nsook.delamain-av"
 assert manifest["scope"] == "Gameplay"
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", manifest["version"]), "M1 Arc only accepts numeric x.y.z manifest versions"
-assert manifest["version"] == "0.2.13"
+assert manifest["version"] == "0.2.14"
 required = manifest["requires"]["m1arc"]
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", required)
 assert tuple(map(int, required.split("."))) <= (1, 0, 1), "Requires exceeds M1 Arc loader compatibility constant"
@@ -74,10 +74,12 @@ assert "CREATE_BEFORE" in script and "CREATE_AFTER" in script
 assert "DelamainAV_DiagnosticLog(level, message)" in script
 assert "DelamainAV_DiagnosticSnapshot(vehicle" in script
 assert "body.vehicle mismatch" in cpp
+assert "kVehicleBody = 0x2D8" in cpp and "kVehiclePhysics" not in cpp
+assert "velocity.X = 0.f;" in cpp and "velocity.Y = 0.f;" in cpp
 assert "diagnostics.hpp" in cpp
 assert "TAXI_MOUNT_BLOCKED" in script
 assert "TAXI_BOARD_POSITION_INVALID" in script
-out = Path("dist/Delamain-AV-v0.2.13-dev.20")
+out = Path("dist/Delamain-AV-v0.2.14-dev.21")
 if out.exists():
     shutil.rmtree(out)
 out.mkdir(parents=True)

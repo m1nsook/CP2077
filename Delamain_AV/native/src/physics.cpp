@@ -26,11 +26,12 @@ using TickFn = void (*)(void*, float);
 using WakeFn = void (*)(Vehicle*);
 constexpr uint32_t kTickHash = 2526549425;
 constexpr uint32_t kWakeHash = 2793083181;
-// DAV develop uses WheeledPhysics::parent -> BaseObject::physicsData.
-// Check both reciprocal relationships and the exact entity pointer and ID.
+// Actual DAV 3.5.0 DLL SHA256 a61ab1b4f42e79cccfff681d2699f9003793c95326526fb0c2d7c1eeeca0f3c4:
+// RVA 0x9BF7 loads tick parent at +0x60, 0x9D13 loads parent physicsData at +0x2D8.
+// dev.20 runtime logs independently prove tick parent matches our private entity.
+// Do not read obsolete +0x2C8 or assume a reverse offset for WheeledPhysics.
 constexpr size_t kPhysicsParent = 0x60;
-constexpr size_t kVehiclePhysics = 0x2C8;
-constexpr size_t kVehicleBody = 0x2D0;
+constexpr size_t kVehicleBody = 0x2D8;
 constexpr size_t kPhysicsState = 0x260;
 constexpr size_t kOwner = 0x180;
 constexpr size_t kVelocity = 0x18;
@@ -132,21 +133,22 @@ void* Resolve(uint32_t hash) {
 bool ResolveBody(uintptr_t owner, uintptr_t expectedPhysics, uintptr_t& body, bool verbose = false) {
     if (!owner) { if (verbose) avdiag::Log("BODY","owner absent"); return false; }
     auto* vehicle = reinterpret_cast<void*>(owner);
-    uintptr_t physics = 0, parent = 0, reverseOwner = 0;
+    uintptr_t parent = 0, reverseOwner = 0;
+    body = 0;
     const char* failure = nullptr;
-    if (!Read(vehicle,kVehiclePhysics,physics)) failure = "vehicle.physics read failed";
-    else if (!physics) failure = "vehicle.physics null";
-    else if (expectedPhysics && physics != expectedPhysics) failure = "vehicle.physics differs from tick argument";
-    else if (!Read(reinterpret_cast<void*>(physics),kPhysicsParent,parent)) failure = "physics.parent read failed";
-    else if (parent != owner) failure = "physics.parent mismatch";
+    // The engine callback itself supplies a real physics object; validate its
+    // parent when available. Never infer the physics object from the old SDK.
+    if (expectedPhysics &&
+        !Read(reinterpret_cast<void*>(expectedPhysics),kPhysicsParent,parent))
+        failure = "physics.parent read failed";
+    else if (expectedPhysics && parent != owner) failure = "physics.parent mismatch";
     else if (!Read(vehicle,kVehicleBody,body)) failure = "vehicle.physicsData read failed";
-    else if (!body) failure = "vehicle.physicsData null";
+    else if (!body || (body & (alignof(void*)-1))) failure = "vehicle.physicsData null or unaligned";
     else if (!Read(reinterpret_cast<void*>(body),kOwner,reverseOwner)) failure = "body.vehicle read failed";
     else if (reverseOwner != owner) failure = "body.vehicle mismatch";
-    if (verbose) avdiag::Log("BODY","owner=%p physics@+0x%zx=%p expected=%p parent@+0x%zx=%p body@+0x%zx=%p reverseOwner@+0x%zx=%p verdict=%s",
-        vehicle,kVehiclePhysics,reinterpret_cast<void*>(physics),reinterpret_cast<void*>(expectedPhysics),kPhysicsParent,
-        reinterpret_cast<void*>(parent),kVehicleBody,reinterpret_cast<void*>(body),kOwner,
-        reinterpret_cast<void*>(reverseOwner),failure?failure:"VALID");
+    if (verbose) avdiag::Log("BODY","owner=%p tick=%p parent@+0x%zx=%p body@+0x%zx=%p reverseOwner@+0x%zx=%p verdict=%s",
+        vehicle,reinterpret_cast<void*>(expectedPhysics),kPhysicsParent,reinterpret_cast<void*>(parent),
+        kVehicleBody,reinterpret_cast<void*>(body),kOwner,reinterpret_cast<void*>(reverseOwner),failure?failure:"VALID");
     return failure == nullptr;
 }
 void Snapshot(const Handle<Vehicle>& v, const char* stage) {
@@ -197,12 +199,13 @@ void ApplyCommand(void* physics, float deltaTime) {
     // tick, before the original resistance calculation. Ramp the target
     // itself for a smooth start/stop rather than writing positions.
     g_cmd.applied = Approach(g_cmd.applied, g_cmd.desired, 1.5f * dt);
-    velocity.X = Approach(velocity.X, 0.f, 4.f * dt);
-    velocity.Y = Approach(velocity.Y, 0.f, 4.f * dt);
+    // DAV mode 2 holds the entire velocity vector every physics tick.
+    // dev.20 drift exceeded the corridor in just two script ticks; don't
+    // gradually brake sideways motion. Smooth only the vertical target.
+    velocity.X = 0.f;
+    velocity.Y = 0.f;
     velocity.Z = g_cmd.applied;
-    angular.X = Approach(angular.X, 0.f, 4.f * dt);
-    angular.Y = Approach(angular.Y, 0.f, 4.f * dt);
-    angular.Z = Approach(angular.Z, 0.f, 4.f * dt);
+    angular = Vector3{0.f,0.f,0.f};
     uint8_t gravity = 0;
     if (!Read(body, kGravity, gravity) || gravity > 1) {
         Fault(-12); return;
@@ -397,7 +400,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
     if (reason == RED4ext::v1::EMainReason::Load) {
         g_sdk = sdk; g_plugin = handle;
         const bool logging=avdiag::Open();
-        avdiag::Log("SESSION","DelamainAV 0.2.13-dev.20 diagnostics format 1; UTC; SDK vehicle size=0x%zx; expected runtime=3.0.88.46235; no gameplay changes from dev.19",sizeof(Vehicle));
+        avdiag::Log("SESSION","DelamainAV 0.2.14-dev.21 diagnostics format 1; UTC; SDK vehicle size=0x%zx; expected runtime=3.0.88.46235; DAV 3.5.0 binary-confirmed body offset 0x2D8",sizeof(Vehicle));
         g_runtimeOK = RuntimeOK();
         avdiag::Log("SESSION","runtime gate=%d",g_runtimeOK);
         if (sdk && sdk->logger && sdk->logger->Info) sdk->logger->Info(handle,logging?"DelamainAV persistent diagnostics enabled: DelamainAV-diagnostics.log":"DelamainAV could not open persistent diagnostics file");
@@ -422,7 +425,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
 RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info) {
     info->name = L"Delamain AV Physics";
     info->author = L"MISO";
-    info->version = RED4EXT_V1_SEMVER(0, 2, 13);
+    info->version = RED4EXT_V1_SEMVER(0, 2, 14);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }
