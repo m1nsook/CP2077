@@ -8,6 +8,7 @@ public class FreeChromeSettings extends ScriptableSystem {
   private let enabled: Bool;
   private let ticks: Int32;
   private let owned: array<TweakDBID>;
+  private let ownedRecords: array<TweakDBID>;
   private let original: array<Variant>;
   private let found: Int32;
   private let changed: Int32;
@@ -61,11 +62,11 @@ public class FreeChromeSettings extends ScriptableSystem {
       return;
     }
     let typ = VariantTypeName(value);
-    let message = stage + ": Humanity16Cost_inline2.value type=" + typ;
-    if Equals(typ, "Float") {
+    let message = stage + ": Humanity16Cost_inline2.value type=" + NameToString(typ);
+    if Equals(typ, n"Float") {
       message += ", value=" + ToString(FromVariant<Float>(value));
     } else {
-      if Equals(typ, "Int32") {
+      if Equals(typ, n"Int32") {
         message += ", value=" + ToString(FromVariant<Int32>(value));
       }
     }
@@ -82,12 +83,12 @@ public class FreeChromeSettings extends ScriptableSystem {
       let family = "Variants.Humanity" + ToString(cost) + "Cost";
       let i = 1;
       while i <= 2 {
-        this.Apply(TDBID.Create(family + "_inline" + ToString(i) + ".value"));
+        this.Apply(family + "_inline" + ToString(i));
         i += 1;
       }
       i = 1;
       while i <= 5 {
-        this.Apply(TDBID.Create(family + "TinkererVariant_inline" + ToString(i) + ".value"));
+        this.Apply(family + "TinkererVariant_inline" + ToString(i));
         i += 1;
       }
       cost += 1;
@@ -106,27 +107,35 @@ public class FreeChromeSettings extends ScriptableSystem {
   private func IsNumeric(value: Variant) -> Bool {
     if !IsDefined(value) { return false; }
     let typ = VariantTypeName(value);
-    return Equals(typ, "Float") || Equals(typ, "Int32");
+    return Equals(typ, n"Float") || Equals(typ, n"Int32");
   }
 
   private func IsZero(value: Variant) -> Bool {
     if !IsDefined(value) { return false; }
-    if Equals(VariantTypeName(value), "Float") {
+    if Equals(VariantTypeName(value), n"Float") {
       return FromVariant<Float>(value) == 0.0;
     }
-    if Equals(VariantTypeName(value), "Int32") {
+    if Equals(VariantTypeName(value), n"Int32") {
       return FromVariant<Int32>(value) == 0;
     }
     return false;
   }
 
-  private func Apply(id: TweakDBID) -> Void {
+  private func Apply(recordName: String) -> Void {
+    let id = TDBID.Create(recordName + ".value");
+    let record = TDBID.Create(recordName);
     let value = TweakDBInterface.GetFlat(id);
     if !this.IsNumeric(value) { return; }
     this.found += 1;
-    if this.IsZero(value) { return; }
+    if this.IsZero(value) {
+      // Retry record refresh on periodic scans if we own this flat.
+      if ArrayContains(this.owned, id) && !TweakDBManager.UpdateRecord(record) {
+        this.failed += 1;
+      }
+      return;
+    }
     let zero: Variant;
-    if Equals(VariantTypeName(value), "Float") {
+    if Equals(VariantTypeName(value), n"Float") {
       zero = ToVariant(0.0);
     } else {
       zero = ToVariant(0);
@@ -139,11 +148,14 @@ public class FreeChromeSettings extends ScriptableSystem {
     let i = ArrayFindFirst(this.owned, id);
     if i < 0 {
       ArrayPush(this.owned, id);
+      ArrayPush(this.ownedRecords, record);
       ArrayPush(this.original, value);
     } else {
       this.original[i] = value;
     }
-    if this.IsZero(TweakDBInterface.GetFlat(id)) {
+    // TweakXL SetFlat only writes the flat; explicitly refresh the record cache.
+    let refreshed = TweakDBManager.UpdateRecord(record);
+    if refreshed && this.IsZero(TweakDBInterface.GetFlat(id)) {
       this.changed += 1;
     } else {
       this.failed += 1;
@@ -160,8 +172,13 @@ public class FreeChromeSettings extends ScriptableSystem {
       let current = TweakDBInterface.GetFlat(id);
       if this.IsZero(current) && Equals(VariantTypeName(current), VariantTypeName(this.original[i])) {
         if TweakDBManager.SetFlat(id, this.original[i]) {
-          restored += 1;
+          if TweakDBManager.UpdateRecord(this.ownedRecords[i]) {
+            restored += 1;
+          } else {
+            failed += 1;
+          }
           ArrayErase(this.owned, i);
+          ArrayErase(this.ownedRecords, i);
           ArrayErase(this.original, i);
         } else {
           failed += 1;
@@ -170,6 +187,7 @@ public class FreeChromeSettings extends ScriptableSystem {
         // A different mod now owns the value; do not overwrite it.
         skipped += 1;
         ArrayErase(this.owned, i);
+        ArrayErase(this.ownedRecords, i);
         ArrayErase(this.original, i);
       }
       i -= 1;

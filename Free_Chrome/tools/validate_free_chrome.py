@@ -12,6 +12,10 @@ for lang in ("en_US", "pl_PL", "ko_KR"):
     assert json.loads((root / "language" / (lang + ".json")).read_text(encoding="utf-8"))["settings"]["enabled"]["description"]
 print("PASS: Free Chrome native patch structure and manifests (not a runtime test)")
 
-assert 'n"Float"' not in src and 'n"Int32"' not in src, "VariantTypeName returns String"
+assert 'Equals(typ, n"Float")' in src and 'Equals(typ, n"Int32")' in src, "Game 2.50 VariantTypeName returns CName"
+assert 'NameToString(typ)' in src, "Convert CName before concatenation"
+assert 'Equals(typ, "Float")' not in src and 'Equals(typ, "Int32")' not in src
+assert 'TweakDBManager.UpdateRecord(record)' in src
+assert 'TweakDBManager.UpdateRecord(this.ownedRecords[i])' in src
 assert 'this.Probe("Before scan")' in src and 'this.Probe("After scan")' in src
 assert 'this.Probe("After restore")' in src

@@ -47,7 +47,7 @@ jobs:
           python3 Free_Chrome/tools/validate_free_chrome.py
       - name: Package game-root ZIP
         run: |
-          python3 scripts/package_release.py --mod Free_Chrome --tag 1.1.0-dev.2 --output dist
+          python3 scripts/package_release.py --mod Free_Chrome --tag 1.1.0-dev.3 --output dist
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
