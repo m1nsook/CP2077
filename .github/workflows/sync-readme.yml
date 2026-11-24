@@ -1,0 +1,99 @@
+name: Synchronize mod README
+
+# Release a mod uses GITHUB_TOKEN, so its release events do not start other
+# workflows. workflow_run handles those releases; release handles human edits.
+on:
+  workflow_run:
+    workflows: ["Release a mod"]
+    types: [completed]
+    branches: [main]
+  release:
+    types: [published, edited, deleted, unpublished]
+  push:
+    branches: [main]
+    paths:
+      - ".github/mod-catalog.json"
+      - ".github/workflows/sync-readme.yml"
+      - "README.md"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-mod-readme
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Synchronize catalog from published releases
+        uses: actions/github-script@v7
+        with:
+          script: |
+            function render(readme,catalog,releases,repo) {
+              const start = "<!-- MOD-CATALOG:START -->", end = "<!-- MOD-CATALOG:END -->";
+              const from = readme.indexOf(start), to = readme.indexOf(end);
+              if (from < 0 || to < from || readme.indexOf(start,from+start.length)!==-1 || readme.indexOf(end,to+end.length)!==-1) throw new Error("Expected exactly one MOD-CATALOG marker pair");
+              if (!Array.isArray(catalog) || !catalog.length || !Array.isArray(releases)) throw new Error("Invalid catalog or release list");
+              const seen = new Set();
+              const lines = ["| Mod | Nexus | M1ARC | Description | Version | Status |","| --- |:-:|:-:| --- |:-:| --- |"];
+              const icon = "https://github.com/user-attachments/assets/8fd6966d-74fc-417d-b09f-28bf5a8e0ac9";
+              const validText = s => typeof s==="string" && s.trim() && !/[\r\n|]/.test(s);
+              for (const mod of catalog) {
+                if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(mod.path || "") || !validText(mod.name) || !validText(mod.description) || !["Required","Optional","-"].includes(mod.m1arc) || !["auto","development","deprecated"].includes(mod.status) || (mod.nexus_id!=null && (!Number.isSafeInteger(mod.nexus_id)||mod.nexus_id<=0))) throw new Error("Invalid catalog entry: "+JSON.stringify(mod));
+                const prefix = mod.path.toLowerCase().replace(/_/g,"-")+"-v";
+                if (seen.has(prefix)) throw new Error("Duplicate mod release prefix: "+prefix);
+                seen.add(prefix);
+                const candidates = releases.filter(r=>!r.draft && typeof r.tag_name==="string" && r.tag_name.startsWith(prefix)).map(r=>{
+                  const version=r.tag_name.slice(prefix.length);
+                  const match=version.match(/^(\d+)\.(\d+)\.(\d+)(-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?$/);
+                  if (!match) return null;
+                  return {tag:r.tag_name,version,parts:match.slice(1,4).map(Number),stable:!r.prerelease&&!match[4],published:r.published_at||""};
+                }).filter(Boolean);
+                const byVersion=(a,b)=> b.parts[0]-a.parts[0] || b.parts[1]-a.parts[1] || b.parts[2]-a.parts[2] || b.published.localeCompare(a.published) || b.tag.localeCompare(a.tag);
+                const stable=candidates.filter(r=>r.stable).sort(byVersion)[0];
+                const preview=candidates.filter(r=>!r.stable).sort((a,b)=>b.published.localeCompare(a.published)||byVersion(a,b))[0];
+                const latest=stable||preview;
+                const status=mod.status==="deprecated"?"Deprecated":mod.status==="development"||!stable?"Development":"Released";
+                const version=latest?`[${latest.version}](https://github.com/${repo}/releases/tag/${encodeURIComponent(latest.tag)})`:"-";
+                const nexus=mod.nexus_id?`<a href="https://www.nexusmods.com/cyberpunk2077/mods/${mod.nexus_id}"><img width="16" height="16" src="${icon}" /></a>`:"-";
+                lines.push(`| [${mod.name}](${mod.path}) | ${nexus} | ${mod.m1arc} | ${mod.description} | ${version} | ${status} |`);
+              }
+              return readme.slice(0,from+start.length)+"\n"+lines.join("\n")+"\n"+readme.slice(to);
+            }
+            
+            const {owner, repo} = context.repo;
+            const repository = owner + "/" + repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {owner, repo, per_page:100});
+            for (let attempt=0; attempt<3; attempt++) {
+              const [readmeResponse, catalogResponse] = await Promise.all([
+                github.rest.repos.getContent({owner, repo, path:"README.md", ref:"main"}),
+                github.rest.repos.getContent({owner, repo, path:".github/mod-catalog.json", ref:"main"})
+              ]);
+              const decode = data => Buffer.from(data.content, "base64").toString("utf8");
+              const readme = decode(readmeResponse.data);
+              const catalog = JSON.parse(decode(catalogResponse.data));
+              const updated = render(readme,catalog,releases,repository);
+              if (updated === readme) {
+                core.info("README is already synchronized.");
+                return;
+              }
+              try {
+                await github.rest.repos.createOrUpdateFileContents({
+                  owner, repo, path:"README.md", branch:"main", sha:readmeResponse.data.sha,
+                  message:"docs: synchronize mod release catalog",
+                  content:Buffer.from(updated,"utf8").toString("base64")
+                });
+                core.info("Updated README.md.");
+                return;
+              } catch (error) {
+                if (error.status !== 409 || attempt === 2) throw error;
+                core.warning("Concurrent README update; retrying with fresh contents.");
+              }
+            }
