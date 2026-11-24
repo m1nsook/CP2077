@@ -1,0 +1,21 @@
+name: Delamain AV prototype
+on:
+  push:
+    branches: [dev/delamain-av]
+    paths:
+      - 'Delamain_AV/**'
+      - '.github/workflows/delamain-av-check.yml'
+permissions:
+  contents: read
+jobs:
+  prototype:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and package prototype
+        run: python3 Delamain_AV/tools/package_prototype.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Delamain-AV-v0.1.0-dev.1
+          path: dist/Delamain-AV-v0.1.0-dev.1.zip
+          if-no-files-found: error

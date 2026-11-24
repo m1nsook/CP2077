@@ -1,0 +1,42 @@
+[
+  {
+    "id": "spawn",
+    "kind": "action",
+    "label": "Spawn test AV",
+    "buttonLabel": "Order test AV",
+    "description": "Stand on flat, empty ground facing at least 12 m of clear space. Spawns one stationary test vehicle.",
+    "group": "Prototype"
+  },
+  {
+    "id": "open",
+    "kind": "action",
+    "label": "Open passenger door",
+    "buttonLabel": "Open rear-left door",
+    "description": "Use only while the AV is stationary.",
+    "group": "Prototype"
+  },
+  {
+    "id": "board",
+    "kind": "action",
+    "label": "Board as passenger",
+    "buttonLabel": "Board rear-left seat",
+    "description": "Stand close to the AV. No driver-seat mounting.",
+    "group": "Prototype"
+  },
+  {
+    "id": "status",
+    "kind": "action",
+    "label": "Inspect vehicle",
+    "buttonLabel": "Log AV status",
+    "description": "Reports record, entity type and V's actual mounting slot.",
+    "group": "Prototype"
+  },
+  {
+    "id": "remove",
+    "kind": "action",
+    "label": "Remove test AV",
+    "buttonLabel": "Despawn empty AV",
+    "description": "Exit the AV first. Refuses to delete an occupied vehicle.",
+    "group": "Prototype"
+  }
+]
