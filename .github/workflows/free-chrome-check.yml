@@ -1,0 +1,65 @@
+name: Free Chrome - development checks
+
+on:
+  pull_request:
+    paths:
+      - "Free_Chrome/**"
+      - ".github/workflows/free-chrome-check.yml"
+      - "Daemon/tools/check_redscript_cli.ps1"
+      - "scripts/package_release.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parser:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin dependency declarations
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory ".ci/m1arc-api" -Force | Out-Null
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/m1nsook/m1arc/8bd94c58869751f89323f5b7c47dd400c57f2bcb/r6/scripts/m1arc/M1Arc.reds" -OutFile ".ci/m1arc-api/M1Arc.reds"
+          New-Item -ItemType Directory ".ci/tweakxl-api" -Force | Out-Null
+          $tweak = "https://raw.githubusercontent.com/psiberx/cp2077-tweak-xl/4ba1ac07b7ae1d4a4a24749e28246833d35687c7/scripts"
+          foreach ($file in @("TweakDBInterface.reds", "TweakDBManager.reds", "TweakDBBatch.reds")) {
+            Invoke-WebRequest -Uri "$tweak/$file" -OutFile ".ci/tweakxl-api/$file"
+          }
+      - name: Parse REDscript (semantic compilation when game bundle configured)
+        shell: pwsh
+        env:
+          REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
+          REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Free_Chrome/r6/scripts", ".ci/tweakxl-api", ".ci/m1arc-api")
+          if ($LASTEXITCODE -ne 0) { throw "REDscript checks failed" }
+
+  package:
+    needs: parser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate native contracts
+        run: |
+          python3 Free_Chrome/tools/validate_free_chrome.py
+      - name: Package game-root ZIP
+        run: |
+          python3 scripts/package_release.py --mod Free_Chrome --tag 1.1.0-dev.1 --output dist
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile(next(Path("dist").glob("*.zip"))) as z:
+              names = z.namelist()
+              assert names and all(n.startswith(("r6/", "red4ext/")) for n in names), names
+              assert not any("cyber_engine_tweaks" in n or n.endswith(".lua") or n.endswith("m1arc.dll") for n in names)
+              assert "red4ext/plugins/m1arc/mods/m1nsook.free-chrome/mod.json" in names
+              z.extractall("game-root")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: free-chrome-game-root-dev
+          path: game-root/
+          if-no-files-found: error
