@@ -1,5 +1,8 @@
 module MisoArcConverter
 
+@if(ModuleExists("MuchBetterAmmo"))
+import MuchBetterAmmo.MuchBetterAmmoRouter
+
 // Arc Converter - Automatic Item Processing
 // Gameplay: REDscript. Settings: M1 Arc. No CET hooks.
 // Newly acquired weapons or clothes must pass safety checks before processing.
@@ -12,6 +15,7 @@ public class ArcConverterSystem extends ScriptableSystem {
   private let m_warmupTicks: Int32;
   private let m_pending: array<ItemID>;
   private let m_ammoCooldown: Int32;
+  private let m_ammoPreferLeft: Bool;
   private let m_processingSale: Bool;
 
   private func OnAttach() -> Void {
@@ -45,6 +49,7 @@ public class ArcConverterSystem extends ScriptableSystem {
     this.m_player = null;
     this.m_warmupTicks = 0;
     this.m_ammoCooldown = 0;
+    this.m_ammoPreferLeft = false;
     this.m_processingSale = false;
     ArrayClear(this.m_pending);
   }
@@ -307,27 +312,55 @@ public class ArcConverterSystem extends ScriptableSystem {
     };
 
     let weapon: ref<WeaponObject> = ScriptedPuppet.GetActiveWeapon(this.m_player);
-    if !IsDefined(weapon) {
+    let left: ref<WeaponObject>;
+    if M1Arc_GetBool("m1nsook.arc-converter", "ammo_dual_wield") {
+      let right: ref<WeaponObject> = GameObject.GetRightActiveWeapon(this.m_player);
+      if IsDefined(right) {
+        weapon = right;
+      };
+      left = GameObject.GetLeftActiveWeapon(this.m_player);
+    };
+    let distinctLeft: Bool = IsDefined(left);
+    if distinctLeft && IsDefined(weapon) {
+      distinctLeft = NotEquals(ItemID.GetTDBID(WeaponObject.GetAmmoType(left)),
+        ItemID.GetTDBID(WeaponObject.GetAmmoType(weapon)));
+    };
+    // One recipe per tick, with alternating priority and shared-pool deduplication.
+    if distinctLeft && this.m_ammoPreferLeft && this.TryCraftWeaponAmmo(left) {
+      this.m_ammoPreferLeft = false;
       return;
+    };
+    if this.TryCraftWeaponAmmo(weapon) {
+      this.m_ammoPreferLeft = true;
+      return;
+    };
+    if distinctLeft && !this.m_ammoPreferLeft && this.TryCraftWeaponAmmo(left) {
+      this.m_ammoPreferLeft = false;
+    };
+  }
+
+  private func TryCraftWeaponAmmo(weapon: ref<WeaponObject>) -> Bool {
+    if !IsDefined(weapon) {
+      return false;
     };
     let ammoItem: ItemID = WeaponObject.GetAmmoType(weapon);
     if !ItemID.IsValid(ammoItem) {
-      return;
+      return false;
     };
     let ammoID: TweakDBID = ItemID.GetTDBID(ammoItem);
-    if !this.IsVanillaAmmo(ammoID) {
-      return;
+    if !this.IsVanillaAmmo(ammoID) && (!M1Arc_GetBool("m1nsook.arc-converter", "ammo_much_better") || !ArcConverterMBAIsCustom(ammoID)) {
+      return false;
     };
 
     let crafting: ref<CraftingSystem> = CraftingSystem.GetInstance(this.GetGameInstance());
     let ts: ref<TransactionSystem> = GameInstance.GetTransactionSystem(this.GetGameInstance());
     if !IsDefined(crafting) || !IsDefined(ts) || !IsDefined(crafting.GetPlayerCraftBook()) {
-      return;
+      return false;
     };
     let record: ref<Item_Record> = TweakDBInterface.GetItemRecord(ammoID);
     if !IsDefined(record) || !IsDefined(record.CraftingData())
       || !crafting.IsRecipeKnown(ammoID, crafting.GetPlayerCraftBook()) {
-      return;
+      return false;
     };
 
     let current: Int32 = ts.GetItemQuantity(this.m_player, ammoItem);
@@ -339,17 +372,22 @@ public class ArcConverterSystem extends ScriptableSystem {
         capacity = liveCap;
       };
     };
+    // MBA's live configuration also covers empty inventory stacks.
+    let modCapacity: Int32 = ArcConverterMBACapacity(ammoID);
+    if modCapacity > 0 {
+      capacity = modCapacity;
+    };
     let batch: Int32 = CraftingSystem.GetAmmoBulletAmount(ammoID);
     if capacity <= 0 || batch <= 0 || current + batch > capacity {
-      return;
+      return false;
     };
     let threshold: Int32 = M1Arc_GetInt("m1nsook.arc-converter", "threshold");
     if threshold < 1 || threshold > 100 || current * 100 >= capacity * threshold {
-      return;
+      return false;
     };
     // Let vanilla calculate real component costs and apply crafting perks.
     if !crafting.CanItemBeCrafted(record) {
-      return;
+      return false;
     };
 
     let request: ref<CraftItemRequest> = new CraftItemRequest();
@@ -360,6 +398,7 @@ public class ArcConverterSystem extends ScriptableSystem {
     crafting.QueueRequest(request);
     // Craft one vanilla recipe batch at a time; re-check resources on next tick.
     this.m_ammoCooldown = 1;
+    return true;
   }
 
   public func Tick() -> Void {
@@ -396,4 +435,27 @@ public class ArcConverterTick extends DelayCallback {
       this.owner.Tick();
     };
   }
+}
+
+@if(ModuleExists("MuchBetterAmmo"))
+private static func ArcConverterMBACapacity(ammo: TweakDBID) -> Int32 {
+  return MuchBetterAmmoRouter.CapacityForAmmo(ammo);
+}
+
+@if(!ModuleExists("MuchBetterAmmo"))
+private static func ArcConverterMBACapacity(ammo: TweakDBID) -> Int32 {
+  return -1;
+}
+
+@if(ModuleExists("MuchBetterAmmo"))
+private static func ArcConverterMBAIsCustom(ammo: TweakDBID) -> Bool {
+  return Equals(ammo, t"MuchBetterAmmo.RevolverAmmo")
+    || Equals(ammo, t"MuchBetterAmmo.SMGAmmo")
+    || Equals(ammo, t"MuchBetterAmmo.MachineGunAmmo")
+    || Equals(ammo, t"MuchBetterAmmo.PrecisionRifleAmmo");
+}
+
+@if(!ModuleExists("MuchBetterAmmo"))
+private static func ArcConverterMBAIsCustom(ammo: TweakDBID) -> Bool {
+  return false;
 }
