@@ -9,8 +9,11 @@ manifest = json.loads((manifest_dir / "mod.json").read_text(encoding="utf-8"))
 settings = json.loads((manifest_dir / "settings.json").read_text(encoding="utf-8"))
 assert manifest["id"] == "m1nsook.delamain-av"
 assert manifest["scope"] == "Gameplay"
-assert manifest["version"] == "0.1.0-dev.1"
-assert manifest["requires"]["m1arc"] == "1.0.10"
+assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", manifest["version"]), "M1 Arc only accepts numeric x.y.z manifest versions"
+assert manifest["version"] == "0.1.0"
+required = manifest["requires"]["m1arc"]
+assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", required)
+assert tuple(map(int, required.split("."))) <= (1, 0, 1), "Requires exceeds M1 Arc loader compatibility constant"
 ids = {item["id"] for item in settings}
 assert ids == {"spawn", "open", "board", "status", "remove"}
 assert all(item["kind"] == "action" for item in settings)
@@ -21,7 +24,7 @@ yaml = (root / "r6/tweaks/DelamainAV/DelamainAV.yaml").read_text()
 assert "Vehicle.m1nsook_delamain_av:" in yaml
 assert "$base: Vehicle.q203_delamain_av" in yaml
 assert "VehicleMountFront" not in yaml and "VehicleHijack" not in yaml
-out = Path("dist/Delamain-AV-v0.1.0-dev.1.zip")
+out = Path("dist/Delamain-AV-v0.1.0-dev.2.zip")
 out.parent.mkdir(exist_ok=True)
 with ZipFile(out, "w", ZIP_DEFLATED) as z:
     for folder in ("r6", "red4ext"):

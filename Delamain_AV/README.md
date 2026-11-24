@@ -1,10 +1,12 @@
-# Delamain AV — 0.1.0-dev.1
+# Delamain AV — 0.1.0-dev.2
 
 Stationary passenger-only prototype for Cyberpunk 2077 2.50. Uses the original quest entity via the separate `Vehicle.m1nsook_delamain_av` record. Does not register an owned vehicle or modify the ending.
 
 ## Requirements
 
-RED4ext, redscript, TweakXL, M1 Arc 1.0.10, Codeware (temporary spawning backend). DAV and CET are not required. Disable DAV for isolation. No custom archive or DLL is shipped.
+RED4ext, redscript, TweakXL, M1 Arc 1.0.1 or newer (1.0.10 recommended), Codeware (temporary spawning backend). DAV and CET are not required. Disable DAV for isolation. No custom archive or DLL is shipped.
+
+The archive has a development suffix; the manifest must remain numeric `0.1.0` for M1 Arc discovery. Fully restart the game after replacing the files.
 
 ## Test
 
