@@ -50,6 +50,9 @@ TickFn g_tickOriginal = nullptr;
 WakeFn g_wake = nullptr;
 std::mutex g_mutex;
 std::atomic<bool> g_active{false};
+std::atomic<bool> g_worldAttached{false};
+std::atomic<bool> g_shuttingDown{false};
+bool CanControl() { return !g_shuttingDown.load(std::memory_order_acquire) && g_worldAttached.load(std::memory_order_acquire); }
 bool g_runtimeOK = false;
 struct Command {
     uintptr_t owner = 0;
@@ -169,11 +172,11 @@ void Snapshot(const Handle<Vehicle>& v, const char* stage) {
     }
 }
 void ApplyCommand(void* physics, float deltaTime) {
-    if (!g_active.load(std::memory_order_acquire)) return;
+    if (!CanControl() || !g_active.load(std::memory_order_acquire)) return;
     uintptr_t owner = 0;
     if (!Read(physics, kPhysicsParent, owner)) return;
-    std::lock_guard guard(g_mutex);
-    if (!g_active.load(std::memory_order_relaxed) || owner != g_cmd.owner || !owner) return;
+    std::unique_lock guard(g_mutex, std::try_to_lock);
+    if (!guard.owns_lock() || !CanControl() || !g_active.load(std::memory_order_relaxed) || owner != g_cmd.owner || !owner) return;
     if (GetTickCount64() > g_cmd.deadline) { Fault(-7); return; }
     uint64_t entityId = 0;
     if (!Read(reinterpret_cast<void*>(owner), kOwnerId, entityId) || entityId != g_cmd.id) {
@@ -213,6 +216,7 @@ void ApplyCommand(void* physics, float deltaTime) {
     // DAV develop's velocity-hold descent disables gravity on the physics
     // tick; retain that state only on the private nonpersistent AV.
     const uint8_t disabled = 0;
+    if (!CanControl() || !g_active.load(std::memory_order_acquire)) return;
     if (!Write(body, kGravity, disabled) ||
         !Write(body, kVelocity, velocity) || !Write(body, kAngular, angular)) {
         Fault(-10); return;
@@ -229,8 +233,9 @@ void TickHook(void* physics, float deltaTime) {
     g_tickOriginal(physics, deltaTime);
 }
 bool Install() {
+    if (!CanControl()) return false;
     if (g_tickAddress && g_wake) return true;
-    if (!g_sdk || !g_sdk->hooking || !g_sdk->hooking->Attach || !g_sdk->hooking->Detach) return false;
+    if (!g_sdk || !g_sdk->hooking || !g_sdk->hooking->Attach) return false;
     auto tick = Resolve(kTickHash), wake = Resolve(kWakeHash);
     if (!tick || !wake || tick == wake) return false;
     if (!g_sdk->hooking->Attach(g_plugin, tick, reinterpret_cast<void*>(&TickHook),
@@ -253,6 +258,7 @@ bool PrivateAV(const Handle<Vehicle>& v) {
 void Begin(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
     Handle<Vehicle> v;
     GetParameter(frame, &v); frame->code++;
+    if (!CanControl()) { if (out) *out = -30; return; }
     avdiag::Log("BEGIN","runtimeOK=%d conflict=%d",g_runtimeOK,Conflict());
     Snapshot(v,"before native Begin");
     int32_t code = 0;
@@ -263,6 +269,7 @@ void Begin(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
     else {
         {
             std::lock_guard guard(g_mutex);
+            if (!CanControl()) { if (out) *out = -30; return; }
             if (g_active.load(std::memory_order_relaxed)) { if (out) *out = -5; return; }
             g_cmd = {};
             g_cmd.owner = reinterpret_cast<uintptr_t>(v.GetPtr());
@@ -274,6 +281,7 @@ void Begin(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
         // Wake once on the game thread. Pulse reasserts simulation only if
         // the validated target is parked, just as DAV develop does.
         avdiag::Log("WAKE","before initial ForceEnablePhysics owner=%p",v.GetPtr());
+        if (!CanControl()) { g_active.store(false,std::memory_order_release); if (out) *out = -30; return; }
         g_wake(v.GetPtr());
         avdiag::Log("WAKE","after initial ForceEnablePhysics");
         Snapshot(v,"after native wake");
@@ -285,11 +293,12 @@ void Begin(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
 void Pulse(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
     Handle<Vehicle> v; float speed = 0;
     GetParameter(frame, &v); GetParameter(frame, &speed); frame->code++;
+    if (!CanControl()) { if (out) *out = -30; return; }
     int32_t code = -6;
     bool wake = false;
     {
         std::lock_guard guard(g_mutex);
-        if (v && v->entityID.hash && v->entityID.hash == g_cmd.id &&
+        if (CanControl() && v && v->entityID.hash && v->entityID.hash == g_cmd.id &&
             reinterpret_cast<uintptr_t>(v.GetPtr()) == g_cmd.owner) {
             const auto now = GetTickCount64();
             if (g_cmd.fault) code = g_cmd.fault;
@@ -323,7 +332,7 @@ void Pulse(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
     }
     // A live script argument holds the vehicle during this game-thread call.
     // Do not retain the handle or invoke the wake routine under the mutex.
-    if (wake && g_wake) {
+    if (wake && g_wake && CanControl()) {
         avdiag::Log("WAKE","before repeated ForceEnablePhysics owner=%p",v.GetPtr());
         g_wake(v.GetPtr());
         avdiag::Log("WAKE","after repeated ForceEnablePhysics");
@@ -340,10 +349,26 @@ void Stop(IScriptable*, CStackFrame* frame, bool* out, int64_t) {
     if (ok) { g_active.store(false, std::memory_order_release); g_cmd = {}; }
     if (out) *out = ok;
 }
+// World teardown never waits on the physics mutex and never deletes entities.
+// Normal Stop still synchronizes with physics before explicit entity removal.
+void WorldState(IScriptable*, CStackFrame* frame, bool* out, int64_t) {
+    bool attached = false;
+    GetParameter(frame, &attached); frame->code++;
+    if (!attached) {
+        g_worldAttached.store(false,std::memory_order_release);
+        g_active.store(false,std::memory_order_release);
+        avdiag::Log("LIFECYCLE","world detach: control disabled; no physics mutex wait");
+    } else if (!g_shuttingDown.load(std::memory_order_acquire)) {
+        g_active.store(false,std::memory_order_release);
+        g_worldAttached.store(true,std::memory_order_release);
+        avdiag::Log("LIFECYCLE","world attach: control idle");
+    }
+    if (out) *out=true;
+}
 void DiagnosticLog(IScriptable*, CStackFrame* frame, bool* out, int64_t) {
     CString level,message;
     GetParameter(frame,&level); GetParameter(frame,&message); frame->code++;
-    avdiag::Log("SCRIPT","%s %s",level.c_str(),message.c_str());
+    if (!g_shuttingDown.load(std::memory_order_acquire)) avdiag::Log("SCRIPT","%s %s",level.c_str(),message.c_str());
     if (out) *out=true;
 }
 void DiagnosticSnapshot(IScriptable*, CStackFrame* frame, bool* out, int64_t) {
@@ -351,14 +376,14 @@ void DiagnosticSnapshot(IScriptable*, CStackFrame* frame, bool* out, int64_t) {
     GetParameter(frame,&v); GetParameter(frame,&stage); frame->code++;
     // Only snapshot the passed private vehicle. No search of other entities.
     // Before class validation, the script logs only safe record/class casts.
-    bool ok=PrivateAV(v);
+    bool ok=CanControl() && PrivateAV(v);
     if (ok) Snapshot(v,stage.c_str());
     else avdiag::Log("AV","snapshot refused stage=%s private car record not confirmed",stage.c_str());
     if (out) *out=ok;
 }
 void DiagnosticEnvironment(IScriptable*, CStackFrame* frame, bool* out, int64_t) {
     CString stage; GetParameter(frame,&stage); frame->code++;
-    avdiag::Inventory(stage.c_str());
+    if (CanControl()) avdiag::Inventory(stage.c_str());
     if (out) *out=true;
 }
 void Register() { avdiag::Log("RTTI","register callback"); }
@@ -389,6 +414,7 @@ void PostRegister() {
         if(secondName) fn->AddParam("String",secondName);
         rtti->RegisterFunction(fn);
     };
+    diagnostic("DelamainAV_WorldState",reinterpret_cast<ScriptingFunction_t<void*>>(&WorldState),"Bool","attached",nullptr);
     diagnostic("DelamainAV_DiagnosticLog",reinterpret_cast<ScriptingFunction_t<void*>>(&DiagnosticLog),"String","level","message");
     diagnostic("DelamainAV_DiagnosticSnapshot",reinterpret_cast<ScriptingFunction_t<void*>>(&DiagnosticSnapshot),"handle:vehicleBaseObject","target","stage");
     diagnostic("DelamainAV_DiagnosticEnvironment",reinterpret_cast<ScriptingFunction_t<void*>>(&DiagnosticEnvironment),"String","stage",nullptr);
@@ -400,7 +426,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
     if (reason == RED4ext::v1::EMainReason::Load) {
         g_sdk = sdk; g_plugin = handle;
         const bool logging=avdiag::Open();
-        avdiag::Log("SESSION","DelamainAV 0.2.14-dev.21 diagnostics format 1; UTC; SDK vehicle size=0x%zx; expected runtime=3.0.88.46235; DAV 3.5.0 binary-confirmed body offset 0x2D8",sizeof(Vehicle));
+        avdiag::Log("SESSION","DelamainAV 0.2.15-dev.22 diagnostics format 1; UTC; SDK vehicle size=0x%zx; expected runtime=3.0.88.46235; DAV 3.5.0 binary-confirmed body offset 0x2D8",sizeof(Vehicle));
         g_runtimeOK = RuntimeOK();
         avdiag::Log("SESSION","runtime gate=%d",g_runtimeOK);
         if (sdk && sdk->logger && sdk->logger->Info) sdk->logger->Info(handle,logging?"DelamainAV persistent diagnostics enabled: DelamainAV-diagnostics.log":"DelamainAV could not open persistent diagnostics file");
@@ -413,11 +439,14 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
                 "DelamainAV native bridge ready; hooks inactive until requested." :
                 "DelamainAV native physics disabled: unsupported executable file version.");
     } else if (reason == RED4ext::v1::EMainReason::Unload) {
-        avdiag::Log("SESSION","plugin unload");
-        g_active.store(false, std::memory_order_release);
-        if (sdk && sdk->hooking && sdk->hooking->Detach) {
-            if (g_tickAddress) sdk->hooking->Detach(handle, g_tickAddress);
-        }
+        // RED4ext v1.31.1 App::Shutdown invokes PluginSystem::Shutdown
+        // before HookingSystem::Shutdown. The latter owns and retains a
+        // shared_ptr to each hooked plugin until its detours are removed.
+        // Do not initiate a second detour transaction or wait on game threads.
+        g_shuttingDown.store(true,std::memory_order_release);
+        g_worldAttached.store(false,std::memory_order_release);
+        g_active.store(false,std::memory_order_release);
+        avdiag::Log("SESSION","plugin unload: control disabled; hook cleanup delegated to RED4ext");
         avdiag::Close();
     }
     return true;
@@ -425,7 +454,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
 RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info) {
     info->name = L"Delamain AV Physics";
     info->author = L"MISO";
-    info->version = RED4EXT_V1_SEMVER(0, 2, 14);
+    info->version = RED4EXT_V1_SEMVER(0, 2, 15);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }

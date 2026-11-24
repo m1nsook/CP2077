@@ -7,3 +7,5 @@ public native func DelamainAV_PhysicsStop(target: EntityID) -> Bool
 public native func DelamainAV_DiagnosticLog(level: String, message: String) -> Bool
 public native func DelamainAV_DiagnosticSnapshot(target: ref<VehicleObject>, stage: String) -> Bool
 public native func DelamainAV_DiagnosticEnvironment(stage: String) -> Bool
+
+public native func DelamainAV_WorldState(attached: Bool) -> Bool

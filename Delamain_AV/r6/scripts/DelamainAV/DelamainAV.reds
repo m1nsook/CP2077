@@ -41,17 +41,20 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_environmentLogged: Bool;
 
   private func OnAttach() -> Void {
+    DelamainAV_WorldState(true);
     this.m_running = true;
-    this.Log("INFO", "SYSTEM_ATTACH: DelamainAV script attached; dev.21 persistent diagnostics enabled.");
+    this.Log("INFO", "SYSTEM_ATTACH: DelamainAV script attached; dev.22 persistent diagnostics enabled.");
     this.Schedule();
   }
 
   private func OnDetach() -> Void {
     // Nonpersistent Codeware entities are cleared by world teardown.
     // Never delete a mounted vehicle during teardown.
-    this.Log("INFO", "SYSTEM_DETACH: world teardown.");
     this.m_running = false;
-    if EntityID.IsDefined(this.m_id) { DelamainAV_PhysicsStop(this.m_id); };
+    this.m_arriving = false;
+    this.m_nativeHolding = false;
+    this.m_summonQueued = false;
+    DelamainAV_WorldState(false);
   }
 
   private func Schedule() -> Void {

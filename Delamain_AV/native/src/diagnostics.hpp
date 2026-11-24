@@ -10,12 +10,15 @@
 #include <cstdint>
 #include <filesystem>
 #include <mutex>
+#include <atomic>
 #include <string>
 #include <vector>
 #include <system_error>
 
 namespace avdiag {
 inline std::mutex mutex;
+inline std::atomic<bool> closing{false};
+inline std::atomic<uint64_t> dropped{0};
 inline HANDLE file = INVALID_HANDLE_VALUE;
 inline std::filesystem::path folder;
 inline std::filesystem::path gameRoot;
@@ -54,15 +57,17 @@ inline void Log(const char* category, const char* format, ...) noexcept {
         std::vsnprintf(message, sizeof(message), format, args);
         va_end(args);
         for (char* p = message; *p; ++p) if (*p == '\r' || *p == '\n') *p = ' ';
-        std::lock_guard guard(mutex);
-        if (file == INVALID_HANDLE_VALUE) return;
+        if (closing.load(std::memory_order_acquire)) return;
+        std::unique_lock guard(mutex,std::try_to_lock);
+        if (!guard.owns_lock()) { dropped.fetch_add(1,std::memory_order_relaxed); return; }
+        if (closing.load(std::memory_order_acquire) || file == INVALID_HANDLE_VALUE) return;
         SYSTEMTIME time{}; GetSystemTime(&time);
         char line[8704]{};
         int n = std::snprintf(line, sizeof(line),
-            "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ seq=%llu mono=%llu tid=%lu [%s] %s\r\n",
+            "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ seq=%llu mono=%llu tid=%lu skipped=%llu [%s] %s\r\n",
             time.wYear,time.wMonth,time.wDay,time.wHour,time.wMinute,time.wSecond,time.wMilliseconds,
             static_cast<unsigned long long>(++sequence),static_cast<unsigned long long>(GetTickCount64()),
-            static_cast<unsigned long>(GetCurrentThreadId()),category,message);
+            static_cast<unsigned long>(GetCurrentThreadId()),static_cast<unsigned long long>(dropped.exchange(0,std::memory_order_relaxed)),category,message);
         if (n <= 0) return;
         DWORD count = static_cast<DWORD>((std::min)(static_cast<size_t>(n),sizeof(line)-1));
         if (bytes + count > maxBytes) {
@@ -101,8 +106,11 @@ inline bool Open() noexcept {
     } catch (...) { return false; }
 }
 inline void Close() noexcept {
-    std::lock_guard guard(mutex);
-    if (file != INVALID_HANDLE_VALUE) { CloseHandle(file); file = INVALID_HANDLE_VALUE; }
+    closing.store(true,std::memory_order_release);
+    std::unique_lock guard(mutex,std::try_to_lock);
+    // A late writer is never waited on during shutdown. Windows closes any
+    // remaining process-owned file handle at process termination.
+    if (guard.owns_lock() && file != INVALID_HANDLE_VALUE) { CloseHandle(file); file = INVALID_HANDLE_VALUE; }
 }
 inline void Inventory(const char* stage) noexcept {
     try {
