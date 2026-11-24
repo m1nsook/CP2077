@@ -1,34 +1,23 @@
-# Delamain AV — 0.1.4-dev.6
+# Delamain AV — 0.2.0-dev.7
 
-Stationary passenger-only prototype for Cyberpunk 2077 2.50. Uses the original quest entity via the separate `Vehicle.m1nsook_delamain_av` record. Does not register an owned vehicle or modify the ending.
+Stationary native passenger transition experiment for Cyberpunk 2077 2.50. Requires RED4ext, REDscript, TweakXL, Codeware and M1 Arc 1.0.1+ (1.0.10 recommended). No CET or DAV dependency. No original quest resources or facts changed. Numeric manifest version 0.2.0.
 
-## Requirements
+## Test focus
 
-RED4ext, redscript, TweakXL, M1 Arc 1.0.1 or newer (1.0.10 recommended), Codeware (temporary spawning backend). DAV and CET are not required. Disable DAV for isolation. No custom archive or DLL is shipped.
+Use a disposable save, flat empty ground, 0.75 m clearance. Spawn the AV, approach the physical left entrance, open it, board from M1 Arc, close the overlay and observe. Inspect the AV after boarding; look for PSM_PASSENGER, WORKSPOT, WORKSPOT_PHASE and WORKSPOT_EXIT. Request Exit as passenger only through M1 Arc for this test. If EXIT_BLOCKED or EXIT_TIMEOUT appears, reload the test save rather than attempting other exit controls. If successful, inspect the exterior before removing. Never save while mounted.
 
-The archive has a development suffix; the manifest must remain numeric `0.1.4` for M1 Arc discovery. Fully restart the game after replacing the files.
+The mount request now preserves position as vanilla mounting does. Door closing waits for the passenger PSM. Exit uses the native Delamain PSM exit request only after verifying the mounted workspot, exit nodes, native exit direction, stationary position and open physical door. No mod teleport, no direct low-level unmount. Native game code may still choose a fallback depending on geometry. Do not interpret an unmount as proof of cinematic animation or absence of damage.
 
-## Test
+## Research from 2.50 exports
 
-Load a disposable save in a flat, open empty area, with V on foot. Face at least 12 metres of clear ground. Open M1 Arc > Gameplay > Delamain AV. Use **Spawn test AV**, close the overlay, and check the vehicle exterior. Approach it, then **Open passenger door** and **Board as passenger**. Close the overlay to observe the boarding animation. Observe the physical front-left entrance, while V remains rear-left. Close entrance is also available. Use **Inspect vehicle** to confirm the rear seat. Use **Exit as passenger** for a controlled stationary unmount and return to the position captured before boarding. Do not move the AV. Remove only after exiting. Copy diagnostics. Native entry/exit animations are not guaranteed; the fallback is intentionally instant. Test the visuals, not just the logical door state.
+- `gameVehicleMountableComponent.script`: MountEntityToSlot uses preservePositionAfterMounting=true.
+- `vehicleTransition.script`: EnteringEvents uses MountToVehicle with OccupantSlots and default entry slot. PassengerEvents calls HandleExitRequest, which consumes VehicleComponentPS.ShouldForceExitDelamain and sets validExitRequest. ExitEvents handles low-level unmount after exiting. The native PSM can still use its own teleport fallback; this prototype does not override it.
+- `workspotSystem.script`: runtime workspot functions operate on existing entity containers, slots, actors and animation names, not arbitrary external .workspot resource paths.
+- q203_04_delamain.scene contains scnWorkspotData_ExternalWorkspotResource for `base/workspots/quest/main_quests/part1/q113/q113_05_av_flight/player__sit_av_excalibur__sit_around__01.workspot`, instance 674, entry 2, mounted scene workspot, Tier4_FPPCinematic and separate cinematic player/vehicle animations. The supplied Excalibur gameplay/base.workspot is a different resource (door-closed idle).
+- q203 scene movement uses questMoveOnSpline_NodeType and named world NodeRefs. AIVehicleOnSplineCommand also takes a NodeRef and inherits useKinematic/needDriver. No standalone runtime-generated spline or valid independent world node has been verified. Do not drive the original quest splines or mutate original quest state.
+- Missing exports: `base/quest/main_quests/epilogue/q203/characters/q203_delamain_av.ent` and the external player workspot above, both raw and WolvenKit JSON. These are needed to establish existing component bindings and author a separate custom resource. No custom scene is shipped yet.
+- DAV and AeroMobility references are not included or required.
 
-If the model falls, moves unexpectedly, or has no safe seat, stop testing and reload the save. This is NOT an autonomous taxi yet. No takeoff or flight is implemented. Don't save while inside the test vehicle. The spawn position uses a static terrain raycast and adjustable origin clearance (default 0.75 m). This is not a full landing-site validator and does not control gravity. Initial and settled height are logged; M1 Arc boarding is blocked if clearance is unstable. Do not use native Get in in this build. Test spawn clearance before any boarding. If clipping persists, remove the unoccupied vehicle and send diagnostics. The actual quest entity's rear seat and animation support require in-game confirmation.
+## Validation
 
-## dev.4 test focus
-
-User reports showed that the physical door and automatic closing work through M1 Arc, while native Get in bypasses that path. Both showed cabin clipping into the road. DAV's uploaded 3.5.0 reference uses a 1 m minimum ground clearance and disables gravity via its native controller. This build measures the origin height without using that DLL; it does not claim to solve gravity, camera or native animation issues.
-
-## dev.5 test focus
-
-Dev.4 returned impossible height values despite a visually stable AV. Sample native position into a typed local before extracting coordinates; log raw Z and surface Z separately and reject impossible coordinates as invalid rather than drift. Boarding still requires a valid clearance measurement. Default 0.75 m follows the user's visual observation. Inspect now reports actual passenger PSM and high-level state. Do not force PSM or scene tier; no status effects are applied while parked. The final boarding flow should follow quest/dialogue-style interaction rather than standard driver controls. Exact q203 scene/quest graph wiring remains unverified; do not modify original ending resources. No flight in this build.
-
-## dev.6 compiler fix
-
-Replace unsupported Cast<Int32>(gamePSMVehicle.Passenger) with EnumInt(gamePSMVehicle.Passenger). No gameplay changes.
-
-## Research
-
-- DAV 3.5.0 uses Codeware's DynamicEntitySystem for entity lifecycle and a native FlyAVSystem for flight. Upstream [repository](https://github.com/tidusmd0806/CP2077-DriveAerialVehicle) main at c318330ce610e61f3350c0a723de00db4fbee4bb includes the binary/interface and Lua/REDscript, not the C++ implementation. No upstream code or binary redistributed here.
-- Codeware [DynamicEntitySystem](https://github.com/psiberx/cp2077-codeware/blob/main/scripts/World/DynamicEntitySystem.reds) supplies the temporary spawning backend.
-- Original game record and mounting API confirmed against provided 2.50 exports.
-- Next: verify spawning and boarding, then implement a scoped native controller and safe flight tests. Passenger-only; no manual flight controls. Remove Codeware dependency only when a replacement is verified.
+The packaging workflow performs static source and archive checks only, not REDscript compilation. The cinematic entry/exit assets have not yet been integrated. Flight is not implemented. Main remains untouched.

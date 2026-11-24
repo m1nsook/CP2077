@@ -10,7 +10,7 @@ settings = json.loads((manifest_dir / "settings.json").read_text(encoding="utf-8
 assert manifest["id"] == "m1nsook.delamain-av"
 assert manifest["scope"] == "Gameplay"
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", manifest["version"]), "M1 Arc only accepts numeric x.y.z manifest versions"
-assert manifest["version"] == "0.1.4"
+assert manifest["version"] == "0.2.0"
 required = manifest["requires"]["m1arc"]
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", required)
 assert tuple(map(int, required.split("."))) <= (1, 0, 1), "Requires exceeds M1 Arc loader compatibility constant"
@@ -21,7 +21,12 @@ script = (root / "r6/scripts/DelamainAV/DelamainAV.reds").read_text()
 assert set(re.findall(r'M1Arc_ConsumeAction\("m1nsook.delamain-av", "([^"]+)"\)', script)) == ids
 assert 'GetBackLeftPassengerSlotID()' in script
 assert 'evt.slotID = n"seat_front_left"' in script
-assert 'new UnmountingRequest()' in script
+assert 'request.preservePositionAfterMounting = true' in script
+assert 'SetShouldForceExitDelamain(true)' in script
+assert 'HasExitNodes(player, true, true, true)' in script
+assert 'new UnmountingRequest()' not in script
+assert 'GetTeleportationFacility' not in script
+assert 'NATIVE_EXIT_COMPLETE' in script
 assert 'SyncRaycastByCollisionGroup' in script
 assert 'GROUND_DRIFT' in script
 assert 'POSITION_INVALID' in script
@@ -32,7 +37,7 @@ yaml = (root / "r6/tweaks/DelamainAV/DelamainAV.yaml").read_text()
 assert "Vehicle.m1nsook_delamain_av:" in yaml
 assert "$base: Vehicle.q203_delamain_av" in yaml
 assert "VehicleMountFront" not in yaml and "VehicleHijack" not in yaml
-out = Path("dist/Delamain-AV-v0.1.4-dev.6.zip")
+out = Path("dist/Delamain-AV-v0.2.0-dev.7.zip")
 out.parent.mkdir(exist_ok=True)
 with ZipFile(out, "w", ZIP_DEFLATED) as z:
     for folder in ("r6", "red4ext"):

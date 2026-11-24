@@ -13,8 +13,7 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_exitWait: Int32;
   private let m_closeWait: Int32;
   private let m_returnValid: Bool;
-  private let m_returnPosition: Vector4;
-  private let m_returnOrientation: Quaternion;
+  private let m_exitRequested: Bool;
   private let m_boardPosition: Vector4;
   private let m_groundZ: Float;
   private let m_clearance: Float;
@@ -254,8 +253,39 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
   }
 
-  // Stationary prototype only. Return to the on-foot position captured before
-  // boarding, rather than guessing an exit location inside the vehicle mesh.
+  // Use the stock passenger PSM's Delamain exit request, not a low-level
+  // instant unmount or a teleport. Require a real workspot and a valid exit.
+  private func IsPassengerState(player: ref<PlayerPuppet>) -> Bool {
+    let bb = GameInstance.GetBlackboardSystem(player.GetGame()).GetLocalInstanced(player.GetEntityID(), GetAllBlackboardDefs().PlayerStateMachine);
+    if !IsDefined(bb) { return false; };
+    return Equals(bb.GetInt(GetAllBlackboardDefs().PlayerStateMachine.Vehicle), EnumInt(gamePSMVehicle.Passenger));
+  }
+
+  private func LogWorkspot(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
+    let ws = GameInstance.GetWorkspotSystem(player.GetGame());
+    let active = ws.IsActorInWorkspot(player);
+    let seated = ws.IsInVehicleWorkspot(vehicle, player, n"seat_back_left");
+    this.Log("INFO", "WORKSPOT: active=" + ToString(active) + "; rearLeft=" + ToString(seated));
+    if active {
+      let info = ws.GetExtendedInfo(player);
+      if IsDefined(info) {
+        this.Log("INFO", "WORKSPOT_PHASE: entering=" + ToString(info.entering) + "; exiting=" + ToString(info.exiting) + "; active=" + ToString(info.isActive));
+      };
+      this.Log("INFO", "WORKSPOT_EXIT: hasExitNodes=" + ToString(ws.HasExitNodes(player, true, true, true)));
+    };
+  }
+
+  private func CanRequestNativeExit(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Bool {
+    if !this.IsPassengerState(player) { return false; };
+    let ws = GameInstance.GetWorkspotSystem(player.GetGame());
+    if !ws.IsInVehicleWorkspot(vehicle, player, n"seat_back_left") { return false; };
+    if !ws.HasExitNodes(player, true, true, true) { return false; };
+    let info = ws.GetExtendedInfo(player);
+    if !IsDefined(info) || !info.isActive || info.entering || info.exiting { return false; };
+    let pos = vehicle.CanUnmount(true, player);
+    return NotEquals(pos.direction, vehicleExitDirection.NoDirection);
+  }
+
   private func ExitPassenger(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
     if !IsDefined(vehicle) || this.m_exitWait > 0 || this.m_boardWait > 0 { return; };
     let facility = GameInstance.GetMountingFacility(player.GetGame());
@@ -264,49 +294,63 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.Log("WARNING", "V is not mounted in the tracked rear passenger seat.");
       return;
     };
-    if !this.m_returnValid || Vector4.Distance(vehicle.GetWorldPosition(), this.m_boardPosition) > 1.5 {
-      this.Log("ERROR", "No valid stationary return position. Reload the test save rather than forcing exit.");
+    if !this.m_returnValid || Vector4.Distance(vehicle.GetWorldPosition(), this.m_boardPosition) > 0.5 || !this.MeasureGround(vehicle, "GROUND_EXIT") {
+      this.Log("ERROR", "EXIT_BLOCKED: stationary landing not verified. Reload the test save.");
+      return;
+    };
+    this.LogWorkspot(player, vehicle);
+    if !this.CanRequestNativeExit(player, vehicle) {
+      this.Log("WARNING", "EXIT_BLOCKED: no verified native passenger exit workspot or safe exit direction. Reload the test save; no forced unmount will be attempted.");
       return;
     };
     this.m_closeWait = 0;
+    this.m_exitRequested = false;
     this.Door(vehicle, true);
-    // Allow the physical entrance to open before requesting instant unmount.
-    this.m_exitWait = 20;
-    this.Log("INFO", "Controlled passenger exit scheduled.");
+    this.m_exitWait = 30;
+    this.Log("INFO", "NATIVE_EXIT_PENDING: waiting for physical entrance.");
   }
 
   private func ExitTick(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
     if this.m_exitWait <= 0 { return; };
     this.m_exitWait -= 1;
-    if !IsDefined(vehicle) || Vector4.Distance(vehicle.GetWorldPosition(), this.m_boardPosition) > 1.5 {
-      this.m_exitWait = 0;
-      this.Log("ERROR", "Exit cancelled: vehicle moved or disappeared.");
-      return;
-    };
+    if !IsDefined(vehicle) { this.m_exitWait = 0; return; };
+    let ps = vehicle.GetVehiclePS();
     let facility = GameInstance.GetMountingFacility(player.GetGame());
     if !facility.IsMountedToAnything(player.GetEntityID()) {
-      GameInstance.GetTeleportationFacility(player.GetGame()).Teleport(player, this.m_returnPosition, Quaternion.ToEulerAngles(this.m_returnOrientation));
+      if IsDefined(ps) { ps.SetShouldForceExitDelamain(false); };
       this.m_exitWait = 0;
+      this.m_exitRequested = false;
       this.m_returnValid = false;
-      this.Log("INFO", "PASS: V unmounted; return to pre-boarding position requested.");
+      this.Log("INFO", "NATIVE_EXIT_COMPLETE: mounting relationship cleared. No mod teleport or forced unmount.");
+      this.LogPassengerState(player);
       return;
     };
     let info = facility.GetMountingInfoSingleWithObjects(player);
-    if !Equals(info.parentId, vehicle.GetEntityID()) || !Equals(info.slotId.id, n"seat_back_left") {
+    if !Equals(info.parentId, vehicle.GetEntityID()) || !Equals(info.slotId.id, n"seat_back_left") ||
+       Vector4.Distance(vehicle.GetWorldPosition(), this.m_boardPosition) > 0.5 {
+      if IsDefined(ps) { ps.SetShouldForceExitDelamain(false); };
       this.m_exitWait = 0;
-      this.Log("WARNING", "Exit cancelled: mounting relationship changed.");
+      this.m_exitRequested = false;
+      this.Log("WARNING", "EXIT_CANCELLED: mounting relationship or landing position changed. Reload test save.");
       return;
     };
-    if this.m_exitWait == 15 {
-      let request = new UnmountingRequest();
-      request.lowLevelMountingInfo = info;
-      request.mountData = new MountEventData();
-      request.mountData.isInstant = true;
-      facility.Unmount(request);
-      this.Log("INFO", "Instant passenger unmount requested.");
+    if !this.m_exitRequested && this.m_exitWait <= 24 {
+      if IsDefined(ps) && Equals(ps.GetDoorState(EVehicleDoor.seat_front_left), VehicleDoorState.Open) {
+        if !this.CanRequestNativeExit(player, vehicle) {
+          this.m_exitWait = 0;
+          this.Log("WARNING", "EXIT_BLOCKED: native exit workspot no longer verified.");
+          return;
+        };
+        ps.SetShouldForceExitDelamain(true);
+        this.m_exitRequested = true;
+        this.Log("INFO", "NATIVE_EXIT_REQUESTED: passenger PSM owns animation and unmount.");
+      };
     };
     if this.m_exitWait == 0 {
-      this.Log("ERROR", "Unmount not confirmed. Do not remove the AV; reload test save.");
+      if IsDefined(ps) { ps.SetShouldForceExitDelamain(false); };
+      this.m_exitRequested = false;
+      this.LogWorkspot(player, vehicle);
+      this.Log("ERROR", "EXIT_TIMEOUT: no confirmed native exit. No instant unmount fallback. Reload test save.");
     };
   }
 
@@ -331,14 +375,12 @@ public class DelamainAVSystem extends ScriptableSystem {
     let request = new MountingRequest();
     request.lowLevelMountingInfo = info;
     request.mountData = data;
-    // Match normal mounting semantics; preservePosition is not used by DAV.
-    this.m_returnPosition = player.GetWorldPosition();
-    this.m_returnOrientation = player.GetWorldOrientation();
+    // Match vanilla gamevehicleVehicleMountableComponent.MountEntityToSlot.
     this.m_boardPosition = vehicle.GetWorldPosition();
     this.m_returnValid = true;
-    request.preservePositionAfterMounting = false;
+    request.preservePositionAfterMounting = true;
     facility.Mount(request);
-    this.m_boardWait = 16;
+    this.m_boardWait = 24;
     this.Log("INFO", "Rear-left passenger mount requested. Waiting for actual mount confirmation.");
   }
 
@@ -369,6 +411,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
     this.MeasureGround(vehicle, "GROUND_STATUS");
     this.LogPassengerState(player);
+    this.LogWorkspot(player, vehicle);
     let mount = GameInstance.GetMountingFacility(player.GetGame()).GetMountingInfoSingleWithObjects(player);
     if Equals(mount.parentId, vehicle.GetEntityID()) {
       this.Log("INFO", "V is mounted in slot: " + NameToString(mount.slotId.id));
@@ -439,15 +482,16 @@ public class DelamainAVSystem extends ScriptableSystem {
       };
       if this.m_boardWait > 0 {
         let info = GameInstance.GetMountingFacility(player.GetGame()).GetMountingInfoSingleWithObjects(player);
-        if IsDefined(vehicle) && Equals(info.parentId, vehicle.GetEntityID()) && Equals(info.slotId.id, n"seat_back_left") {
+        if IsDefined(vehicle) && Equals(info.parentId, vehicle.GetEntityID()) && Equals(info.slotId.id, n"seat_back_left") && this.IsPassengerState(player) {
           this.m_boardWait = 0;
           this.Log("INFO", "PASS: V mounted in rear-left passenger seat.");
           this.LogPassengerState(player);
+          this.LogWorkspot(player, vehicle);
           this.m_closeWait = 6;
         } else {
           this.m_boardWait -= 1;
           if this.m_boardWait == 0 {
-            this.Log("ERROR", "Rear-left passenger mount not confirmed within 8 seconds.");
+            this.Log("ERROR", "Rear-left passenger PSM not confirmed within 12 seconds. Reload if mounted.");
           };
         };
       };
@@ -456,8 +500,8 @@ public class DelamainAVSystem extends ScriptableSystem {
         if spawn { this.Spawn(player); };
         if exit { this.ExitPassenger(player, vehicle); }
         else {
-          if open && IsDefined(vehicle) && this.m_exitWait == 0 && Vector4.Distance(player.GetWorldPosition(), vehicle.GetWorldPosition()) <= 8.0 { this.Door(vehicle, true); };
-          if close && IsDefined(vehicle) && this.m_exitWait == 0 && Vector4.Distance(player.GetWorldPosition(), vehicle.GetWorldPosition()) <= 8.0 { this.Door(vehicle, false); };
+          if open && IsDefined(vehicle) && this.m_exitWait == 0 && this.m_boardWait == 0 && Vector4.Distance(player.GetWorldPosition(), vehicle.GetWorldPosition()) <= 8.0 { this.Door(vehicle, true); };
+          if close && IsDefined(vehicle) && this.m_exitWait == 0 && this.m_boardWait == 0 && Vector4.Distance(player.GetWorldPosition(), vehicle.GetWorldPosition()) <= 8.0 { this.Door(vehicle, false); };
           if board { this.Board(player, vehicle); };
         };
         if status { this.Inspect(player, vehicle); };
