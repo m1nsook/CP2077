@@ -60,3 +60,7 @@ assert "GetPointOfInterestMappinSavedState" in core
 assert "UDMOwnsPin(pin.GetNewMappinID())" in core
 assert "miso_rmp_all_disabled" in core
 print("PASS: fifth tab, native catalog and M1 Arc settings")
+
+import json
+manifest = json.loads((root / "red4ext/plugins/m1arc/mods/m1nsook.undiscoverme/mod.json").read_text(encoding="utf-8"))
+assert manifest["scope"] == "Locations", "M1 Arc scope must be a registered category"
