@@ -15,6 +15,9 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_closeWait: Int32;
   private let m_returnValid: Bool;
   private let m_exitRequested: Bool;
+  private let m_exitAnimationSeen: Bool;
+  private let m_exitElapsedTicks: Int32;
+  private let m_exitStartPosition: Vector4;
   private let m_boardPosition: Vector4;
   private let m_groundZ: Float;
   private let m_clearance: Float;
@@ -326,6 +329,8 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
     this.m_closeWait = 0;
     this.m_exitRequested = false;
+    this.m_exitAnimationSeen = false;
+    this.m_exitElapsedTicks = 0;
     this.Door(vehicle, true);
     this.m_exitWait = 30;
     this.Log("INFO", "NATIVE_EXIT_PENDING: waiting for physical entrance.");
@@ -337,13 +342,28 @@ public class DelamainAVSystem extends ScriptableSystem {
     if !IsDefined(vehicle) { this.m_exitWait = 0; return; };
     let ps = vehicle.GetVehiclePS();
     let facility = GameInstance.GetMountingFacility(player.GetGame());
+    if this.m_exitRequested {
+      this.m_exitElapsedTicks += 1;
+      let phase = GameInstance.GetWorkspotSystem(player.GetGame()).GetExtendedInfo(player);
+      if IsDefined(phase) && phase.exiting && !this.m_exitAnimationSeen {
+        this.m_exitAnimationSeen = true;
+        this.Log("INFO", "EXIT_ANIMATION_ACTIVE: native workspot reports exiting.");
+      };
+    };
     if !facility.IsMountedToAnything(player.GetEntityID()) {
       if IsDefined(ps) { ps.SetShouldForceExitDelamain(false); };
       this.m_exitWait = 0;
       this.m_exitRequested = false;
       this.m_returnValid = false;
-      this.Door(vehicle, false);
-      this.Log("INFO", "NATIVE_EXIT_COMPLETE: mounting relationship cleared. No mod teleport or forced unmount.");
+      let elapsed = Cast<Float>(this.m_exitElapsedTicks) * 0.5;
+      let displacement = Vector4.Distance(player.GetWorldPosition(), this.m_exitStartPosition);
+      this.Log("INFO", "EXIT_DETACHED: elapsed=" + ToString(elapsed) + "; animationObserved=" + ToString(this.m_exitAnimationSeen) + "; displacement=" + ToString(displacement));
+      if this.m_exitAnimationSeen && elapsed >= 2.5 && displacement >= 1.0 {
+        this.Door(vehicle, false);
+        this.Log("INFO", "EXIT_ANIMATION_FINISHED: native workspot ended after movement. Visual clearance not verified.");
+      } else {
+        this.Log("WARNING", "EXIT_EARLY_DETACH: mount cleared without observed complete animation; leaving door open.");
+      };
       this.LogPassengerState(player);
       return;
     };
@@ -363,6 +383,7 @@ public class DelamainAVSystem extends ScriptableSystem {
           this.Log("WARNING", "EXIT_BLOCKED: native exit workspot no longer verified.");
           return;
         };
+        this.m_exitStartPosition = player.GetWorldPosition();
         ps.SetShouldForceExitDelamain(true);
         this.m_exitRequested = true;
         this.Log("INFO", "NATIVE_EXIT_REQUESTED: passenger PSM owns animation and unmount.");
@@ -601,9 +622,17 @@ public class DelamainAVTick extends DelayCallback {
      wrappedMethod(stateContext, scriptInterface, isInstant, upsideDown);
      return;
    };
-   // The private workspot has exactly one cinematic exit slot.
+   // q203_04_delamain.scene plays this exact 5000 ms root-motion animation
+   // before its unmount event at 4999 ms. Do not request a vehicle-slot unmount
+   // here: dev.9 immediately cleared the mount, skipping the animation.
+   // ExitingDecisions.ExitCondition waits for the active workspot to end;
+   // ExitEvents then performs the normal mounting/PSM cleanup.
    this.SetSide(stateContext, scriptInterface);
-   scriptInterface.GetWorkspotSystem().UnmountFromVehicle(scriptInterface.owner, scriptInterface.executionOwner, false, new Vector4(0.0, 0.0, 0.0, 0.0), new Quaternion(0.0, 0.0, 0.0, 1.0), n"default");
+   let ws = scriptInterface.GetWorkspotSystem();
+   let name = n"sit_couch__AV_excalibur__01__to__stand__2h_on_sides__01__turn270__01";
+   let id = ws.GetIdOfExitAnim(scriptInterface.executionOwner, name);
+   M1Arc_Log("m1nsook.delamain-av", "INFO", "EXIT_ANIMATION_REQUEST: named slow exit; entryId=" + ToString(id));
+   ws.SendSlowExitSignal(scriptInterface.executionOwner, name, true);
  }
 
  @wrapMethod(ExitingEvents)

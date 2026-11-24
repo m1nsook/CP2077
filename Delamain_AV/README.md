@@ -1,4 +1,4 @@
-# Delamain AV — 0.2.2-dev.9
+# Delamain AV — 0.2.3-dev.10
 
 dev.7 established the real failure: the original OccupantSlots component points to a passenger workspot with a looping seated sequence and no entry/exit nodes. The original spawn, 0.75 m clearance, exterior door animation, rear-left passenger PSM and despawn are already confirmed. Do not retest those as separate milestones.
 
@@ -29,3 +29,13 @@ dev.8 game test verified animated boarding both manually and through M1 Arc, phy
 - Remap rear-left door open/close events to the physical front-left entrance only for this record. Observe manual passenger mounting and close the door after entry.
 - Native ExitEvents still owns the mounting relationship and player-state cleanup. No manual teleport or forced unmount fallback.
 - Runtime alignment, successful unmount, and REDscript compilation remain unverified by CI.
+
+## dev.10
+
+dev.9 manual entry opens the physical door, plays the animation, and closes it automatically. Do not change the confirmed entry path. Exit logs show native mount and player-state cleanup in the same second as the request, not actual animated exit.
+
+The supplied q203_04_delamain.scene JSON has a 5000 ms scnPlaySkAnimEvent for sit_couch__AV_excalibur__01__to__stand__2h_on_sides__01__turn270__01, with root motion enabled and scnUnmountEvent at 4999 ms. It is not a standard vehicle exit-slot sequence.
+
+Use the imported WorkspotGameSystem.SendSlowExitSignal(actor, animationName, dontWaitForCurrentAnimationToFinish) instead of UnmountFromVehicle inside the custom record's ExitWorkspot wrapper. The native ExitingDecisions waits for the actor's workspot to end; native ExitEvents then cleans up the mounting relationship. Log the named exit entry ID, observed exiting phase, elapsed time, and displacement. Keep the entrance open on premature detach. Do not claim gameplay success solely from cleared mount or PSM. The 2.5 s and 1 m thresholds are diagnostic heuristics, not proof of exterior clearance.
+
+No asset, entry, spawn, or original quest changes. The named workspot signal is imported in the supplied 2.50 script dump but its behavior on this AV remains unverified.
