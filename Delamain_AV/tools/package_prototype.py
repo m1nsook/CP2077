@@ -23,10 +23,14 @@ assert 'GetBackLeftPassengerSlotID()' in script
 assert 'evt.slotID = n"seat_front_left"' in script
 assert 'request.preservePositionAfterMounting = true' in script
 assert 'SetShouldForceExitDelamain(true)' in script
-assert 'HasExitNodes(player, true, true, true)' in script
+assert 'HasExitNodes(player, true, true, false)' in script
 assert 'new UnmountingRequest()' not in script
 assert 'GetTeleportationFacility' not in script
-assert 'NATIVE_EXIT_COMPLETE' in script
+assert 'EXIT_DETACHED' in script
+assert 'EXIT_EARLY_DETACH' in script
+assert 'EXIT_ANIMATION_FINISHED' in script
+assert 'GetIdOfExitAnim(scriptInterface.executionOwner, name)' in script
+assert 'SendSlowExitSignal(scriptInterface.executionOwner, name, true)' in script
 assert 'SyncRaycastByCollisionGroup' in script
 assert 'GROUND_DRIFT' in script
 assert 'POSITION_INVALID' in script
