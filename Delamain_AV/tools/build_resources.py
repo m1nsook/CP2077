@@ -35,14 +35,13 @@ with tempfile.TemporaryDirectory() as temp:
         if final.suffix == ".workspot":
             tree = data["workspotTree"]["Data"]
             nodes = [x["Data"] for x in tree["rootEntry"]["Data"]["list"]]
-            assert [n["$type"] for n in nodes] == ["workEntryAnim", "workSequence", "workExitAnim"]
+            assert [n["$type"] for n in nodes] == ["workEntryAnim", "workSequence", "workAnimClip"]
             assert value(nodes[0]["slotName"]) == "default"
-            assert value(nodes[2]["slotName"]) == "default"
             assert value(nodes[0]["animName"]) == "stand__2h_on_sides__01__to__sit_couch__AV_excalibur__01__turn270__getting_into_AV__01"
             assert value(nodes[2]["animName"]) == "sit_couch__AV_excalibur__01__to__stand__2h_on_sides__01__turn270__01"
-            assert nodes[2]["stayOnNavmesh"] == 0
-            assert nodes[2]["snapZToNavmesh"] == 0
-            assert nodes[2]["forceNoZSnap"] == 1
+            assert nodes[2]["id"]["id"] == 6
+            assert nodes[2]["flags"] == 2
+            assert nodes[2]["blendOutTime"] == 0.5
             assert nodes[1]["loopInfinitely"] == 1
             assert len(tree["finalAnimsets"]) == 2
         else:

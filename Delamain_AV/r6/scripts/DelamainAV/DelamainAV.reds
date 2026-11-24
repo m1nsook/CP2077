@@ -16,6 +16,7 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_returnValid: Bool;
   private let m_exitRequested: Bool;
   private let m_exitAnimationSeen: Bool;
+  private let m_exitCleanupRequested: Bool;
   private let m_exitElapsedTicks: Int32;
   private let m_exitStartPosition: Vector4;
   private let m_boardPosition: Vector4;
@@ -279,16 +280,14 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
   }
 
-  private func CanRequestNativeExit(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Bool {
+  private func CanStartAVDisembark(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Bool {
     if !this.IsPassengerState(player) { return false; };
     let ws = GameInstance.GetWorkspotSystem(player.GetGame());
     if !ws.IsInVehicleWorkspot(vehicle, player, n"seat_back_left") { return false; };
-    if !ws.HasExitNodes(player, true, true, false) { return false; };
     let info = ws.GetExtendedInfo(player);
     if !IsDefined(info) || !info.isActive || info.entering || info.exiting { return false; };
-    // Custom cinematic exit is not a road-car navmesh exit. Ground clearance,
-    // stationary position and real workspot nodes are checked by the caller.
-    // The scoped PSM wrapper prevents the vanilla teleport recovery.
+    // The private AV has a finite disembark clip, not a road-car exit node.
+    // Stationary landing and seating are validated before playing the clip.
     return true;
   }
 
@@ -323,31 +322,36 @@ public class DelamainAVSystem extends ScriptableSystem {
       return;
     };
     this.LogWorkspot(player, vehicle);
-    if !this.CanRequestNativeExit(player, vehicle) {
-      this.Log("WARNING", "EXIT_BLOCKED: no active structural passenger exit workspot. Reload the test save; no forced unmount will be attempted.");
+    if !this.CanStartAVDisembark(player, vehicle) {
+      this.Log("WARNING", "EXIT_BLOCKED: no active seated AV workspot. Reload the test save; no forced unmount will be attempted.");
       return;
     };
     this.m_closeWait = 0;
     this.m_exitRequested = false;
     this.m_exitAnimationSeen = false;
+    this.m_exitCleanupRequested = false;
     this.m_exitElapsedTicks = 0;
     this.Door(vehicle, true);
     this.m_exitWait = 30;
-    this.Log("INFO", "NATIVE_EXIT_PENDING: waiting for physical entrance.");
+    this.Log("INFO", "AV_DISEMBARK_PENDING: waiting for physical entrance.");
   }
 
+  // AV lifecycle: door -> cinematic workspot clip -> native mount cleanup.
+  // Do not enter the car exit PSM while the passenger animation is playing.
   private func ExitTick(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
     if this.m_exitWait <= 0 { return; };
     this.m_exitWait -= 1;
     if !IsDefined(vehicle) { this.m_exitWait = 0; return; };
     let ps = vehicle.GetVehiclePS();
     let facility = GameInstance.GetMountingFacility(player.GetGame());
+    let ws = GameInstance.GetWorkspotSystem(player.GetGame());
+    let active = ws.IsActorInWorkspot(player);
     if this.m_exitRequested {
       this.m_exitElapsedTicks += 1;
-      let phase = GameInstance.GetWorkspotSystem(player.GetGame()).GetExtendedInfo(player);
-      if IsDefined(phase) && phase.exiting && !this.m_exitAnimationSeen {
+      let phase = ws.GetExtendedInfo(player);
+      if IsDefined(phase) && phase.inMotion && !this.m_exitAnimationSeen {
         this.m_exitAnimationSeen = true;
-        this.Log("INFO", "EXIT_ANIMATION_ACTIVE: native workspot reports exiting.");
+        this.Log("INFO", "AV_DISEMBARK_MOTION: workspot reports root motion.");
       };
     };
     if !facility.IsMountedToAnything(player.GetEntityID()) {
@@ -357,13 +361,14 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.m_returnValid = false;
       let elapsed = Cast<Float>(this.m_exitElapsedTicks) * 0.5;
       let displacement = Vector4.Distance(player.GetWorldPosition(), this.m_exitStartPosition);
-      this.Log("INFO", "EXIT_DETACHED: elapsed=" + ToString(elapsed) + "; animationObserved=" + ToString(this.m_exitAnimationSeen) + "; displacement=" + ToString(displacement));
-      if this.m_exitAnimationSeen && elapsed >= 2.5 && displacement >= 1.0 {
+      this.Log("INFO", "AV_DETACHED: elapsed=" + ToString(elapsed) + "; motionObserved=" + ToString(this.m_exitAnimationSeen) + "; displacement=" + ToString(displacement));
+      if this.m_exitCleanupRequested && !active {
         this.Door(vehicle, false);
-        this.Log("INFO", "EXIT_ANIMATION_FINISHED: native workspot ended after movement. Visual clearance not verified.");
+        this.Log("INFO", "AV_CLEANUP_COMPLETE: clip ended before detach. Exterior clearance still needs runtime confirmation.");
       } else {
-        this.Log("WARNING", "EXIT_EARLY_DETACH: mount cleared without observed complete animation; leaving door open.");
+        this.Log("WARNING", "AV_EARLY_DETACH: native mount cleared before validated clip completion; door remains open.");
       };
+      this.m_exitCleanupRequested = false;
       this.LogPassengerState(player);
       return;
     };
@@ -373,28 +378,51 @@ public class DelamainAVSystem extends ScriptableSystem {
       if IsDefined(ps) { ps.SetShouldForceExitDelamain(false); };
       this.m_exitWait = 0;
       this.m_exitRequested = false;
-      this.Log("WARNING", "EXIT_CANCELLED: mounting relationship or landing position changed. Reload test save.");
+      this.m_exitCleanupRequested = false;
+      this.Log("WARNING", "AV_DISEMBARK_CANCELLED: mounting relationship or landing position changed.");
       return;
     };
     if !this.m_exitRequested && this.m_exitWait <= 24 {
       if IsDefined(ps) && Equals(ps.GetDoorState(EVehicleDoor.seat_front_left), VehicleDoorState.Open) {
-        if !this.CanRequestNativeExit(player, vehicle) {
+        if !this.CanStartAVDisembark(player, vehicle) {
           this.m_exitWait = 0;
-          this.Log("WARNING", "EXIT_BLOCKED: native exit workspot no longer verified.");
+          this.Log("WARNING", "AV_DISEMBARK_BLOCKED: active seated workspot no longer verified.");
           return;
         };
         this.m_exitStartPosition = player.GetWorldPosition();
-        ps.SetShouldForceExitDelamain(true);
         this.m_exitRequested = true;
-        this.Log("INFO", "NATIVE_EXIT_REQUESTED: passenger PSM owns animation and unmount.");
+        // The private workspot's finite workAnimClip has entry ID 6.
+        // The quest uses this same 5-second skeletal clip before unmounting.
+        ws.SendJumpCommandEnt(player, 6, true);
+        this.Log("INFO", "AV_DISEMBARK_PLAY: cinematic clip 6; passenger mount retained.");
+      };
+    };
+    if this.m_exitRequested && !this.m_exitCleanupRequested && !active {
+      let elapsed = Cast<Float>(this.m_exitElapsedTicks) * 0.5;
+      let displacement = Vector4.Distance(player.GetWorldPosition(), this.m_exitStartPosition);
+      if elapsed < 4.5 || displacement < 1.0 {
+        this.m_exitWait = 0;
+        this.m_exitRequested = false;
+        this.Log("ERROR", "AV_DISEMBARK_INTERRUPTED: elapsed=" + ToString(elapsed) + "; displacement=" + ToString(displacement) + ". No car-exit fallback.");
+        return;
+      };
+      if IsDefined(ps) {
+        this.m_exitCleanupRequested = true;
+        ps.SetShouldForceExitDelamain(true);
+        this.Log("INFO", "AV_DISEMBARK_CLIP_ENDED: requesting native mount cleanup only.");
       };
     };
     if this.m_exitWait == 0 {
       if IsDefined(ps) { ps.SetShouldForceExitDelamain(false); };
       this.m_exitRequested = false;
+      this.m_exitCleanupRequested = false;
       this.LogWorkspot(player, vehicle);
-      this.Log("ERROR", "EXIT_TIMEOUT: no confirmed native exit. No instant unmount fallback. Reload test save.");
+      this.Log("ERROR", "AV_DISEMBARK_TIMEOUT: no validated clip completion. No forced exit or teleport fallback.");
     };
+  }
+
+  public func IsAVCleanupReady(vehicle: ref<VehicleObject>) -> Bool {
+    return IsDefined(vehicle) && Equals(vehicle.GetEntityID(), this.m_id) && this.m_exitCleanupRequested;
   }
 
   private func Board(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
@@ -600,12 +628,13 @@ public class DelamainAVTick extends DelayCallback {
    if !IsDefined(ps) { return false; };
    let info = scriptInterface.GetMountingInfo(player);
    if NotEquals(info.slotId.id, n"seat_back_left") { return false; };
-   // No road-car exit selection, QuickExit or teleport fallback for this AV.
-   // ExitTick sets the native flag only after stationary/ground/workspot/door checks.
+   // AV controller owns disembark motion. Native PSM is requested only after the clip ends.
    if ps.ShouldForceExitDelamain() {
      ps.SetShouldForceExitDelamain(false);
+     let system = GameInstance.GetScriptableSystemsContainer(player.GetGame()).Get(n"DelamainAV.DelamainAVSystem") as DelamainAVSystem;
+     if !IsDefined(system) || !system.IsAVCleanupReady(vehicle) { return false; };
      this.DeactivateTimeDilationCW(stateContext, scriptInterface);
-     stateContext.SetPermanentIntParameter(n"vehUnmountDir", EnumInt(vehicleExitDirection.Left), true);
+     stateContext.RemovePermanentIntParameter(n"vehUnmountDir");
      stateContext.SetPermanentBoolParameter(n"validExitRequest", true, true);
      return true;
    };
@@ -622,17 +651,15 @@ public class DelamainAVTick extends DelayCallback {
      wrappedMethod(stateContext, scriptInterface, isInstant, upsideDown);
      return;
    };
-   // q203_04_delamain.scene plays this exact 5000 ms root-motion animation
-   // before its unmount event at 4999 ms. Do not request a vehicle-slot unmount
-   // here: dev.9 immediately cleared the mount, skipping the animation.
-   // ExitingDecisions.ExitCondition waits for the active workspot to end;
-   // ExitEvents then performs the normal mounting/PSM cleanup.
-   this.SetSide(stateContext, scriptInterface);
-   let ws = scriptInterface.GetWorkspotSystem();
-   let name = n"sit_couch__AV_excalibur__01__to__stand__2h_on_sides__01__turn270__01";
-   let id = ws.GetIdOfExitAnim(scriptInterface.executionOwner, name);
-   M1Arc_Log("m1nsook.delamain-av", "INFO", "EXIT_ANIMATION_REQUEST: named slow exit; entryId=" + ToString(id));
-   ws.SendSlowExitSignal(scriptInterface.executionOwner, name, true);
+   // No vehicle exit animation here. AV controller has already played it.
+   // Native ExitingDecisions observes the completed workspot and ExitEvents
+   // clears the mount, camera, input and player state.
+   let player = scriptInterface.executionOwner as PlayerPuppet;
+   if IsDefined(player) {
+     let system = GameInstance.GetScriptableSystemsContainer(player.GetGame()).Get(n"DelamainAV.DelamainAVSystem") as DelamainAVSystem;
+     if IsDefined(system) && system.IsAVCleanupReady(scriptInterface.owner as VehicleObject) { return; };
+   };
+   wrappedMethod(stateContext, scriptInterface, isInstant, upsideDown);
  }
 
  @wrapMethod(ExitingEvents)

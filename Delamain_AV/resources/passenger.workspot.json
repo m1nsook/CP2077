@@ -453,33 +453,18 @@
                 {
                   "HandleId": "9",
                   "Data": {
-                    "$type": "workExitAnim",
+                    "$type": "workAnimClip",
                     "id": {
                       "$type": "workWorkEntryId",
                       "id": 6
                     },
-                    "flags": 8,
+                    "flags": 2,
                     "animName": {
                       "$type": "CName",
                       "$storage": "string",
                       "$value": "sit_couch__AV_excalibur__01__to__stand__2h_on_sides__01__turn270__01"
                     },
-                    "idleAnim": {
-                      "$type": "CName",
-                      "$storage": "string",
-                      "$value": "sit_couch__AV_excalibur__01"
-                    },
-                    "disableAutoTransition": 0,
-                    "isSynchronized": 0,
-                    "stayOnNavmesh": 0,
-                    "snapZToNavmesh": 0,
-                    "forceNoZSnap": 1,
-                    "slotName": {
-                      "$type": "CName",
-                      "$storage": "string",
-                      "$value": "default"
-                    },
-                    "disableRandomExit": 0
+                    "blendOutTime": 0.5
                   }
                 }
               ],

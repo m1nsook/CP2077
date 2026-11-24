@@ -39,3 +39,13 @@ The supplied q203_04_delamain.scene JSON has a 5000 ms scnPlaySkAnimEvent for si
 Use the imported WorkspotGameSystem.SendSlowExitSignal(actor, animationName, dontWaitForCurrentAnimationToFinish) instead of UnmountFromVehicle inside the custom record's ExitWorkspot wrapper. The native ExitingDecisions waits for the actor's workspot to end; native ExitEvents then cleans up the mounting relationship. Log the named exit entry ID, observed exiting phase, elapsed time, and displacement. Keep the entrance open on premature detach. Do not claim gameplay success solely from cleared mount or PSM. The 2.5 s and 1 m thresholds are diagnostic heuristics, not proof of exterior clearance.
 
 No asset, entry, spawn, or original quest changes. The named workspot signal is imported in the supplied 2.50 script dump but its behavior on this AV remains unverified.
+
+## dev.11 — AV-owned disembark sequence
+
+Supersedes the dev.8–10 vehicle-exit-node approach. Original q203_04_delamain.scene uses a five-second skeletal animation followed by a separate unmount event at 4999 ms. The vanilla AV record inherits generic four-wheel data, but the cinematic sequence is not a road-car exit. The supplied SceneSystemInterface does not expose a standalone scene-start method.
+
+Preserve confirmed manual boarding and physical door routing. In the private passenger workspot, replace the workExitAnim with a finite workAnimClip (entry ID 6) carrying the exact original Excalibur clip. workAnimClip type, flag 2 and blendOutTime are verified against WolvenKit RED4 generated classes. Native SendJumpCommandEnt is present in the supplied workspotSystem.script and is used by vanilla takedown sequences.
+
+AV controller opens the entrance, jumps directly to this clip while V remains a passenger, waits for natural workspot end and checks elapsed time and displacement, then requests native PSM cleanup. The standard vehicle exit path is not responsible for animation or navigation. No mod teleport or forced instant unmount. The threshold checks are conservative heuristics; runtime clip playback, root motion, exterior position and cleanup still require verification. Forced engine transitions outside this managed lifecycle retain stock behavior.
+
+Not a standalone cinematic scene yet: the source does not establish a safe script API for starting one. No original quest edits or new dependencies.
