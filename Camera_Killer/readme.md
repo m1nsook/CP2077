@@ -1,4 +1,4 @@
-# Camera Killer
+# Camera Killer 1.1.0
 
 Turns off **other cameras connected to the same network** when V shuts down one surveillance camera. Tested in Cyberpunk 2077 2.5 (previously named *Miso Camera Spread*).
 
