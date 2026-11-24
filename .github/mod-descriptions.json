@@ -5,7 +5,7 @@
   },
   "UndiscoverMe": {
     "name": "UndiscoverMe",
-    "summary": "Reveals eligible undiscovered vanilla map markers without modifying quests."
+    "summary": "Reveals eligible undiscovered vanilla map markers with persistent M1 Arc settings and a native REDscript catalog. Requires RED4ext, REDscript, TweakXL and M1 Arc 1.0.1+. CET is no longer required. Remove the old UndiscoverMe CET mod folder before installing."
   },
   "UndiscoverMe_Teleporter": {
     "name": "UndiscoverMe Teleporter",
@@ -35,11 +35,11 @@
   },
   "Free_Chrome": {
     "name": "Free Chrome — All Cyberware Costs 0 Humanity",
-    "summary": "Sets standard cyberware Humanity/Capacity costs to zero, with reversible in-game settings."
+    "summary": "Sets standard cyberware Humanity/Capacity costs to zero, with reversible M1 Arc controls. Requires RED4ext, REDscript, TweakXL and M1 Arc 1.0.1+. CET is no longer required. Remove the old FreeChrome CET mod folder before installing; reload a save after changing the setting."
   },
   "Camera_Killer": {
     "name": "Camera Killer",
-    "summary": "Shuts down cameras connected to the same access point or surveillance system when V turns off one camera."
+    "summary": "Shuts down connected surveillance cameras when V switches one off. Requires RED4ext, REDscript and M1 Arc 1.0.1+. CET is not required."
   },
   "Weight_Customizer": {
     "name": "Weight Customizer",
