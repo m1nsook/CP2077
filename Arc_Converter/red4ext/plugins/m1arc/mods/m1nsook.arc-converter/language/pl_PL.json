@@ -48,8 +48,8 @@
       "group": "Amunicja"
     },
     "sell_junk": {
-      "label": "Automatyczna sprzedaż śmieci za eurodolary",
-      "description": "Automatycznie sprzedaje śmieci i biżuterię po cenach gry, także te już znajdujące się w ekwipunku. Przedmioty misji i chronione pozostają nietknięte.",
+      "label": "Automatycznie przetwarzaj śmieci",
+      "description": "Przetwarzaj śmieci i biżuterię według wybranej akcji, także istniejące stosy.",
       "group": "Śmieci"
     },
     "weapon_action": {
@@ -99,6 +99,146 @@
       "label": "Poziom 5 (+ warianty)",
       "description": "Przetwarza nowo zdobyte ubrania poziomu 5.",
       "group": "Ubrania"
+    },
+    "junk_action": {
+      "label": "Akcja dla śmieci",
+      "description": "Sprzedaj, rozłóż lub użyj progu ceny jednostkowej. Niedozwolone przedmioty pozostają.",
+      "group": "Śmieci",
+      "choices": {
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż",
+        "By value": "Według ceny"
+      }
+    },
+    "junk_price_threshold": {
+      "label": "Próg ceny (€$)",
+      "description": "W trybie ceny rozkładaj do tej ceny włącznie, sprzedawaj powyżej.",
+      "group": "Śmieci"
+    },
+    "food_enabled": {
+      "label": "Jedzenie i napoje",
+      "description": "Przetwarzaj kwalifikujące się istniejące i nowe stosy. Domyślnie wyłączone.",
+      "group": "Jedzenie i napoje"
+    },
+    "food_tier1": {
+      "label": "Poziom 1",
+      "description": "Zachowaj, sprzedaj lub rozłóż, jeśli gra na to pozwala.",
+      "group": "Jedzenie i napoje",
+      "choices": {
+        "Keep": "Zachowaj",
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż"
+      }
+    },
+    "food_tier2": {
+      "label": "Poziom 2",
+      "description": "Zachowaj, sprzedaj lub rozłóż, jeśli gra na to pozwala.",
+      "group": "Jedzenie i napoje",
+      "choices": {
+        "Keep": "Zachowaj",
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż"
+      }
+    },
+    "food_tier3": {
+      "label": "Poziom 3",
+      "description": "Zachowaj, sprzedaj lub rozłóż, jeśli gra na to pozwala.",
+      "group": "Jedzenie i napoje",
+      "choices": {
+        "Keep": "Zachowaj",
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż"
+      }
+    },
+    "food_tier4": {
+      "label": "Poziom 4",
+      "description": "Zachowaj, sprzedaj lub rozłóż, jeśli gra na to pozwala.",
+      "group": "Jedzenie i napoje",
+      "choices": {
+        "Keep": "Zachowaj",
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż"
+      }
+    },
+    "food_tier5": {
+      "label": "Poziom 5",
+      "description": "Zachowaj, sprzedaj lub rozłóż, jeśli gra na to pozwala.",
+      "group": "Jedzenie i napoje",
+      "choices": {
+        "Keep": "Zachowaj",
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż"
+      }
+    },
+    "boosters_enabled": {
+      "label": "Wzmacniacze",
+      "description": "Przetwarzaj kwalifikujące się istniejące i nowe stosy. Domyślnie wyłączone.",
+      "group": "Wzmacniacze"
+    },
+    "boosters_tier1": {
+      "label": "Poziom 1",
+      "description": "Zachowaj, sprzedaj lub rozłóż, jeśli gra na to pozwala.",
+      "group": "Wzmacniacze",
+      "choices": {
+        "Keep": "Zachowaj",
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż"
+      }
+    },
+    "boosters_tier2": {
+      "label": "Poziom 2",
+      "description": "Zachowaj, sprzedaj lub rozłóż, jeśli gra na to pozwala.",
+      "group": "Wzmacniacze",
+      "choices": {
+        "Keep": "Zachowaj",
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż"
+      }
+    },
+    "boosters_tier3": {
+      "label": "Poziom 3",
+      "description": "Zachowaj, sprzedaj lub rozłóż, jeśli gra na to pozwala.",
+      "group": "Wzmacniacze",
+      "choices": {
+        "Keep": "Zachowaj",
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż"
+      }
+    },
+    "boosters_tier4": {
+      "label": "Poziom 4",
+      "description": "Zachowaj, sprzedaj lub rozłóż, jeśli gra na to pozwala.",
+      "group": "Wzmacniacze",
+      "choices": {
+        "Keep": "Zachowaj",
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż"
+      }
+    },
+    "boosters_tier5": {
+      "label": "Poziom 5",
+      "description": "Zachowaj, sprzedaj lub rozłóż, jeśli gra na to pozwala.",
+      "group": "Wzmacniacze",
+      "choices": {
+        "Keep": "Zachowaj",
+        "Sell": "Sprzedaj",
+        "Disassemble": "Rozłóż"
+      }
+    },
+    "consumables_keep": {
+      "label": "Zachowaj na stos",
+      "description": "Zachowaj tyle sztuk każdego stosu jedzenia, napoju lub wzmacniacza.",
+      "group": "Materiały zużywalne"
+    },
+    "ammo_much_better": {
+      "label": "Much Better Ammo",
+      "description": "Włącz wytwarzanie czterech dodatkowych rodzajów amunicji, jeśli mod jest zainstalowany.",
+      "group": "Opcjonalna kompatybilność"
+    },
+    "ammo_dual_wield": {
+      "label": "Expanded Dual Wielding / obie ręce",
+      "description": "Sprawdzaj obie aktywne bronie; wspólna amunicja jest wytwarzana tylko raz.",
+      "group": "Opcjonalna kompatybilność"
     }
   }
 }

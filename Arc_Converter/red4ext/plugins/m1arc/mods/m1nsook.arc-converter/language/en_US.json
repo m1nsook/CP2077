@@ -48,8 +48,8 @@
       "group": "Ammunition"
     },
     "sell_junk": {
-      "label": "Automatically sell junk for eddies",
-      "description": "Automatically convert ordinary junk and jewelry into eddies at the game's selling prices, including items already in V's backpack. Quest and protected items are skipped.",
+      "label": "Automatically process junk",
+      "description": "Process junk and jewelry using the selected action, including existing stacks.",
       "group": "Junk"
     },
     "weapon_action": {
@@ -99,6 +99,146 @@
       "label": "Tier 5 (+ variants)",
       "description": "Process newly acquired Tier 5 clothing.",
       "group": "Clothes"
+    },
+    "junk_action": {
+      "label": "Junk action",
+      "description": "Sell, disassemble or use the unit price threshold. Ineligible items are kept.",
+      "group": "Junk",
+      "choices": {
+        "Sell": "Sell",
+        "Disassemble": "Disassemble",
+        "By value": "By value"
+      }
+    },
+    "junk_price_threshold": {
+      "label": "Price threshold (€$)",
+      "description": "In By value mode, disassemble at or below this unit price; sell above it.",
+      "group": "Junk"
+    },
+    "food_enabled": {
+      "label": "Food and drinks",
+      "description": "Process eligible existing and newly acquired stacks. Off by default.",
+      "group": "Food and drinks"
+    },
+    "food_tier1": {
+      "label": "Tier 1",
+      "description": "Keep, sell or disassemble if the game permits it.",
+      "group": "Food and drinks",
+      "choices": {
+        "Keep": "Keep",
+        "Sell": "Sell",
+        "Disassemble": "Disassemble"
+      }
+    },
+    "food_tier2": {
+      "label": "Tier 2",
+      "description": "Keep, sell or disassemble if the game permits it.",
+      "group": "Food and drinks",
+      "choices": {
+        "Keep": "Keep",
+        "Sell": "Sell",
+        "Disassemble": "Disassemble"
+      }
+    },
+    "food_tier3": {
+      "label": "Tier 3",
+      "description": "Keep, sell or disassemble if the game permits it.",
+      "group": "Food and drinks",
+      "choices": {
+        "Keep": "Keep",
+        "Sell": "Sell",
+        "Disassemble": "Disassemble"
+      }
+    },
+    "food_tier4": {
+      "label": "Tier 4",
+      "description": "Keep, sell or disassemble if the game permits it.",
+      "group": "Food and drinks",
+      "choices": {
+        "Keep": "Keep",
+        "Sell": "Sell",
+        "Disassemble": "Disassemble"
+      }
+    },
+    "food_tier5": {
+      "label": "Tier 5",
+      "description": "Keep, sell or disassemble if the game permits it.",
+      "group": "Food and drinks",
+      "choices": {
+        "Keep": "Keep",
+        "Sell": "Sell",
+        "Disassemble": "Disassemble"
+      }
+    },
+    "boosters_enabled": {
+      "label": "Boosters",
+      "description": "Process eligible existing and newly acquired stacks. Off by default.",
+      "group": "Boosters"
+    },
+    "boosters_tier1": {
+      "label": "Tier 1",
+      "description": "Keep, sell or disassemble if the game permits it.",
+      "group": "Boosters",
+      "choices": {
+        "Keep": "Keep",
+        "Sell": "Sell",
+        "Disassemble": "Disassemble"
+      }
+    },
+    "boosters_tier2": {
+      "label": "Tier 2",
+      "description": "Keep, sell or disassemble if the game permits it.",
+      "group": "Boosters",
+      "choices": {
+        "Keep": "Keep",
+        "Sell": "Sell",
+        "Disassemble": "Disassemble"
+      }
+    },
+    "boosters_tier3": {
+      "label": "Tier 3",
+      "description": "Keep, sell or disassemble if the game permits it.",
+      "group": "Boosters",
+      "choices": {
+        "Keep": "Keep",
+        "Sell": "Sell",
+        "Disassemble": "Disassemble"
+      }
+    },
+    "boosters_tier4": {
+      "label": "Tier 4",
+      "description": "Keep, sell or disassemble if the game permits it.",
+      "group": "Boosters",
+      "choices": {
+        "Keep": "Keep",
+        "Sell": "Sell",
+        "Disassemble": "Disassemble"
+      }
+    },
+    "boosters_tier5": {
+      "label": "Tier 5",
+      "description": "Keep, sell or disassemble if the game permits it.",
+      "group": "Boosters",
+      "choices": {
+        "Keep": "Keep",
+        "Sell": "Sell",
+        "Disassemble": "Disassemble"
+      }
+    },
+    "consumables_keep": {
+      "label": "Keep per stack",
+      "description": "Keep this many units of each eligible food, drink or booster stack.",
+      "group": "Consumables"
+    },
+    "ammo_much_better": {
+      "label": "Much Better Ammo",
+      "description": "Enable crafting the four extra ammo types when Much Better Ammo is installed. Does nothing without it.",
+      "group": "Optional compatibility"
+    },
+    "ammo_dual_wield": {
+      "label": "Expanded Dual Wielding / both hands",
+      "description": "Check both active weapons using native game APIs; shared ammo is crafted only once.",
+      "group": "Optional compatibility"
     }
   }
 }

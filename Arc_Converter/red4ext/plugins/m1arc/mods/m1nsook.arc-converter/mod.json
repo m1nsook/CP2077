@@ -2,7 +2,7 @@
   "format": 1,
   "id": "m1nsook.arc-converter",
   "name": "Arc Converter - Automatic Item Processing",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "민숙 MISO @m1nsook",
   "scope": "Crafting",
   "shortDesc": "Auto-process newly acquired weapons and clothes by tier, craft ammo, and sell junk for eddies",
