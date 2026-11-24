@@ -41,7 +41,7 @@ def validate(catalog: Path, links: Path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     root = Path(__file__).resolve().parents[1]
-    mod = root / "bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins"
+    mod = root / "tools/catalog"
     parser.add_argument("--catalog", type=Path, default=mod / "catalog.tsv")
     parser.add_argument("--links", type=Path, default=mod / "quest_links.tsv")
     args = parser.parse_args()

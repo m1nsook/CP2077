@@ -9,8 +9,8 @@ root = Path(__file__).resolve().parents[1]
 ui = (root / "r6/scripts/UndiscoverMe/UndiscoverMeMapFilters.reds").read_text(encoding="utf-8")
 tweak = (root / "r6/tweaks/UndiscoverMe/filters.yaml").read_text(encoding="utf-8")
 core = (root / "r6/scripts/UndiscoverMe/UndiscoverMe.reds").read_text(encoding="utf-8")
-cet = (root / "bin/x64/plugins/cyber_engine_tweaks/mods/UndiscoverMe/init.lua").read_text(encoding="utf-8")
-runtime = (root / "bin/x64/plugins/cyber_engine_tweaks/mods/UndiscoverMe/catalog_runtime.lua").read_text(encoding="utf-8")
+
+catalog = (root / "r6/scripts/UndiscoverMe/UndiscoverMeCatalog.reds").read_text(encoding="utf-8")
 
 # Only one new quick-filter group, after the four original groups.
 assert "WorldMap.WorldMapQuickFiltersList.list:" in tweak
@@ -49,16 +49,18 @@ assert "if !this.m_udmQuickActive" in ui
 for prohibited in ("RegisterMappin", "UnregisterMappin", "ChangeEntryState",
                    "CompleteQuest", "Mappins.CustomMapMarkersVariant"):
     assert prohibited not in ui, prohibited
-assert "miso_rmp_catalog_enabled" in ui
-assert "miso_rmp_ncpd_disabled" in ui
-assert "miso_rmp_psycho_disabled" in ui
-assert "miso_rmp_tarot_disabled" in ui
-assert "miso_rmp_travel_disabled" in ui
+for key in ("enabled", "catalog", "ncpd", "psycho", "tarot", "travel"):
+    assert f'RMPState.Get("{key}")' in ui
+assert 'M1Arc_SetBool("m1nsook.undiscoverme"' in ui
+assert 'M1Arc_GetBool("m1nsook.undiscoverme"' in core
+assert catalog.count("ArrayPush(rows, UDMCatalogRow.Make(") == 212
+assert not list(root.glob("bin/**/*.lua"))
+assert "journal.GetQuests(context, finished)" in core
+assert "GetPointOfInterestMappinSavedState" in core
+assert "UDMOwnsPin(pin.GetNewMappinID())" in core
+assert "miso_rmp_all_disabled" in core
+print("PASS: fifth tab, native catalog and M1 Arc settings")
 
-# Keep existing renderer, 212-row catalog, and original fact/binding IDs.
-assert 'local MOD = "RevealMapPins"' in cet
-assert 'local TITLE = "UndiscoverMe"' in cet
-assert "ModSettings.mod\", \"UndiscoverMe" in core
-assert "JOURNAL_QUEST_IDS = 175" in runtime
-assert "if #rows ~= 212" in runtime
-print("PASS: UndiscoverMe is a fifth quick tab; Custom unchanged; safe restore")
+import json
+manifest = json.loads((root / "red4ext/plugins/m1arc/mods/m1nsook.undiscoverme/mod.json").read_text(encoding="utf-8"))
+assert manifest["scope"] == "Locations", "M1 Arc scope must be a registered category"

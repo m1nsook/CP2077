@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "m1nsook.undiscoverme",
+  "name": "UndiscoverMe",
+  "version": "1.1.0",
+  "author": "민숙 MISO @m1nsook",
+  "scope": "Locations",
+  "shortDesc": "Reveal undiscovered vanilla map markers",
+  "requires": {
+    "m1arc": "1.0.1"
+  }
+}

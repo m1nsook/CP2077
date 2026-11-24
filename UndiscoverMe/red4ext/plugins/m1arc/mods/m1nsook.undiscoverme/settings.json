@@ -1,0 +1,50 @@
+[
+  {
+    "id": "enabled",
+    "kind": "boolean",
+    "label": "Enable UndiscoverMe",
+    "description": "Master switch for selected vanilla markers.",
+    "group": "General",
+    "default": true
+  },
+  {
+    "id": "catalog",
+    "kind": "boolean",
+    "label": "Reveal additional map markers",
+    "description": "Show the classified catalog of undiscovered NCPD, Cyberpsycho and Tarot locations.",
+    "group": "General",
+    "default": false
+  },
+  {
+    "id": "travel",
+    "kind": "boolean",
+    "label": "Fast travel locations",
+    "description": "Display only; does not unlock destinations.",
+    "group": "Exploration",
+    "default": true
+  },
+  {
+    "id": "ncpd",
+    "kind": "boolean",
+    "label": "NCPD scanner hustles",
+    "description": "Assault in Progress, Organized Crime and Reported Crime.",
+    "group": "Exploration",
+    "default": true
+  },
+  {
+    "id": "psycho",
+    "kind": "boolean",
+    "label": "Cyberpsycho sightings",
+    "description": "Cyberpsycho locations, not quest stages.",
+    "group": "Exploration",
+    "default": true
+  },
+  {
+    "id": "tarot",
+    "kind": "boolean",
+    "label": "Tarot cards",
+    "description": "Tarot graffiti markers.",
+    "group": "Exploration",
+    "default": true
+  }
+]
