@@ -8,9 +8,9 @@ Vehicle.m1nsook_delamain_av_state:
 
 Vehicle.m1nsook_delamain_av:
   $base: Vehicle.q203_delamain_av
+  entityTemplatePath: m1nsook\delamain_av\excalibur.ent
   savable: false
   canOnlySpawnOnValidRoad: false
   vehDefaultState: Vehicle.m1nsook_delamain_av_state
   objectActions:
     - VehicleActions.VehicleMountBackLeft
-    - VehicleActions.VehicleMountBackRight

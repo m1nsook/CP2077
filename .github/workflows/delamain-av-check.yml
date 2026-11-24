@@ -9,13 +9,31 @@ permissions:
   contents: read
 jobs:
   prototype:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download pinned WolvenKit CLI
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/WolvenKit/WolvenKit/releases/download/10.0.0-beta.1/WolvenKit.Console-10.0.0-beta.1.zip'
+          $zip = Join-Path $env:RUNNER_TEMP 'wolvenkit.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'wolvenkit'
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          $cli = Get-ChildItem -Path $dir -Filter 'WolvenKit.CLI.exe' -Recurse | Select-Object -First 1
+          if (!$cli) { $cli = Get-ChildItem -Path $dir -Filter 'cp77tools.exe' -Recurse | Select-Object -First 1 }
+          if (!$cli) { throw 'WolvenKit CLI executable missing' }
+          "WOLVENKIT_CLI=$($cli.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Compile native workspot and occupant resource
+        shell: pwsh
+        run: python Delamain_AV/tools/build_resources.py "$env:WOLVENKIT_CLI"
       - name: Validate and package prototype
-        run: python3 Delamain_AV/tools/package_prototype.py
+        run: python Delamain_AV/tools/package_prototype.py
       - uses: actions/upload-artifact@v4
         with:
-          name: Delamain-AV-v0.2.0-dev.7
-          path: dist/Delamain-AV-v0.2.0-dev.7.zip
+          name: Delamain-AV-v0.2.1-dev.8
+          path: dist/Delamain-AV-v0.2.1-dev.8.zip
           if-no-files-found: error

@@ -2,10 +2,10 @@
   "format": 1,
   "id": "m1nsook.delamain-av",
   "name": "Delamain AV",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "민숙 MISO @m1nsook",
   "scope": "Gameplay",
-  "shortDesc": "Passenger-only Delamain AV native entry and exit experiment",
+  "shortDesc": "Delamain AV passenger entry and exit workspot",
   "requires": {
     "m1arc": "1.0.1"
   }

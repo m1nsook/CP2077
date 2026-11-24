@@ -10,7 +10,7 @@ settings = json.loads((manifest_dir / "settings.json").read_text(encoding="utf-8
 assert manifest["id"] == "m1nsook.delamain-av"
 assert manifest["scope"] == "Gameplay"
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", manifest["version"]), "M1 Arc only accepts numeric x.y.z manifest versions"
-assert manifest["version"] == "0.2.0"
+assert manifest["version"] == "0.2.1"
 required = manifest["requires"]["m1arc"]
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", required)
 assert tuple(map(int, required.split("."))) <= (1, 0, 1), "Requires exceeds M1 Arc loader compatibility constant"
@@ -37,10 +37,15 @@ yaml = (root / "r6/tweaks/DelamainAV/DelamainAV.yaml").read_text()
 assert "Vehicle.m1nsook_delamain_av:" in yaml
 assert "$base: Vehicle.q203_delamain_av" in yaml
 assert "VehicleMountFront" not in yaml and "VehicleHijack" not in yaml
-out = Path("dist/Delamain-AV-v0.2.0-dev.7.zip")
+resource = root / "archive/pc/mod/DelamainAV.archive"
+assert resource.is_file() and resource.stat().st_size > 100, "Native resource archive required"
+assert resource.read_bytes()[:4] == b"RDAR"
+assert (root / "archive/pc/mod/DelamainAV.xl").is_file()
+assert 'entityTemplatePath: m1nsook\\\\delamain_av\\\\excalibur.ent'.replace('\\\\', '\\') in yaml
+out = Path("dist/Delamain-AV-v0.2.1-dev.8.zip")
 out.parent.mkdir(exist_ok=True)
 with ZipFile(out, "w", ZIP_DEFLATED) as z:
-    for folder in ("r6", "red4ext"):
+    for folder in ("r6", "red4ext", "archive"):
         for file in sorted((root / folder).rglob("*")):
             if file.is_file():
                 z.write(file, file.relative_to(root).as_posix())

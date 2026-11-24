@@ -47,7 +47,7 @@
     "kind": "action",
     "label": "Exit as passenger",
     "buttonLabel": "Disembark stationary AV",
-    "description": "Stationary test: requests native passenger exit only when a valid workspot and exit direction are confirmed. No forced unmount or mod teleport.",
+    "description": "Requests the AV's native passenger exit using the custom workspot. No forced unmount or mod teleport.",
     "group": "Prototype"
   },
   {

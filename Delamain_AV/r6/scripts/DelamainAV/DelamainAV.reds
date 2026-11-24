@@ -122,7 +122,7 @@ public class DelamainAVSystem extends ScriptableSystem {
         ps.SetDoorInteractionState(EVehicleDoor.seat_front_left, VehicleDoorInteractionState.Disabled);
         ps.SetDoorInteractionState(EVehicleDoor.seat_front_right, VehicleDoorInteractionState.Disabled);
         ps.SetDoorInteractionState(EVehicleDoor.seat_back_left, VehicleDoorInteractionState.Available);
-        ps.SetDoorInteractionState(EVehicleDoor.seat_back_right, VehicleDoorInteractionState.Available);
+        ps.SetDoorInteractionState(EVehicleDoor.seat_back_right, VehicleDoorInteractionState.Disabled);
         ps.SetDoorInteractionState(EVehicleDoor.trunk, VehicleDoorInteractionState.Disabled);
         ps.SetDoorInteractionState(EVehicleDoor.hood, VehicleDoorInteractionState.Disabled);
       };
@@ -271,7 +271,7 @@ public class DelamainAVSystem extends ScriptableSystem {
       if IsDefined(info) {
         this.Log("INFO", "WORKSPOT_PHASE: entering=" + ToString(info.entering) + "; exiting=" + ToString(info.exiting) + "; active=" + ToString(info.isActive));
       };
-      this.Log("INFO", "WORKSPOT_EXIT: hasExitNodes=" + ToString(ws.HasExitNodes(player, true, true, true)));
+      this.Log("INFO", "WORKSPOT_EXIT: hasExitNodes=" + ToString(ws.HasExitNodes(player, true, true, true)) + "; structural=" + ToString(ws.HasExitNodes(player, true, true, false)));
     };
   }
 
@@ -282,8 +282,10 @@ public class DelamainAVSystem extends ScriptableSystem {
     if !ws.HasExitNodes(player, true, true, true) { return false; };
     let info = ws.GetExtendedInfo(player);
     if !IsDefined(info) || !info.isActive || info.entering || info.exiting { return false; };
-    let pos = vehicle.CanUnmount(true, player);
-    return NotEquals(pos.direction, vehicleExitDirection.NoDirection);
+    // Vanilla HandleExitRequest permits an AV (neither CarObject nor BikeObject)
+    // to use the native workspot exit even without a car-style exit direction.
+    // The workspot/navmesh check above remains mandatory.
+    return true;
   }
 
   private func ExitPassenger(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
@@ -300,7 +302,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
     this.LogWorkspot(player, vehicle);
     if !this.CanRequestNativeExit(player, vehicle) {
-      this.Log("WARNING", "EXIT_BLOCKED: no verified native passenger exit workspot or safe exit direction. Reload the test save; no forced unmount will be attempted.");
+      this.Log("WARNING", "EXIT_BLOCKED: no verified native passenger exit workspot or navigable exit. Reload the test save; no forced unmount will be attempted.");
       return;
     };
     this.m_closeWait = 0;
