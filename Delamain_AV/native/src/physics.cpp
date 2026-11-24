@@ -6,7 +6,7 @@
 #include <RED4ext/RED4ext.hpp>
 #include <RED4ext/RTTITypes.hpp>
 #include <RED4ext/Scripting/Natives/vehicleBaseObject.hpp>
-#include <RED4ext/Scripting/Natives/Generated/vehicle/AVBaseObject.hpp>
+#include <RED4ext/Scripting/Natives/Generated/vehicle/CarBaseObject.hpp>
 #include <RED4ext/Scripting/Natives/Generated/Vector3.hpp>
 #include <Windows.h>
 #include <winver.h>
@@ -34,6 +34,7 @@ constexpr size_t kOwner = 0x180;
 constexpr size_t kVelocity = 0x18;
 constexpr size_t kAngular = 0x24;
 constexpr size_t kMass = 0x1BC;
+constexpr size_t kGravity = 0x1B0;
 constexpr size_t kOwnerId = 0x48;
 const TweakDBID kRecord("Vehicle.m1nsook_delamain_av");
 static_assert(offsetof(ent::Entity, entityID) == kOwnerId);
@@ -54,6 +55,7 @@ struct Command {
     uint64_t lastWake = 0;
     float desired = 0;
     float applied = 0;
+    int32_t pendingBody = 0;
     int32_t samples = 0;
     int32_t fault = 0;
 };
@@ -146,7 +148,9 @@ void ApplyCommand(void* physics, float deltaTime) {
     }
     uintptr_t bodyAddress = 0;
     if (!ResolveBody(owner, reinterpret_cast<uintptr_t>(physics), bodyAddress)) {
-        Fault(-11); return;
+        // A materialized entity can still be initializing physics. Let the
+        // bounded script watchdog wait for a valid reciprocal body.
+        return;
     }
     auto* body = reinterpret_cast<void*>(bodyAddress);
     float mass = 0;
@@ -168,7 +172,15 @@ void ApplyCommand(void* physics, float deltaTime) {
     angular.X = Approach(angular.X, 0.f, 4.f * dt);
     angular.Y = Approach(angular.Y, 0.f, 4.f * dt);
     angular.Z = Approach(angular.Z, 0.f, 4.f * dt);
-    if (!Write(body, kVelocity, velocity) || !Write(body, kAngular, angular)) {
+    uint8_t gravity = 0;
+    if (!Read(body, kGravity, gravity) || gravity > 1) {
+        Fault(-12); return;
+    }
+    // DAV develop's velocity-hold descent disables gravity on the physics
+    // tick; retain that state only on the private nonpersistent AV.
+    const uint8_t disabled = 0;
+    if (!Write(body, kGravity, disabled) ||
+        !Write(body, kVelocity, velocity) || !Write(body, kAngular, angular)) {
         Fault(-10); return;
     }
     if (g_cmd.samples < 1000000) ++g_cmd.samples;
@@ -191,7 +203,7 @@ bool Install() {
 bool PrivateAV(const Handle<Vehicle>& v) {
     if (!v) return false;
     auto* cls = v->GetNativeType();
-    auto* av = CRTTISystem::Get()->GetClass("vehicleAVBaseObject");
+    auto* av = CRTTISystem::Get()->GetClass("vehicleCarBaseObject");
     if (!cls || !av || !cls->IsA(av)) return false;
     auto* getRecord = cls->GetFunction("GetRecordID");
     TweakDBID record;
@@ -207,11 +219,6 @@ void Begin(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
     else if (!PrivateAV(v) || !v->entityID.hash) code = -3;
     else if (!Install()) code = -4;
     else {
-        uintptr_t body = 0;
-        if (!ResolveBody(reinterpret_cast<uintptr_t>(v.GetPtr()), 0, body)) {
-            if (out) *out = -11;
-            return;
-        }
         {
             std::lock_guard guard(g_mutex);
             if (g_active.load(std::memory_order_relaxed)) { if (out) *out = -5; return; }
@@ -244,17 +251,24 @@ void Pulse(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
                      std::isfinite(speed) && speed >= -2.f && speed <= 0.f) {
                 uintptr_t body = 0;
                 uint32_t state = 0;
-                if (!ResolveBody(g_cmd.owner, 0, body) ||
-                    !Read(v.GetPtr(), kPhysicsState, state) || state > 0x1FF) {
-                    Fault(-11); code = -11;
-                } else {
-                    g_cmd.desired = speed;
-                    g_cmd.deadline = now + 1500;
+                // Bind first, then wake, then wait for the reciprocal
+                // pointer chain; DAV also waits for simulation to initialize.
+                const bool ready = ResolveBody(g_cmd.owner, 0, body);
+                g_cmd.desired = speed;
+                g_cmd.deadline = now + 1500;
+                if (ready) {
+                    g_cmd.pendingBody = 0;
                     code = g_cmd.samples;
-                    if (state != 0 && now - g_cmd.lastWake >= 250) {
-                        g_cmd.lastWake = now;
-                        wake = true;
-                    }
+                } else {
+                    ++g_cmd.pendingBody;
+                    // -20 is a nonterminal initialization status.
+                    code = -20;
+                    if (g_cmd.pendingBody >= 80) { Fault(-11); code = -11; }
+                }
+                const bool knownState = Read(v.GetPtr(), kPhysicsState, state) && state <= 0x1FF;
+                if ((!ready || (knownState && state != 0)) && now - g_cmd.lastWake >= 250) {
+                    g_cmd.lastWake = now;
+                    wake = true;
                 }
             } else { Fault(-7); code = -7; }
         }
@@ -316,7 +330,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
 RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info) {
     info->name = L"Delamain AV Physics";
     info->author = L"MISO";
-    info->version = RED4EXT_V1_SEMVER(0, 2, 10);
+    info->version = RED4EXT_V1_SEMVER(0, 2, 11);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }

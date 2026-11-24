@@ -29,7 +29,7 @@
           },
           "Chunks": [
             {
-              "$type": "vehicleAVBaseObject"
+              "$type": "vehicleCarBaseObject"
             },
             {
               "$type": "gameOccupantSlotComponent",
@@ -434,7 +434,7 @@
       "entity": {
         "HandleId": "1",
         "Data": {
-          "$type": "vehicleAVBaseObject"
+          "$type": "vehicleCarBaseObject"
         }
       },
       "includeInstanceBuffer": null,

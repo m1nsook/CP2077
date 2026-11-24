@@ -10,7 +10,7 @@ settings = json.loads((manifest_dir / "settings.json").read_text(encoding="utf-8
 assert manifest["id"] == "m1nsook.delamain-av"
 assert manifest["scope"] == "Gameplay"
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", manifest["version"]), "M1 Arc only accepts numeric x.y.z manifest versions"
-assert manifest["version"] == "0.2.10"
+assert manifest["version"] == "0.2.11"
 required = manifest["requires"]["m1arc"]
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", required)
 assert tuple(map(int, required.split("."))) <= (1, 0, 1), "Requires exceeds M1 Arc loader compatibility constant"
@@ -65,10 +65,13 @@ assert "kTickHash = 2526549425" in cpp and "ResolveBody(" in cpp
 assert "g_tickOriginal(physics, deltaTime)" in cpp and "g_forceOriginal" not in cpp
 native = root / "red4ext/plugins/DelamainAV/DelamainAV.dll"
 assert native.is_file() and native.read_bytes()[:2] == b"MZ", "Native physics plugin required"
-assert "TAXI_LANDING_HANDOFF" in script
+assert "TAXI_NATIVE_SETTLING" in script and "TAXI_LANDING_HANDOFF" not in script
+assert script.count("system.CreateEntity(spec)") == 1
+assert "vehicle as CarObject" in script
+assert "kGravity = 0x1B0" in cpp
 assert "TAXI_MOUNT_BLOCKED" in script
 assert "TAXI_BOARD_POSITION_INVALID" in script
-out = Path("dist/Delamain-AV-v0.2.10-dev.17")
+out = Path("dist/Delamain-AV-v0.2.11-dev.18")
 if out.exists():
     shutil.rmtree(out)
 out.mkdir(parents=True)

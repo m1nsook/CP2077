@@ -4,6 +4,6 @@ resource:
       - m1nsook\delamain_av\excalibur.ent
   patch:
     m1nsook\delamain_av\occupant_patch.ent:
-      props: [ components, resolvedDependencies ]
+      props: [ entity, components, resolvedDependencies ]
       targets:
         - m1nsook\delamain_av\excalibur.ent

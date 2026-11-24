@@ -33,7 +33,9 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_reopenBlocked: Bool;
   private let m_airExitLogged: Bool;
   private let m_summonQueued: Bool;
-  private let m_landingReplacement: Bool;
+  private let m_landingSettling: Bool;
+  private let m_nativeHolding: Bool;
+  private let m_touchdownTicks: Int32;
   private let m_boardGroundRejected: Bool;
   private let m_physicsSamples: Int32;
 
@@ -116,7 +118,9 @@ public class DelamainAVSystem extends ScriptableSystem {
     this.m_arriving = false;
     this.m_airborne = false;
     this.m_arrivalStep = 0;
-    this.m_landingReplacement = false;
+    this.m_landingSettling = false;
+    this.m_nativeHolding = false;
+    this.m_touchdownTicks = 0;
     this.m_boardGroundRejected = false;
     this.m_reopenBlocked = false;
     this.m_airExitLogged = false;
@@ -176,23 +180,25 @@ public class DelamainAVSystem extends ScriptableSystem {
         ps.SetDoorInteractionState(EVehicleDoor.hood, VehicleDoorInteractionState.Disabled);
       };
     };
-    let av = vehicle as AVObject;
-    if IsDefined(av) {
-      this.SetThrusters(vehicle, this.m_arriving);
-      this.Log("INFO", "Spawned custom AVObject; arriving=" + ToString(this.m_arriving));
-    } else {
-      this.Log("WARNING", "Entity is a VehicleObject but not an AVObject. Flight is not available.");
+    // The private ArchiveXL copy replaces only the entity root class,
+    // not the Excalibur's visuals, rig or cinematic passenger workspot.
+    if !IsDefined(vehicle as CarObject) {
+      this.AbortArrival(vehicle, "private entity is not the expected car-based Excalibur; inspect ArchiveXL patch");
+      return;
     };
+    this.SetThrusters(vehicle, this.m_arriving);
+    this.Log("INFO", "Spawned private car-physics Excalibur; arriving=" + ToString(this.m_arriving));
     this.m_ready = true;
     if this.m_arriving {
       this.Door(vehicle, false);
       this.m_physicsSamples = 0;
       let result = DelamainAV_PhysicsBegin(vehicle);
       if result != 1 {
-        this.AbortArrival(vehicle, "native bridge refused startup (code -11 means reciprocal physics pointer validation failed); code=" + ToString(result));
+        this.AbortArrival(vehicle, "native bridge refused startup; code=" + ToString(result));
         return;
       };
-      this.Log("INFO", "TAXI_ARRIVAL_NATIVE: physics armed; waiting for dedicated resistance physics tick.");
+      this.m_nativeHolding = true;
+      this.Log("INFO", "TAXI_ARRIVAL_NATIVE: car-physics entity bound; waiting for native physics initialization.");
       this.ScheduleArrival();
     } else {
       this.m_groundCheckWait = 6;
@@ -216,54 +222,17 @@ public class DelamainAVSystem extends ScriptableSystem {
     this.Log("INFO", "AV_AUDIO_REQUEST: original Excalibur exterior landing sound.");
   }
 
-  // The descent entity is never boardable. Codeware SetWorldTransform moved its
-  // visual transform, but dev.14 mounting restored its original spawn height.
-  // Replace the unoccupied arrival entity with the proven ground-spawn record
-  // before any passenger can mount. No occupied transforms or forced unmount.
+  // Keep the same entity and authoritative physics position. Hold zero
+  // velocity at the landing point, then verify clearance before boarding.
   private func FinishArrival(vehicle: ref<VehicleObject>) -> Void {
-    let system = GameInstance.GetDynamicEntitySystem();
-    if !IsDefined(system) || !system.IsReady() {
-      this.m_arriving = false;
-      this.Log("ERROR", "TAXI_LANDING_HANDOFF_FAILED: entity system unavailable; boarding blocked.");
-      return;
-    };
-    let mounts = GameInstance.GetMountingFacility(vehicle.GetGame()).GetMountingInfoMultipleWithObjects(null, vehicle);
-    if vehicle.IsPlayerMounted() || ArraySize(mounts) > 0 {
-      this.m_arriving = false;
-      this.Log("ERROR", "TAXI_LANDING_HANDOFF_FAILED: occupied arrival entity; not deleting.");
-      return;
-    };
-    DelamainAV_PhysicsStop(this.m_id);
+    if !IsDefined(vehicle) || vehicle.IsPlayerMounted() { return; };
     this.SetThrusters(vehicle, false);
     this.m_arriving = false;
-    this.m_ready = false;
     this.m_groundStable = false;
     this.m_groundValid = false;
-    if !system.DeleteEntity(this.m_id) {
-      this.Log("ERROR", "TAXI_LANDING_HANDOFF_FAILED: deletion failed; boarding blocked.");
-      return;
-    };
-    this.m_id = EntityID();
-    let spec = new DynamicEntitySpec();
-    spec.recordID = t"Vehicle.m1nsook_delamain_av";
-    spec.position = this.m_spawnTarget;
-    spec.orientation = this.m_arrivalOrientation;
-    spec.persistState = false;
-    spec.persistSpawn = false;
-    spec.alwaysSpawned = true;
-    spec.spawnInView = true;
-    spec.active = true;
-    this.m_id = system.CreateEntity(spec);
-    if !EntityID.IsDefined(this.m_id) {
-      this.Log("ERROR", "TAXI_LANDING_HANDOFF_FAILED: landed entity creation failed.");
-      this.m_airborne = false;
-      return;
-    };
-    this.m_landingReplacement = true;
-    this.m_wait = 20;
-    this.m_doorWait = 0;
-    this.m_doorOpen = false;
-    this.Log("INFO", "TAXI_LANDING_HANDOFF: ground-origin passenger AV created; verifying before boarding.");
+    this.m_landingSettling = true;
+    this.m_groundCheckWait = 6;
+    this.Log("INFO", "TAXI_NATIVE_SETTLING: same entity retained, zero velocity hold, verifying ground.");
   }
 
   private func ScheduleArrival() -> Void {
@@ -275,6 +244,7 @@ public class DelamainAVSystem extends ScriptableSystem {
 
   private func AbortArrival(vehicle: ref<VehicleObject>, reason: String) -> Void {
     DelamainAV_PhysicsStop(this.m_id);
+    this.m_nativeHolding = false;
     this.m_arriving = false;
     this.m_ready = false;
     this.Log("ERROR", "TAXI_NATIVE_ABORT: " + reason + ". No transform fallback.");
@@ -325,6 +295,11 @@ public class DelamainAVSystem extends ScriptableSystem {
     let speed = -MinF(1.35, MaxF(0.12, remaining * 0.85));
     if remaining <= 0.15 { speed = 0.0; };
     let samples = DelamainAV_PhysicsPulse(vehicle, speed);
+    if samples == -20 {
+      if this.m_arrivalStep % 20 == 0 { this.Log("INFO", "TAXI_NATIVE_INIT: waiting for reciprocal physics body."); };
+      this.ScheduleArrival();
+      return;
+    };
     if samples < 0 {
       this.AbortArrival(vehicle, "physics bridge fault=" + ToString(samples));
       return;
@@ -332,15 +307,20 @@ public class DelamainAVSystem extends ScriptableSystem {
     if this.m_arrivalStep % 20 == 0 {
       this.Log("INFO", "TAXI_NATIVE_TRACE: callbackSamples=" + ToString(samples) + "; remaining=" + ToString(remaining) + "; targetVz=" + ToString(speed) + "; lateral=" + ToString(lateral));
     };
-    if this.m_arrivalStep >= 40 && samples == 0 {
+    if this.m_arrivalStep >= 100 && samples == 0 {
       this.AbortArrival(vehicle, "no matching resistance physics tick");
       return;
     };
     if remaining <= 0.15 && samples > 0 {
-      this.m_arrivalStep = 100;
-      this.Log("INFO", "TAXI_NATIVE_TOUCHDOWN: actual descent reached pickup; samples=" + ToString(samples));
-      this.FinishArrival(vehicle);
-      return;
+      this.m_touchdownTicks += 1;
+      if this.m_touchdownTicks >= 8 {
+        this.m_arrivalStep = 100;
+        this.Log("INFO", "TAXI_NATIVE_TOUCHDOWN: same entity reached pickup; samples=" + ToString(samples));
+        this.FinishArrival(vehicle);
+        return;
+      };
+    } else {
+      this.m_touchdownTicks = 0;
     };
     if this.m_arrivalStep >= 360 {
       this.AbortArrival(vehicle, "native descent timed out");
@@ -427,7 +407,7 @@ public class DelamainAVSystem extends ScriptableSystem {
         this.Log("WARNING", "GROUND_DRIFT: valid position differs from requested clearance. Do not board if clipped.");
       } else {
         this.Log("INFO", "GROUND_PASS: clearance within tolerance. Confirm visible landing gear.");
-        if this.m_landingReplacement && this.m_airborne && this.m_arrivalStep >= 100 {
+        if this.m_landingSettling && this.m_airborne && this.m_arrivalStep >= 100 {
           this.m_airborne = false;
           let controller = vehicle.GetAccessoryController();
           if IsDefined(controller) {
@@ -435,10 +415,10 @@ public class DelamainAVSystem extends ScriptableSystem {
             if IsDefined(ps) { ps.SetDoorInteractionState(EVehicleDoor.seat_back_left, VehicleDoorInteractionState.Available); };
           };
           if this.IsLanded(vehicle) {
-            this.m_landingReplacement = false;
+            this.m_landingSettling = false;
             this.LandingSound(vehicle);
             this.Door(vehicle, true);
-            this.Log("INFO", "TAXI_PICKUP_READY: ground-origin passenger AV verified, entrance opened.");
+            this.Log("INFO", "TAXI_PICKUP_READY: same native physics entity verified, entrance opened.");
           } else {
             this.m_airborne = true;
             if IsDefined(controller) {
@@ -801,7 +781,8 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.m_airborne = false;
       this.m_arriving = false;
       this.m_reopenBlocked = false;
-      this.m_landingReplacement = false;
+      this.m_landingSettling = false;
+      this.m_nativeHolding = false;
       this.m_boardGroundRejected = false;
       this.Log("INFO", "Test AV removed.");
     } else {
@@ -829,6 +810,17 @@ public class DelamainAVSystem extends ScriptableSystem {
           if this.m_wait == 0 {
             this.Log("ERROR", "AV did not materialize in 10 seconds. Use Remove before retrying.");
           };
+        };
+      };
+      // DAV keeps zero velocity on the landed vehicle. Keep our command
+      // lease alive only for the exact tracked entity; never issue flight
+      // commands with a passenger aboard.
+      if this.m_nativeHolding && !this.m_arriving && IsDefined(vehicle) {
+        let hold = DelamainAV_PhysicsPulse(vehicle, 0.0);
+        if hold < 0 {
+          this.m_nativeHolding = false;
+          this.m_groundStable = false;
+          this.Log("ERROR", "TAXI_NATIVE_HOLD_LOST: code=" + ToString(hold));
         };
       };
       this.GroundCheck(vehicle);

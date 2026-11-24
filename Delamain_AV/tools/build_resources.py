@@ -58,6 +58,8 @@ with tempfile.TemporaryDirectory() as temp:
             print("q000 disembark animset verified for both player rigs", flush=True)
         else:
             compiled = data["compiledData"]["Data"]["Chunks"]
+            assert data["entity"]["Data"]["$type"] == "vehicleCarBaseObject"
+            assert compiled[0]["$type"] == "vehicleCarBaseObject"
             component = next(x for x in compiled if x["$type"] == "gameOccupantSlotComponent")
             assert component["id"] == "1640045072000864256"
             assert value(component["name"]) == "OccupantSlots"
