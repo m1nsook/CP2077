@@ -1,7 +1,7 @@
 from pathlib import Path
 import json
 import re
-from zipfile import ZipFile, ZIP_DEFLATED
+import shutil
 
 root = Path(__file__).resolve().parents[1]
 manifest_dir = root / "red4ext/plugins/m1arc/mods/m1nsook.delamain-av"
@@ -10,12 +10,12 @@ settings = json.loads((manifest_dir / "settings.json").read_text(encoding="utf-8
 assert manifest["id"] == "m1nsook.delamain-av"
 assert manifest["scope"] == "Gameplay"
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", manifest["version"]), "M1 Arc only accepts numeric x.y.z manifest versions"
-assert manifest["version"] == "0.2.6"
+assert manifest["version"] == "0.2.7"
 required = manifest["requires"]["m1arc"]
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", required)
 assert tuple(map(int, required.split("."))) <= (1, 0, 1), "Requires exceeds M1 Arc loader compatibility constant"
 ids = {item["id"] for item in settings if item["kind"] == "action"}
-assert ids == {"spawn", "open", "board", "close", "exit", "status", "remove"}
+assert ids == {"spawn", "status", "remove"}
 assert any(item["id"] == "ground_clearance" and item["kind"] == "float" for item in settings)
 script = (root / "r6/scripts/DelamainAV/DelamainAV.reds").read_text()
 assert set(re.findall(r'M1Arc_ConsumeAction\("m1nsook.delamain-av", "([^"]+)"\)', script)) == ids
@@ -51,14 +51,16 @@ assert resource.is_file() and resource.stat().st_size > 100, "Native resource ar
 assert resource.read_bytes()[:4] == b"RDAR"
 assert (root / "archive/pc/mod/DelamainAV.xl").is_file()
 assert 'entityTemplatePath: m1nsook\\\\delamain_av\\\\excalibur.ent'.replace('\\\\', '\\') in yaml
-out = Path("dist/Delamain-AV-v0.2.6-dev.13.zip")
-out.parent.mkdir(exist_ok=True)
-with ZipFile(out, "w", ZIP_DEFLATED) as z:
-    for folder in ("r6", "red4ext", "archive"):
-        for file in sorted((root / folder).rglob("*")):
-            if file.is_file():
-                z.write(file, file.relative_to(root).as_posix())
-with ZipFile(out) as z:
-    assert z.testzip() is None
+ui = (root / "r6/scripts/DelamainAV/DelamainAVSummon.reds").read_text(encoding="utf-8")
+assert "AVSummonRows" in ui and "QueueSummon()" in ui
+assert "TAXI_EXIT_BLOCKED" in script and "TAXI_PICKUP_READY" in script
+assert "vehicle.SetWorldTransform(transform)" in script
+out = Path("dist/Delamain-AV-v0.2.7-dev.14")
+if out.exists():
+    shutil.rmtree(out)
+out.mkdir(parents=True)
+for folder in ("r6", "red4ext", "archive"):
+    shutil.copytree(root / folder, out / folder)
+assert not list(out.rglob("*.zip")), "No nested ZIPs"
 print("Static checks passed. REDscript compilation and in-game behavior remain unverified.")
 print(out)

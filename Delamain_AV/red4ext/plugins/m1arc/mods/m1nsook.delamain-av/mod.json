@@ -2,10 +2,10 @@
   "format": 1,
   "id": "m1nsook.delamain-av",
   "name": "Delamain AV",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "author": "민숙 MISO @m1nsook",
   "scope": "Gameplay",
-  "shortDesc": "Delamain AV passenger entry and exit workspot",
+  "shortDesc": "Delamain AV taxi pickup service",
   "requires": {
     "m1arc": "1.0.1"
   }

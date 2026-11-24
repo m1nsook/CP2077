@@ -90,3 +90,30 @@ and displacement every 0.5 s during exit. Codeware version must provide that
 API. Door only closes after native state release and observed movement.
 The 1 m displacement is a diagnostic heuristic, not proof of exterior clearance.
 The intended motion and runtime cleanup are not yet verified.
+
+## dev.14 — native taxi pickup and automatic entrance
+
+Preserves dev.13 workspot and exit animation unchanged. The native summon popup
+gets a separate top-row Delamain AV, with the vanilla cab's icon/style. No
+garage ownership, original cab registration, or quest facts. Selecting it
+requests the independent dynamic AV. On clear ground it spawns 6 m above
+pickup and descends over roughly five seconds using Codeware Entity.SetWorldTransform.
+This is an experimental unoccupied transform-based descent, not full flight
+physics or a validated obstacle planner. The centre overhead ray is not a
+complete vehicle-volume clearance check. If actual position diverges, abort
+and keep boarding disabled. M1 Arc retains only stationary diagnostic spawn,
+status, remove and clearance. No manual door actions. Entrance opens on
+verified arrival/approach, closes after mounting/exit, and does not reopen
+until V moves away. Exit requires a live raycast and verified parked position.
+
+Vanilla map integration research: UISystem.RequestDelamainTaxiMenu opens the
+existing taxi map. WorldMapMenuGameController.UpdateTravelDestination queues
+SetTravelDestinationRequest(mappinID,cost); MappinSystem.GetMappin(id) and
+IMappin.GetWorldPosition can resolve the destination. StartDelamainTaxiRequest
+normally starts road AutoDrive via DelamainTaxiComponent and must be scoped
+to the AV instead. Do not open the map until occupied flight and destination
+landing are implemented; the stock taxi must remain unaffected.
+
+Actions uploads the staged installation directory directly (one ZIP).
+No archive or passenger animation changes. New UI, transform motion and
+ground checks require runtime verification; no occupied ride yet.

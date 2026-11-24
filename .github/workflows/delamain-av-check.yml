@@ -34,6 +34,6 @@ jobs:
         run: python Delamain_AV/tools/package_prototype.py
       - uses: actions/upload-artifact@v4
         with:
-          name: Delamain-AV-v0.2.6-dev.13
-          path: dist/Delamain-AV-v0.2.6-dev.13.zip
+          name: Delamain-AV-v0.2.7-dev.14
+          path: dist/Delamain-AV-v0.2.7-dev.14/
           if-no-files-found: error

@@ -4,7 +4,7 @@
     "kind": "float",
     "label": "Test ground clearance (m)",
     "description": "Test AV origin height above a static surface. Default 0.75 m based on dev.4 visual feedback. Set explicitly; existing saved values are preserved.",
-    "group": "Prototype",
+    "group": "Diagnostics",
     "min": 0.75,
     "max": 2,
     "step": 0.05,
@@ -13,42 +13,10 @@
   {
     "id": "spawn",
     "kind": "action",
-    "label": "Spawn test AV",
-    "buttonLabel": "Order test AV",
-    "description": "Stand on flat, empty ground facing at least 12 m of clear space. Spawns one stationary test vehicle.",
-    "group": "Prototype"
-  },
-  {
-    "id": "open",
-    "kind": "action",
-    "label": "Open passenger door",
-    "buttonLabel": "Open Excalibur entrance",
-    "description": "Requests the physical front-left entrance, not the rear passenger seat.",
-    "group": "Prototype"
-  },
-  {
-    "id": "board",
-    "kind": "action",
-    "label": "Board as passenger",
-    "buttonLabel": "Board rear-left seat",
-    "description": "Stand close to the open entrance on clear ground. Uses the native rear-left passenger mount while preserving position for entry animation.",
-    "group": "Prototype"
-  },
-  {
-    "id": "close",
-    "kind": "action",
-    "label": "Close entrance",
-    "buttonLabel": "Close Excalibur entrance",
-    "description": "Requests closing the physical entrance. The door also closes automatically after mounting.",
-    "group": "Prototype"
-  },
-  {
-    "id": "exit",
-    "kind": "action",
-    "label": "Exit as passenger",
-    "buttonLabel": "Disembark stationary AV",
-    "description": "Requests the AV's native passenger exit using the custom workspot. No forced unmount or mod teleport.",
-    "group": "Prototype"
+    "label": "Spawn stationary diagnostic AV",
+    "buttonLabel": "Spawn diagnostic AV",
+    "description": "Diagnostic-only ground spawn. Use the native vehicle list for visible taxi arrival.",
+    "group": "Diagnostics"
   },
   {
     "id": "status",
@@ -56,7 +24,7 @@
     "label": "Inspect vehicle",
     "buttonLabel": "Log AV status",
     "description": "Reports record, clearance, mounting slot, native PSM and workspot/exit-node availability.",
-    "group": "Prototype"
+    "group": "Diagnostics"
   },
   {
     "id": "remove",
@@ -64,6 +32,6 @@
     "label": "Remove test AV",
     "buttonLabel": "Despawn empty AV",
     "description": "Exit the AV first. Refuses to delete an occupied vehicle.",
-    "group": "Prototype"
+    "group": "Diagnostics"
   }
 ]
