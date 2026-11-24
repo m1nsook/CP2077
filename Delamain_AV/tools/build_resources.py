@@ -40,6 +40,9 @@ with tempfile.TemporaryDirectory() as temp:
             assert value(nodes[2]["slotName"]) == "default"
             assert value(nodes[0]["animName"]) == "stand__2h_on_sides__01__to__sit_couch__AV_excalibur__01__turn270__getting_into_AV__01"
             assert value(nodes[2]["animName"]) == "sit_couch__AV_excalibur__01__to__stand__2h_on_sides__01__turn270__01"
+            assert nodes[2]["stayOnNavmesh"] == 0
+            assert nodes[2]["snapZToNavmesh"] == 0
+            assert nodes[2]["forceNoZSnap"] == 1
             assert nodes[1]["loopInfinitely"] == 1
             assert len(tree["finalAnimsets"]) == 2
         else:

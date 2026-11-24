@@ -471,9 +471,9 @@
                     },
                     "disableAutoTransition": 0,
                     "isSynchronized": 0,
-                    "stayOnNavmesh": 1,
-                    "snapZToNavmesh": 1,
-                    "forceNoZSnap": 0,
+                    "stayOnNavmesh": 0,
+                    "snapZToNavmesh": 0,
+                    "forceNoZSnap": 1,
                     "slotName": {
                       "$type": "CName",
                       "$storage": "string",

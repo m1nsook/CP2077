@@ -1,7 +1,8 @@
 module DelamainAV
 
 // M1: stationary prototype only. No flight, input hooks, vehicle ownership,
-// quest facts, global vehicle hooks or mutation of the original quest record.
+// quest facts or mutation of the original quest record. PSM/door wrappers below
+// delegate unchanged for every vehicle except the private mod record.
 public class DelamainAVSystem extends ScriptableSystem {
   private let m_running: Bool;
   private let m_id: EntityID;
@@ -279,13 +280,31 @@ public class DelamainAVSystem extends ScriptableSystem {
     if !this.IsPassengerState(player) { return false; };
     let ws = GameInstance.GetWorkspotSystem(player.GetGame());
     if !ws.IsInVehicleWorkspot(vehicle, player, n"seat_back_left") { return false; };
-    if !ws.HasExitNodes(player, true, true, true) { return false; };
+    if !ws.HasExitNodes(player, true, true, false) { return false; };
     let info = ws.GetExtendedInfo(player);
     if !IsDefined(info) || !info.isActive || info.entering || info.exiting { return false; };
-    // Vanilla HandleExitRequest permits an AV (neither CarObject nor BikeObject)
-    // to use the native workspot exit even without a car-style exit direction.
-    // The workspot/navmesh check above remains mandatory.
+    // Custom cinematic exit is not a road-car navmesh exit. Ground clearance,
+    // stationary position and real workspot nodes are checked by the caller.
+    // The scoped PSM wrapper prevents the vanilla teleport recovery.
     return true;
+  }
+
+  // Manual native input and the M1 Arc button share this guarded door/exit path.
+  public func RequestManualExit(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
+    if !IsDefined(vehicle) || !Equals(vehicle.GetEntityID(), this.m_id) { return; };
+    this.ExitPassenger(player, vehicle);
+  }
+
+  private func ObserveManualPassenger(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
+    if !IsDefined(vehicle) || !this.m_ready || this.m_returnValid || this.m_boardWait > 0 || this.m_exitWait > 0 { return; };
+    if !this.IsPassengerState(player) { return; };
+    let info = GameInstance.GetMountingFacility(player.GetGame()).GetMountingInfoSingleWithObjects(player);
+    if !Equals(info.parentId, vehicle.GetEntityID()) || !Equals(info.slotId.id, n"seat_back_left") { return; };
+    if !this.MeasureGround(vehicle, "GROUND_MANUAL_BOARD") { return; };
+    this.m_boardPosition = vehicle.GetWorldPosition();
+    this.m_returnValid = true;
+    this.m_closeWait = 6;
+    this.Log("INFO", "MANUAL_BOARD: native passenger detected; physical door will close.");
   }
 
   private func ExitPassenger(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
@@ -302,7 +321,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
     this.LogWorkspot(player, vehicle);
     if !this.CanRequestNativeExit(player, vehicle) {
-      this.Log("WARNING", "EXIT_BLOCKED: no verified native passenger exit workspot or navigable exit. Reload the test save; no forced unmount will be attempted.");
+      this.Log("WARNING", "EXIT_BLOCKED: no active structural passenger exit workspot. Reload the test save; no forced unmount will be attempted.");
       return;
     };
     this.m_closeWait = 0;
@@ -323,6 +342,7 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.m_exitWait = 0;
       this.m_exitRequested = false;
       this.m_returnValid = false;
+      this.Door(vehicle, false);
       this.Log("INFO", "NATIVE_EXIT_COMPLETE: mounting relationship cleared. No mod teleport or forced unmount.");
       this.LogPassengerState(player);
       return;
@@ -477,6 +497,7 @@ public class DelamainAVSystem extends ScriptableSystem {
       };
       this.GroundCheck(vehicle);
       this.DoorCheck(vehicle);
+      this.ObserveManualPassenger(player, vehicle);
       this.ExitTick(player, vehicle);
       if this.m_closeWait > 0 {
         this.m_closeWait -= 1;
@@ -523,3 +544,80 @@ public class DelamainAVTick extends DelayCallback {
     if IsDefined(this.owner) { this.owner.Tick(); };
   }
 }
+
+ // Only this mod's private AV record uses the special route. Every other vehicle
+ // retains all vanilla behavior, including the original q203 Delamain AV.
+ public static func IsCustomDelamainAV(vehicle: wref<VehicleObject>) -> Bool {
+   return IsDefined(vehicle) && Equals(vehicle.GetRecordID(), t"Vehicle.m1nsook_delamain_av");
+ }
+
+ @wrapMethod(VehicleComponentPS)
+ public func OnVehicleDoorOpen(evt: ref<VehicleDoorOpen>) -> EntityNotificationType {
+   if IsCustomDelamainAV(this.GetOwnerEntity()) && Equals(evt.slotID, n"seat_back_left") {
+     evt.slotID = n"seat_front_left";
+     // The mod observes the passenger state and closes the door after entry.
+     evt.shouldAutoClose = false;
+   };
+   return wrappedMethod(evt);
+ }
+
+ @wrapMethod(VehicleComponentPS)
+ public func OnVehicleDoorClose(evt: ref<VehicleDoorClose>) -> EntityNotificationType {
+   if IsCustomDelamainAV(this.GetOwnerEntity()) && Equals(evt.slotID, n"seat_back_left") {
+     evt.slotID = n"seat_front_left";
+   };
+   return wrappedMethod(evt);
+ }
+
+ @wrapMethod(VehicleEventsTransition)
+ protected func HandleExitRequest(timeDelta: Float, stateContext: ref<StateContext>, scriptInterface: ref<StateGameScriptInterface>) -> Bool {
+   let vehicle = scriptInterface.owner as VehicleObject;
+   if !IsCustomDelamainAV(vehicle) { return wrappedMethod(timeDelta, stateContext, scriptInterface); };
+   let player = scriptInterface.executionOwner as PlayerPuppet;
+   if !IsDefined(player) { return false; };
+   let ps = vehicle.GetVehiclePS();
+   if !IsDefined(ps) { return false; };
+   let info = scriptInterface.GetMountingInfo(player);
+   if NotEquals(info.slotId.id, n"seat_back_left") { return false; };
+   // No road-car exit selection, QuickExit or teleport fallback for this AV.
+   // ExitTick sets the native flag only after stationary/ground/workspot/door checks.
+   if ps.ShouldForceExitDelamain() {
+     ps.SetShouldForceExitDelamain(false);
+     this.DeactivateTimeDilationCW(stateContext, scriptInterface);
+     stateContext.SetPermanentIntParameter(n"vehUnmountDir", EnumInt(vehicleExitDirection.Left), true);
+     stateContext.SetPermanentBoolParameter(n"validExitRequest", true, true);
+     return true;
+   };
+   if this.GetInStateTime() >= 0.3 && scriptInterface.IsActionJustPressed(n"Exit") && !this.IsExitVehicleBlocked(scriptInterface) {
+     let system = GameInstance.GetScriptableSystemsContainer(player.GetGame()).Get(n"DelamainAV.DelamainAVSystem") as DelamainAVSystem;
+     if IsDefined(system) { system.RequestManualExit(player, vehicle); };
+   };
+   return false;
+ }
+
+ @wrapMethod(VehicleTransition)
+ protected func ExitWorkspot(stateContext: ref<StateContext>, scriptInterface: ref<StateGameScriptInterface>, isInstant: Bool, opt upsideDown: Bool) -> Void {
+   if !IsCustomDelamainAV(scriptInterface.owner as VehicleObject) || isInstant || upsideDown {
+     wrappedMethod(stateContext, scriptInterface, isInstant, upsideDown);
+     return;
+   };
+   // The private workspot has exactly one cinematic exit slot.
+   this.SetSide(stateContext, scriptInterface);
+   scriptInterface.GetWorkspotSystem().UnmountFromVehicle(scriptInterface.owner, scriptInterface.executionOwner, false, new Vector4(0.0, 0.0, 0.0, 0.0), new Quaternion(0.0, 0.0, 0.0, 1.0), n"default");
+ }
+
+ @wrapMethod(ExitingEvents)
+ public func OnUpdate(timeDelta: Float, stateContext: ref<StateContext>, scriptInterface: ref<StateGameScriptInterface>) -> Void {
+   if !IsCustomDelamainAV(scriptInterface.owner as VehicleObject) {
+     wrappedMethod(timeDelta, stateContext, scriptInterface);
+     return;
+   };
+   // Preserve the stock delayed animation start; omit its road-car geometry
+   // recovery branch which can teleport V above the Excalibur.
+   let exitDelay = this.GetVehicleDataPackage(stateContext).ExitDelay();
+   let started = stateContext.GetPermanentBoolParameter(n"startedExiting");
+   if exitDelay > 0.0 && this.GetInStateTime() >= exitDelay && !started.value {
+     this.StartExiting(stateContext, scriptInterface);
+   };
+   // ExitingDecisions/ExitEvents remain native and complete the unmount.
+ }
