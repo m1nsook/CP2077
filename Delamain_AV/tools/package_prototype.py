@@ -54,7 +54,8 @@ assert 'entityTemplatePath: m1nsook\\\\delamain_av\\\\excalibur.ent'.replace('\\
 ui = (root / "r6/scripts/DelamainAV/DelamainAVSummon.reds").read_text(encoding="utf-8")
 assert "AVSummonRows" in ui and "QueueSummon()" in ui
 assert "TAXI_EXIT_BLOCKED" in script and "TAXI_PICKUP_READY" in script
-assert "SetWorldTransform" not in script
+# Reject actual transform calls, not historical comments describing dev.14.
+assert not re.search(r"\bSetWorldTransform\s*\(", re.sub(r"//[^\n]*", "", script)), "Transform-based movement is prohibited"
 assert "DelamainAV_PhysicsBegin(vehicle)" in script
 assert "DelamainAV_PhysicsPulse(this.m_id, speed)" in script
 assert "TAXI_NATIVE_TOUCHDOWN" in script
