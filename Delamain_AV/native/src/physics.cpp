@@ -1,8 +1,8 @@
 // Native physics bridge for the private Delamain AV pickup.
-// Rigid-body offsets and relocation hashes informed by tidusmd's MIT-licensed
-// CP2077-RED4EXT-DAV, commit 9f0d1359a7f5bb02d71ac6fec86c36aef9dd5615,
-// and the supplied DAV 3.5.0 binary. See THIRD_PARTY_LICENSES.txt.
-// No forked vehicleBaseObject layout, persistent vehicle handles or world transforms.
+// Physics-tick signature and offsets informed by tidusmd's MIT-licensed
+// CP2077-RED4EXT-DAV develop, commit 28a82418c9f956d2b3b06cdff575adc5a3752d63.
+// See THIRD_PARTY_LICENSES.txt. No forked SDK, persistent vehicle handles or
+// world transforms. Reverse-engineered pointer fields are cross-checked before use.
 #include <RED4ext/RED4ext.hpp>
 #include <RED4ext/RTTITypes.hpp>
 #include <RED4ext/Scripting/Natives/vehicleBaseObject.hpp>
@@ -20,12 +20,16 @@
 namespace {
 using namespace RED4ext;
 using Vehicle = vehicle::BaseObject;
-using ForceFn = void (*)(void*, Vector3*, Vector3*);
+using TickFn = void (*)(void*, float);
 using WakeFn = void (*)(Vehicle*);
-constexpr uint32_t kForceHash = 611586815;
-constexpr uint32_t kTorqueHash = 3303544265;
+constexpr uint32_t kTickHash = 2526549425;
 constexpr uint32_t kWakeHash = 2793083181;
-// PhysicsData, not BaseObject. Owner and hash are corroborated by DAV 3.5.0.
+// DAV develop uses WheeledPhysics::parent -> BaseObject::physicsData.
+// Check both reciprocal relationships and the exact entity pointer and ID.
+constexpr size_t kPhysicsParent = 0x60;
+constexpr size_t kVehiclePhysics = 0x2C8;
+constexpr size_t kVehicleBody = 0x2D0;
+constexpr size_t kPhysicsState = 0x260;
 constexpr size_t kOwner = 0x180;
 constexpr size_t kVelocity = 0x18;
 constexpr size_t kAngular = 0x24;
@@ -37,10 +41,8 @@ static_assert(sizeof(Vector3) == 12);
 
 const v1::Sdk* g_sdk = nullptr;
 v1::PluginHandle g_plugin{};
-void* g_forceAddress = nullptr;
-void* g_torqueAddress = nullptr;
-ForceFn g_forceOriginal = nullptr;
-ForceFn g_torqueOriginal = nullptr;
+void* g_tickAddress = nullptr;
+TickFn g_tickOriginal = nullptr;
 WakeFn g_wake = nullptr;
 std::mutex g_mutex;
 std::atomic<bool> g_active{false};
@@ -49,8 +51,9 @@ struct Command {
     uintptr_t owner = 0;
     uint64_t id = 0;
     uint64_t deadline = 0;
-    uint64_t last = 0;
+    uint64_t lastWake = 0;
     float desired = 0;
+    float applied = 0;
     int32_t samples = 0;
     int32_t fault = 0;
 };
@@ -116,20 +119,36 @@ void* Resolve(uint32_t hash) {
         (mbi.Protect & PAGE_GUARD)) return nullptr;
     return addr;
 }
-void ApplyCommand(void* body) {
+// Validate the reverse-engineered pointer chain on the live target.
+// Never dereference a foreign vehicle's physicsData or cache a body pointer.
+bool ResolveBody(uintptr_t owner, uintptr_t expectedPhysics, uintptr_t& body) {
+    if (!owner) return false;
+    auto* vehicle = reinterpret_cast<void*>(owner);
+    uintptr_t physics = 0, parent = 0, reverseOwner = 0;
+    if (!Read(vehicle, kVehiclePhysics, physics) || !physics ||
+        (expectedPhysics && physics != expectedPhysics) ||
+        !Read(reinterpret_cast<void*>(physics), kPhysicsParent, parent) || parent != owner ||
+        !Read(vehicle, kVehicleBody, body) || !body ||
+        !Read(reinterpret_cast<void*>(body), kOwner, reverseOwner) || reverseOwner != owner)
+        return false;
+    return true;
+}
+void ApplyCommand(void* physics, float deltaTime) {
     if (!g_active.load(std::memory_order_acquire)) return;
     uintptr_t owner = 0;
-    if (!Read(body, kOwner, owner)) return;
+    if (!Read(physics, kPhysicsParent, owner)) return;
     std::lock_guard guard(g_mutex);
     if (!g_active.load(std::memory_order_relaxed) || owner != g_cmd.owner || !owner) return;
-    auto now = GetTickCount64();
-    if (now > g_cmd.deadline) { Fault(-7); return; }
+    if (GetTickCount64() > g_cmd.deadline) { Fault(-7); return; }
     uint64_t entityId = 0;
     if (!Read(reinterpret_cast<void*>(owner), kOwnerId, entityId) || entityId != g_cmd.id) {
         Fault(-8); return;
     }
-    // Only validated engine-owned physics objects are accessed. All original
-    // force/torque callbacks still execute, including collision handling.
+    uintptr_t bodyAddress = 0;
+    if (!ResolveBody(owner, reinterpret_cast<uintptr_t>(physics), bodyAddress)) {
+        Fault(-11); return;
+    }
+    auto* body = reinterpret_cast<void*>(bodyAddress);
     float mass = 0;
     Vector3 velocity{}, angular{};
     if (!Read(body, kMass, mass) || !std::isfinite(mass) || mass < 100 || mass > 100000 ||
@@ -137,15 +156,15 @@ void ApplyCommand(void* body) {
         !Bounded(velocity) || !Bounded(angular)) {
         Fault(-9); return;
     }
-    // Don't multiply acceleration when several forces are applied in one tick.
-    if (g_cmd.last && now - g_cmd.last < 8) return;
-    float dt = g_cmd.last ? std::clamp(float(now - g_cmd.last) * .001f, .008f, .05f) : .016f;
-    g_cmd.last = now;
-    // Bounded, gradual velocity change, not a position update. Keep original
-    // gravity and original engine force/torque functions enabled.
+    if (!std::isfinite(deltaTime) || deltaTime <= 0.f || deltaTime > 0.25f) return;
+    const float dt = std::min(deltaTime, 0.05f);
+    // Like DAV develop mode 2, hold a velocity target on the actual physics
+    // tick, before the original resistance calculation. Ramp the target
+    // itself for a smooth start/stop rather than writing positions.
+    g_cmd.applied = Approach(g_cmd.applied, g_cmd.desired, 1.5f * dt);
     velocity.X = Approach(velocity.X, 0.f, 4.f * dt);
     velocity.Y = Approach(velocity.Y, 0.f, 4.f * dt);
-    velocity.Z = Approach(velocity.Z, g_cmd.desired, 16.f * dt);
+    velocity.Z = g_cmd.applied;
     angular.X = Approach(angular.X, 0.f, 4.f * dt);
     angular.Y = Approach(angular.Y, 0.f, 4.f * dt);
     angular.Z = Approach(angular.Z, 0.f, 4.f * dt);
@@ -154,29 +173,18 @@ void ApplyCommand(void* body) {
     }
     if (g_cmd.samples < 1000000) ++g_cmd.samples;
 }
-void ForceHook(void* body, Vector3* pos, Vector3* force) {
-    g_forceOriginal(body, pos, force);
-    ApplyCommand(body);
-}
-void TorqueHook(void* body, Vector3* pos, Vector3* torque) {
-    g_torqueOriginal(body, pos, torque);
-    ApplyCommand(body);
+void TickHook(void* physics, float deltaTime) {
+    ApplyCommand(physics, deltaTime);
+    g_tickOriginal(physics, deltaTime);
 }
 bool Install() {
-    if (g_forceAddress && g_torqueAddress && g_wake) return true;
+    if (g_tickAddress && g_wake) return true;
     if (!g_sdk || !g_sdk->hooking || !g_sdk->hooking->Attach || !g_sdk->hooking->Detach) return false;
-    auto force = Resolve(kForceHash), torque = Resolve(kTorqueHash), wake = Resolve(kWakeHash);
-    if (!force || !torque || !wake || force == torque) return false;
-    if (!g_sdk->hooking->Attach(g_plugin, force, reinterpret_cast<void*>(&ForceHook),
-         reinterpret_cast<void**>(&g_forceOriginal))) return false;
-    g_forceAddress = force;
-    if (!g_sdk->hooking->Attach(g_plugin, torque, reinterpret_cast<void*>(&TorqueHook),
-         reinterpret_cast<void**>(&g_torqueOriginal))) {
-        g_sdk->hooking->Detach(g_plugin, g_forceAddress);
-        g_forceAddress = nullptr;
-        return false;
-    }
-    g_torqueAddress = torque;
+    auto tick = Resolve(kTickHash), wake = Resolve(kWakeHash);
+    if (!tick || !wake || tick == wake) return false;
+    if (!g_sdk->hooking->Attach(g_plugin, tick, reinterpret_cast<void*>(&TickHook),
+         reinterpret_cast<void**>(&g_tickOriginal))) return false;
+    g_tickAddress = tick;
     g_wake = reinterpret_cast<WakeFn>(wake);
     return true;
 }
@@ -199,6 +207,11 @@ void Begin(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
     else if (!PrivateAV(v) || !v->entityID.hash) code = -3;
     else if (!Install()) code = -4;
     else {
+        uintptr_t body = 0;
+        if (!ResolveBody(reinterpret_cast<uintptr_t>(v.GetPtr()), 0, body)) {
+            if (out) *out = -11;
+            return;
+        }
         {
             std::lock_guard guard(g_mutex);
             if (g_active.load(std::memory_order_relaxed)) { if (out) *out = -5; return; }
@@ -206,29 +219,49 @@ void Begin(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
             g_cmd.owner = reinterpret_cast<uintptr_t>(v.GetPtr());
             g_cmd.id = v->entityID.hash;
             g_cmd.deadline = GetTickCount64() + 1500;
+            g_cmd.lastWake = GetTickCount64();
             g_active.store(true, std::memory_order_release);
         }
-        // Called once from the REDscript/game thread, never a retry loop.
-        // The current DAV binary and source both use this relocation hash.
+        // Wake once on the game thread. Pulse reasserts simulation only if
+        // the validated target is parked, just as DAV develop does.
         g_wake(v.GetPtr());
         code = 1;
     }
     if (out) *out = code;
 }
 void Pulse(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
-    EntityID id; float speed = 0;
-    GetParameter(frame, &id); GetParameter(frame, &speed); frame->code++;
-    std::lock_guard guard(g_mutex);
+    Handle<Vehicle> v; float speed = 0;
+    GetParameter(frame, &v); GetParameter(frame, &speed); frame->code++;
     int32_t code = -6;
-    if (id.hash && id.hash == g_cmd.id) {
-        if (g_cmd.fault) code = g_cmd.fault;
-        else if (g_active.load(std::memory_order_relaxed) && GetTickCount64() <= g_cmd.deadline &&
-                 std::isfinite(speed) && speed >= -2.f && speed <= 0.f) {
-            g_cmd.desired = speed;
-            g_cmd.deadline = GetTickCount64() + 1500;
-            code = g_cmd.samples;
-        } else { Fault(-7); code = -7; }
+    bool wake = false;
+    {
+        std::lock_guard guard(g_mutex);
+        if (v && v->entityID.hash && v->entityID.hash == g_cmd.id &&
+            reinterpret_cast<uintptr_t>(v.GetPtr()) == g_cmd.owner) {
+            const auto now = GetTickCount64();
+            if (g_cmd.fault) code = g_cmd.fault;
+            else if (g_active.load(std::memory_order_relaxed) && now <= g_cmd.deadline &&
+                     std::isfinite(speed) && speed >= -2.f && speed <= 0.f) {
+                uintptr_t body = 0;
+                uint32_t state = 0;
+                if (!ResolveBody(g_cmd.owner, 0, body) ||
+                    !Read(v.GetPtr(), kPhysicsState, state) || state > 0x1FF) {
+                    Fault(-11); code = -11;
+                } else {
+                    g_cmd.desired = speed;
+                    g_cmd.deadline = now + 1500;
+                    code = g_cmd.samples;
+                    if (state != 0 && now - g_cmd.lastWake >= 250) {
+                        g_cmd.lastWake = now;
+                        wake = true;
+                    }
+                }
+            } else { Fault(-7); code = -7; }
+        }
     }
+    // A live script argument holds the vehicle during this game-thread call.
+    // Do not retain the handle or invoke the wake routine under the mutex.
+    if (wake && g_wake) g_wake(v.GetPtr());
     if (out) *out = code;
 }
 void Stop(IScriptable*, CStackFrame* frame, bool* out, int64_t) {
@@ -254,7 +287,7 @@ void PostRegister() {
     add("DelamainAV_PhysicsBegin", reinterpret_cast<ScriptingFunction_t<void*>>(&Begin),
         "Int32", "handle:vehicleBaseObject", false);
     add("DelamainAV_PhysicsPulse", reinterpret_cast<ScriptingFunction_t<void*>>(&Pulse),
-        "Int32", "entEntityID", true);
+        "Int32", "handle:vehicleBaseObject", true);
     add("DelamainAV_PhysicsStop", reinterpret_cast<ScriptingFunction_t<void*>>(&Stop),
         "Bool", "entEntityID", false);
 }
@@ -275,8 +308,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
     } else if (reason == RED4ext::v1::EMainReason::Unload) {
         g_active.store(false, std::memory_order_release);
         if (sdk && sdk->hooking && sdk->hooking->Detach) {
-            if (g_torqueAddress) sdk->hooking->Detach(handle, g_torqueAddress);
-            if (g_forceAddress) sdk->hooking->Detach(handle, g_forceAddress);
+            if (g_tickAddress) sdk->hooking->Detach(handle, g_tickAddress);
         }
     }
     return true;
@@ -284,7 +316,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
 RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info) {
     info->name = L"Delamain AV Physics";
     info->author = L"MISO";
-    info->version = RED4EXT_V1_SEMVER(0, 2, 9);
+    info->version = RED4EXT_V1_SEMVER(0, 2, 10);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }

@@ -189,10 +189,10 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.m_physicsSamples = 0;
       let result = DelamainAV_PhysicsBegin(vehicle);
       if result != 1 {
-        this.AbortArrival(vehicle, "native bridge refused startup; code=" + ToString(result));
+        this.AbortArrival(vehicle, "native bridge refused startup (code -11 means reciprocal physics pointer validation failed); code=" + ToString(result));
         return;
       };
-      this.Log("INFO", "TAXI_ARRIVAL_NATIVE: physics armed; waiting for engine callback.");
+      this.Log("INFO", "TAXI_ARRIVAL_NATIVE: physics armed; waiting for dedicated resistance physics tick.");
       this.ScheduleArrival();
     } else {
       this.m_groundCheckWait = 6;
@@ -324,7 +324,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
     let speed = -MinF(1.35, MaxF(0.12, remaining * 0.85));
     if remaining <= 0.15 { speed = 0.0; };
-    let samples = DelamainAV_PhysicsPulse(this.m_id, speed);
+    let samples = DelamainAV_PhysicsPulse(vehicle, speed);
     if samples < 0 {
       this.AbortArrival(vehicle, "physics bridge fault=" + ToString(samples));
       return;
@@ -333,7 +333,7 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.Log("INFO", "TAXI_NATIVE_TRACE: callbackSamples=" + ToString(samples) + "; remaining=" + ToString(remaining) + "; targetVz=" + ToString(speed) + "; lateral=" + ToString(lateral));
     };
     if this.m_arrivalStep >= 40 && samples == 0 {
-      this.AbortArrival(vehicle, "no matching engine physics callback");
+      this.AbortArrival(vehicle, "no matching resistance physics tick");
       return;
     };
     if remaining <= 0.15 && samples > 0 {
