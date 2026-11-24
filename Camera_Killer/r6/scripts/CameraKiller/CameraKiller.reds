@@ -5,6 +5,10 @@ public let m_cameraKillerIncoming: Bool;
 
 @addMethod(SurveillanceCameraControllerPS)
 public func CameraKillerToNetwork() -> Void {
+  // The original OFF action has already run. Only gate propagation.
+  if !M1Arc_GetBool("m1nsook.camera-killer", "enabled") {
+    return;
+  }
   let accessPoints: array<ref<AccessPointControllerPS>> = this.GetAccessPoints();
   let i: Int32 = 0;
 
@@ -91,4 +95,41 @@ protected func OnSetDeviceOFF(evt: ref<SetDeviceOFF>) -> EntityNotificationType 
     }
   }
   return result;
+}
+
+// Report the effective setting once at startup and when it changes.
+public class MisoCameraKillerDiagnostics extends ScriptableSystem {
+  private let running: Bool;
+  private let ready: Bool;
+  private let previous: Bool;
+
+  private func OnAttach() -> Void {
+    this.running = true;
+    this.Tick();
+  }
+
+  private func OnDetach() -> Void {
+    this.running = false;
+  }
+
+  public func Tick() -> Void {
+    if !this.running { return; }
+    let enabled = M1Arc_GetBool("m1nsook.camera-killer", "enabled");
+    if !this.ready || NotEquals(enabled, this.previous) {
+      if M1Arc_Log("m1nsook.camera-killer", "INFO", "Camera network shutdown enabled=" + ToString(enabled)) {
+        this.ready = true;
+        this.previous = enabled;
+      }
+    }
+    let cb = new MisoCameraKillerDiagnosticsTick();
+    cb.owner = this;
+    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 1.00, false);
+  }
+}
+
+public class MisoCameraKillerDiagnosticsTick extends DelayCallback {
+  public let owner: wref<MisoCameraKillerDiagnostics>;
+  public func Call() -> Void {
+    if IsDefined(this.owner) { this.owner.Tick(); }
+  }
 }

@@ -15,7 +15,9 @@ Turns off **other cameras connected to the same network** when V shuts down one 
 2. Extract the Camera Killer ZIP into your **Cyberpunk 2077** game folder.
 3. Check that `r6/scripts/CameraKiller/CameraKiller.reds` exists, and launch the game.
 
-**Requirements:** RED4ext and redscript, compatible with Cyberpunk 2077 2.5. No CET, Codeware, TweakXL, ArchiveXL, or separate DLL is required.
+**Requirements:** RED4ext, redscript and [M1 Arc 1.0.1 or newer](https://github.com/m1nsook/m1arc), compatible with Cyberpunk 2077 2.5. No CET, Codeware, TweakXL, ArchiveXL, or additional mod DLL is required.
+
+Open Camera Killer in M1 Arc to enable or disable network propagation. The setting defaults to ON, persists through M1 Arc and applies to subsequent camera shutdowns. The Logs panel reports the effective setting. Turning the feature off does not undo previous camera shutdowns.
 
 ## Behavior and limitations
 
@@ -25,4 +27,4 @@ Turns off **other cameras connected to the same network** when V shuts down one 
 
 ## Uninstallation
 
-Delete `r6/scripts/CameraKiller/` and restart the game. Cameras already switched off during gameplay may retain their current state until normal game logic restores them or the area resets.
+Delete `r6/scripts/CameraKiller/` and `red4ext/plugins/m1arc/mods/m1nsook.camera-killer/` and restart the game. Cameras already switched off during gameplay may retain their current state until normal game logic restores them or the area resets.

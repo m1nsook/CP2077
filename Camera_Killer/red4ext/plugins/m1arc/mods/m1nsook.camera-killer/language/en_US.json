@@ -1,0 +1,11 @@
+{
+  "name": "Camera Killer",
+  "shortDesc": "Shut down connected surveillance cameras",
+  "settings": {
+    "enabled": {
+      "label": "Network camera shutdown",
+      "description": "Turning off one camera also switches off eligible cameras on its network. Disabling stops future propagation; it does not turn cameras back on.",
+      "group": "General"
+    }
+  }
+}
