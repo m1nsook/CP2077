@@ -1,4 +1,4 @@
-# Delamain AV — 0.1.0-dev.2
+# Delamain AV — 0.1.1-dev.3
 
 Stationary passenger-only prototype for Cyberpunk 2077 2.50. Uses the original quest entity via the separate `Vehicle.m1nsook_delamain_av` record. Does not register an owned vehicle or modify the ending.
 
@@ -6,11 +6,11 @@ Stationary passenger-only prototype for Cyberpunk 2077 2.50. Uses the original q
 
 RED4ext, redscript, TweakXL, M1 Arc 1.0.1 or newer (1.0.10 recommended), Codeware (temporary spawning backend). DAV and CET are not required. Disable DAV for isolation. No custom archive or DLL is shipped.
 
-The archive has a development suffix; the manifest must remain numeric `0.1.0` for M1 Arc discovery. Fully restart the game after replacing the files.
+The archive has a development suffix; the manifest must remain numeric `0.1.1` for M1 Arc discovery. Fully restart the game after replacing the files.
 
 ## Test
 
-Load a disposable save in a flat, open empty area, with V on foot. Face at least 12 metres of clear ground. Open M1 Arc > Gameplay > Delamain AV. Use **Spawn test AV**, close the overlay, and check the vehicle exterior. Approach it, then **Open passenger door** and **Board as passenger**. Close the overlay to observe the boarding animation. Use **Inspect vehicle** and copy the M1 Arc diagnostics. Exit normally before **Remove test AV**.
+Load a disposable save in a flat, open empty area, with V on foot. Face at least 12 metres of clear ground. Open M1 Arc > Gameplay > Delamain AV. Use **Spawn test AV**, close the overlay, and check the vehicle exterior. Approach it, then **Open passenger door** and **Board as passenger**. Close the overlay to observe the boarding animation. Observe the physical front-left entrance, while V remains rear-left. Close entrance is also available. Use **Inspect vehicle** to confirm the rear seat. Use **Exit as passenger** for a controlled stationary unmount and return to the position captured before boarding. Do not move the AV. Remove only after exiting. Copy diagnostics. Native entry/exit animations are not guaranteed; the fallback is intentionally instant. Test the visuals, not just the logical door state.
 
 If the model falls, moves unexpectedly, or has no safe seat, stop testing and reload the save. This is NOT an autonomous taxi yet. No takeoff or flight is implemented. Don't save while inside the test vehicle. The spawn position is a simple forward offset, not a validated landing location. The actual quest entity's rear seat and animation support require in-game confirmation.
 

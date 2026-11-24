@@ -11,8 +11,8 @@
     "id": "open",
     "kind": "action",
     "label": "Open passenger door",
-    "buttonLabel": "Open rear-left door",
-    "description": "Use only while the AV is stationary.",
+    "buttonLabel": "Open Excalibur entrance",
+    "description": "Requests the physical front-left entrance, not the rear passenger seat.",
     "group": "Prototype"
   },
   {
@@ -20,7 +20,23 @@
     "kind": "action",
     "label": "Board as passenger",
     "buttonLabel": "Board rear-left seat",
-    "description": "Stand close to the AV. No driver-seat mounting.",
+    "description": "Stand close to the open entrance on clear ground; boards rear-left and remembers your on-foot position.",
+    "group": "Prototype"
+  },
+  {
+    "id": "close",
+    "kind": "action",
+    "label": "Close entrance",
+    "buttonLabel": "Close Excalibur entrance",
+    "description": "Requests closing the physical entrance. The door also closes automatically after mounting.",
+    "group": "Prototype"
+  },
+  {
+    "id": "exit",
+    "kind": "action",
+    "label": "Exit as passenger",
+    "buttonLabel": "Disembark stationary AV",
+    "description": "Opens the entrance, requests instant unmount and returns V to the pre-boarding position after confirmation. Stationary test only.",
     "group": "Prototype"
   },
   {
