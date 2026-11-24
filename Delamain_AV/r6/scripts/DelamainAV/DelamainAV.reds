@@ -38,15 +38,18 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_touchdownTicks: Int32;
   private let m_boardGroundRejected: Bool;
   private let m_physicsSamples: Int32;
+  private let m_environmentLogged: Bool;
 
   private func OnAttach() -> Void {
     this.m_running = true;
+    this.Log("INFO", "SYSTEM_ATTACH: DelamainAV script attached; dev.20 persistent diagnostics enabled.");
     this.Schedule();
   }
 
   private func OnDetach() -> Void {
     // Nonpersistent Codeware entities are cleared by world teardown.
     // Never delete a mounted vehicle during teardown.
+    this.Log("INFO", "SYSTEM_DETACH: world teardown.");
     this.m_running = false;
     if EntityID.IsDefined(this.m_id) { DelamainAV_PhysicsStop(this.m_id); };
   }
@@ -59,6 +62,7 @@ public class DelamainAVSystem extends ScriptableSystem {
   }
 
   private func Log(level: String, message: String) -> Void {
+    DelamainAV_DiagnosticLog(level, message);
     M1Arc_Log("m1nsook.delamain-av", level, message);
   }
 
@@ -68,10 +72,16 @@ public class DelamainAVSystem extends ScriptableSystem {
   }
 
   public func QueueSummon() -> Void {
+    this.Log("INFO", "SUMMON_QUEUED: native vehicle menu request.");
     this.m_summonQueued = true;
   }
 
   private func Spawn(player: ref<PlayerPuppet>, arrival: Bool) -> Void {
+    this.Log("INFO", "SPAWN_ENTER: arrival=" + ToString(arrival) + "; tracked=" + ToString(EntityID.IsDefined(this.m_id)));
+    if !this.m_environmentLogged {
+      this.m_environmentLogged = true;
+      DelamainAV_DiagnosticEnvironment("first summon or stationary spawn");
+    };
     if EntityID.IsDefined(this.m_id) {
       this.Log("WARNING", "A test AV is already tracked. Remove it first.");
       return;
@@ -99,12 +109,14 @@ public class DelamainAVSystem extends ScriptableSystem {
     let target = player.GetWorldPosition() + forward * 9.0;
     let rayStart = target + new Vector4(0.0, 0.0, 2.0, 0.0);
     let rayEnd = target - new Vector4(0.0, 0.0, 3.0, 0.0);
+    this.Log("INFO", "SPAWN_RAY: target=" + ToString(target.X) + "," + ToString(target.Y) + "," + ToString(target.Z) + "; rayStartZ=" + ToString(rayStart.Z) + "; rayEndZ=" + ToString(rayEnd.Z));
     let hit: TraceResult;
     let spatial = GameInstance.GetSpatialQueriesSystem(player.GetGame());
     if !spatial.SyncRaycastByCollisionGroup(rayStart, rayEnd, n"Static", hit, true, false) {
       this.Log("WARNING", "GROUND_NO_HIT: No static surface below pickup point. Choose flat open ground.");
       return;
     };
+    this.Log("INFO", "SPAWN_RAY_HIT: xyz=" + ToString(hit.position.X) + "," + ToString(hit.position.Y) + "," + ToString(hit.position.Z) + "; normal=" + ToString(hit.normal.X) + "," + ToString(hit.normal.Y) + "," + ToString(hit.normal.Z));
     if hit.normal.Z < 0.95 {
       this.Log("WARNING", "GROUND_SLOPE: Surface too steep for stationary test.");
       return;
@@ -150,7 +162,10 @@ public class DelamainAVSystem extends ScriptableSystem {
     spec.alwaysSpawned = true;
     spec.spawnInView = true;
     spec.active = true;
+    let origin = spec.position;
+    this.Log("INFO", "CREATE_BEFORE: record=Vehicle.m1nsook_delamain_av; origin=" + ToString(origin.X) + "," + ToString(origin.Y) + "," + ToString(origin.Z) + "; persist=false; active=true; alwaysSpawned=true; spawnInView=true");
     this.m_id = system.CreateEntity(spec);
+    this.Log("INFO", "CREATE_AFTER: defined=" + ToString(EntityID.IsDefined(this.m_id)));
     if !EntityID.IsDefined(this.m_id) {
       this.m_arriving = false;
       this.m_airborne = false;
@@ -164,9 +179,15 @@ public class DelamainAVSystem extends ScriptableSystem {
   }
 
   private func Configure(vehicle: ref<VehicleObject>) -> Void {
+    this.Log("INFO", "CONFIGURE_ENTER: car=" + ToString(IsDefined(vehicle as CarObject)) + "; AV=" + ToString(IsDefined(vehicle as AVObject)) + "; recordMatch=" + ToString(Equals(vehicle.GetRecordID(), t"Vehicle.m1nsook_delamain_av")));
+    DelamainAV_DiagnosticSnapshot(vehicle, "configure entry");
+    let position = vehicle.GetWorldPosition();
+    this.Log("INFO", "CONFIGURE_POSITION: xyz=" + ToString(position.X) + "," + ToString(position.Y) + "," + ToString(position.Z));
     let controller = vehicle.GetAccessoryController();
+    this.Log("INFO", "CONFIGURE_ACCESSORY: controllerDefined=" + ToString(IsDefined(controller)));
     if IsDefined(controller) {
       let ps = controller.GetPS() as vehicleControllerPS;
+      this.Log("INFO", "CONFIGURE_ACCESSORY: psDefined=" + ToString(IsDefined(ps)));
       if IsDefined(ps) {
         ps.SetDoorInteractionState(EVehicleDoor.seat_front_left, VehicleDoorInteractionState.Disabled);
         ps.SetDoorInteractionState(EVehicleDoor.seat_front_right, VehicleDoorInteractionState.Disabled);
@@ -192,7 +213,9 @@ public class DelamainAVSystem extends ScriptableSystem {
     if this.m_arriving {
       this.Door(vehicle, false);
       this.m_physicsSamples = 0;
+      this.Log("INFO", "PHYSICS_BEGIN_BEFORE");
       let result = DelamainAV_PhysicsBegin(vehicle);
+      this.Log("INFO", "PHYSICS_BEGIN_AFTER: result=" + ToString(result));
       if result != 1 {
         this.AbortArrival(vehicle, "native bridge refused startup; code=" + ToString(result));
         return;
@@ -208,6 +231,7 @@ public class DelamainAVSystem extends ScriptableSystem {
 
   private func SetThrusters(vehicle: ref<VehicleObject>, enabled: Bool) -> Void {
     let ps = vehicle.GetVehiclePS();
+    this.Log("INFO", "THRUSTER_BEFORE: psDefined=" + ToString(IsDefined(ps)) + "; enabled=" + ToString(enabled));
     if !IsDefined(ps) { return; };
     // Original vehicle quest event updates persisted thruster state and VFX.
     let evt = new VehicleQuestAVThrusterEvent();
@@ -243,6 +267,8 @@ public class DelamainAVSystem extends ScriptableSystem {
   }
 
   private func AbortArrival(vehicle: ref<VehicleObject>, reason: String) -> Void {
+    this.Log("ERROR", "ABORT_ENTER: " + reason + "; vehicleDefined=" + ToString(IsDefined(vehicle)) + "; step=" + ToString(this.m_arrivalStep));
+    if IsDefined(vehicle) { DelamainAV_DiagnosticSnapshot(vehicle, "before abort"); };
     DelamainAV_PhysicsStop(this.m_id);
     this.m_nativeHolding = false;
     this.m_arriving = false;
@@ -252,17 +278,21 @@ public class DelamainAVSystem extends ScriptableSystem {
     let mounts = GameInstance.GetMountingFacility(vehicle.GetGame()).GetMountingInfoMultipleWithObjects(null, vehicle);
     if vehicle.IsPlayerMounted() || ArraySize(mounts) > 0 { return; };
     this.SetThrusters(vehicle, false);
+    this.Log("WARNING", "DELETE_BEFORE: reason=arrival abort; occupantCount=" + ToString(ArraySize(mounts)));
     if GameInstance.GetDynamicEntitySystem().DeleteEntity(this.m_id) {
       this.m_id = EntityID();
       this.m_airborne = false;
       this.m_doorWait = 0;
       this.Log("INFO", "TAXI_NATIVE_ABORT: empty arrival entity removed; stationary diagnostic spawn remains available.");
+    } else {
+      this.Log("ERROR", "DELETE_AFTER: arrival abort deletion rejected.");
     };
   }
 
   public func ArrivalTick() -> Void {
     if !this.m_running || !this.m_arriving { return; };
     let vehicle = this.Vehicle();
+    DelamainAV_DiagnosticLog("TRACE", "ARRIVAL_TICK_ENTER: step=" + ToString(this.m_arrivalStep) + "; vehicleDefined=" + ToString(IsDefined(vehicle)));
     if !IsDefined(vehicle) || vehicle.IsPlayerMounted() {
       this.AbortArrival(vehicle, "missing or occupied AV");
       return;
@@ -277,6 +307,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     let target = this.m_spawnTarget;
     let remaining = pos.Z - target.Z;
     let lateral = SqrtF((pos.X - target.X) * (pos.X - target.X) + (pos.Y - target.Y) * (pos.Y - target.Y));
+    DelamainAV_DiagnosticLog("TRACE", "ARRIVAL_POSITION: step=" + ToString(this.m_arrivalStep) + "; xyz=" + ToString(pos.X) + "," + ToString(pos.Y) + "," + ToString(pos.Z) + "; target=" + ToString(target.X) + "," + ToString(target.Y) + "," + ToString(target.Z) + "; zDelta=" + ToString(remaining) + "; lateral=" + ToString(lateral) + "; mounts=" + ToString(ArraySize(mounts)));
     if !(remaining >= -0.20 && remaining <= 7.5 && lateral <= 0.8) {
       this.AbortArrival(vehicle, "position outside pickup corridor; zDelta=" + ToString(remaining) + "; lateral=" + ToString(lateral));
       return;
@@ -294,7 +325,9 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
     let speed = -MinF(1.35, MaxF(0.12, remaining * 0.85));
     if remaining <= 0.15 { speed = 0.0; };
+    DelamainAV_DiagnosticLog("TRACE", "PULSE_BEFORE: requestedVz=" + ToString(speed));
     let samples = DelamainAV_PhysicsPulse(vehicle, speed);
+    DelamainAV_DiagnosticLog("TRACE", "PULSE_AFTER: result=" + ToString(samples));
     if samples == -20 {
       if this.m_arrivalStep % 20 == 0 { this.Log("INFO", "TAXI_NATIVE_INIT: waiting for reciprocal physics body."); };
       this.ScheduleArrival();
@@ -767,6 +800,8 @@ public class DelamainAVSystem extends ScriptableSystem {
         return;
       };
     };
+    this.Log("INFO", "DELETE_BEFORE: reason=manual removal");
+    if IsDefined(vehicle) { DelamainAV_DiagnosticSnapshot(vehicle, "before manual remove"); };
     DelamainAV_PhysicsStop(this.m_id);
     if GameInstance.GetDynamicEntitySystem().DeleteEntity(this.m_id) {
       this.m_id = EntityID();
@@ -802,6 +837,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     if IsDefined(player) && !player.IsDead() {
       let vehicle = this.Vehicle();
       if this.m_wait > 0 {
+        DelamainAV_DiagnosticLog("TRACE", "ENTITY_WAIT: remaining=" + ToString(this.m_wait) + "; found=" + ToString(IsDefined(vehicle)));
         if IsDefined(vehicle) {
           this.m_wait = 0;
           this.Configure(vehicle);
