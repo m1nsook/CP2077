@@ -10,7 +10,7 @@ settings = json.loads((manifest_dir / "settings.json").read_text(encoding="utf-8
 assert manifest["id"] == "m1nsook.delamain-av"
 assert manifest["scope"] == "Gameplay"
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", manifest["version"]), "M1 Arc only accepts numeric x.y.z manifest versions"
-assert manifest["version"] == "0.2.8"
+assert manifest["version"] == "0.2.9"
 required = manifest["requires"]["m1arc"]
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", required)
 assert tuple(map(int, required.split("."))) <= (1, 0, 1), "Requires exceeds M1 Arc loader compatibility constant"
@@ -54,11 +54,17 @@ assert 'entityTemplatePath: m1nsook\\\\delamain_av\\\\excalibur.ent'.replace('\\
 ui = (root / "r6/scripts/DelamainAV/DelamainAVSummon.reds").read_text(encoding="utf-8")
 assert "AVSummonRows" in ui and "QueueSummon()" in ui
 assert "TAXI_EXIT_BLOCKED" in script and "TAXI_PICKUP_READY" in script
-assert "vehicle.SetWorldTransform(transform)" in script
+assert "SetWorldTransform" not in script
+assert "DelamainAV_PhysicsBegin(vehicle)" in script
+assert "DelamainAV_PhysicsPulse(this.m_id, speed)" in script
+assert "TAXI_NATIVE_TOUCHDOWN" in script
+assert "TAXI_NATIVE_ABORT" in script
+native = root / "red4ext/plugins/DelamainAV/DelamainAV.dll"
+assert native.is_file() and native.read_bytes()[:2] == b"MZ", "Native physics plugin required"
 assert "TAXI_LANDING_HANDOFF" in script
 assert "TAXI_MOUNT_BLOCKED" in script
 assert "TAXI_BOARD_POSITION_INVALID" in script
-out = Path("dist/Delamain-AV-v0.2.8-dev.15")
+out = Path("dist/Delamain-AV-v0.2.9-dev.16")
 if out.exists():
     shutil.rmtree(out)
 out.mkdir(parents=True)

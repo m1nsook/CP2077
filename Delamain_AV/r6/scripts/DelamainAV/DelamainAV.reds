@@ -35,6 +35,7 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_summonQueued: Bool;
   private let m_landingReplacement: Bool;
   private let m_boardGroundRejected: Bool;
+  private let m_physicsSamples: Int32;
 
   private func OnAttach() -> Void {
     this.m_running = true;
@@ -45,6 +46,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     // Nonpersistent Codeware entities are cleared by world teardown.
     // Never delete a mounted vehicle during teardown.
     this.m_running = false;
+    if EntityID.IsDefined(this.m_id) { DelamainAV_PhysicsStop(this.m_id); };
   }
 
   private func Schedule() -> Void {
@@ -184,7 +186,13 @@ public class DelamainAVSystem extends ScriptableSystem {
     this.m_ready = true;
     if this.m_arriving {
       this.Door(vehicle, false);
-      this.Log("INFO", "TAXI_ARRIVAL: starting unoccupied vertical descent.");
+      this.m_physicsSamples = 0;
+      let result = DelamainAV_PhysicsBegin(vehicle);
+      if result != 1 {
+        this.AbortArrival(vehicle, "native bridge refused startup; code=" + ToString(result));
+        return;
+      };
+      this.Log("INFO", "TAXI_ARRIVAL_NATIVE: physics armed; waiting for engine callback.");
       this.ScheduleArrival();
     } else {
       this.m_groundCheckWait = 6;
@@ -225,6 +233,7 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.Log("ERROR", "TAXI_LANDING_HANDOFF_FAILED: occupied arrival entity; not deleting.");
       return;
     };
+    DelamainAV_PhysicsStop(this.m_id);
     this.SetThrusters(vehicle, false);
     this.m_arriving = false;
     this.m_ready = false;
@@ -264,40 +273,80 @@ public class DelamainAVSystem extends ScriptableSystem {
     GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.05, false);
   }
 
+  private func AbortArrival(vehicle: ref<VehicleObject>, reason: String) -> Void {
+    DelamainAV_PhysicsStop(this.m_id);
+    this.m_arriving = false;
+    this.m_ready = false;
+    this.Log("ERROR", "TAXI_NATIVE_ABORT: " + reason + ". No transform fallback.");
+    if !IsDefined(vehicle) { return; };
+    let mounts = GameInstance.GetMountingFacility(vehicle.GetGame()).GetMountingInfoMultipleWithObjects(null, vehicle);
+    if vehicle.IsPlayerMounted() || ArraySize(mounts) > 0 { return; };
+    this.SetThrusters(vehicle, false);
+    if GameInstance.GetDynamicEntitySystem().DeleteEntity(this.m_id) {
+      this.m_id = EntityID();
+      this.m_airborne = false;
+      this.m_doorWait = 0;
+      this.Log("INFO", "TAXI_NATIVE_ABORT: empty arrival entity removed; stationary diagnostic spawn remains available.");
+    };
+  }
+
   public func ArrivalTick() -> Void {
     if !this.m_running || !this.m_arriving { return; };
     let vehicle = this.Vehicle();
     if !IsDefined(vehicle) || vehicle.IsPlayerMounted() {
-      this.m_arriving = false;
-      this.Log("ERROR", "TAXI_ARRIVAL_ABORT: missing or occupied AV; exit interlock retained.");
+      this.AbortArrival(vehicle, "missing or occupied AV");
       return;
     };
     let mounts = GameInstance.GetMountingFacility(this.GetGameInstance()).GetMountingInfoMultipleWithObjects(null, vehicle);
     if ArraySize(mounts) > 0 {
-      this.m_arriving = false;
-      this.Log("ERROR", "TAXI_ARRIVAL_ABORT: occupant detected.");
-      return;
-    };
-    // Only the unoccupied pickup is moved through Codeware's native transform
-    // setter. Never apply this to a mounted player. Check actual position
-    // against previous requested position before advancing.
-    let previous = this.m_spawnTarget + new Vector4(0.0, 0.0, 6.0 * (1.0 - Cast<Float>(this.m_arrivalStep) / 100.0), 0.0);
-    if Vector4.Distance(vehicle.GetWorldPosition(), previous) > 1.5 {
-      this.m_arriving = false;
-      this.Log("ERROR", "TAXI_ARRIVAL_TRANSFORM_REJECTED: AV did not follow requested descent; boarding remains blocked.");
-      return;
-    };
-    if this.m_arrivalStep >= 100 {
-      this.Log("INFO", "TAXI_ARRIVAL_DESCENT_COMPLETE: committing grounded pickup entity.");
-      this.FinishArrival(vehicle);
+      this.AbortArrival(vehicle, "occupant detected");
       return;
     };
     this.m_arrivalStep += 1;
-    let pos = this.m_spawnTarget + new Vector4(0.0, 0.0, 6.0 * (1.0 - Cast<Float>(this.m_arrivalStep) / 100.0), 0.0);
-    let transform: WorldTransform;
-    WorldTransform.SetPosition(transform, pos);
-    WorldTransform.SetOrientation(transform, this.m_arrivalOrientation);
-    vehicle.SetWorldTransform(transform);
+    let pos = vehicle.GetWorldPosition();
+    let target = this.m_spawnTarget;
+    let remaining = pos.Z - target.Z;
+    let lateral = SqrtF((pos.X - target.X) * (pos.X - target.X) + (pos.Y - target.Y) * (pos.Y - target.Y));
+    if !(remaining >= -0.20 && remaining <= 7.5 && lateral <= 0.8) {
+      this.AbortArrival(vehicle, "position outside pickup corridor; zDelta=" + ToString(remaining) + "; lateral=" + ToString(lateral));
+      return;
+    };
+    // Recheck the landing column; a changed surface aborts this empty pickup.
+    if this.m_arrivalStep % 10 == 0 {
+      let hit: TraceResult;
+      let top = target + new Vector4(0.0, 0.0, 0.3, 0.0);
+      let bottom = target - new Vector4(0.0, 0.0, 3.0, 0.0);
+      if !GameInstance.GetSpatialQueriesSystem(vehicle.GetGame()).SyncRaycastByCollisionGroup(top, bottom, n"Static", hit, true, false) ||
+         hit.normal.Z < 0.95 || AbsF(hit.position.Z - this.m_groundZ) > 0.25 {
+        this.AbortArrival(vehicle, "landing surface changed");
+        return;
+      };
+    };
+    let speed = -MinF(1.35, MaxF(0.12, remaining * 0.85));
+    if remaining <= 0.15 { speed = 0.0; };
+    let samples = DelamainAV_PhysicsPulse(this.m_id, speed);
+    if samples < 0 {
+      this.AbortArrival(vehicle, "physics bridge fault=" + ToString(samples));
+      return;
+    };
+    if this.m_arrivalStep % 20 == 0 {
+      this.Log("INFO", "TAXI_NATIVE_TRACE: callbackSamples=" + ToString(samples) + "; remaining=" + ToString(remaining) + "; targetVz=" + ToString(speed) + "; lateral=" + ToString(lateral));
+    };
+    if this.m_arrivalStep >= 40 && samples == 0 {
+      this.AbortArrival(vehicle, "no matching engine physics callback");
+      return;
+    };
+    if remaining <= 0.15 && samples > 0 {
+      this.m_arrivalStep = 100;
+      this.Log("INFO", "TAXI_NATIVE_TOUCHDOWN: actual descent reached pickup; samples=" + ToString(samples));
+      this.FinishArrival(vehicle);
+      return;
+    };
+    if this.m_arrivalStep >= 360 {
+      this.AbortArrival(vehicle, "native descent timed out");
+      return;
+    };
+    this.m_physicsSamples = samples;
     this.ScheduleArrival();
   }
 
@@ -738,6 +787,7 @@ public class DelamainAVSystem extends ScriptableSystem {
         return;
       };
     };
+    DelamainAV_PhysicsStop(this.m_id);
     if GameInstance.GetDynamicEntitySystem().DeleteEntity(this.m_id) {
       this.m_id = EntityID();
       this.m_wait = 0;

@@ -30,10 +30,21 @@ jobs:
       - name: Compile native workspot and occupant resource
         shell: pwsh
         run: python Delamain_AV/tools/build_resources.py "$env:WOLVENKIT_CLI"
+      - name: Configure native AV physics bridge
+        run: cmake -S Delamain_AV/native -B build/delamain-av -A x64
+      - name: Build native AV physics bridge
+        run: cmake --build build/delamain-av --config Release --parallel 2
+      - name: Stage native DLL
+        shell: pwsh
+        run: |
+          $dll = 'build/delamain-av/Release/DelamainAV.dll'
+          if (!(Test-Path $dll)) { throw 'Native DLL missing' }
+          New-Item -ItemType Directory -Force Delamain_AV/red4ext/plugins/DelamainAV
+          Copy-Item $dll Delamain_AV/red4ext/plugins/DelamainAV/DelamainAV.dll
       - name: Validate and package prototype
         run: python Delamain_AV/tools/package_prototype.py
       - uses: actions/upload-artifact@v4
         with:
-          name: Delamain-AV-v0.2.8-dev.15
-          path: dist/Delamain-AV-v0.2.8-dev.15/
+          name: Delamain-AV-v0.2.9-dev.16
+          path: dist/Delamain-AV-v0.2.9-dev.16/
           if-no-files-found: error

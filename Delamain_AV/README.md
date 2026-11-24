@@ -139,3 +139,9 @@ names. Sound playback remains unverified. The original quest dust effect
 is a separate scene resource; no guessed FX API or dust injection. Do not
 enable occupied flight or destination travel until this pickup lifecycle
 is proven. Single-ZIP Actions artifact.
+
+## dev.16 — native physics descent experiment
+
+Source reference: [tidusmd/CP2077-RED4EXT-DAV](https://github.com/tidusmd0806/CP2077-RED4EXT-DAV), commit 9f0d1359a7f5bb02d71ac6fec86c36aef9dd5615 (MIT). The supplied DAV 3.5.0 DLL corroborates the force/torque/wake relocation hashes and rigid-body owner/id offsets. The public DAV source's forked BaseObject size (0xBA0) differs from current official SDK (0xBC0); we do not use that layout or physicsData pointer offset. The bridge uses the engine callback's rigid-body pointer, checks its owner pointer and full EntityID, AV class, private record, exact executable file version 3.0.88.46235, finite/bounded velocity and mass, and a 1.5-second command lease. It preserves original callbacks and gravity, applies bounded velocity changes in matching callbacks, and uses the original physics wake function once on the game thread. No strong vehicle references or indefinite hook retries. The reverse-engineered velocity, angular velocity and mass offsets still require runtime validation; successful C++ compilation is not proof of ABI compatibility.
+
+The scripted pickup now requests a downward velocity and observes actual world position rather than writing transforms. If the bridge is unavailable, has no matching callbacks, faults, or the empty AV drifts outside the narrow pickup corridor, abort and remove only the unoccupied arrival AV. No transform fallback, no occupied flight, no new UI. After actual descent to within 0.15 m, retain the dev.15 ground-origin handoff and the proven passenger system. This remains a prototype and the handoff can still visibly pop. No game testing in CI.
