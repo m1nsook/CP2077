@@ -3,12 +3,12 @@
     "id": "ground_clearance",
     "kind": "float",
     "label": "Test ground clearance (m)",
-    "description": "Requested AV origin height above a static surface at spawn. Default 1 m matches DAV Excalibur reference. Changes apply to next spawn.",
+    "description": "Test AV origin height above a static surface. Default 0.75 m based on dev.4 visual feedback. Set explicitly; existing saved values are preserved.",
     "group": "Prototype",
     "min": 0.75,
     "max": 2,
-    "step": 0.25,
-    "default": 1
+    "step": 0.05,
+    "default": 0.75
   },
   {
     "id": "spawn",
@@ -55,7 +55,7 @@
     "kind": "action",
     "label": "Inspect vehicle",
     "buttonLabel": "Log AV status",
-    "description": "Reports record, entity type and V's actual mounting slot.",
+    "description": "Reports record, validated clearance, actual mounting slot and native player vehicle/high-level state.",
     "group": "Prototype"
   },
   {

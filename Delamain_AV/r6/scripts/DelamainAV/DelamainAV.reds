@@ -20,6 +20,8 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_clearance: Float;
   private let m_groundCheckWait: Int32;
   private let m_groundStable: Bool;
+  private let m_groundValid: Bool;
+  private let m_spawnTarget: Vector4;
 
   private func OnAttach() -> Void {
     this.m_running = true;
@@ -92,7 +94,9 @@ public class DelamainAVSystem extends ScriptableSystem {
     target.Z = this.m_groundZ + this.m_clearance;
     spec.position = target;
     spec.orientation = Quaternion.BuildFromDirectionVector(forward);
+    this.m_spawnTarget = target;
     this.m_groundStable = false;
+    this.m_groundValid = false;
     this.m_groundCheckWait = 0;
     this.Log("INFO", "GROUND_SPAWN: surface Z=" + ToString(this.m_groundZ) + "; requested origin height=" + ToString(this.m_clearance));
     spec.persistState = false;
@@ -133,19 +137,52 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
     this.m_ready = true;
     this.m_groundCheckWait = 6;
-    this.Log("INFO", "GROUND_INITIAL: origin above surface=" + ToString(vehicle.GetWorldPosition().Z - this.m_groundZ));
+    this.MeasureGround(vehicle, "GROUND_INITIAL");
+  }
+
+  // Never access a field on a temporary struct returned by a native call.
+  // Validate the complete position before subtracting heights. dev.4 logged
+  // impossible values while the vehicle was visibly parked above the road.
+  private func MeasureGround(vehicle: ref<VehicleObject>, stage: String) -> Bool {
+    this.m_groundValid = false;
+    if !IsDefined(vehicle) { return false; };
+    let pos: Vector4 = vehicle.GetWorldPosition();
+    let x: Float = pos.X;
+    let y: Float = pos.Y;
+    let z: Float = pos.Z;
+    let surface: Float = this.m_groundZ;
+    let expected: Vector4 = this.m_spawnTarget;
+    let expectedZ: Float = expected.Z;
+    let requested: Float = this.m_clearance;
+    // Positive comparisons reject NaN/Inf as well as implausible coordinates.
+    if !(AbsF(x - expected.X) <= 5.0 && AbsF(y - expected.Y) <= 5.0 &&
+         AbsF(z - expectedZ) <= 10.0 && AbsF(surface) < 100000.0) {
+      this.Log("ERROR", stage + ": POSITION_INVALID; x=" + ToString(x) + "; y=" + ToString(y) + "; z=" + ToString(z) + "; expectedZ=" + ToString(expectedZ) + ". Not classified as ground drift.");
+      return false;
+    };
+    let delta: Float = z - surface;
+    if !(AbsF(delta) <= 12.0) {
+      this.Log("ERROR", stage + ": HEIGHT_INVALID; position Z=" + ToString(z) + "; surface Z=" + ToString(surface));
+      return false;
+    };
+    this.m_groundValid = true;
+    this.Log("INFO", stage + ": position Z=" + ToString(z) + "; surface Z=" + ToString(surface) + "; clearance=" + ToString(delta) + "; requested=" + ToString(requested));
+    return AbsF(delta - requested) <= 0.25;
   }
 
   private func GroundCheck(vehicle: ref<VehicleObject>) -> Void {
     if this.m_groundCheckWait <= 0 || !IsDefined(vehicle) { return; };
     this.m_groundCheckWait -= 1;
     if this.m_groundCheckWait != 0 { return; };
-    let delta = vehicle.GetWorldPosition().Z - this.m_groundZ;
-    this.m_groundStable = delta >= this.m_clearance - 0.25 && delta <= this.m_clearance + 0.25;
-    if this.m_groundStable {
-      this.Log("INFO", "GROUND_SETTLED: origin above surface=" + ToString(delta) + "; within target tolerance. Confirm visible landing gear.");
+    this.m_groundStable = this.MeasureGround(vehicle, "GROUND_SETTLED");
+    if !this.m_groundValid {
+      this.Log("WARNING", "GROUND_UNVERIFIED: position sample is invalid. Boarding blocked; send diagnostics.");
     } else {
-      this.Log("WARNING", "GROUND_DRIFT: origin above surface=" + ToString(delta) + "; expected=" + ToString(this.m_clearance) + ". Do not board if clipped.");
+      if !this.m_groundStable {
+        this.Log("WARNING", "GROUND_DRIFT: valid position differs from requested clearance. Do not board if clipped.");
+      } else {
+        this.Log("INFO", "GROUND_PASS: clearance within tolerance. Confirm visible landing gear.");
+      };
     };
   }
 
@@ -154,8 +191,13 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.Log("WARNING", "No ready test AV.");
       return false;
     };
-    if this.m_groundCheckWait > 0 || !this.m_groundStable || vehicle.GetWorldPosition().Z - this.m_groundZ < this.m_clearance - 0.25 {
-      this.Log("WARNING", "Board blocked: ground clearance is not stable. Inspect and remove the AV.");
+    if this.m_groundCheckWait > 0 {
+      this.Log("WARNING", "Board blocked: waiting for the clearance measurement.");
+      return false;
+    };
+    this.m_groundStable = this.MeasureGround(vehicle, "GROUND_BOARD");
+    if !this.m_groundStable {
+      this.Log("WARNING", "Board blocked: ground clearance is outside tolerance or cannot be verified.");
       return false;
     };
     if Vector4.Distance(player.GetWorldPosition(), vehicle.GetWorldPosition()) > 8.0 {
@@ -300,6 +342,21 @@ public class DelamainAVSystem extends ScriptableSystem {
     this.Log("INFO", "Rear-left passenger mount requested. Waiting for actual mount confirmation.");
   }
 
+  private func LogPassengerState(player: ref<PlayerPuppet>) -> Void {
+    let bb = GameInstance.GetBlackboardSystem(player.GetGame()).GetLocalInstanced(player.GetEntityID(), GetAllBlackboardDefs().PlayerStateMachine);
+    if !IsDefined(bb) {
+      this.Log("WARNING", "PSM_UNAVAILABLE: no local player state machine blackboard.");
+      return;
+    };
+    let state = bb.GetInt(GetAllBlackboardDefs().PlayerStateMachine.Vehicle);
+    let high = bb.GetInt(GetAllBlackboardDefs().PlayerStateMachine.HighLevel);
+    if Equals(state, Cast<Int32>(gamePSMVehicle.Passenger)) {
+      this.Log("INFO", "PSM_PASSENGER: native passenger state confirmed; vehicle=" + ToString(state) + "; highLevel=" + ToString(high));
+    } else {
+      this.Log("INFO", "PSM_OTHER: vehicle=" + ToString(state) + "; highLevel=" + ToString(high));
+    };
+  }
+
   private func Inspect(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
     if !IsDefined(vehicle) {
       this.Log("INFO", "No materialized test AV.");
@@ -310,7 +367,8 @@ public class DelamainAVSystem extends ScriptableSystem {
     } else {
       this.Log("ERROR", "Unexpected vehicle record.");
     };
-    this.Log("INFO", "GROUND_STATUS: current origin height=" + ToString(vehicle.GetWorldPosition().Z - this.m_groundZ) + "; requested=" + ToString(this.m_clearance));
+    this.MeasureGround(vehicle, "GROUND_STATUS");
+    this.LogPassengerState(player);
     let mount = GameInstance.GetMountingFacility(player.GetGame()).GetMountingInfoSingleWithObjects(player);
     if Equals(mount.parentId, vehicle.GetEntityID()) {
       this.Log("INFO", "V is mounted in slot: " + NameToString(mount.slotId.id));
@@ -340,6 +398,7 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.m_doorWait = 0;
       this.m_groundCheckWait = 0;
       this.m_groundStable = false;
+      this.m_groundValid = false;
       this.m_closeWait = 0;
       this.m_returnValid = false;
       this.Log("INFO", "Test AV removed.");
@@ -383,6 +442,7 @@ public class DelamainAVSystem extends ScriptableSystem {
         if IsDefined(vehicle) && Equals(info.parentId, vehicle.GetEntityID()) && Equals(info.slotId.id, n"seat_back_left") {
           this.m_boardWait = 0;
           this.Log("INFO", "PASS: V mounted in rear-left passenger seat.");
+          this.LogPassengerState(player);
           this.m_closeWait = 6;
         } else {
           this.m_boardWait -= 1;
