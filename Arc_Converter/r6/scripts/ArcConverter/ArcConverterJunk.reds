@@ -1,8 +1,7 @@
 module MisoArcConverter
 
 // Arc Converter - Automatic Item Processing
-// Independent junk-to-eddies processor. Does not modify the existing
-// auto-disassembly or ammo-crafting system.
+// Independent junk and consumable processor. Equipment remains acquisition-only.
 //
 // Matches the vanilla "Sell Junk" classification (Gen_Junk + Gen_Jewellery).
 // This is a vendor-free exchange at the game's native sell price; it is
@@ -12,6 +11,15 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
   private let m_running: Bool;
   private let m_player: wref<PlayerPuppet>;
   private let m_warmupTicks: Int32;
+  private let m_diagWarnTicks: Int32;
+  private let m_diagActivityTicks: Int32;
+
+  private func StackActivity(message: String) -> Void {
+    if this.m_diagActivityTicks <= 0 {
+      M1Arc_Log("m1nsook.arc-converter", "DEBUG", message);
+      this.m_diagActivityTicks = 5;
+    };
+  }
 
   private func OnAttach() -> Void {
     this.m_running = true;
@@ -43,18 +51,25 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
     return board.GetBool(GetAllBlackboardDefs().UI_System.IsInMenu);
   }
 
-  private func IsSellableJunk(data: wref<gameItemData>) -> Bool {
+  private func IsSafeStack(data: wref<gameItemData>) -> Bool {
     if !IsDefined(data) {
       return false;
     };
     let id: ItemID = data.GetID();
     if !ItemID.IsValid(id) || ItemID.HasFlag(id, gameEItemIDFlag.Preview)
       || data.HasTag(n"Quest") || data.HasTag(n"UnequipBlocked")
-      || data.HasTag(n"LongLasting") || data.HasTag(n"IconicWeapon")
-      || RPGManager.IsItemIconic(data) {
+      || data.HasTag(n"IconicWeapon")
+      || RPGManager.IsItemIconic(data) || RPGManager.IsItemEquipped(this.m_player, id) {
       return false;
     };
-    let itemType: gamedataItemType = RPGManager.GetItemType(id);
+    return true;
+  }
+
+  private func IsSellableJunk(data: wref<gameItemData>) -> Bool {
+    if !this.IsSafeStack(data) || data.HasTag(n"LongLasting") {
+      return false;
+    };
+    let itemType: gamedataItemType = RPGManager.GetItemType(data.GetID());
     // Exactly what the game's "Sell Junk" button considers junk.
     return Equals(itemType, gamedataItemType.Gen_Junk)
       || Equals(itemType, gamedataItemType.Gen_Jewellery);
@@ -64,14 +79,17 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
   // this helper instead of trying to skip a while-loop iteration.
   private func SellJunkStack(gi: GameInstance, ts: ref<TransactionSystem>,
     data: wref<gameItemData>) -> Bool {
-    if !this.IsSellableJunk(data) {
+    if !this.IsSafeStack(data) {
       return false;
     };
 
     let item: ItemID = data.GetID();
     // Recheck the live stack, not the inventory snapshot.
-    let quantity: Int32 = Min(128, Min(data.GetQuantity(),
-      ts.GetItemQuantity(this.m_player, item)));
+    let quantity: Int32 = Min(data.GetQuantity(), ts.GetItemQuantity(this.m_player, item));
+    if !this.IsSellableJunk(data) {
+      quantity -= Max(0, M1Arc_GetInt("m1nsook.arc-converter", "consumables_keep"));
+    };
+    quantity = Min(128, quantity);
     if quantity <= 0 {
       return false;
     };
@@ -95,16 +113,115 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
     // the rare failure to grant currency rather than silently losing it.
     if ts.RemoveItem(this.m_player, item, quantity) {
       if !ts.GiveItemByTDBID(this.m_player, t"Items.money", payment) {
-        ts.GiveItem(this.m_player, item, quantity);
+        if ts.GiveItem(this.m_player, item, quantity) {
+          M1Arc_Log("m1nsook.arc-converter", "ERROR", "Stack payment failed; items restored.");
+        } else {
+          M1Arc_Log("m1nsook.arc-converter", "ERROR", "Stack payment and restoration failed: " + TDBID.ToStringDEBUG(ItemID.GetTDBID(item)));
+        };
         return false;
       };
+      this.StackActivity("Sold stack: " + TDBID.ToStringDEBUG(ItemID.GetTDBID(item)) + ", quantity=" + ToString(quantity) + ", eddies=" + ToString(payment));
       return true;
     };
     return false;
   }
 
+  private func ConsumableTier(data: wref<gameItemData>) -> Int32 {
+    switch RPGManager.GetItemQuality(data) {
+      case gamedataQuality.Common:
+      case gamedataQuality.CommonPlus: return 1;
+      case gamedataQuality.Uncommon:
+      case gamedataQuality.UncommonPlus: return 2;
+      case gamedataQuality.Rare:
+      case gamedataQuality.RarePlus: return 3;
+      case gamedataQuality.Epic:
+      case gamedataQuality.EpicPlus: return 4;
+      case gamedataQuality.Legendary:
+      case gamedataQuality.LegendaryPlus:
+      case gamedataQuality.LegendaryPlusPlus: return 5;
+    };
+    return 0;
+  }
+
+  private func ConsumableAction(data: wref<gameItemData>) -> String {
+    let ty: gamedataItemType = RPGManager.GetItemType(data.GetID());
+    let tier: Int32 = this.ConsumableTier(data);
+    if Equals(ty, gamedataItemType.Con_Edible) && M1Arc_GetBool("m1nsook.arc-converter", "food_enabled") {
+      switch tier {
+        case 1: return M1Arc_GetString("m1nsook.arc-converter", "food_tier1");
+        case 2: return M1Arc_GetString("m1nsook.arc-converter", "food_tier2");
+        case 3: return M1Arc_GetString("m1nsook.arc-converter", "food_tier3");
+        case 4: return M1Arc_GetString("m1nsook.arc-converter", "food_tier4");
+        case 5: return M1Arc_GetString("m1nsook.arc-converter", "food_tier5");
+      };
+    };
+    if Equals(ty, gamedataItemType.Con_LongLasting) && M1Arc_GetBool("m1nsook.arc-converter", "boosters_enabled") {
+      switch tier {
+        case 1: return M1Arc_GetString("m1nsook.arc-converter", "boosters_tier1");
+        case 2: return M1Arc_GetString("m1nsook.arc-converter", "boosters_tier2");
+        case 3: return M1Arc_GetString("m1nsook.arc-converter", "boosters_tier3");
+        case 4: return M1Arc_GetString("m1nsook.arc-converter", "boosters_tier4");
+        case 5: return M1Arc_GetString("m1nsook.arc-converter", "boosters_tier5");
+      };
+    };
+    return "Keep";
+  }
+
+  private func ProcessStack(gi: GameInstance, ts: ref<TransactionSystem>, data: wref<gameItemData>) -> Bool {
+    if !this.IsSafeStack(data) {
+      return false;
+    };
+    let item: ItemID = data.GetID();
+    let action: String;
+    let keep: Int32 = 0;
+    if this.IsSellableJunk(data) {
+      if !M1Arc_GetBool("m1nsook.arc-converter", "sell_junk") {
+        return false;
+      };
+      action = M1Arc_GetString("m1nsook.arc-converter", "junk_action");
+      if Equals(action, "By value") {
+        let price: Int32 = RPGManager.CalculateSellPrice(gi, this.m_player, item);
+        if price <= M1Arc_GetInt("m1nsook.arc-converter", "junk_price_threshold") {
+          action = "Disassemble";
+        } else {
+          action = "Sell";
+        };
+      };
+    } else {
+      action = this.ConsumableAction(data);
+      keep = Max(0, M1Arc_GetInt("m1nsook.arc-converter", "consumables_keep"));
+    };
+    if Equals(action, "Sell") {
+      return this.SellJunkStack(gi, ts, data);
+    };
+    if !Equals(action, "Disassemble") {
+      return false;
+    };
+    let crafting: ref<CraftingSystem> = CraftingSystem.GetInstance(gi);
+    let quantity: Int32 = Min(128, Min(data.GetQuantity(), ts.GetItemQuantity(this.m_player, item)) - keep);
+    if quantity <= 0 || !IsDefined(crafting) {
+      return false;
+    };
+    if !crafting.CanItemBeDisassembled(this.m_player, item) {
+      if this.m_diagWarnTicks <= 0 {
+        M1Arc_Log("m1nsook.arc-converter", "WARNING", "Vanilla disassembly unavailable; stack kept: " + TDBID.ToStringDEBUG(ItemID.GetTDBID(item)));
+        this.m_diagWarnTicks = 30;
+      };
+      return false;
+    };
+    let request: ref<DisassembleItemRequest> = new DisassembleItemRequest();
+    request.target = this.m_player;
+    request.itemID = item;
+    request.amount = quantity;
+    crafting.QueueRequest(request);
+    this.StackActivity("Queued stack disassembly: " + TDBID.ToStringDEBUG(ItemID.GetTDBID(item)) + ", quantity=" + ToString(quantity));
+    return true;
+  }
+
   private func SellJunk() -> Void {
-    if !M1Arc_GetBool("m1nsook.arc-converter", "sell_junk")
+    if (!M1Arc_GetBool("m1nsook.arc-converter", "sell_junk")
+      && !M1Arc_GetBool("m1nsook.arc-converter", "food_enabled")
+      && !M1Arc_GetBool("m1nsook.arc-converter", "boosters_enabled"))
       || !M1Arc_GetBool("m1nsook.arc-converter", "enabled")
       || this.IsMenuOpen() {
       return;
@@ -125,7 +242,7 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
     while i < ArraySize(items) && processed < 12 {
       let data: wref<gameItemData> = items[i];
       i += 1;
-      if this.SellJunkStack(gi, ts, data) {
+      if this.ProcessStack(gi, ts, data) {
         processed += 1;
       };
     };
@@ -150,6 +267,12 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
         if this.m_warmupTicks > 0 {
           this.m_warmupTicks -= 1;
         } else {
+          if this.m_diagWarnTicks > 0 {
+            this.m_diagWarnTicks -= 1;
+          };
+          if this.m_diagActivityTicks > 0 {
+            this.m_diagActivityTicks -= 1;
+          };
           this.SellJunk();
         };
       };

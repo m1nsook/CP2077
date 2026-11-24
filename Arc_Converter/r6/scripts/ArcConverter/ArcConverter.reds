@@ -1,5 +1,8 @@
 module MisoArcConverter
 
+@if(ModuleExists("MuchBetterAmmo"))
+import MuchBetterAmmo.MuchBetterAmmoRouter
+
 // Arc Converter - Automatic Item Processing
 // Gameplay: REDscript. Settings: M1 Arc. No CET hooks.
 // Newly acquired weapons or clothes must pass safety checks before processing.
@@ -12,7 +15,86 @@ public class ArcConverterSystem extends ScriptableSystem {
   private let m_warmupTicks: Int32;
   private let m_pending: array<ItemID>;
   private let m_ammoCooldown: Int32;
+  private let m_ammoPreferLeft: Bool;
   private let m_processingSale: Bool;
+  private let m_diagReady: Bool;
+  private let m_diagRevision: Int32;
+  private let m_diagAmmoWarnTicks: Int32;
+  private let m_diagActivityTicks: Int32;
+  private let m_diagMBA: Bool;
+  private let m_diagDual: Bool;
+  private let m_diagEnabled: Bool;
+  private let m_diagAmmoEnabled: Bool;
+  private let m_diagMBAEnabled: Bool;
+  private let m_diagDualEnabled: Bool;
+
+  private func UpdateDiagnostics() -> Void {
+    if this.m_diagAmmoWarnTicks > 0 {
+      this.m_diagAmmoWarnTicks -= 1;
+    };
+    if this.m_diagActivityTicks > 0 {
+      this.m_diagActivityTicks -= 1;
+    };
+    let revision: Int32 = M1Arc_Revision();
+    if this.m_diagReady && Equals(revision, this.m_diagRevision) {
+      return;
+    };
+    let enabled: Bool = M1Arc_GetBool("m1nsook.arc-converter", "enabled");
+    let ammo: Bool = M1Arc_GetBool("m1nsook.arc-converter", "ammo");
+    let mbaEnabled: Bool = M1Arc_GetBool("m1nsook.arc-converter", "ammo_much_better");
+    let dualEnabled: Bool = M1Arc_GetBool("m1nsook.arc-converter", "ammo_dual_wield");
+    let mba: Bool = ArcConverterMBALoaded();
+    // EDW 3.8 has no module declaration; check its unique loaded tweak.
+    let dual: Bool = IsDefined(TweakDBInterface.GetGameplayLogicPackageRecord(t"EDW.TiconChargedShot.Package"));
+    if !this.m_diagReady {
+      if !M1Arc_Log("m1nsook.arc-converter", "INFO", "Arc Converter 1.0.1 initialized; M1 Arc " + M1Arc_Version()) {
+        return;
+      };
+    };
+    if !this.m_diagReady || NotEquals(enabled, this.m_diagEnabled) || NotEquals(ammo, this.m_diagAmmoEnabled) {
+      M1Arc_Log("m1nsook.arc-converter", "INFO", "Settings: master=" + ToString(enabled) + ", ammunition=" + ToString(ammo));
+    };
+    if !this.m_diagReady || NotEquals(mba, this.m_diagMBA) || NotEquals(mbaEnabled, this.m_diagMBAEnabled) {
+      if mba {
+        M1Arc_Log("m1nsook.arc-converter", "INFO", "Much Better Ammo: scripts and all four custom ammo records detected; extra ammo crafting enabled=" + ToString(mbaEnabled) + ". Configured capacities respected.");
+      } else {
+        if mbaEnabled {
+          M1Arc_Log("m1nsook.arc-converter", "WARNING", "Much Better Ammo: not detected or incomplete installation. Custom ammo crafting unavailable; vanilla ammo remains supported.");
+        } else {
+          M1Arc_Log("m1nsook.arc-converter", "INFO", "Much Better Ammo: not detected or incomplete installation (optional).");
+        };
+      };
+    };
+    if !this.m_diagReady || NotEquals(dual, this.m_diagDual) || NotEquals(dualEnabled, this.m_diagDualEnabled) {
+      if dual {
+        M1Arc_Log("m1nsook.arc-converter", "INFO", "Expanded Dual Wielding: 3.8 tweak marker detected; both-hand crafting enabled=" + ToString(dualEnabled));
+      } else {
+        M1Arc_Log("m1nsook.arc-converter", "INFO", "Expanded Dual Wielding: tweak marker not detected. Optional native both-hand scan enabled=" + ToString(dualEnabled));
+      };
+    };
+    this.m_diagReady = true;
+    this.m_diagRevision = revision;
+    this.m_diagEnabled = enabled;
+    this.m_diagAmmoEnabled = ammo;
+    this.m_diagMBA = mba;
+    this.m_diagDual = dual;
+    this.m_diagMBAEnabled = mbaEnabled;
+    this.m_diagDualEnabled = dualEnabled;
+  }
+
+  private func AmmoWarning(message: String) -> Void {
+    if this.m_diagAmmoWarnTicks <= 0 {
+      M1Arc_Log("m1nsook.arc-converter", "WARNING", message);
+      this.m_diagAmmoWarnTicks = 60;
+    };
+  }
+
+  private func Activity(message: String) -> Void {
+    if this.m_diagActivityTicks <= 0 {
+      M1Arc_Log("m1nsook.arc-converter", "DEBUG", message);
+      this.m_diagActivityTicks = 10;
+    };
+  }
 
   private func OnAttach() -> Void {
     this.m_running = true;
@@ -45,7 +127,11 @@ public class ArcConverterSystem extends ScriptableSystem {
     this.m_player = null;
     this.m_warmupTicks = 0;
     this.m_ammoCooldown = 0;
+    this.m_ammoPreferLeft = false;
     this.m_processingSale = false;
+    this.m_diagReady = false;
+    this.m_diagAmmoWarnTicks = 0;
+    this.m_diagActivityTicks = 0;
     ArrayClear(this.m_pending);
   }
 
@@ -237,7 +323,13 @@ public class ArcConverterSystem extends ScriptableSystem {
     this.m_processingSale = true;
     if ts.RemoveItem(this.m_player, item, 1) {
       if !ts.GiveItemByTDBID(this.m_player, t"Items.money", price) {
-        ts.GiveItem(this.m_player, item, 1);
+        if ts.GiveItem(this.m_player, item, 1) {
+          M1Arc_Log("m1nsook.arc-converter", "ERROR", "Equipment payment failed; item restored.");
+        } else {
+          M1Arc_Log("m1nsook.arc-converter", "ERROR", "Equipment payment and item restoration failed.");
+        };
+      } else {
+        this.Activity("Sold equipment: " + TDBID.ToStringDEBUG(ItemID.GetTDBID(item)) + " for " + ToString(price) + " eddies.");
       };
     };
     this.m_processingSale = false;
@@ -270,6 +362,7 @@ public class ArcConverterSystem extends ScriptableSystem {
           request.itemID = item;
           request.amount = 1;
           crafting.QueueRequest(request);
+          this.Activity("Queued equipment disassembly: " + TDBID.ToStringDEBUG(ItemID.GetTDBID(item)));
         };
       };
       i += 1;
@@ -307,27 +400,56 @@ public class ArcConverterSystem extends ScriptableSystem {
     };
 
     let weapon: ref<WeaponObject> = ScriptedPuppet.GetActiveWeapon(this.m_player);
-    if !IsDefined(weapon) {
+    let left: ref<WeaponObject>;
+    if M1Arc_GetBool("m1nsook.arc-converter", "ammo_dual_wield") {
+      let right: ref<WeaponObject> = GameObject.GetRightActiveWeapon(this.m_player);
+      if IsDefined(right) {
+        weapon = right;
+      };
+      left = GameObject.GetLeftActiveWeapon(this.m_player);
+    };
+    let distinctLeft: Bool = IsDefined(left);
+    if distinctLeft && IsDefined(weapon) {
+      distinctLeft = NotEquals(ItemID.GetTDBID(WeaponObject.GetAmmoType(left)),
+        ItemID.GetTDBID(WeaponObject.GetAmmoType(weapon)));
+    };
+    // One recipe per tick, with alternating priority and shared-pool deduplication.
+    if distinctLeft && this.m_ammoPreferLeft && this.TryCraftWeaponAmmo(left) {
+      this.m_ammoPreferLeft = false;
       return;
+    };
+    if this.TryCraftWeaponAmmo(weapon) {
+      this.m_ammoPreferLeft = true;
+      return;
+    };
+    if distinctLeft && !this.m_ammoPreferLeft && this.TryCraftWeaponAmmo(left) {
+      this.m_ammoPreferLeft = false;
+    };
+  }
+
+  private func TryCraftWeaponAmmo(weapon: ref<WeaponObject>) -> Bool {
+    if !IsDefined(weapon) {
+      return false;
     };
     let ammoItem: ItemID = WeaponObject.GetAmmoType(weapon);
     if !ItemID.IsValid(ammoItem) {
-      return;
+      return false;
     };
     let ammoID: TweakDBID = ItemID.GetTDBID(ammoItem);
-    if !this.IsVanillaAmmo(ammoID) {
-      return;
+    if !this.IsVanillaAmmo(ammoID) && (!M1Arc_GetBool("m1nsook.arc-converter", "ammo_much_better") || !ArcConverterMBAIsCustom(ammoID)) {
+      return false;
     };
 
     let crafting: ref<CraftingSystem> = CraftingSystem.GetInstance(this.GetGameInstance());
     let ts: ref<TransactionSystem> = GameInstance.GetTransactionSystem(this.GetGameInstance());
     if !IsDefined(crafting) || !IsDefined(ts) || !IsDefined(crafting.GetPlayerCraftBook()) {
-      return;
+      return false;
     };
     let record: ref<Item_Record> = TweakDBInterface.GetItemRecord(ammoID);
     if !IsDefined(record) || !IsDefined(record.CraftingData())
       || !crafting.IsRecipeKnown(ammoID, crafting.GetPlayerCraftBook()) {
-      return;
+      this.AmmoWarning("Ammo recipe missing or unknown: " + TDBID.ToStringDEBUG(ammoID));
+      return false;
     };
 
     let current: Int32 = ts.GetItemQuantity(this.m_player, ammoItem);
@@ -339,17 +461,23 @@ public class ArcConverterSystem extends ScriptableSystem {
         capacity = liveCap;
       };
     };
+    // MBA's live configuration also covers empty inventory stacks.
+    let modCapacity: Int32 = ArcConverterMBACapacity(ammoID);
+    if modCapacity > 0 {
+      capacity = modCapacity;
+    };
     let batch: Int32 = CraftingSystem.GetAmmoBulletAmount(ammoID);
     if capacity <= 0 || batch <= 0 || current + batch > capacity {
-      return;
+      return false;
     };
     let threshold: Int32 = M1Arc_GetInt("m1nsook.arc-converter", "threshold");
     if threshold < 1 || threshold > 100 || current * 100 >= capacity * threshold {
-      return;
+      return false;
     };
     // Let vanilla calculate real component costs and apply crafting perks.
     if !crafting.CanItemBeCrafted(record) {
-      return;
+      this.AmmoWarning("Ammo crafting blocked (components or recipe restrictions): " + TDBID.ToStringDEBUG(ammoID));
+      return false;
     };
 
     let request: ref<CraftItemRequest> = new CraftItemRequest();
@@ -358,8 +486,10 @@ public class ArcConverterSystem extends ScriptableSystem {
     request.amount = 1;
     request.bulletAmount = batch;
     crafting.QueueRequest(request);
+    this.Activity("Queued ammo crafting: " + TDBID.ToStringDEBUG(ammoID) + ", batch=" + ToString(batch) + ", reserve=" + ToString(current) + "/" + ToString(capacity));
     // Craft one vanilla recipe batch at a time; re-check resources on next tick.
     this.m_ammoCooldown = 1;
+    return true;
   }
 
   public func Tick() -> Void {
@@ -370,6 +500,7 @@ public class ArcConverterSystem extends ScriptableSystem {
       if this.m_warmupTicks > 0 {
         this.m_warmupTicks -= 1;
       } else {
+        this.UpdateDiagnostics();
         this.ProcessEquipment();
         this.CraftEquippedAmmo();
       };
@@ -396,4 +527,40 @@ public class ArcConverterTick extends DelayCallback {
       this.owner.Tick();
     };
   }
+}
+
+@if(ModuleExists("MuchBetterAmmo"))
+private static func ArcConverterMBACapacity(ammo: TweakDBID) -> Int32 {
+  return MuchBetterAmmoRouter.CapacityForAmmo(ammo);
+}
+
+@if(!ModuleExists("MuchBetterAmmo"))
+private static func ArcConverterMBACapacity(ammo: TweakDBID) -> Int32 {
+  return -1;
+}
+
+@if(ModuleExists("MuchBetterAmmo"))
+private static func ArcConverterMBAIsCustom(ammo: TweakDBID) -> Bool {
+  return Equals(ammo, t"MuchBetterAmmo.RevolverAmmo")
+    || Equals(ammo, t"MuchBetterAmmo.SMGAmmo")
+    || Equals(ammo, t"MuchBetterAmmo.MachineGunAmmo")
+    || Equals(ammo, t"MuchBetterAmmo.PrecisionRifleAmmo");
+}
+
+@if(!ModuleExists("MuchBetterAmmo"))
+private static func ArcConverterMBAIsCustom(ammo: TweakDBID) -> Bool {
+  return false;
+}
+
+@if(ModuleExists("MuchBetterAmmo"))
+private static func ArcConverterMBALoaded() -> Bool {
+  return IsDefined(TweakDBInterface.GetItemRecord(t"MuchBetterAmmo.RevolverAmmo"))
+    && IsDefined(TweakDBInterface.GetItemRecord(t"MuchBetterAmmo.SMGAmmo"))
+    && IsDefined(TweakDBInterface.GetItemRecord(t"MuchBetterAmmo.MachineGunAmmo"))
+    && IsDefined(TweakDBInterface.GetItemRecord(t"MuchBetterAmmo.PrecisionRifleAmmo"));
+}
+
+@if(!ModuleExists("MuchBetterAmmo"))
+private static func ArcConverterMBALoaded() -> Bool {
+  return false;
 }

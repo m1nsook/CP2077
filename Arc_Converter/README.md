@@ -1,6 +1,6 @@
 # Arc Converter - Automatic Item Processing
 
-Cyberpunk 2077 2.50 mod using RED4ext, redscript and M1 Arc 1.0.0. No CET dependency.
+Cyberpunk 2077 2.50 mod using RED4ext, redscript and M1 Arc 1.0.1 or newer. No CET dependency.
 
 ## Features
 
@@ -70,3 +70,15 @@ Open **Arc Converter - Automatic Item Processing** in M1 Arc to configure your s
 Arc Converter's weapon and clothes Sell / Disassemble modes, melee weapon support, ammunition crafting and junk conversion have been tested in Cyberpunk 2077 2.50.
 
 Nexus Mods: https://www.nexusmods.com/games/cyberpunk2077/mods/39454
+
+## 1.0.1 development update — runtime testing pending
+
+- Junk: Sell (existing default), Disassemble, or By value. The threshold is per item: at or below it disassemble, above it sell. Unsupported disassembly is skipped, not sold automatically.
+- Food/drinks and boosters: independent switches and per-tier Keep/Sell/Disassemble choices. Includes existing stacks; each stack retains a configurable reserve (default 1). Healing inhalers/injectors and skill shards are excluded. Equipped, quest and protected items are skipped. Disassembly requires vanilla eligibility; ordinary food/drinks may not support it without a separate mod restoring that action. No artificial component rewards.
+- Optional Much Better Ammo 1.8 support: uses its router for capacities (including empty stacks), four custom ammo records, and game crafting recipes/yields. No required dependency or redistributed files. When present its capacity settings are honored even for the four standard ammo types.
+- Optional Expanded Dual Wielding 3.8 support: native left/right active weapon APIs, distinct ammo pools, alternating priority, one recipe per cycle. Works with or without Much Better Ammo. Both optional switches default off.
+- Existing settings IDs and the existing junk Sell default are preserved. No changes to release workflows.
+
+### M1 Arc 1.0.1 diagnostics
+
+Open the Arc Converter Logs panel or use Copy Diagnostics. The session log reports initialization, master/ammo settings, Much Better Ammo script + record availability, and Expanded Dual Wielding's loaded 3.8 tweak marker. Missing optional mods are not errors; a requested but unavailable MBA integration is a warning. The EDW marker indicates loaded tweak data, not CET runtime health; the native both-hand scan works regardless. Activity samples are limited to one per five seconds per processor, and repeated ammo/disassembly warnings to one per thirty seconds per processor. Queued crafting/disassembly is logged as queued, not falsely reported as completed. Payment/rollback failures are logged as errors. Diagnostics use English technical messages.

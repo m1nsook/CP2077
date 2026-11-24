@@ -12,8 +12,8 @@ settings = json.loads((moddir / "settings.json").read_text(encoding="utf-8"))
 assert manifest["format"] == 1
 assert manifest["id"] == moddir.name
 assert manifest["name"] == "Arc Converter - Automatic Item Processing"
-assert manifest["requires"]["m1arc"] == "1.0.0"
-assert manifest["version"] == "1.0.0"
+assert manifest["requires"]["m1arc"] == "1.0.1"
+assert manifest["version"] == "1.0.1"
 assert manifest["scope"] == "Crafting"
 
 ids = [s["id"] for s in settings]
@@ -23,6 +23,10 @@ expected_ids = {
     "tier4", "tier5", "clothes_enabled", "clothes_action",
     *(f"clothes_tier{i}" for i in range(1, 6)),
     "ammo", "threshold", "sell_junk",
+    "junk_action", "junk_price_threshold", "food_enabled", "boosters_enabled", "consumables_keep",
+    "ammo_much_better", "ammo_dual_wield",
+    *(f"food_tier{i}" for i in range(1, 6)),
+    *(f"boosters_tier{i}" for i in range(1, 6)),
 }
 assert set(ids) == expected_ids
 by_id = {s["id"]: s for s in settings}
@@ -127,4 +131,31 @@ for check in junk_checks:
     assert check in junk_source, check
 assert 'weapon_action' not in junk_source
 assert 'clothes_action' not in junk_source
-print("PASS: M1 Arc choice settings, safety checks, translations and isolated junk logic")
+assert by_id["junk_action"]["default"] == "Sell"
+assert by_id["junk_price_threshold"]["default"] == 500
+assert by_id["consumables_keep"]["default"] == 1
+for prefix in ("food", "boosters"):
+    assert by_id[prefix + "_enabled"]["default"] is False
+    for tier in range(1, 6):
+        assert by_id[f"{prefix}_tier{tier}"]["default"] == "Keep"
+for key in ("ammo_much_better", "ammo_dual_wield"):
+    assert by_id[key]["default"] is False
+for check in ('ModuleExists("MuchBetterAmmo")', 'MuchBetterAmmoRouter.CapacityForAmmo(ammo)', 'GameObject.GetLeftActiveWeapon', 'GameObject.GetRightActiveWeapon', 'distinctLeft', 'this.m_ammoPreferLeft'):
+    assert check in source, check
+for check in ('gamedataItemType.Con_Edible', 'gamedataItemType.Con_LongLasting', 'crafting.CanItemBeDisassembled(this.m_player, item)', 'request.amount = quantity', 'junk_price_threshold', 'consumables_keep', 'RPGManager.IsItemEquipped(this.m_player, id)'):
+    assert check in junk_source, check
+for key in expected_ids:
+    if by_id[key]["kind"] == "choice":
+        for locale in ("en_US", "pl_PL", "ko_KR"):
+            t = json.loads((moddir / "language" / f"{locale}.json").read_text(encoding="utf-8"))
+            assert set(t["settings"][key]["choices"]) == set(by_id[key]["choices"])
+print("PASS: settings, translations, safety contracts and optional compatibility")
+
+assert 'M1Arc_Log(' in source and 'M1Arc_Log(' in junk_source
+assert 'ArcConverterMBALoaded()' in source
+assert 'EDW.TiconChargedShot.Package' in source
+assert 'this.m_diagAmmoWarnTicks = 60' in source
+assert 'this.m_diagWarnTicks = 30' in junk_source
+assert 'Queued ammo crafting:' in source
+assert 'Queued stack disassembly:' in junk_source
+print("PASS: M1 Arc 1.0.1 diagnostics contracts")
