@@ -25,7 +25,7 @@ jobs:
           Invoke-WebRequest -Uri "https://raw.githubusercontent.com/m1nsook/m1arc/8bd94c58869751f89323f5b7c47dd400c57f2bcb/r6/scripts/m1arc/M1Arc.reds" -OutFile ".ci/m1arc-api/M1Arc.reds"
           New-Item -ItemType Directory ".ci/tweakxl-api" -Force | Out-Null
           $tweak = "https://raw.githubusercontent.com/psiberx/cp2077-tweak-xl/4ba1ac07b7ae1d4a4a24749e28246833d35687c7/scripts"
-          foreach ($file in @("TweakDBInterface.reds", "TweakDBManager.reds", "TweakDBBatch.reds")) {
+          foreach ($file in @("TweakDBInterface.reds", "TweakDBManager.reds", "TweakDBBatch.reds", "ScriptableTweak.reds")) {
             Invoke-WebRequest -Uri "$tweak/$file" -OutFile ".ci/tweakxl-api/$file"
           }
       - name: Parse REDscript (semantic compilation when game bundle configured)
@@ -47,7 +47,7 @@ jobs:
           python3 Free_Chrome/tools/validate_free_chrome.py
       - name: Package game-root ZIP
         run: |
-          python3 scripts/package_release.py --mod Free_Chrome --tag 1.1.0-dev.3 --output dist
+          python3 scripts/package_release.py --mod Free_Chrome --tag 1.1.0-dev.4 --output dist
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile

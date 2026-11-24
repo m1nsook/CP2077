@@ -1,108 +1,14 @@
 module MisoFreeChrome
 
-// Native TweakXL access; M1 Arc is the sole settings authority.
-// Keep exact Float/Int32 type and restore only flats we actually zeroed.
-public class FreeChromeSettings extends ScriptableSystem {
-  private let running: Bool;
-  private let ready: Bool;
-  private let enabled: Bool;
-  private let ticks: Int32;
-  private let owned: array<TweakDBID>;
-  private let ownedRecords: array<TweakDBID>;
-  private let original: array<Variant>;
+// TweakDB lives for the process, not the save. Backup flats are namespaced,
+// process-local and never saved into a player profile or game save.
+// Nonzero backup = this mod owns a change. Zero = no outstanding change.
+public class FreeChromePatch {
   private let found: Int32;
   private let changed: Int32;
+  private let restored: Int32;
+  private let skipped: Int32;
   private let failed: Int32;
-  private let firstScan: Bool;
-  private let firstRestore: Bool;
-
-  private func OnAttach() -> Void {
-    this.running = true;
-    this.firstScan = true;
-    this.firstRestore = true;
-    this.Tick();
-  }
-
-  private func OnDetach() -> Void {
-    this.running = false;
-    this.Restore();
-  }
-
-  public func Tick() -> Void {
-    if !this.running { return; }
-    let enabled = M1Arc_GetBool("m1nsook.free-chrome", "enabled");
-    if !this.ready || NotEquals(enabled, this.enabled) {
-      this.enabled = enabled;
-      this.ready = M1Arc_Log("m1nsook.free-chrome", "INFO", "Zero Humanity cost enabled=" + ToString(enabled) + "; reload a save after switching.");
-      this.ticks = 0;
-      this.firstScan = true;
-      this.firstRestore = true;
-      if enabled {
-        this.Scan();
-      } else {
-        this.Restore();
-      }
-    } else {
-      this.ticks += 1;
-      if this.ticks >= 60 {
-        this.ticks = 0;
-        if enabled { this.Scan(); }
-        else { if ArraySize(this.owned) > 0 { this.Restore(); } }
-      }
-    }
-    let cb = new FreeChromeSettingsTick();
-    cb.owner = this;
-    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.50, false);
-  }
-
-  private func Probe(stage: String) -> Void {
-    let value = TweakDBInterface.GetFlat(t"Variants.Humanity16Cost_inline2.value");
-    if !IsDefined(value) {
-      M1Arc_Log("m1nsook.free-chrome", "WARNING", stage + ": known Humanity16Cost_inline2.value missing");
-      return;
-    }
-    let typ = VariantTypeName(value);
-    let message = stage + ": Humanity16Cost_inline2.value type=" + NameToString(typ);
-    if Equals(typ, n"Float") {
-      message += ", value=" + ToString(FromVariant<Float>(value));
-    } else {
-      if Equals(typ, n"Int32") {
-        message += ", value=" + ToString(FromVariant<Int32>(value));
-      }
-    }
-    M1Arc_Log("m1nsook.free-chrome", "INFO", message);
-  }
-
-  private func Scan() -> Void {
-    if this.firstScan { this.Probe("Before scan"); }
-    this.found = 0;
-    this.changed = 0;
-    this.failed = 0;
-    let cost = 1;
-    while cost <= 200 {
-      let family = "Variants.Humanity" + ToString(cost) + "Cost";
-      let i = 1;
-      while i <= 2 {
-        this.Apply(family + "_inline" + ToString(i));
-        i += 1;
-      }
-      i = 1;
-      while i <= 5 {
-        this.Apply(family + "TinkererVariant_inline" + ToString(i));
-        i += 1;
-      }
-      cost += 1;
-    }
-    if this.found == 0 || this.failed > 0 {
-      M1Arc_Log("m1nsook.free-chrome", "WARNING", "Humanity fields found=" + ToString(this.found) + ", zeroed=" + ToString(this.changed) + ", failures=" + ToString(this.failed));
-    } else {
-      if this.firstScan || this.changed > 0 {
-        M1Arc_Log("m1nsook.free-chrome", "INFO", "Humanity fields found=" + ToString(this.found) + ", zeroed=" + ToString(this.changed));
-      }
-    }
-    if this.firstScan { this.Probe("After scan"); }
-    this.firstScan = false;
-  }
 
   private func IsNumeric(value: Variant) -> Bool {
     if !IsDefined(value) { return false; }
@@ -111,92 +17,178 @@ public class FreeChromeSettings extends ScriptableSystem {
   }
 
   private func IsZero(value: Variant) -> Bool {
-    if !IsDefined(value) { return false; }
-    if Equals(VariantTypeName(value), n"Float") {
-      return FromVariant<Float>(value) == 0.0;
-    }
-    if Equals(VariantTypeName(value), n"Int32") {
-      return FromVariant<Int32>(value) == 0;
-    }
-    return false;
+    if !this.IsNumeric(value) { return false; }
+    if Equals(VariantTypeName(value), n"Float") { return FromVariant<Float>(value) == 0.0; }
+    return FromVariant<Int32>(value) == 0;
   }
 
-  private func Apply(recordName: String) -> Void {
-    let id = TDBID.Create(recordName + ".value");
+  private func Same(a: Variant, b: Variant) -> Bool {
+    if !this.IsNumeric(a) || !this.IsNumeric(b) { return false; }
+    if NotEquals(VariantTypeName(a), VariantTypeName(b)) { return false; }
+    if Equals(VariantTypeName(a), n"Float") { return FromVariant<Float>(a) == FromVariant<Float>(b); }
+    return FromVariant<Int32>(a) == FromVariant<Int32>(b);
+  }
+
+  private func Zero(value: Variant) -> Variant {
+    if Equals(VariantTypeName(value), n"Float") { return ToVariant(0.0); }
+    return ToVariant(0);
+  }
+
+  private func Write(id: TweakDBID, value: Variant) -> Bool {
+    if !TweakDBManager.SetFlat(id, value) { return false; }
+    return this.Same(TweakDBInterface.GetFlat(id), value);
+  }
+
+  private func Visit(recordName: String, enabled: Bool) -> Void {
     let record = TDBID.Create(recordName);
+    let id = TDBID.Create(recordName + ".value");
+    let backupId = TDBID.Create("M1nsook.FreeChrome.Backup." + recordName + ".value");
     let value = TweakDBInterface.GetFlat(id);
     if !this.IsNumeric(value) { return; }
     this.found += 1;
-    if this.IsZero(value) {
-      // Retry record refresh on periodic scans if we own this flat.
-      if ArrayContains(this.owned, id) && !TweakDBManager.UpdateRecord(record) {
+    let original = TweakDBInterface.GetFlat(backupId);
+    let owned = this.IsNumeric(original) && !this.IsZero(original);
+
+    if enabled {
+      if this.IsZero(value) { return; }
+      // Record the previous value BEFORE changing the real flat. Do not
+      // touch the real flat if the backup cannot be written and verified.
+      if !this.Write(backupId, value) {
         this.failed += 1;
+        return;
       }
-      return;
-    }
-    let zero: Variant;
-    if Equals(VariantTypeName(value), n"Float") {
-      zero = ToVariant(0.0);
-    } else {
-      zero = ToVariant(0);
-    }
-    if !TweakDBManager.SetFlat(id, zero) {
-      this.failed += 1;
-      return;
-    }
-    // Keep the original even if the read-back fails; restoration checks ownership.
-    let i = ArrayFindFirst(this.owned, id);
-    if i < 0 {
-      ArrayPush(this.owned, id);
-      ArrayPush(this.ownedRecords, record);
-      ArrayPush(this.original, value);
-    } else {
-      this.original[i] = value;
-    }
-    // TweakXL SetFlat only writes the flat; explicitly refresh the record cache.
-    let refreshed = TweakDBManager.UpdateRecord(record);
-    if refreshed && this.IsZero(TweakDBInterface.GetFlat(id)) {
+      if !this.Write(id, this.Zero(value)) {
+        this.failed += 1;
+        return;
+      }
+      if !TweakDBManager.UpdateRecord(record) {
+        this.failed += 1;
+        return;
+      }
       this.changed += 1;
+      return;
+    }
+
+    if !owned { return; }
+    if this.IsZero(value) || this.Same(value, original) {
+      // Keep the backup if a record refresh fails so restoration can retry.
+      if !this.Same(value, original) && !this.Write(id, original) {
+        this.failed += 1;
+        return;
+      }
+      if !TweakDBManager.UpdateRecord(record) {
+        this.failed += 1;
+        return;
+      }
+      if !this.Write(backupId, this.Zero(original)) {
+        this.failed += 1;
+        return;
+      }
+      this.restored += 1;
     } else {
-      this.failed += 1;
+      // A different mod has changed the field. Preserve its new value.
+      if !this.Write(backupId, this.Zero(original)) {
+        this.failed += 1;
+        return;
+      }
+      this.skipped += 1;
     }
   }
 
-  private func Restore() -> Void {
-    let restored = 0;
-    let skipped = 0;
-    let failed = 0;
-    let i = ArraySize(this.owned) - 1;
-    while i >= 0 {
-      let id = this.owned[i];
-      let current = TweakDBInterface.GetFlat(id);
-      if this.IsZero(current) && Equals(VariantTypeName(current), VariantTypeName(this.original[i])) {
-        if TweakDBManager.SetFlat(id, this.original[i]) {
-          if TweakDBManager.UpdateRecord(this.ownedRecords[i]) {
-            restored += 1;
-          } else {
-            failed += 1;
-          }
-          ArrayErase(this.owned, i);
-          ArrayErase(this.ownedRecords, i);
-          ArrayErase(this.original, i);
-        } else {
-          failed += 1;
-        }
-      } else {
-        // A different mod now owns the value; do not overwrite it.
-        skipped += 1;
-        ArrayErase(this.owned, i);
-        ArrayErase(this.ownedRecords, i);
-        ArrayErase(this.original, i);
+  private func Probe(stage: String) -> Void {
+    let value = TweakDBInterface.GetFlat(t"Variants.Humanity16Cost_inline2.value");
+    if !IsDefined(value) {
+      M1Arc_Log("m1nsook.free-chrome", "WARNING", stage + ": known Humanity16 flat missing");
+      return;
+    }
+    let typ = VariantTypeName(value);
+    let message = stage + ": Humanity16Cost_inline2.value type=" + NameToString(typ);
+    if Equals(typ, n"Float") {
+      message += ", value=" + ToString(FromVariant<Float>(value));
+    } else {
+      if Equals(typ, n"Int32") { message += ", value=" + ToString(FromVariant<Int32>(value)); }
+    }
+    M1Arc_Log("m1nsook.free-chrome", "INFO", message);
+  }
+
+  public func Run(enabled: Bool, stage: String, report: Bool) -> Void {
+    this.found = 0;
+    this.changed = 0;
+    this.restored = 0;
+    this.skipped = 0;
+    this.failed = 0;
+    if report { this.Probe(stage + " before"); }
+    let cost = 1;
+    while cost <= 200 {
+      let family = "Variants.Humanity" + ToString(cost) + "Cost";
+      let i = 1;
+      while i <= 2 {
+        this.Visit(family + "_inline" + ToString(i), enabled);
+        i += 1;
       }
-      i -= 1;
+      i = 1;
+      while i <= 5 {
+        this.Visit(family + "TinkererVariant_inline" + ToString(i), enabled);
+        i += 1;
+      }
+      cost += 1;
     }
-    if this.firstRestore || restored + skipped + failed > 0 {
-      M1Arc_Log("m1nsook.free-chrome", failed > 0 ? "WARNING" : "INFO", "Humanity fields restored=" + ToString(restored) + ", external changes preserved=" + ToString(skipped) + ", failures=" + ToString(failed));
+    if report || this.changed > 0 || this.restored > 0 || this.failed > 0 || this.found == 0 {
+      M1Arc_Log("m1nsook.free-chrome", this.failed > 0 || this.found == 0 ? "WARNING" : "INFO", stage + ": enabled=" + ToString(enabled) + ", found=" + ToString(this.found) + ", zeroed=" + ToString(this.changed) + ", restored=" + ToString(this.restored) + ", external preserved=" + ToString(this.skipped) + ", failures=" + ToString(this.failed));
     }
-    if this.firstRestore { this.Probe("After restore"); }
-    this.firstRestore = false;
+    if report { this.Probe(stage + " after"); }
+  }
+}
+
+// TweakXL executes ScriptableTweaks while loading the TweakDB, before
+// the player's first save is initialized. This also works without CET.
+public class FreeChromeStartup extends ScriptableTweak {
+  protected cb func OnApply() -> Void {
+    let patch = new FreeChromePatch();
+    patch.Run(M1Arc_GetBool("m1nsook.free-chrome", "enabled"), "TweakXL startup", true);
+  }
+}
+
+public class FreeChromeSettings extends ScriptableSystem {
+  private let running: Bool;
+  private let ready: Bool;
+  private let enabled: Bool;
+  private let ticks: Int32;
+
+  private func OnAttach() -> Void {
+    this.running = true;
+    this.ready = false;
+    this.Tick();
+  }
+
+  private func OnDetach() -> Void {
+    this.running = false;
+    // Never restore on save reload. The next session must see the same
+    // patched database before its cyberware is initialized.
+    M1Arc_Log("m1nsook.free-chrome", "DEBUG", "Session detached; Humanity flats preserved across save loads.");
+  }
+
+  public func Tick() -> Void {
+    if !this.running { return; }
+    let enabled = M1Arc_GetBool("m1nsook.free-chrome", "enabled");
+    if !this.ready || NotEquals(enabled, this.enabled) {
+      let stage = this.ready ? "Setting changed" : "Session attach";
+      this.ready = true;
+      this.enabled = enabled;
+      this.ticks = 0;
+      let patch = new FreeChromePatch();
+      patch.Run(enabled, stage, true);
+    } else {
+      this.ticks += 1;
+      if this.ticks >= 60 {
+        this.ticks = 0;
+        let patch = new FreeChromePatch();
+        patch.Run(enabled, "Periodic refresh", false);
+      }
+    }
+    let cb = new FreeChromeSettingsTick();
+    cb.owner = this;
+    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.50, false);
   }
 }
 
