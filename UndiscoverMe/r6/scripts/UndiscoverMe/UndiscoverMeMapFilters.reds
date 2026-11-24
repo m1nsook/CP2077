@@ -22,45 +22,28 @@ private final func UDMSlot(typ: gamedataWorldMapFilter) -> Int32 {
 
 @addMethod(WorldMapMenuGameController)
 private final func UDMFactEnabled(slot: Int32) -> Bool {
-  if !IsDefined(this.m_player) { return false; }
-  let qs = GameInstance.GetQuestsSystem(this.m_player.GetGame());
-  if !IsDefined(qs) || qs.GetFactStr("miso_rmp_all_disabled") == 1 {
-    return false;
-  }
-  let catalog = qs.GetFactStr("miso_rmp_catalog_enabled") == 1;
-  if slot == 1 {
-    return catalog && qs.GetFactStr("miso_rmp_ncpd_disabled") != 1;
-  }
-  if slot == 2 {
-    return catalog && qs.GetFactStr("miso_rmp_psycho_disabled") != 1;
-  }
-  if slot == 3 {
-    return catalog && qs.GetFactStr("miso_rmp_tarot_disabled") != 1;
-  }
-  if slot == 4 {
-    return qs.GetFactStr("miso_rmp_travel_disabled") != 1;
-  }
+  if !IsDefined(this.m_player) || !RMPState.Get("enabled") { return false; }
+  let catalog = RMPState.Get("catalog");
+  if slot == 1 { return catalog && RMPState.Get("ncpd"); }
+  if slot == 2 { return catalog && RMPState.Get("psycho"); }
+  if slot == 3 { return catalog && RMPState.Get("tarot"); }
+  if slot == 4 { return RMPState.Get("travel"); }
   return false;
 }
 
-// Update ONLY our category facts. CET's existing fact bridge synchronizes
-// these with the same db.json used by the working PR #18 runtime.
+// The fifth map tab and M1 Arc write the same persistent settings.
 @addMethod(WorldMapMenuGameController)
 private final func UDMToggle(slot: Int32) -> Void {
-  if !IsDefined(this.m_player) { return; }
-  let qs = GameInstance.GetQuestsSystem(this.m_player.GetGame());
-  if !IsDefined(qs) { return; }
+  if !IsDefined(this.m_player) || slot < 1 || slot > 4 { return; }
   let enable = !this.UDMFactEnabled(slot);
   if enable {
-    qs.SetFactStr("miso_rmp_all_disabled", 0);
-    if slot != 4 {
-      qs.SetFactStr("miso_rmp_catalog_enabled", 1);
-    }
+    M1Arc_SetBool("m1nsook.undiscoverme", "enabled", true);
+    if slot != 4 { M1Arc_SetBool("m1nsook.undiscoverme", "catalog", true); }
   }
-  if slot == 1 { qs.SetFactStr("miso_rmp_ncpd_disabled", enable ? 0 : 1); }
-  if slot == 2 { qs.SetFactStr("miso_rmp_psycho_disabled", enable ? 0 : 1); }
-  if slot == 3 { qs.SetFactStr("miso_rmp_tarot_disabled", enable ? 0 : 1); }
-  if slot == 4 { qs.SetFactStr("miso_rmp_travel_disabled", enable ? 0 : 1); }
+  if slot == 1 { M1Arc_SetBool("m1nsook.undiscoverme", "ncpd", enable); }
+  if slot == 2 { M1Arc_SetBool("m1nsook.undiscoverme", "psycho", enable); }
+  if slot == 3 { M1Arc_SetBool("m1nsook.undiscoverme", "tarot", enable); }
+  if slot == 4 { M1Arc_SetBool("m1nsook.undiscoverme", "travel", enable); }
   this.UDMApplyNativeFilters();
   this.UDMRefreshVisibleRows();
 }

@@ -58,7 +58,7 @@ def validate(path: Path, candidates: Path | None = None):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--catalog", type=Path, default=Path(__file__).parent.parent / "bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins/catalog.tsv")
+    ap.add_argument("--catalog", type=Path, default=Path(__file__).parent.parent / "tools/catalog/catalog.tsv")
     ap.add_argument("--candidates", type=Path, help="optional offline original 219-candidate JSON; validates 212 selected rows")
     args = ap.parse_args()
     validate(args.catalog, args.candidates)

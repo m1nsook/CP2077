@@ -1,0 +1,36 @@
+{
+  "name": "UndiscoverMe",
+  "shortDesc": "미발견 기본 게임 지도 마커를 표시합니다",
+  "settings": {
+    "enabled": {
+      "label": "UndiscoverMe 활성화",
+      "description": "선택한 기본 게임 마커의 전체 스위치입니다.",
+      "group": "일반"
+    },
+    "catalog": {
+      "label": "추가 지도 마커 표시",
+      "description": "미발견 NCPD, 사이버사이코 및 타로 위치 목록을 표시합니다.",
+      "group": "일반"
+    },
+    "travel": {
+      "label": "빠른 이동 위치",
+      "description": "위치만 표시하며 잠금을 해제하지 않습니다.",
+      "group": "탐험"
+    },
+    "ncpd": {
+      "label": "NCPD 스캐너 사건",
+      "description": "진행 중인 습격, 조직 범죄 및 신고된 범죄.",
+      "group": "탐험"
+    },
+    "psycho": {
+      "label": "사이버사이코 목격",
+      "description": "사이버사이코 위치만 표시합니다. 퀘스트 단계는 제외합니다.",
+      "group": "탐험"
+    },
+    "tarot": {
+      "label": "타로 카드",
+      "description": "타로 그래피티 마커입니다.",
+      "group": "탐험"
+    }
+  }
+}

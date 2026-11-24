@@ -49,7 +49,7 @@ def validate(catalog: Path, quest_ids: Path, metadata: Path | None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     root = Path(__file__).resolve().parents[1]
-    folder = root / "bin/x64/plugins/cyber_engine_tweaks/mods/RevealMapPins"
+    folder = root / "tools/catalog"
     parser.add_argument("--catalog", type=Path, default=folder / "catalog.tsv")
     parser.add_argument("--quest-ids", type=Path, default=folder / "quest_ids.tsv")
     parser.add_argument("--metadata", type=Path, help="optional private save metadata; do not commit")

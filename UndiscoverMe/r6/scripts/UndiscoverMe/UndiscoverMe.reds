@@ -74,13 +74,16 @@ public abstract class RMPAllowlist {
 }
 
 public abstract class RMPState {
+  public static func Get(key: String) -> Bool {
+    return M1Arc_GetBool("m1nsook.undiscoverme", key);
+  }
+
   public static func Enabled(gi: GameInstance, t: gamedataWorldMapFilter) -> Bool {
-    let q = GameInstance.GetQuestsSystem(gi);
-    if !IsDefined(q) || q.GetFactStr("miso_rmp_all_disabled") == 1 { return false; }
-    if Equals(t, gamedataWorldMapFilter.FastTravel) { return q.GetFactStr("miso_rmp_travel_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.Story) { return q.GetFactStr("miso_rmp_ncpd_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.PsychoFilter) { return q.GetFactStr("miso_rmp_psycho_disabled") != 1; }
-    if Equals(t, gamedataWorldMapFilter.TarotFilter) { return q.GetFactStr("miso_rmp_tarot_disabled") != 1; }
+    if !RMPState.Get("enabled") { return false; }
+    if Equals(t, gamedataWorldMapFilter.FastTravel) { return RMPState.Get("travel"); }
+    if Equals(t, gamedataWorldMapFilter.Story) { return RMPState.Get("ncpd"); }
+    if Equals(t, gamedataWorldMapFilter.PsychoFilter) { return RMPState.Get("psycho"); }
+    if Equals(t, gamedataWorldMapFilter.TarotFilter) { return RMPState.Get("tarot"); }
     return false;
   }
 }
@@ -101,8 +104,7 @@ public abstract class RMPVanillaGuard {
     // The external catalog handles all classified POI types when enabled;
     // keep the registered fast-travel path alive because it is not in that
     // catalog and its originals cannot conflict with NCPD/Tarot pins.
-    let facts = GameInstance.GetQuestsSystem(gi);
-    if IsDefined(facts) && facts.GetFactStr("miso_rmp_catalog_enabled") == 1
+    if RMPState.Get("catalog")
       && !Equals(group, gamedataWorldMapFilter.FastTravel) {
       return false;
     }
@@ -137,6 +139,13 @@ public class RMPSystem extends ScriptableSystem {
   private let sourceIds: array<Uint64>;
   private let proxyIds: array<NewMappinID>;
   private let catalogIds: array<NewMappinID>;
+  private let rows: array<ref<UDMCatalogRow>>;
+  private let running: Bool;
+  private let catalogTicks: Int32;
+  private let lastRevision: Int32;
+  private let diagnosticReady: Bool;
+  private let lastActive: Int32;
+  private let lastFailed: Int32;
 
   // Public runtime API; deliberately excludes original vanilla mappins.
   public func UDMRegisterCatalogPin(id: NewMappinID) -> Void {
@@ -169,9 +178,17 @@ public class RMPSystem extends ScriptableSystem {
     return false;
   }
 
-  private func OnAttach() { this.Schedule(); }
+  private func OnAttach() {
+    this.running = true;
+    this.rows = UDMCatalogRow.Build();
+    this.catalogTicks = 6;
+    this.Schedule();
+  }
 
-  private func OnDetach() { this.ClearAll(); }
+  private func OnDetach() {
+    this.running = false;
+    this.ClearAll();
+  }
 
   private func Schedule() {
     let cb = new RMPPollTick();
@@ -186,7 +203,10 @@ public class RMPSystem extends ScriptableSystem {
     }
     ArrayClear(this.proxyIds);
     ArrayClear(this.sourceIds);
-    ArrayClear(this.catalogIds);
+    this.ClearCatalog();
+    this.catalogTicks = 6;
+    this.diagnosticReady = false;
+    for row in this.rows { row.completed = false; }
   }
 
   private func ContainsSource(id: Uint64) -> Bool {
@@ -200,7 +220,107 @@ public class RMPSystem extends ScriptableSystem {
     return false;
   }
 
+  // Legacy mod-owned fact mirror only for the existing Teleporter addon.
+  // M1 Arc is authoritative; these are not vanilla quest progression facts.
+  private func SyncLegacyFact() -> Void {
+    let qs = GameInstance.GetQuestsSystem(this.GetGameInstance());
+    if IsDefined(qs) {
+      let value = RMPState.Get("enabled") ? 0 : 1;
+      if qs.GetFactStr("miso_rmp_all_disabled") != value {
+        qs.SetFactStr("miso_rmp_all_disabled", value);
+      }
+    }
+  }
+
+  private func ClearCatalog() -> Void {
+    let ms = GameInstance.GetMappinSystem(this.GetGameInstance());
+    for row in this.rows {
+      if row.owned.value != 0ul {
+        if IsDefined(ms) { ms.UnregisterMappin(row.owned); }
+        row.owned.value = 0ul;
+      }
+    }
+    ArrayClear(this.catalogIds);
+  }
+
+  private func RefreshCatalog(arr: array<ref<IMappin>>) -> Void {
+    let gi = this.GetGameInstance();
+    let ms = GameInstance.GetMappinSystem(gi);
+    let journal = GameInstance.GetJournalManager(gi);
+    if !IsDefined(ms) || !IsDefined(journal) { this.ClearCatalog(); return; }
+    let context: JournalRequestContext;
+    context.stateFilter.succeeded = true;
+    context.stateFilter.failed = true;
+    let finished: array<wref<JournalEntry>>;
+    journal.GetQuests(context, finished);
+    let ids: array<String>;
+    for entry in finished {
+      if IsDefined(entry) {
+        let state = journal.GetEntryState(entry);
+        if Equals(state, gameJournalEntryState.Succeeded) || Equals(state, gameJournalEntryState.Failed) {
+          ArrayPush(ids, entry.GetId());
+        }
+      }
+    }
+    let active = 0;
+    let failed = 0;
+    let completed = 0;
+    for row in this.rows {
+      if NotEquals(row.questId, "") && ArrayContains(ids, row.questId) { row.completed = true; }
+      if row.completed { completed += 1; }
+      let allowed = RMPState.Get(row.key) && !row.completed && (IsEP1() || !row.ep1);
+      if allowed {
+        let phase: Uint16;
+        let variant: Uint16;
+        let stateActive: Bool;
+        if ms.GetPointOfInterestMappinSavedState(row.hash, phase, variant, stateActive) {
+          if Equals(phase, Cast<Uint16>(EnumInt(gamedataMappinPhase.CompletedPhase))) ||
+            (NotEquals(phase, Cast<Uint16>(EnumInt(gamedataMappinPhase.UndiscoveredPhase))) && !stateActive) {
+            allowed = false;
+          }
+        }
+      }
+      if allowed {
+        for pin in arr {
+          if IsDefined(pin) && pin.IsVisible() && !this.UDMOwnsPin(pin.GetNewMappinID()) && Equals(pin.GetVariant(), row.variant) {
+            let p = pin.GetWorldPosition();
+            if AbsF(p.X - row.position.X) < 3.0 && AbsF(p.Y - row.position.Y) < 3.0 {
+              allowed = false;
+              break;
+            }
+          }
+        }
+      }
+      if !allowed {
+        if row.owned.value != 0ul {
+          this.UDMUnregisterCatalogPin(row.owned);
+          ms.UnregisterMappin(row.owned);
+          row.owned.value = 0ul;
+        }
+      } else {
+        if row.owned.value == 0ul {
+          let data: MappinData;
+          data.mappinType = t"Mappins.StaticPointOfInterestMappinDefinition";
+          data.variant = row.variant;
+          data.active = true;
+          data.visibleThroughWalls = false;
+          data.debugCaption = row.caption;
+          row.owned = ms.RegisterMappin(data, row.position);
+          if row.owned.value != 0ul { this.UDMRegisterCatalogPin(row.owned); }
+          else { failed += 1; }
+        }
+        if row.owned.value != 0ul { active += 1; }
+      }
+    }
+    if !this.diagnosticReady || active != this.lastActive || failed != this.lastFailed {
+      this.diagnosticReady = M1Arc_Log("m1nsook.undiscoverme", failed > 0 ? "WARNING" : "INFO", "Catalog=212, active=" + ToString(active) + ", completed journal matches=" + ToString(completed) + ", failed=" + ToString(failed));
+      this.lastActive = active;
+      this.lastFailed = failed;
+    }
+  }
+
   public func Tick() {
+    if !this.running { return; }
     let gi = this.GetGameInstance();
     if !IsDefined(GetPlayer(gi)) { this.ClearAll(); this.Schedule(); return; }
     let ms = GameInstance.GetMappinSystem(gi);
@@ -208,6 +328,21 @@ public class RMPSystem extends ScriptableSystem {
     if !IsDefined(this.filters) { this.filters = RMPFilters.Build(); }
     let arr: array<ref<IMappin>>;
     ms.GetMappins(gamemappinsMappinTargetType.Map, arr);
+
+    this.SyncLegacyFact();
+    let revision = M1Arc_Revision();
+    if !RMPState.Get("enabled") || !RMPState.Get("catalog") {
+      if ArraySize(this.catalogIds) > 0 { this.ClearCatalog(); }
+      this.catalogTicks = 6;
+      this.diagnosticReady = false;
+    } else {
+      this.catalogTicks += 1;
+      if this.catalogTicks >= 6 || revision != this.lastRevision {
+        this.catalogTicks = 0;
+        this.RefreshCatalog(arr);
+      }
+    }
+    this.lastRevision = revision;
 
     // Remove proxies if source has become visible, disappeared, or is toggled off.
     let i = ArraySize(this.sourceIds) - 1;
@@ -255,119 +390,3 @@ public class RMPPollTick extends DelayCallback {
   public func Call() { if IsDefined(this.owner) { this.owner.Tick(); } }
 }
 
-// Optional Mod Settings interface. CET JSON database and the Mod Settings panel
-// share an internal fact bridge; no hard dependency on the Mod Settings module.
-// Optional Mod Settings UI. CET db.json is the persistent source of
-// truth; the fact bridge remains backward-compatible for retained keys.
-public class RMPSettings extends ScriptableSystem {
-  @runtimeProperty("ModSettings.mod", "UndiscoverMe")
-  @runtimeProperty("ModSettings.category", "General")
-  @runtimeProperty("ModSettings.displayName", "Reveal selected vanilla markers")
-  public let enabled: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "UndiscoverMe")
-  @runtimeProperty("ModSettings.category", "Exploration")
-  @runtimeProperty("ModSettings.displayName", "Fast travel locations")
-  public let travel: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "UndiscoverMe")
-  @runtimeProperty("ModSettings.category", "Exploration")
-  @runtimeProperty("ModSettings.displayName", "NCPD scanner hustles")
-  public let ncpd: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "UndiscoverMe")
-  @runtimeProperty("ModSettings.category", "Exploration")
-  @runtimeProperty("ModSettings.displayName", "Cyberpsycho sightings")
-  public let psycho: Bool = true;
-
-  @runtimeProperty("ModSettings.mod", "UndiscoverMe")
-  @runtimeProperty("ModSettings.category", "Exploration")
-  @runtimeProperty("ModSettings.displayName", "Tarot cards")
-  public let tarot: Bool = true;
-
-  private let ready: Bool;
-  private let previous: array<Bool>;
-  private let keys: array<String>;
-
-  private func Prepare() {
-    ArrayPush(this.keys, "miso_rmp_all_disabled");
-    ArrayPush(this.keys, "miso_rmp_travel_disabled");
-    ArrayPush(this.keys, "miso_rmp_ncpd_disabled");
-    ArrayPush(this.keys, "miso_rmp_psycho_disabled");
-    ArrayPush(this.keys, "miso_rmp_tarot_disabled");
-  }
-
-  private func ValueAt(i: Int32) -> Bool {
-    if i == 0 { return this.enabled; }
-    if i == 1 { return this.travel; }
-    if i == 2 { return this.ncpd; }
-    if i == 3 { return this.psycho; }
-    return this.tarot;
-  }
-
-  private func SetAt(i: Int32, enabled: Bool) {
-    if i == 0 { this.enabled = enabled; }
-    else if i == 1 { this.travel = enabled; }
-    else if i == 2 { this.ncpd = enabled; }
-    else if i == 3 { this.psycho = enabled; }
-    else { this.tarot = enabled; }
-  }
-
-  private func OnAttach() {
-    this.Prepare();
-    let qs = GameInstance.GetQuestsSystem(this.GetGameInstance());
-    let i = 0;
-    while i < ArraySize(this.keys) {
-      let value = !IsDefined(qs) || qs.GetFactStr(this.keys[i]) != 1;
-      this.SetAt(i, value);
-      ArrayPush(this.previous, value);
-      i += 1;
-    }
-    RMPRegister(this);
-    this.Schedule();
-  }
-
-  private func OnDetach() { RMPUnregister(this); }
-
-  private func Schedule() {
-    let cb = new RMPSettingsTick();
-    cb.owner = this;
-    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.75, false);
-  }
-
-  public func Tick() {
-    let qs = GameInstance.GetQuestsSystem(this.GetGameInstance());
-    if IsDefined(qs) {
-      let i = 0;
-      while i < ArraySize(this.keys) {
-        let curr = this.ValueAt(i);
-        if NotEquals(curr, this.previous[i]) {
-          qs.SetFactStr(this.keys[i], curr ? 0 : 1);
-          this.previous[i] = curr;
-        } else {
-          let bridge = qs.GetFactStr(this.keys[i]) != 1;
-          if NotEquals(curr, bridge) {
-            this.SetAt(i, bridge);
-            this.previous[i] = bridge;
-          }
-        }
-        i += 1;
-      }
-    }
-    this.Schedule();
-  }
-}
-
-public class RMPSettingsTick extends DelayCallback {
-  public let owner: wref<RMPSettings>;
-  public func Call() { if IsDefined(this.owner) { this.owner.Tick(); } }
-}
-
-@if(ModuleExists("ModSettingsModule"))
-public func RMPRegister(s: ref<RMPSettings>) { ModSettings.RegisterListenerToClass(s); }
-@if(!ModuleExists("ModSettingsModule"))
-public func RMPRegister(s: ref<RMPSettings>) {}
-@if(ModuleExists("ModSettingsModule"))
-public func RMPUnregister(s: ref<RMPSettings>) { ModSettings.UnregisterListenerToClass(s); }
-@if(!ModuleExists("ModSettingsModule"))
-public func RMPUnregister(s: ref<RMPSettings>) {}

@@ -1,0 +1,36 @@
+{
+  "name": "UndiscoverMe",
+  "shortDesc": "Pokaż nieodkryte znaczniki gry",
+  "settings": {
+    "enabled": {
+      "label": "Włącz UndiscoverMe",
+      "description": "Główny przełącznik wybranych znaczników gry.",
+      "group": "Ogólne"
+    },
+    "catalog": {
+      "label": "Odkryj dodatkowe znaczniki",
+      "description": "Pokaż katalog nieodkrytych lokacji NCPD, cyberpsychopatów i tarota.",
+      "group": "Ogólne"
+    },
+    "travel": {
+      "label": "Punkty szybkiej podróży",
+      "description": "Tylko wyświetlanie; nie odblokowuje punktów.",
+      "group": "Eksploracja"
+    },
+    "ncpd": {
+      "label": "Zlecenia skanera NCPD",
+      "description": "Trwające napaści, przestępczość zorganizowana i zgłoszone przestępstwa.",
+      "group": "Eksploracja"
+    },
+    "psycho": {
+      "label": "Cyberpsychopaci",
+      "description": "Lokacje cyberpsychopatów, nie etapy zadań.",
+      "group": "Eksploracja"
+    },
+    "tarot": {
+      "label": "Karty tarota",
+      "description": "Znaczniki graffiti tarota.",
+      "group": "Eksploracja"
+    }
+  }
+}
