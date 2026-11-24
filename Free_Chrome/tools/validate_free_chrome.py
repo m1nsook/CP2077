@@ -11,3 +11,7 @@ for x in ("M1Arc_GetBool", "M1Arc_Log", "TweakDBInterface.GetFlat", "TweakDBMana
 for lang in ("en_US", "pl_PL", "ko_KR"):
     assert json.loads((root / "language" / (lang + ".json")).read_text(encoding="utf-8"))["settings"]["enabled"]["description"]
 print("PASS: Free Chrome native patch structure and manifests (not a runtime test)")
+
+assert 'n"Float"' not in src and 'n"Int32"' not in src, "VariantTypeName returns String"
+assert 'this.Probe("Before scan")' in src and 'this.Probe("After scan")' in src
+assert 'this.Probe("After restore")' in src

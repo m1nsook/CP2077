@@ -12,9 +12,13 @@ public class FreeChromeSettings extends ScriptableSystem {
   private let found: Int32;
   private let changed: Int32;
   private let failed: Int32;
+  private let firstScan: Bool;
+  private let firstRestore: Bool;
 
   private func OnAttach() -> Void {
     this.running = true;
+    this.firstScan = true;
+    this.firstRestore = true;
     this.Tick();
   }
 
@@ -30,6 +34,8 @@ public class FreeChromeSettings extends ScriptableSystem {
       this.enabled = enabled;
       this.ready = M1Arc_Log("m1nsook.free-chrome", "INFO", "Zero Humanity cost enabled=" + ToString(enabled) + "; reload a save after switching.");
       this.ticks = 0;
+      this.firstScan = true;
+      this.firstRestore = true;
       if enabled {
         this.Scan();
       } else {
@@ -48,7 +54,26 @@ public class FreeChromeSettings extends ScriptableSystem {
     GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.50, false);
   }
 
+  private func Probe(stage: String) -> Void {
+    let value = TweakDBInterface.GetFlat(t"Variants.Humanity16Cost_inline2.value");
+    if !IsDefined(value) {
+      M1Arc_Log("m1nsook.free-chrome", "WARNING", stage + ": known Humanity16Cost_inline2.value missing");
+      return;
+    }
+    let typ = VariantTypeName(value);
+    let message = stage + ": Humanity16Cost_inline2.value type=" + typ;
+    if Equals(typ, "Float") {
+      message += ", value=" + ToString(FromVariant<Float>(value));
+    } else {
+      if Equals(typ, "Int32") {
+        message += ", value=" + ToString(FromVariant<Int32>(value));
+      }
+    }
+    M1Arc_Log("m1nsook.free-chrome", "INFO", message);
+  }
+
   private func Scan() -> Void {
+    if this.firstScan { this.Probe("Before scan"); }
     this.found = 0;
     this.changed = 0;
     this.failed = 0;
@@ -70,22 +95,26 @@ public class FreeChromeSettings extends ScriptableSystem {
     if this.found == 0 || this.failed > 0 {
       M1Arc_Log("m1nsook.free-chrome", "WARNING", "Humanity fields found=" + ToString(this.found) + ", zeroed=" + ToString(this.changed) + ", failures=" + ToString(this.failed));
     } else {
-      if this.changed > 0 {
+      if this.firstScan || this.changed > 0 {
         M1Arc_Log("m1nsook.free-chrome", "INFO", "Humanity fields found=" + ToString(this.found) + ", zeroed=" + ToString(this.changed));
       }
     }
+    if this.firstScan { this.Probe("After scan"); }
+    this.firstScan = false;
   }
 
   private func IsNumeric(value: Variant) -> Bool {
+    if !IsDefined(value) { return false; }
     let typ = VariantTypeName(value);
-    return Equals(typ, n"Float") || Equals(typ, n"Int32");
+    return Equals(typ, "Float") || Equals(typ, "Int32");
   }
 
   private func IsZero(value: Variant) -> Bool {
-    if Equals(VariantTypeName(value), n"Float") {
+    if !IsDefined(value) { return false; }
+    if Equals(VariantTypeName(value), "Float") {
       return FromVariant<Float>(value) == 0.0;
     }
-    if Equals(VariantTypeName(value), n"Int32") {
+    if Equals(VariantTypeName(value), "Int32") {
       return FromVariant<Int32>(value) == 0;
     }
     return false;
@@ -97,7 +126,7 @@ public class FreeChromeSettings extends ScriptableSystem {
     this.found += 1;
     if this.IsZero(value) { return; }
     let zero: Variant;
-    if Equals(VariantTypeName(value), n"Float") {
+    if Equals(VariantTypeName(value), "Float") {
       zero = ToVariant(0.0);
     } else {
       zero = ToVariant(0);
@@ -145,9 +174,11 @@ public class FreeChromeSettings extends ScriptableSystem {
       }
       i -= 1;
     }
-    if restored + skipped + failed > 0 {
+    if this.firstRestore || restored + skipped + failed > 0 {
       M1Arc_Log("m1nsook.free-chrome", failed > 0 ? "WARNING" : "INFO", "Humanity fields restored=" + ToString(restored) + ", external changes preserved=" + ToString(skipped) + ", failures=" + ToString(failed));
     }
+    if this.firstRestore { this.Probe("After restore"); }
+    this.firstRestore = false;
   }
 }
 
