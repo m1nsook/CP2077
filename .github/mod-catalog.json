@@ -1,0 +1,66 @@
+[
+  {
+    "path": "Arc_Converter",
+    "name": "Arc Converter - Automatic Item Processing",
+    "nexus_id": 39454,
+    "m1arc": "Required",
+    "description": "Processes new weapons and clothes by tier (sell or disassemble), crafts ammunition and sells junk.",
+    "status": "auto"
+  },
+  {
+    "path": "NetDeck",
+    "name": "NetWatch Σ MK.1",
+    "nexus_id": 39422,
+    "m1arc": "Required",
+    "description": "NetWatch Σ MK.1 iconic cyberdeck with NETWORM quickhack and M1 Arc controls.",
+    "status": "auto"
+  },
+  {
+    "path": "Daemon",
+    "name": "Daemon",
+    "nexus_id": 39379,
+    "m1arc": "Required",
+    "description": "Automatically solves the original Breach Protocol grid through M1 Arc.",
+    "status": "auto"
+  },
+  {
+    "path": "Weight_Customizer",
+    "name": "Weight Customizer",
+    "nexus_id": 39409,
+    "m1arc": "Required",
+    "description": "Configurable carry capacity (50–5000 kg) with live, reversible M1 Arc settings.",
+    "status": "auto"
+  },
+  {
+    "path": "Free_Chrome",
+    "name": "Free Chrome",
+    "nexus_id": 38695,
+    "m1arc": "Required",
+    "description": "Sets standard cyberware Humanity/Capacity costs to zero with reversible M1 Arc controls.",
+    "status": "auto"
+  },
+  {
+    "path": "Camera_Killer",
+    "name": "Camera Killer",
+    "nexus_id": 38726,
+    "m1arc": "Required",
+    "description": "Shuts down cameras connected to the same network when V disables one camera; configurable in M1 Arc.",
+    "status": "auto"
+  },
+  {
+    "path": "UndiscoverMe",
+    "name": "UndiscoverMe",
+    "nexus_id": 38417,
+    "m1arc": "Required",
+    "description": "Reveals eligible map markers with a native REDscript catalog and M1 Arc settings.",
+    "status": "auto"
+  },
+  {
+    "path": "UndiscoverMe_Teleporter",
+    "name": "UndiscoverMe Teleporter",
+    "nexus_id": 38417,
+    "m1arc": "-",
+    "description": "Optional addon: hold the map's Fast Travel action on an UndiscoverMe pin to teleport. Requires UndiscoverMe core.",
+    "status": "auto"
+  }
+]
