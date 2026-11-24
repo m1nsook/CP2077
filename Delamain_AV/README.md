@@ -66,3 +66,27 @@ is not evidence of motion; leave the entrance open if displacement is below
 1 m. If the clip still fails, detached V may remain inside the AV. No teleport
 fallback. The actual .anims clip and hash computation are not independently
 verified; runtime playback still requires game testing.
+
+## dev.13 — proper workspot release with the now-verified q000 asset
+
+dev.12 runtime confirmed the original exit animation plays but world displacement
+is zero and the workspot remains active. Vanilla ExitingDecisions.ExitCondition
+waits for IsActorInWorkspot to become false. Suppressing ExitWorkspot in dev.12
+therefore left V stuck in the exit transition, including camera/movement.
+
+Preserve the q000 resource correction, existing hashes, entry, seat and doors.
+Restore a private workExitAnim (ID 6, default slot, no road-navmesh snap) now
+that its actual animation set is included. Use the engine's non-instant
+UnmountFromVehicle with that private node rather than a pose jump plus timer.
+Check GetIdOfExitAnim against the resource's authored entry ID. Clear the
+VehiclePassenger.isCar flag for the private AV exit request. Keep the
+record-scoped suppression of road-car teleport recovery. Never use a manual
+teleport or forced instant detach. ExitEvents owns cleanup. This is a native
+workspot release, not a standalone cinematic scene.
+
+Capture real animation name and entry ID from Codeware GetWorkspotInstance
+(verified in Codeware v1.21.4), workspot phase, mount, vehicle PSM, position
+and displacement every 0.5 s during exit. Codeware version must provide that
+API. Door only closes after native state release and observed movement.
+The 1 m displacement is a diagnostic heuristic, not proof of exterior clearance.
+The intended motion and runtime cleanup are not yet verified.

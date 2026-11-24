@@ -10,7 +10,7 @@ settings = json.loads((manifest_dir / "settings.json").read_text(encoding="utf-8
 assert manifest["id"] == "m1nsook.delamain-av"
 assert manifest["scope"] == "Gameplay"
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", manifest["version"]), "M1 Arc only accepts numeric x.y.z manifest versions"
-assert manifest["version"] == "0.2.5"
+assert manifest["version"] == "0.2.6"
 required = manifest["requires"]["m1arc"]
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", required)
 assert tuple(map(int, required.split("."))) <= (1, 0, 1), "Requires exceeds M1 Arc loader compatibility constant"
@@ -26,13 +26,15 @@ assert 'SetShouldForceExitDelamain(true)' in script
 assert 'CanStartAVDisembark' in script
 assert 'new UnmountingRequest()' not in script
 assert 'GetTeleportationFacility' not in script
-assert 'AV_DETACHED' in script
-assert 'AV_EARLY_DETACH' in script
-assert 'AV_CLEANUP_COMPLETE' in script
-assert 'ws.SendJumpCommandEnt(player, 6, true)' in script
-assert 'AV_DISEMBARK_UNMOUNT_REQUEST' in script
-assert 'AV_CLIP_NOT_PLAYING' in script
-assert 'IsAVCleanupReady' in script
+assert 'AV_EXIT_STATE_RELEASED' in script
+assert 'AV_EXIT_TRACE' in script
+assert 'AV_EXIT_WORKSPOT' in script
+assert 'SendJumpCommandEnt' not in script
+assert 'GetWorkspotInstance(player.GetEntityID())' in script
+assert 'GetIdOfExitAnim(player,' in script
+assert 'IsAVExitRequested' in script
+assert 'this.SetIsCar(stateContext, false)' in script
+assert 'UnmountFromVehicle(scriptInterface.owner, scriptInterface.executionOwner, false,' in script
 assert 'SendSlowExitSignal' not in script
 assert 'SyncRaycastByCollisionGroup' in script
 assert 'GROUND_DRIFT' in script
@@ -49,7 +51,7 @@ assert resource.is_file() and resource.stat().st_size > 100, "Native resource ar
 assert resource.read_bytes()[:4] == b"RDAR"
 assert (root / "archive/pc/mod/DelamainAV.xl").is_file()
 assert 'entityTemplatePath: m1nsook\\\\delamain_av\\\\excalibur.ent'.replace('\\\\', '\\') in yaml
-out = Path("dist/Delamain-AV-v0.2.5-dev.12.zip")
+out = Path("dist/Delamain-AV-v0.2.6-dev.13.zip")
 out.parent.mkdir(exist_ok=True)
 with ZipFile(out, "w", ZIP_DEFLATED) as z:
     for folder in ("r6", "red4ext", "archive"):
