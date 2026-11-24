@@ -44,6 +44,15 @@ with tempfile.TemporaryDirectory() as temp:
             assert nodes[2]["blendOutTime"] == 0.5
             assert nodes[1]["loopInfinitely"] == 1
             assert len(tree["finalAnimsets"]) == 2
+            # The original q203_04_delamain.scene maps the disembark clip to
+            # cinematicAnimNames[1] / cinematicAnimSets[1], not q113.
+            exit_animset = r"base\animations\quest\main_quests\prologue\q000\q000_corpo_03b_fly_to_lizzies\body\q000_corpo_03b_fly_to_lizzies__player_male.anims"
+            for rig in tree["finalAnimsets"]:
+                matches = [entry for entry in rig["animations"]["cinematics"]
+                           if value(entry["animSet"]["DepotPath"]) == exit_animset]
+                assert len(matches) == 1 and matches[0]["priority"] == 128
+                assert sum(value(h["DepotPath"]) == exit_animset for h in rig["loadingHandles"]) == 1
+            print("q000 disembark animset verified for both player rigs", flush=True)
         else:
             compiled = data["compiledData"]["Data"]["Chunks"]
             component = next(x for x in compiled if x["$type"] == "gameOccupantSlotComponent")

@@ -49,3 +49,20 @@ Preserve confirmed manual boarding and physical door routing. In the private pas
 AV controller opens the entrance, jumps directly to this clip while V remains a passenger, waits for natural workspot end and checks elapsed time and displacement, then requests native PSM cleanup. The standard vehicle exit path is not responsible for animation or navigation. No mod teleport or forced instant unmount. The threshold checks are conservative heuristics; runtime clip playback, root motion, exterior position and cleanup still require verification. Forced engine transitions outside this managed lifecycle retain stock behavior.
 
 Not a standalone cinematic scene yet: the source does not establish a safe script API for starting one. No original quest edits or new dependencies.
+
+## dev.12 — user-provided missing animation-set correction
+
+The original q203_04_delamain.scene resource's cinematicAnimNames[1] lists
+sit_couch__AV_excalibur__01__to__stand__2h_on_sides__01__turn270__01.
+cinematicAnimSets[1] points to:
+`base\animations\quest\main_quests\prologue\q000\q000_corpo_03b_fly_to_lizzies\body\q000_corpo_03b_fly_to_lizzies__player_male.anims`
+
+Entry and idle belong to q113, but exit belongs to q000. Add that exact
+resource to both player rig cinematic setups and loadingHandles, priority 128,
+preserving existing q113 entries and setup hashes. Verify this in the compiled
+resource round trip. No change to entry/idle or original quest files.
+Integrate the user's 4-second timed cleanup and stock-exit suppression. Cleanup
+is not evidence of motion; leave the entrance open if displacement is below
+1 m. If the clip still fails, detached V may remain inside the AV. No teleport
+fallback. The actual .anims clip and hash computation are not independently
+verified; runtime playback still requires game testing.

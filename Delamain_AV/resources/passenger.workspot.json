@@ -271,6 +271,19 @@
                     },
                     "priority": 128,
                     "variableNames": []
+                  },
+                  {
+                    "$type": "animAnimSetupEntry",
+                    "animSet": {
+                      "DepotPath": {
+                        "$type": "ResourcePath",
+                        "$storage": "string",
+                        "$value": "base\\animations\\quest\\main_quests\\prologue\\q000\\q000_corpo_03b_fly_to_lizzies\\body\\q000_corpo_03b_fly_to_lizzies__player_male.anims"
+                      },
+                      "Flags": "Default"
+                    },
+                    "priority": 128,
+                    "variableNames": []
                   }
                 ],
                 "gameplay": [],
@@ -282,6 +295,14 @@
                     "$type": "ResourcePath",
                     "$storage": "string",
                     "$value": "base\\animations\\quest\\main_quests\\part1\\q113\\q113_05_av_flight\\body\\q113_05_av_flight__player_male.anims"
+                  },
+                  "Flags": "Default"
+                },
+                {
+                  "DepotPath": {
+                    "$type": "ResourcePath",
+                    "$storage": "string",
+                    "$value": "base\\animations\\quest\\main_quests\\prologue\\q000\\q000_corpo_03b_fly_to_lizzies\\body\\q000_corpo_03b_fly_to_lizzies__player_male.anims"
                   },
                   "Flags": "Default"
                 }
@@ -325,6 +346,19 @@
                     },
                     "priority": 128,
                     "variableNames": []
+                  },
+                  {
+                    "$type": "animAnimSetupEntry",
+                    "animSet": {
+                      "DepotPath": {
+                        "$type": "ResourcePath",
+                        "$storage": "string",
+                        "$value": "base\\animations\\quest\\main_quests\\prologue\\q000\\q000_corpo_03b_fly_to_lizzies\\body\\q000_corpo_03b_fly_to_lizzies__player_male.anims"
+                      },
+                      "Flags": "Default"
+                    },
+                    "priority": 128,
+                    "variableNames": []
                   }
                 ],
                 "gameplay": [],
@@ -344,6 +378,14 @@
                     "$type": "ResourcePath",
                     "$storage": "string",
                     "$value": "base\\animations\\quest\\main_quests\\part1\\q113\\q113_05_av_flight\\body\\q113_05_av_flight__player_male.anims"
+                  },
+                  "Flags": "Default"
+                },
+                {
+                  "DepotPath": {
+                    "$type": "ResourcePath",
+                    "$storage": "string",
+                    "$value": "base\\animations\\quest\\main_quests\\prologue\\q000\\q000_corpo_03b_fly_to_lizzies\\body\\q000_corpo_03b_fly_to_lizzies__player_male.anims"
                   },
                   "Flags": "Default"
                 }

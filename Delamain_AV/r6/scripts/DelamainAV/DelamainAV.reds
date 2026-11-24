@@ -332,7 +332,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     this.m_exitCleanupRequested = false;
     this.m_exitElapsedTicks = 0;
     this.Door(vehicle, true);
-    this.m_exitWait = 30;
+    this.m_exitWait = 40;
     this.Log("INFO", "AV_DISEMBARK_PENDING: waiting for physical entrance.");
   }
 
@@ -362,9 +362,11 @@ public class DelamainAVSystem extends ScriptableSystem {
       let elapsed = Cast<Float>(this.m_exitElapsedTicks) * 0.5;
       let displacement = Vector4.Distance(player.GetWorldPosition(), this.m_exitStartPosition);
       this.Log("INFO", "AV_DETACHED: elapsed=" + ToString(elapsed) + "; motionObserved=" + ToString(this.m_exitAnimationSeen) + "; displacement=" + ToString(displacement));
-      if this.m_exitCleanupRequested && !active {
-        this.Door(vehicle, false);
-        this.Log("INFO", "AV_CLEANUP_COMPLETE: clip ended before detach. Exterior clearance still needs runtime confirmation.");
+      if this.m_exitCleanupRequested {
+        if displacement >= 1.0 {
+          this.Door(vehicle, false);
+        };
+        this.Log("INFO", "AV_CLEANUP_COMPLETE: detached; clipMode=" + ToString(this.UseClipExit()) + "; exterior clearance not verified.");
       } else {
         this.Log("WARNING", "AV_EARLY_DETACH: native mount cleared before validated clip completion; door remains open.");
       };
@@ -382,7 +384,7 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.Log("WARNING", "AV_DISEMBARK_CANCELLED: mounting relationship or landing position changed.");
       return;
     };
-    if !this.m_exitRequested && this.m_exitWait <= 24 {
+    if !this.m_exitRequested && this.m_exitWait <= 34 {
       if IsDefined(ps) && Equals(ps.GetDoorState(EVehicleDoor.seat_front_left), VehicleDoorState.Open) {
         if !this.CanStartAVDisembark(player, vehicle) {
           this.m_exitWait = 0;
@@ -391,25 +393,33 @@ public class DelamainAVSystem extends ScriptableSystem {
         };
         this.m_exitStartPosition = player.GetWorldPosition();
         this.m_exitRequested = true;
-        // The private workspot's finite workAnimClip has entry ID 6.
-        // The quest uses this same 5-second skeletal clip before unmounting.
-        ws.SendJumpCommandEnt(player, 6, true);
-        this.Log("INFO", "AV_DISEMBARK_PLAY: cinematic clip 6; passenger mount retained.");
+        if this.UseClipExit() {
+          ws.SendJumpCommandEnt(player, 6, true);
+          this.Log("INFO", "AV_DISEMBARK_PLAY: cinematic clip 6; passenger mount retained.");
+        } else {
+          this.m_exitCleanupRequested = true;
+          if IsDefined(ps) { ps.SetShouldForceExitDelamain(true); };
+          this.Log("INFO", "AV_EXIT_NATIVE: door open; no workspot jump; requesting stock PSM exit.");
+        };
       };
     };
-    if this.m_exitRequested && !this.m_exitCleanupRequested && !active {
+    if this.m_exitRequested && !this.m_exitCleanupRequested {
       let elapsed = Cast<Float>(this.m_exitElapsedTicks) * 0.5;
       let displacement = Vector4.Distance(player.GetWorldPosition(), this.m_exitStartPosition);
-      if elapsed < 4.5 || displacement < 1.0 {
-        this.m_exitWait = 0;
-        this.m_exitRequested = false;
-        this.Log("ERROR", "AV_DISEMBARK_INTERRUPTED: elapsed=" + ToString(elapsed) + "; displacement=" + ToString(displacement) + ". No car-exit fallback.");
-        return;
+      // Preserve the user's timed cleanup, which prevents a permanently attached
+      // passenger after an early workspot failure. It does not prove disembarking.
+      if !active && this.m_exitElapsedTicks == 1 {
+        this.Log("WARNING", "AV_CLIP_NOT_PLAYING: workspot inactive 0.5 s after jump; displacement=" + ToString(displacement) + ". q000 exit animation set is now included; runtime playback unverified. Cleanup requested at 4.0 s.");
       };
-      if IsDefined(ps) {
-        this.m_exitCleanupRequested = true;
-        ps.SetShouldForceExitDelamain(true);
-        this.Log("INFO", "AV_DISEMBARK_CLIP_ENDED: requesting native mount cleanup only.");
+      if elapsed >= 4.0 {
+        if displacement < 1.0 {
+          this.Log("WARNING", "AV_DISEMBARK_NO_MOTION: displacement=" + ToString(displacement) + ". Continuing to cleanup; door will stay open.");
+        };
+        if IsDefined(ps) {
+          this.m_exitCleanupRequested = true;
+          ps.SetShouldForceExitDelamain(true);
+          this.Log("INFO", "AV_DISEMBARK_UNMOUNT_REQUEST: elapsed=" + ToString(elapsed) + "; workspotActive=" + ToString(active) + "; displacement=" + ToString(displacement));
+        };
       };
     };
     if this.m_exitWait == 0 {
@@ -423,6 +433,14 @@ public class DelamainAVSystem extends ScriptableSystem {
 
   public func IsAVCleanupReady(vehicle: ref<VehicleObject>) -> Bool {
     return IsDefined(vehicle) && Equals(vehicle.GetEntityID(), this.m_id) && this.m_exitCleanupRequested;
+  }
+
+  private func UseClipExit() -> Bool {
+    return true;
+  }
+
+  public func ShouldSkipStockExitAnim(vehicle: ref<VehicleObject>) -> Bool {
+    return this.IsAVCleanupReady(vehicle) && this.UseClipExit();
   }
 
   private func Board(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Void {
@@ -657,7 +675,13 @@ public class DelamainAVTick extends DelayCallback {
    let player = scriptInterface.executionOwner as PlayerPuppet;
    if IsDefined(player) {
      let system = GameInstance.GetScriptableSystemsContainer(player.GetGame()).Get(n"DelamainAV.DelamainAVSystem") as DelamainAVSystem;
-     if IsDefined(system) && system.IsAVCleanupReady(scriptInterface.owner as VehicleObject) { return; };
+     if IsDefined(system) && system.ShouldSkipStockExitAnim(scriptInterface.owner as VehicleObject) {
+       M1Arc_Log("m1nsook.delamain-av", "INFO", "EXIT_WORKSPOT: stock exit animation suppressed for AV cleanup; clip completion not assumed.");
+       return;
+     };
+     if IsDefined(system) {
+       M1Arc_Log("m1nsook.delamain-av", "INFO", "EXIT_WORKSPOT: stock exit running; avCleanupRequested=" + ToString(system.IsAVCleanupReady(scriptInterface.owner as VehicleObject)));
+     };
    };
    wrappedMethod(stateContext, scriptInterface, isInstant, upsideDown);
  }
