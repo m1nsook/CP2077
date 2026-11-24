@@ -11,6 +11,15 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
   private let m_running: Bool;
   private let m_player: wref<PlayerPuppet>;
   private let m_warmupTicks: Int32;
+  private let m_diagWarnTicks: Int32;
+  private let m_diagActivityTicks: Int32;
+
+  private func StackActivity(message: String) -> Void {
+    if this.m_diagActivityTicks <= 0 {
+      M1Arc_Log("m1nsook.arc-converter", "DEBUG", message);
+      this.m_diagActivityTicks = 5;
+    };
+  }
 
   private func OnAttach() -> Void {
     this.m_running = true;
@@ -104,9 +113,14 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
     // the rare failure to grant currency rather than silently losing it.
     if ts.RemoveItem(this.m_player, item, quantity) {
       if !ts.GiveItemByTDBID(this.m_player, t"Items.money", payment) {
-        ts.GiveItem(this.m_player, item, quantity);
+        if ts.GiveItem(this.m_player, item, quantity) {
+          M1Arc_Log("m1nsook.arc-converter", "ERROR", "Stack payment failed; items restored.");
+        } else {
+          M1Arc_Log("m1nsook.arc-converter", "ERROR", "Stack payment and restoration failed: " + TDBID.ToStringDEBUG(ItemID.GetTDBID(item)));
+        };
         return false;
       };
+      this.StackActivity("Sold stack: " + TDBID.ToStringDEBUG(ItemID.GetTDBID(item)) + ", quantity=" + ToString(quantity) + ", eddies=" + ToString(payment));
       return true;
     };
     return false;
@@ -185,7 +199,14 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
     };
     let crafting: ref<CraftingSystem> = CraftingSystem.GetInstance(gi);
     let quantity: Int32 = Min(128, Min(data.GetQuantity(), ts.GetItemQuantity(this.m_player, item)) - keep);
-    if quantity <= 0 || !IsDefined(crafting) || !crafting.CanItemBeDisassembled(this.m_player, item) {
+    if quantity <= 0 || !IsDefined(crafting) {
+      return false;
+    };
+    if !crafting.CanItemBeDisassembled(this.m_player, item) {
+      if this.m_diagWarnTicks <= 0 {
+        M1Arc_Log("m1nsook.arc-converter", "WARNING", "Vanilla disassembly unavailable; stack kept: " + TDBID.ToStringDEBUG(ItemID.GetTDBID(item)));
+        this.m_diagWarnTicks = 30;
+      };
       return false;
     };
     let request: ref<DisassembleItemRequest> = new DisassembleItemRequest();
@@ -193,6 +214,7 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
     request.itemID = item;
     request.amount = quantity;
     crafting.QueueRequest(request);
+    this.StackActivity("Queued stack disassembly: " + TDBID.ToStringDEBUG(ItemID.GetTDBID(item)) + ", quantity=" + ToString(quantity));
     return true;
   }
 
@@ -245,6 +267,12 @@ public class ArcConverterJunkSystem extends ScriptableSystem {
         if this.m_warmupTicks > 0 {
           this.m_warmupTicks -= 1;
         } else {
+          if this.m_diagWarnTicks > 0 {
+            this.m_diagWarnTicks -= 1;
+          };
+          if this.m_diagActivityTicks > 0 {
+            this.m_diagActivityTicks -= 1;
+          };
           this.SellJunk();
         };
       };

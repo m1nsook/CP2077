@@ -12,7 +12,7 @@ settings = json.loads((moddir / "settings.json").read_text(encoding="utf-8"))
 assert manifest["format"] == 1
 assert manifest["id"] == moddir.name
 assert manifest["name"] == "Arc Converter - Automatic Item Processing"
-assert manifest["requires"]["m1arc"] == "1.0.0"
+assert manifest["requires"]["m1arc"] == "1.0.1"
 assert manifest["version"] == "1.0.1"
 assert manifest["scope"] == "Crafting"
 
@@ -150,3 +150,12 @@ for key in expected_ids:
             t = json.loads((moddir / "language" / f"{locale}.json").read_text(encoding="utf-8"))
             assert set(t["settings"][key]["choices"]) == set(by_id[key]["choices"])
 print("PASS: settings, translations, safety contracts and optional compatibility")
+
+assert 'M1Arc_Log(' in source and 'M1Arc_Log(' in junk_source
+assert 'ArcConverterMBALoaded()' in source
+assert 'EDW.TiconChargedShot.Package' in source
+assert 'this.m_diagAmmoWarnTicks = 60' in source
+assert 'this.m_diagWarnTicks = 30' in junk_source
+assert 'Queued ammo crafting:' in source
+assert 'Queued stack disassembly:' in junk_source
+print("PASS: M1 Arc 1.0.1 diagnostics contracts")

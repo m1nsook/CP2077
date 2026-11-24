@@ -7,6 +7,6 @@
   "scope": "Crafting",
   "shortDesc": "Auto-process newly acquired weapons and clothes by tier, craft ammo, and sell junk for eddies",
   "requires": {
-    "m1arc": "1.0.0"
+    "m1arc": "1.0.1"
   }
 }
