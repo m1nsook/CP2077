@@ -24,6 +24,9 @@ using namespace RED4ext;
 using Vehicle = vehicle::BaseObject;
 using TickFn = void (*)(void*, float);
 using WakeFn = void (*)(Vehicle*);
+using ForceFn = void (*)(void*, Vector3*, Vector3*);
+constexpr uint32_t kForceHash = 611586815;
+constexpr uint32_t kTorqueHash = 3303544265;
 constexpr uint32_t kTickHash = 2526549425;
 constexpr uint32_t kWakeHash = 2793083181;
 // Actual DAV 3.5.0 DLL SHA256 a61ab1b4f42e79cccfff681d2699f9003793c95326526fb0c2d7c1eeeca0f3c4:
@@ -47,6 +50,10 @@ const v1::Sdk* g_sdk = nullptr;
 v1::PluginHandle g_plugin{};
 void* g_tickAddress = nullptr;
 TickFn g_tickOriginal = nullptr;
+void* g_forceAddress = nullptr;
+void* g_torqueAddress = nullptr;
+ForceFn g_forceOriginal = nullptr;
+ForceFn g_torqueOriginal = nullptr;
 WakeFn g_wake = nullptr;
 std::mutex g_mutex;
 std::atomic<bool> g_active{false};
@@ -66,6 +73,8 @@ struct Command {
     uint64_t lastTickLog = 0;
     int32_t samples = 0;
     int32_t fault = 0;
+    uint64_t suppressedForce = 0;
+    uint64_t suppressedTorque = 0;
 };
 Command g_cmd;
 
@@ -205,6 +214,8 @@ void ApplyCommand(void* physics, float deltaTime) {
     // DAV mode 2 holds the entire velocity vector every physics tick.
     // dev.20 drift exceeded the corridor in just two script ticks; don't
     // gradually brake sideways motion. Smooth only the vertical target.
+    const Vector3 incoming = velocity;
+    const Vector3 incomingAngular = angular;
     velocity.X = 0.f;
     velocity.Y = 0.f;
     velocity.Z = g_cmd.applied;
@@ -226,7 +237,36 @@ void ApplyCommand(void* physics, float deltaTime) {
     if (g_cmd.samples <= 10 || now-g_cmd.lastTickLog >= 100) {
         g_cmd.lastTickLog=now;
         avdiag::Log("PHYSICS_TICK","sample=%d dt=%.6f mass=%.3f desired=%.6f applied=%.6f velocity=%.6f,%.6f,%.6f angular=%.6f,%.6f,%.6f priorGravity=%u",g_cmd.samples,deltaTime,mass,g_cmd.desired,g_cmd.applied,velocity.X,velocity.Y,velocity.Z,angular.X,angular.Y,angular.Z,static_cast<unsigned>(gravity));
+        avdiag::Log("FORCE_STATE","sample=%d incomingV=%.6f,%.6f,%.6f incomingAngular=%.6f,%.6f,%.6f suppressedForce=%llu suppressedTorque=%llu",g_cmd.samples,incoming.X,incoming.Y,incoming.Z,incomingAngular.X,incomingAngular.Y,incomingAngular.Z,static_cast<unsigned long long>(g_cmd.suppressedForce),static_cast<unsigned long long>(g_cmd.suppressedTorque));
     }
+}
+// DAV develop ApplyForceAtPosition/ApplyTorqueAtPosition: bypass the
+// original when flight owns that vehicle. Do not suppress collisions or
+// touch a foreign vehicle, an expired command or an inactive world.
+// Never hold our mutex while calling original engine code.
+bool SuppressOriginal(void* body, bool torque) {
+    if (!CanControl() || !g_active.load(std::memory_order_acquire)) return false;
+    uintptr_t owner = 0;
+    if (!Read(body,kOwner,owner) || !owner) return false;
+    std::unique_lock guard(g_mutex,std::try_to_lock);
+    if (!guard.owns_lock() || !CanControl() ||
+        !g_active.load(std::memory_order_relaxed) || owner != g_cmd.owner ||
+        GetTickCount64() > g_cmd.deadline) return false;
+    uint64_t id=0;
+    uintptr_t expected=0;
+    if (!Read(reinterpret_cast<void*>(owner),kOwnerId,id) || id != g_cmd.id ||
+        !ResolveBody(owner,0,expected) || expected != reinterpret_cast<uintptr_t>(body))
+        return false;
+    auto& count = torque ? g_cmd.suppressedTorque : g_cmd.suppressedForce;
+    ++count;
+    if (count <= 3) avdiag::Log("FORCE_SUPPRESSED","kind=%s count=%llu entity=%016llx body=%p",torque?"torque":"force",static_cast<unsigned long long>(count),static_cast<unsigned long long>(id),body);
+    return true;
+}
+void ForceHook(void* body,Vector3* offset,Vector3* force) {
+    if (!SuppressOriginal(body,false)) g_forceOriginal(body,offset,force);
+}
+void TorqueHook(void* body,Vector3* offset,Vector3* torque) {
+    if (!SuppressOriginal(body,true)) g_torqueOriginal(body,offset,torque);
 }
 void TickHook(void* physics, float deltaTime) {
     ApplyCommand(physics, deltaTime);
@@ -234,14 +274,32 @@ void TickHook(void* physics, float deltaTime) {
 }
 bool Install() {
     if (!CanControl()) return false;
-    if (g_tickAddress && g_wake) return true;
+    if (g_tickAddress && g_forceAddress && g_torqueAddress && g_wake) return true;
     if (!g_sdk || !g_sdk->hooking || !g_sdk->hooking->Attach) return false;
-    auto tick = Resolve(kTickHash), wake = Resolve(kWakeHash);
-    if (!tick || !wake || tick == wake) return false;
-    if (!g_sdk->hooking->Attach(g_plugin, tick, reinterpret_cast<void*>(&TickHook),
-         reinterpret_cast<void**>(&g_tickOriginal))) return false;
-    g_tickAddress = tick;
-    g_wake = reinterpret_cast<WakeFn>(wake);
+    auto tick=Resolve(kTickHash), wake=Resolve(kWakeHash);
+    auto force=Resolve(kForceHash), torque=Resolve(kTorqueHash);
+    if (!tick || !wake || !force || !torque ||
+        tick==wake || tick==force || tick==torque || wake==force || wake==torque || force==torque) return false;
+    // Partial installation stays dormant: Begin cannot activate control
+    // until all three registered hooks are installed. RED4ext owns cleanup.
+    if (!g_forceAddress) {
+        if (!g_sdk->hooking->Attach(g_plugin,force,reinterpret_cast<void*>(&ForceHook),
+            reinterpret_cast<void**>(&g_forceOriginal))) return false;
+        g_forceAddress=force;
+        avdiag::Log("HOOK","force installed address=%p",force);
+    }
+    if (!g_torqueAddress) {
+        if (!g_sdk->hooking->Attach(g_plugin,torque,reinterpret_cast<void*>(&TorqueHook),
+            reinterpret_cast<void**>(&g_torqueOriginal))) return false;
+        g_torqueAddress=torque;
+        avdiag::Log("HOOK","torque installed address=%p",torque);
+    }
+    if (!g_tickAddress) {
+        if (!g_sdk->hooking->Attach(g_plugin,tick,reinterpret_cast<void*>(&TickHook),
+            reinterpret_cast<void**>(&g_tickOriginal))) return false;
+        g_tickAddress=tick;
+    }
+    g_wake=reinterpret_cast<WakeFn>(wake);
     avdiag::Log("HOOK","resistance tick installed address=%p trampoline=%p wake=%p",tick,reinterpret_cast<void*>(g_tickOriginal),wake);
     return true;
 }
@@ -345,7 +403,7 @@ void Stop(IScriptable*, CStackFrame* frame, bool* out, int64_t) {
     GetParameter(frame, &id); frame->code++;
     std::lock_guard guard(g_mutex);
     bool ok = id.hash && id.hash == g_cmd.id;
-    avdiag::Log("STOP","requested=%016llx matched=%d samples=%d fault=%d",static_cast<unsigned long long>(id.hash),ok,g_cmd.samples,g_cmd.fault);
+    avdiag::Log("STOP","requested=%016llx matched=%d samples=%d fault=%d suppressedForce=%llu suppressedTorque=%llu",static_cast<unsigned long long>(id.hash),ok,g_cmd.samples,g_cmd.fault,static_cast<unsigned long long>(g_cmd.suppressedForce),static_cast<unsigned long long>(g_cmd.suppressedTorque));
     if (ok) { g_active.store(false, std::memory_order_release); g_cmd = {}; }
     if (out) *out = ok;
 }
@@ -426,7 +484,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
     if (reason == RED4ext::v1::EMainReason::Load) {
         g_sdk = sdk; g_plugin = handle;
         const bool logging=avdiag::Open();
-        avdiag::Log("SESSION","DelamainAV 0.2.15-dev.22 diagnostics format 1; UTC; SDK vehicle size=0x%zx; expected runtime=3.0.88.46235; DAV 3.5.0 binary-confirmed body offset 0x2D8",sizeof(Vehicle));
+        avdiag::Log("SESSION","DelamainAV 0.2.16-dev.23 diagnostics format 1; UTC; SDK vehicle size=0x%zx; expected runtime=3.0.88.46235; DAV 3.5.0 binary-confirmed body offset 0x2D8",sizeof(Vehicle));
         g_runtimeOK = RuntimeOK();
         avdiag::Log("SESSION","runtime gate=%d",g_runtimeOK);
         if (sdk && sdk->logger && sdk->logger->Info) sdk->logger->Info(handle,logging?"DelamainAV persistent diagnostics enabled: DelamainAV-diagnostics.log":"DelamainAV could not open persistent diagnostics file");
@@ -454,7 +512,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
 RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info) {
     info->name = L"Delamain AV Physics";
     info->author = L"MISO";
-    info->version = RED4EXT_V1_SEMVER(0, 2, 15);
+    info->version = RED4EXT_V1_SEMVER(0, 2, 16);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }

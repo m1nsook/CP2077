@@ -43,7 +43,7 @@ public class DelamainAVSystem extends ScriptableSystem {
   private func OnAttach() -> Void {
     DelamainAV_WorldState(true);
     this.m_running = true;
-    this.Log("INFO", "SYSTEM_ATTACH: DelamainAV script attached; dev.22 persistent diagnostics enabled.");
+    this.Log("INFO", "SYSTEM_ATTACH: DelamainAV script attached; dev.23 persistent diagnostics enabled.");
     this.Schedule();
   }
 
