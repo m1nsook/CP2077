@@ -33,6 +33,8 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_reopenBlocked: Bool;
   private let m_airExitLogged: Bool;
   private let m_summonQueued: Bool;
+  private let m_landingReplacement: Bool;
+  private let m_boardGroundRejected: Bool;
 
   private func OnAttach() -> Void {
     this.m_running = true;
@@ -112,6 +114,8 @@ public class DelamainAVSystem extends ScriptableSystem {
     this.m_arriving = false;
     this.m_airborne = false;
     this.m_arrivalStep = 0;
+    this.m_landingReplacement = false;
+    this.m_boardGroundRejected = false;
     this.m_reopenBlocked = false;
     this.m_airExitLogged = false;
     this.m_arrivalOrientation = Quaternion.BuildFromDirectionVector(forward);
@@ -172,7 +176,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
     let av = vehicle as AVObject;
     if IsDefined(av) {
-      if this.m_arriving { av.TurnOnThrusters(); } else { av.TurnOffThrusters(); };
+      this.SetThrusters(vehicle, this.m_arriving);
       this.Log("INFO", "Spawned custom AVObject; arriving=" + ToString(this.m_arriving));
     } else {
       this.Log("WARNING", "Entity is a VehicleObject but not an AVObject. Flight is not available.");
@@ -186,6 +190,71 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.m_groundCheckWait = 6;
       this.MeasureGround(vehicle, "GROUND_INITIAL");
     };
+  }
+
+  private func SetThrusters(vehicle: ref<VehicleObject>, enabled: Bool) -> Void {
+    let ps = vehicle.GetVehiclePS();
+    if !IsDefined(ps) { return; };
+    // Original vehicle quest event updates persisted thruster state and VFX.
+    let evt = new VehicleQuestAVThrusterEvent();
+    evt.enable = enabled;
+    GameInstance.GetPersistencySystem(vehicle.GetGame()).QueuePSEvent(ps.GetID(), ps.GetClassName(), evt);
+    this.Log("INFO", "AV_THRUSTER_REQUEST: enabled=" + ToString(enabled));
+  }
+
+  private func LandingSound(vehicle: ref<VehicleObject>) -> Void {
+    // Exact exterior landing audio event from q203_04_delamain.scene.
+    GameInstance.GetAudioSystem(vehicle.GetGame()).Play(n"v_av_rayfield_excalibur_sc_203_ext_engine_landing_to_idle", vehicle.GetEntityID());
+    this.Log("INFO", "AV_AUDIO_REQUEST: original Excalibur exterior landing sound.");
+  }
+
+  // The descent entity is never boardable. Codeware SetWorldTransform moved its
+  // visual transform, but dev.14 mounting restored its original spawn height.
+  // Replace the unoccupied arrival entity with the proven ground-spawn record
+  // before any passenger can mount. No occupied transforms or forced unmount.
+  private func FinishArrival(vehicle: ref<VehicleObject>) -> Void {
+    let system = GameInstance.GetDynamicEntitySystem();
+    if !IsDefined(system) || !system.IsReady() {
+      this.m_arriving = false;
+      this.Log("ERROR", "TAXI_LANDING_HANDOFF_FAILED: entity system unavailable; boarding blocked.");
+      return;
+    };
+    let mounts = GameInstance.GetMountingFacility(vehicle.GetGame()).GetMountingInfoMultipleWithObjects(null, vehicle);
+    if vehicle.IsPlayerMounted() || ArraySize(mounts) > 0 {
+      this.m_arriving = false;
+      this.Log("ERROR", "TAXI_LANDING_HANDOFF_FAILED: occupied arrival entity; not deleting.");
+      return;
+    };
+    this.SetThrusters(vehicle, false);
+    this.m_arriving = false;
+    this.m_ready = false;
+    this.m_groundStable = false;
+    this.m_groundValid = false;
+    if !system.DeleteEntity(this.m_id) {
+      this.Log("ERROR", "TAXI_LANDING_HANDOFF_FAILED: deletion failed; boarding blocked.");
+      return;
+    };
+    this.m_id = EntityID();
+    let spec = new DynamicEntitySpec();
+    spec.recordID = t"Vehicle.m1nsook_delamain_av";
+    spec.position = this.m_spawnTarget;
+    spec.orientation = this.m_arrivalOrientation;
+    spec.persistState = false;
+    spec.persistSpawn = false;
+    spec.alwaysSpawned = true;
+    spec.spawnInView = true;
+    spec.active = true;
+    this.m_id = system.CreateEntity(spec);
+    if !EntityID.IsDefined(this.m_id) {
+      this.Log("ERROR", "TAXI_LANDING_HANDOFF_FAILED: landed entity creation failed.");
+      this.m_airborne = false;
+      return;
+    };
+    this.m_landingReplacement = true;
+    this.m_wait = 20;
+    this.m_doorWait = 0;
+    this.m_doorOpen = false;
+    this.Log("INFO", "TAXI_LANDING_HANDOFF: ground-origin passenger AV created; verifying before boarding.");
   }
 
   private func ScheduleArrival() -> Void {
@@ -219,11 +288,8 @@ public class DelamainAVSystem extends ScriptableSystem {
       return;
     };
     if this.m_arrivalStep >= 100 {
-      this.m_arriving = false;
-      this.m_groundCheckWait = 6;
-      let av = vehicle as AVObject;
-      if IsDefined(av) { av.TurnOffThrusters(); };
-      this.Log("INFO", "TAXI_ARRIVAL_DESCENT_COMPLETE: verifying actual ground contact.");
+      this.Log("INFO", "TAXI_ARRIVAL_DESCENT_COMPLETE: committing grounded pickup entity.");
+      this.FinishArrival(vehicle);
       return;
     };
     this.m_arrivalStep += 1;
@@ -233,6 +299,10 @@ public class DelamainAVSystem extends ScriptableSystem {
     WorldTransform.SetOrientation(transform, this.m_arrivalOrientation);
     vehicle.SetWorldTransform(transform);
     this.ScheduleArrival();
+  }
+
+  public func IsTrackedLanded(vehicle: ref<VehicleObject>) -> Bool {
+    return IsDefined(vehicle) && Equals(vehicle.GetEntityID(), this.m_id) && this.IsLanded(vehicle);
   }
 
   public func IsLanded(vehicle: ref<VehicleObject>) -> Bool {
@@ -308,7 +378,7 @@ public class DelamainAVSystem extends ScriptableSystem {
         this.Log("WARNING", "GROUND_DRIFT: valid position differs from requested clearance. Do not board if clipped.");
       } else {
         this.Log("INFO", "GROUND_PASS: clearance within tolerance. Confirm visible landing gear.");
-        if this.m_airborne && this.m_arrivalStep >= 100 {
+        if this.m_landingReplacement && this.m_airborne && this.m_arrivalStep >= 100 {
           this.m_airborne = false;
           let controller = vehicle.GetAccessoryController();
           if IsDefined(controller) {
@@ -316,8 +386,10 @@ public class DelamainAVSystem extends ScriptableSystem {
             if IsDefined(ps) { ps.SetDoorInteractionState(EVehicleDoor.seat_back_left, VehicleDoorInteractionState.Available); };
           };
           if this.IsLanded(vehicle) {
+            this.m_landingReplacement = false;
+            this.LandingSound(vehicle);
             this.Door(vehicle, true);
-            this.Log("INFO", "TAXI_PICKUP_READY: landed, entrance opened.");
+            this.Log("INFO", "TAXI_PICKUP_READY: ground-origin passenger AV verified, entrance opened.");
           } else {
             this.m_airborne = true;
             if IsDefined(controller) {
@@ -373,12 +445,14 @@ public class DelamainAVSystem extends ScriptableSystem {
       evt.forceScene = false;
       evt.shouldAutoClose = false;
       persistence.QueuePSEvent(ps.GetID(), ps.GetClassName(), evt);
+      GameInstance.GetAudioSystem(vehicle.GetGame()).Play(n"v_av_rayfield_excalibur_door_open_fast", vehicle.GetEntityID(), n"vehicle_general_emitter");
       this.Log("INFO", "Physical front-left entrance open requested.");
     } else {
       let evt = new VehicleDoorClose();
       evt.slotID = n"seat_front_left";
       evt.forceScene = false;
       persistence.QueuePSEvent(ps.GetID(), ps.GetClassName(), evt);
+      GameInstance.GetAudioSystem(vehicle.GetGame()).Play(n"v_av_rayfield_excalibur_door_close", vehicle.GetEntityID(), n"vehicle_general_emitter");
       this.Log("INFO", "Physical front-left entrance close requested.");
     };
     this.m_doorOpen = opening;
@@ -447,7 +521,12 @@ public class DelamainAVSystem extends ScriptableSystem {
     if !this.IsPassengerState(player) { return; };
     let info = GameInstance.GetMountingFacility(player.GetGame()).GetMountingInfoSingleWithObjects(player);
     if !Equals(info.parentId, vehicle.GetEntityID()) || !Equals(info.slotId.id, n"seat_back_left") { return; };
-    if !this.MeasureGround(vehicle, "GROUND_MANUAL_BOARD") { return; };
+    if this.m_boardGroundRejected { return; };
+    if !this.MeasureGround(vehicle, "GROUND_MANUAL_BOARD") {
+      this.m_boardGroundRejected = true;
+      this.Log("ERROR", "TAXI_BOARD_POSITION_INVALID: ground check failed after mount; exit remains protected. No automatic teleport.");
+      return;
+    };
     this.m_boardPosition = vehicle.GetWorldPosition();
     this.m_returnValid = true;
     this.m_closeWait = 6;
@@ -470,10 +549,16 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.Log("WARNING", "V is not mounted in the tracked rear passenger seat.");
       return;
     };
+    if !this.m_returnValid && this.IsPassengerState(player) {
+      this.m_boardPosition = vehicle.GetWorldPosition();
+      this.m_returnValid = true;
+    };
     if !this.m_returnValid || Vector4.Distance(vehicle.GetWorldPosition(), this.m_boardPosition) > 0.5 || !this.MeasureGround(vehicle, "GROUND_EXIT") {
       this.Log("ERROR", "EXIT_BLOCKED: stationary landing not verified. Reload the test save.");
       return;
     };
+    // A diagnostic exit can recover a normally mounted, landed passenger even
+    // if the boarding observer missed the original state update.
     this.LogWorkspot(player, vehicle);
     if !this.CanStartAVDisembark(player, vehicle) {
       this.Log("WARNING", "EXIT_BLOCKED: no active seated AV workspot. Reload the test save; no forced unmount will be attempted.");
@@ -529,6 +614,7 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.m_exitRequested = false;
       this.m_exitTransitionRequested = false;
       this.m_returnValid = false;
+      this.m_boardGroundRejected = false;
       let displacement = Vector4.Distance(player.GetWorldPosition(), this.m_exitStartPosition);
       this.Log("INFO", "AV_EXIT_STATE_RELEASED: mount=false; workspot=false; vehiclePSM=0; displacement=" + ToString(displacement));
       if this.m_exitAnimationSeen && displacement >= 1.0 {
@@ -665,6 +751,8 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.m_airborne = false;
       this.m_arriving = false;
       this.m_reopenBlocked = false;
+      this.m_landingReplacement = false;
+      this.m_boardGroundRejected = false;
       this.Log("INFO", "Test AV removed.");
     } else {
       this.Log("ERROR", "DeleteEntity failed; retaining ID to avoid duplicate spawn.");
@@ -674,6 +762,7 @@ public class DelamainAVSystem extends ScriptableSystem {
   public func Tick() -> Void {
     if !this.m_running { return; };
     let spawn = M1Arc_ConsumeAction("m1nsook.delamain-av", "spawn");
+    let exit = M1Arc_ConsumeAction("m1nsook.delamain-av", "exit");
     let summon = this.m_summonQueued;
     this.m_summonQueued = false;
     let status = M1Arc_ConsumeAction("m1nsook.delamain-av", "status");
@@ -719,10 +808,11 @@ public class DelamainAVSystem extends ScriptableSystem {
       if remove { this.Remove(vehicle); }
       else {
         if summon { this.Spawn(player, true); } else { if spawn { this.Spawn(player, false); }; };
+        if exit { this.ExitPassenger(player, vehicle); };
         if status { this.Inspect(player, vehicle); };
       };
     } else {
-      if spawn || summon || status || remove {
+      if spawn || summon || status || remove || exit {
         this.Log("WARNING", "Load a save with V alive before testing.");
       };
     };
@@ -833,4 +923,19 @@ public class DelamainAVTick extends DelayCallback {
      this.StartExiting(stateContext, scriptInterface);
    };
    // ExitingDecisions/ExitEvents remain native and complete the unmount.
+ }
+
+ // Hard interlock at the actual native mount request, not merely a disabled UI
+ // choice. The temporary arriving AV cannot accept a passenger.
+ @wrapMethod(gamevehicleVehicleMountableComponent)
+ protected func MountEntityToSlot(parentID: EntityID, childId: EntityID, slot: CName, mountType: MountType) -> Void {
+   let vehicle = this.GetEntity() as VehicleObject;
+   if IsCustomDelamainAV(vehicle) {
+     let system = GameInstance.GetScriptableSystemsContainer(vehicle.GetGame()).Get(n"DelamainAV.DelamainAVSystem") as DelamainAVSystem;
+     if !IsDefined(system) || !system.IsTrackedLanded(vehicle) || NotEquals(slot, n"seat_back_left") {
+       M1Arc_Log("m1nsook.delamain-av", "WARNING", "TAXI_MOUNT_BLOCKED: pickup not ready or invalid seat.");
+       return;
+     };
+   };
+   wrappedMethod(parentID, childId, slot, mountType);
  }

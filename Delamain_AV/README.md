@@ -117,3 +117,25 @@ landing are implemented; the stock taxi must remain unaffected.
 Actions uploads the staged installation directory directly (one ZIP).
 No archive or passenger animation changes. New UI, transform motion and
 ground checks require runtime verification; no occupied ride yet.
+
+## dev.15 — preserve ground-origin mounting and restore diagnostic exit
+
+dev.14 confirmed the summon UI and arrival transform, but the original spawn
+height was restored on boarding (+6 m). A successful visual transform does
+not guarantee a relocated vehicle's authoritative mount origin. Preserve
+dev.13's verified ground-origin passenger lifecycle: the empty, non-boardable
+arrival AV is replaced at the end of descent by a newly created ground-origin
+AV with the same record and orientation. This is a temporary two-entity
+handoff, not a flight-physics solution. There may be a visible pop during
+replacement; it requires runtime verification. MountEntityToSlot now checks
+the tracked entity and live landing state, rather than relying on interaction
+state alone. No occupied transform, despawn, teleport, or forced exit.
+Restore a diagnostic disembark button using the same landed-only exit path.
+Log a failed post-mount ground check once rather than flooding the log.
+
+Use the vanilla VehicleQuestAVThrusterEvent to drive persisted thruster
+state, and exact original q203 exterior landing and entrance audio event
+names. Sound playback remains unverified. The original quest dust effect
+is a separate scene resource; no guessed FX API or dust injection. Do not
+enable occupied flight or destination travel until this pickup lifecycle
+is proven. Single-ZIP Actions artifact.

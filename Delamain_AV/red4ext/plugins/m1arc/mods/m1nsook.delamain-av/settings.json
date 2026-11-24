@@ -19,6 +19,14 @@
     "group": "Diagnostics"
   },
   {
+    "id": "exit",
+    "kind": "action",
+    "label": "Disembark landed AV",
+    "buttonLabel": "Request diagnostic exit",
+    "description": "Uses the verified native AV exit path. Does not bypass airborne protection or force an unmount.",
+    "group": "Diagnostics"
+  },
+  {
     "id": "status",
     "kind": "action",
     "label": "Inspect vehicle",
