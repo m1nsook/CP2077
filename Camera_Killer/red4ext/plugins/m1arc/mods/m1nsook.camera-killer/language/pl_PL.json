@@ -1,0 +1,11 @@
+{
+  "name": "Camera Killer",
+  "shortDesc": "Wyłączanie połączonych kamer monitoringu",
+  "settings": {
+    "enabled": {
+      "label": "Wyłączanie kamer w sieci",
+      "description": "Wyłączenie jednej kamery wyłącza również pozostałe kwalifikujące się kamery w jej sieci. Wyłączenie opcji zatrzymuje dalsze rozprzestrzenianie, ale nie włącza ponownie kamer.",
+      "group": "Ogólne"
+    }
+  }
+}
