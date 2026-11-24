@@ -1,7 +1,7 @@
 [
   {
     "path": "Arc_Converter",
-    "name": "Arc Converter - Automatic Item Processing",
+    "name": "Arc Converter",
     "nexus_id": 39454,
     "m1arc": "Required",
     "description": "Processes new weapons and clothes by tier (sell or disassemble), crafts ammunition and sells junk.",
@@ -61,6 +61,7 @@
     "nexus_id": 38417,
     "m1arc": "-",
     "description": "Optional addon: hold the map's Fast Travel action on an UndiscoverMe pin to teleport. Requires UndiscoverMe core.",
-    "status": "auto"
+    "status": "auto",
+    "checks": "deprecated"
   }
 ]
