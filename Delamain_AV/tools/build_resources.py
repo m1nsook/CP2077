@@ -60,6 +60,19 @@ with tempfile.TemporaryDirectory() as temp:
             compiled = data["compiledData"]["Data"]["Chunks"]
             assert data["entity"]["Data"]["$type"] == "vehicleCarBaseObject"
             assert compiled[0]["$type"] == "vehicleCarBaseObject"
+            by_name = {value(c["name"]): c for c in compiled if "name" in c}
+            physics_rig = by_name["vehicle_rig"]
+            deformation = by_name["deformation_rig"]
+            assert physics_rig["id"] == "1651752295586041860"
+            assert value(physics_rig["rig"]["DepotPath"]) == r"base\vehicles\base_rig\v_base_x4_150_149_27\v_base_x4_150_149_27.rig"
+            assert value(physics_rig["graph"]["DepotPath"]) == r"base\vehicles\base_rig\v_base_x4_150_149_27\v_base_x4_150_149_27.animgraph"
+            assert value(physics_rig["controlBinding"]["Data"]["bindName"]) == "AnimationController"
+            assert deformation["id"] == "1651752295586041856"
+            assert value(deformation["controlBinding"]["Data"]["bindName"]) == "vehicle_rig"
+            assert value(deformation["parentTransform"]["Data"]["bindName"]) == "vehicle_rig"
+            assert value(deformation["rig"]["DepotPath"]) == r"base\vehicles\special\av_rayfield_excalibur\rig\av_rayfield_excalibur_01__basic_01.rig"
+            assert all("base\\dav\\" not in json.dumps(c) for c in (physics_rig, deformation))
+            print("Car physics rig and original Excalibur deformation hierarchy verified", flush=True)
             component = next(x for x in compiled if x["$type"] == "gameOccupantSlotComponent")
             assert component["id"] == "1640045072000864256"
             assert value(component["name"]) == "OccupantSlots"

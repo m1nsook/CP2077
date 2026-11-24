@@ -10,7 +10,7 @@ settings = json.loads((manifest_dir / "settings.json").read_text(encoding="utf-8
 assert manifest["id"] == "m1nsook.delamain-av"
 assert manifest["scope"] == "Gameplay"
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", manifest["version"]), "M1 Arc only accepts numeric x.y.z manifest versions"
-assert manifest["version"] == "0.2.11"
+assert manifest["version"] == "0.2.12"
 required = manifest["requires"]["m1arc"]
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", required)
 assert tuple(map(int, required.split("."))) <= (1, 0, 1), "Requires exceeds M1 Arc loader compatibility constant"
@@ -44,7 +44,8 @@ assert 'EnumInt(gamePSMVehicle.Passenger)' in script
 assert 'Cast<Int32>(gamePSMVehicle.Passenger)' not in script
 yaml = (root / "r6/tweaks/DelamainAV/DelamainAV.yaml").read_text()
 assert "Vehicle.m1nsook_delamain_av:" in yaml
-assert "$base: Vehicle.q203_delamain_av" in yaml
+assert "$base: Vehicle.av_rayfield_excalibur" in yaml
+assert "Vehicle.q203_delamain_av_inline0" in yaml
 assert "VehicleMountFront" not in yaml and "VehicleHijack" not in yaml
 resource = root / "archive/pc/mod/DelamainAV.archive"
 assert resource.is_file() and resource.stat().st_size > 100, "Native resource archive required"
@@ -71,7 +72,7 @@ assert "vehicle as CarObject" in script
 assert "kGravity = 0x1B0" in cpp
 assert "TAXI_MOUNT_BLOCKED" in script
 assert "TAXI_BOARD_POSITION_INVALID" in script
-out = Path("dist/Delamain-AV-v0.2.11-dev.18")
+out = Path("dist/Delamain-AV-v0.2.12-dev.19")
 if out.exists():
     shutil.rmtree(out)
 out.mkdir(parents=True)

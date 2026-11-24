@@ -7,7 +7,10 @@ Vehicle.m1nsook_delamain_av_state:
   Thrusters: false
 
 Vehicle.m1nsook_delamain_av:
-  $base: Vehicle.q203_delamain_av
+  $base: Vehicle.av_rayfield_excalibur
+  displayName: LocKey#77295
+  tags:
+    - !append-once Immortal
   entityTemplatePath: m1nsook\delamain_av\excalibur.ent
   savable: false
   canOnlySpawnOnValidRoad: false

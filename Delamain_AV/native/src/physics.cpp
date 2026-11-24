@@ -330,7 +330,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
 RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info) {
     info->name = L"Delamain AV Physics";
     info->author = L"MISO";
-    info->version = RED4EXT_V1_SEMVER(0, 2, 11);
+    info->version = RED4EXT_V1_SEMVER(0, 2, 12);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }

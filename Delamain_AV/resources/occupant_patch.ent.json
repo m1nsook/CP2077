@@ -25,7 +25,9 @@
           "CruidIndex": 0,
           "CruidDict": {
             "0": "0",
-            "1": "1640045072000864256"
+            "1": "1640045072000864256",
+            "2": "1651752295586041860",
+            "3": "1651752295586041856"
           },
           "Chunks": [
             {
@@ -241,6 +243,302 @@
                   }
                 }
               ]
+            },
+            {
+              "$type": "entAnimatedComponent",
+              "animations": {
+                "$type": "animAnimSetup",
+                "cinematics": [],
+                "gameplay": [],
+                "hash": "3608263332070672655"
+              },
+              "animParameters": [],
+              "animTags": {
+                "$type": "redTagList",
+                "tags": []
+              },
+              "audioAltName": {
+                "$type": "CName",
+                "$storage": "string",
+                "$value": "None"
+              },
+              "calculateAccelerationWs": 0,
+              "clientForcedLod": -1,
+              "clientForcedVisibility": 0,
+              "controlBinding": {
+                "HandleId": "2",
+                "Data": {
+                  "$type": "entAnimationControlBinding",
+                  "bindName": {
+                    "$type": "CName",
+                    "$storage": "string",
+                    "$value": "AnimationController"
+                  },
+                  "enabled": 1,
+                  "enableMask": {
+                    "$type": "entTagMask",
+                    "excludedTags": {
+                      "$type": "redTagList",
+                      "tags": [
+                        {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "NoBinding"
+                        }
+                      ]
+                    },
+                    "hardTags": {
+                      "$type": "redTagList",
+                      "tags": []
+                    },
+                    "softTags": {
+                      "$type": "redTagList",
+                      "tags": []
+                    }
+                  }
+                }
+              },
+              "facialSetup": {
+                "DepotPath": {
+                  "$type": "ResourcePath",
+                  "$storage": "uint64",
+                  "$value": "0"
+                },
+                "Flags": "Soft"
+              },
+              "graph": {
+                "DepotPath": {
+                  "$type": "ResourcePath",
+                  "$storage": "string",
+                  "$value": "base\\vehicles\\base_rig\\v_base_x4_150_149_27\\v_base_x4_150_149_27.animgraph"
+                },
+                "Flags": "Obligatory"
+              },
+              "id": "1651752295586041860",
+              "isReplicable": 0,
+              "localTransform": {
+                "$type": "WorldTransform",
+                "Orientation": {
+                  "$type": "Quaternion",
+                  "i": 0,
+                  "j": 0,
+                  "k": 0,
+                  "r": 1
+                },
+                "Position": {
+                  "$type": "WorldPosition",
+                  "x": {
+                    "$type": "FixedPoint",
+                    "Bits": 0
+                  },
+                  "y": {
+                    "$type": "FixedPoint",
+                    "Bits": 0
+                  },
+                  "z": {
+                    "$type": "FixedPoint",
+                    "Bits": 0
+                  }
+                }
+              },
+              "name": {
+                "$type": "CName",
+                "$storage": "string",
+                "$value": "vehicle_rig"
+              },
+              "parentTransform": null,
+              "rig": {
+                "DepotPath": {
+                  "$type": "ResourcePath",
+                  "$storage": "string",
+                  "$value": "base\\vehicles\\base_rig\\v_base_x4_150_149_27\\v_base_x4_150_149_27.rig"
+                },
+                "Flags": "Obligatory"
+              },
+              "serverForcedLod": -1,
+              "serverForcedVisibility": 0,
+              "useLongRangeVisibility": 0
+            },
+            {
+              "$type": "entAnimatedComponent",
+              "animations": {
+                "$type": "animAnimSetup",
+                "cinematics": [],
+                "gameplay": [
+                  {
+                    "$type": "animAnimSetupEntry",
+                    "animSet": {
+                      "DepotPath": {
+                        "$type": "ResourcePath",
+                        "$storage": "string",
+                        "$value": "base\\animations\\vehicle\\special\\av_rayfield_excalibur\\av_rayfield_excalibur.anims"
+                      },
+                      "Flags": "Default"
+                    },
+                    "priority": 128,
+                    "variableNames": []
+                  }
+                ],
+                "hash": "3608263332070672655"
+              },
+              "animParameters": [
+                {
+                  "$type": "entAnimTrackParameter",
+                  "animTrackName": {
+                    "$type": "CName",
+                    "$storage": "string",
+                    "$value": "invisible_in_fpp"
+                  },
+                  "defaultValue": 1,
+                  "parameterName": {
+                    "$type": "CName",
+                    "$storage": "string",
+                    "$value": "invisible_in_fpp"
+                  }
+                }
+              ],
+              "animTags": {
+                "$type": "redTagList",
+                "tags": []
+              },
+              "audioAltName": {
+                "$type": "CName",
+                "$storage": "string",
+                "$value": "None"
+              },
+              "calculateAccelerationWs": 0,
+              "clientForcedLod": -1,
+              "clientForcedVisibility": 0,
+              "controlBinding": {
+                "HandleId": "3",
+                "Data": {
+                  "$type": "entAnimationControlBinding",
+                  "bindName": {
+                    "$type": "CName",
+                    "$storage": "string",
+                    "$value": "vehicle_rig"
+                  },
+                  "enabled": 1,
+                  "enableMask": {
+                    "$type": "entTagMask",
+                    "excludedTags": {
+                      "$type": "redTagList",
+                      "tags": [
+                        {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "NoBinding"
+                        }
+                      ]
+                    },
+                    "hardTags": {
+                      "$type": "redTagList",
+                      "tags": []
+                    },
+                    "softTags": {
+                      "$type": "redTagList",
+                      "tags": []
+                    }
+                  }
+                }
+              },
+              "facialSetup": {
+                "DepotPath": {
+                  "$type": "ResourcePath",
+                  "$storage": "uint64",
+                  "$value": "0"
+                },
+                "Flags": "Soft"
+              },
+              "graph": {
+                "DepotPath": {
+                  "$type": "ResourcePath",
+                  "$storage": "string",
+                  "$value": "base\\vehicles\\special\\av_rayfield_excalibur\\rig\\av_rayfield_excalibur_01__basic_01_anim_graph.animgraph"
+                },
+                "Flags": "Obligatory"
+              },
+              "id": "1651752295586041856",
+              "isReplicable": 0,
+              "localTransform": {
+                "$type": "WorldTransform",
+                "Orientation": {
+                  "$type": "Quaternion",
+                  "i": 0,
+                  "j": 0,
+                  "k": 0,
+                  "r": 1
+                },
+                "Position": {
+                  "$type": "WorldPosition",
+                  "x": {
+                    "$type": "FixedPoint",
+                    "Bits": 0
+                  },
+                  "y": {
+                    "$type": "FixedPoint",
+                    "Bits": 0
+                  },
+                  "z": {
+                    "$type": "FixedPoint",
+                    "Bits": 0
+                  }
+                }
+              },
+              "name": {
+                "$type": "CName",
+                "$storage": "string",
+                "$value": "deformation_rig"
+              },
+              "parentTransform": {
+                "HandleId": "4",
+                "Data": {
+                  "$type": "entHardTransformBinding",
+                  "bindName": {
+                    "$type": "CName",
+                    "$storage": "string",
+                    "$value": "vehicle_rig"
+                  },
+                  "enabled": 1,
+                  "enableMask": {
+                    "$type": "entTagMask",
+                    "excludedTags": {
+                      "$type": "redTagList",
+                      "tags": [
+                        {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "NoBinding"
+                        }
+                      ]
+                    },
+                    "hardTags": {
+                      "$type": "redTagList",
+                      "tags": []
+                    },
+                    "softTags": {
+                      "$type": "redTagList",
+                      "tags": []
+                    }
+                  },
+                  "slotName": {
+                    "$type": "CName",
+                    "$storage": "string",
+                    "$value": "None"
+                  }
+                }
+              },
+              "rig": {
+                "DepotPath": {
+                  "$type": "ResourcePath",
+                  "$storage": "string",
+                  "$value": "base\\vehicles\\special\\av_rayfield_excalibur\\rig\\av_rayfield_excalibur_01__basic_01.rig"
+                },
+                "Flags": "Obligatory"
+              },
+              "serverForcedLod": -1,
+              "serverForcedVisibility": 0,
+              "useLongRangeVisibility": 0
             }
           ]
         }
@@ -423,6 +721,207 @@
               }
             }
           ]
+        },
+        {
+          "$type": "entAnimatedComponent",
+          "animations": {
+            "$type": "animAnimSetup",
+            "cinematics": [],
+            "gameplay": [],
+            "hash": "3608263332070672655"
+          },
+          "animParameters": [],
+          "animTags": {
+            "$type": "redTagList",
+            "tags": []
+          },
+          "audioAltName": {
+            "$type": "CName",
+            "$storage": "string",
+            "$value": "None"
+          },
+          "calculateAccelerationWs": 0,
+          "clientForcedLod": -1,
+          "clientForcedVisibility": 0,
+          "controlBinding": {
+            "HandleRefId": "2"
+          },
+          "facialSetup": {
+            "DepotPath": {
+              "$type": "ResourcePath",
+              "$storage": "uint64",
+              "$value": "0"
+            },
+            "Flags": "Soft"
+          },
+          "graph": {
+            "DepotPath": {
+              "$type": "ResourcePath",
+              "$storage": "string",
+              "$value": "base\\vehicles\\base_rig\\v_base_x4_150_149_27\\v_base_x4_150_149_27.animgraph"
+            },
+            "Flags": "Obligatory"
+          },
+          "id": "1651752295586041860",
+          "isReplicable": 0,
+          "localTransform": {
+            "$type": "WorldTransform",
+            "Orientation": {
+              "$type": "Quaternion",
+              "i": 0,
+              "j": 0,
+              "k": 0,
+              "r": 1
+            },
+            "Position": {
+              "$type": "WorldPosition",
+              "x": {
+                "$type": "FixedPoint",
+                "Bits": 0
+              },
+              "y": {
+                "$type": "FixedPoint",
+                "Bits": 0
+              },
+              "z": {
+                "$type": "FixedPoint",
+                "Bits": 0
+              }
+            }
+          },
+          "name": {
+            "$type": "CName",
+            "$storage": "string",
+            "$value": "vehicle_rig"
+          },
+          "parentTransform": null,
+          "rig": {
+            "DepotPath": {
+              "$type": "ResourcePath",
+              "$storage": "string",
+              "$value": "base\\vehicles\\base_rig\\v_base_x4_150_149_27\\v_base_x4_150_149_27.rig"
+            },
+            "Flags": "Obligatory"
+          },
+          "serverForcedLod": -1,
+          "serverForcedVisibility": 0,
+          "useLongRangeVisibility": 0
+        },
+        {
+          "$type": "entAnimatedComponent",
+          "animations": {
+            "$type": "animAnimSetup",
+            "cinematics": [],
+            "gameplay": [
+              {
+                "$type": "animAnimSetupEntry",
+                "animSet": {
+                  "DepotPath": {
+                    "$type": "ResourcePath",
+                    "$storage": "string",
+                    "$value": "base\\animations\\vehicle\\special\\av_rayfield_excalibur\\av_rayfield_excalibur.anims"
+                  },
+                  "Flags": "Default"
+                },
+                "priority": 128,
+                "variableNames": []
+              }
+            ],
+            "hash": "3608263332070672655"
+          },
+          "animParameters": [
+            {
+              "$type": "entAnimTrackParameter",
+              "animTrackName": {
+                "$type": "CName",
+                "$storage": "string",
+                "$value": "invisible_in_fpp"
+              },
+              "defaultValue": 1,
+              "parameterName": {
+                "$type": "CName",
+                "$storage": "string",
+                "$value": "invisible_in_fpp"
+              }
+            }
+          ],
+          "animTags": {
+            "$type": "redTagList",
+            "tags": []
+          },
+          "audioAltName": {
+            "$type": "CName",
+            "$storage": "string",
+            "$value": "None"
+          },
+          "calculateAccelerationWs": 0,
+          "clientForcedLod": -1,
+          "clientForcedVisibility": 0,
+          "controlBinding": {
+            "HandleRefId": "3"
+          },
+          "facialSetup": {
+            "DepotPath": {
+              "$type": "ResourcePath",
+              "$storage": "uint64",
+              "$value": "0"
+            },
+            "Flags": "Soft"
+          },
+          "graph": {
+            "DepotPath": {
+              "$type": "ResourcePath",
+              "$storage": "string",
+              "$value": "base\\vehicles\\special\\av_rayfield_excalibur\\rig\\av_rayfield_excalibur_01__basic_01_anim_graph.animgraph"
+            },
+            "Flags": "Obligatory"
+          },
+          "id": "1651752295586041856",
+          "isReplicable": 0,
+          "localTransform": {
+            "$type": "WorldTransform",
+            "Orientation": {
+              "$type": "Quaternion",
+              "i": 0,
+              "j": 0,
+              "k": 0,
+              "r": 1
+            },
+            "Position": {
+              "$type": "WorldPosition",
+              "x": {
+                "$type": "FixedPoint",
+                "Bits": 0
+              },
+              "y": {
+                "$type": "FixedPoint",
+                "Bits": 0
+              },
+              "z": {
+                "$type": "FixedPoint",
+                "Bits": 0
+              }
+            }
+          },
+          "name": {
+            "$type": "CName",
+            "$storage": "string",
+            "$value": "deformation_rig"
+          },
+          "parentTransform": {
+            "HandleRefId": "4"
+          },
+          "rig": {
+            "DepotPath": {
+              "$type": "ResourcePath",
+              "$storage": "string",
+              "$value": "base\\vehicles\\special\\av_rayfield_excalibur\\rig\\av_rayfield_excalibur_01__basic_01.rig"
+            },
+            "Flags": "Obligatory"
+          },
+          "serverForcedLod": -1,
+          "serverForcedVisibility": 0,
+          "useLongRangeVisibility": 0
         }
       ],
       "cookingPlatform": "PLATFORM_PC",
