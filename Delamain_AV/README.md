@@ -1,4 +1,4 @@
-# Delamain AV — 0.1.1-dev.3
+# Delamain AV — 0.1.2-dev.4
 
 Stationary passenger-only prototype for Cyberpunk 2077 2.50. Uses the original quest entity via the separate `Vehicle.m1nsook_delamain_av` record. Does not register an owned vehicle or modify the ending.
 
@@ -6,13 +6,17 @@ Stationary passenger-only prototype for Cyberpunk 2077 2.50. Uses the original q
 
 RED4ext, redscript, TweakXL, M1 Arc 1.0.1 or newer (1.0.10 recommended), Codeware (temporary spawning backend). DAV and CET are not required. Disable DAV for isolation. No custom archive or DLL is shipped.
 
-The archive has a development suffix; the manifest must remain numeric `0.1.1` for M1 Arc discovery. Fully restart the game after replacing the files.
+The archive has a development suffix; the manifest must remain numeric `0.1.2` for M1 Arc discovery. Fully restart the game after replacing the files.
 
 ## Test
 
 Load a disposable save in a flat, open empty area, with V on foot. Face at least 12 metres of clear ground. Open M1 Arc > Gameplay > Delamain AV. Use **Spawn test AV**, close the overlay, and check the vehicle exterior. Approach it, then **Open passenger door** and **Board as passenger**. Close the overlay to observe the boarding animation. Observe the physical front-left entrance, while V remains rear-left. Close entrance is also available. Use **Inspect vehicle** to confirm the rear seat. Use **Exit as passenger** for a controlled stationary unmount and return to the position captured before boarding. Do not move the AV. Remove only after exiting. Copy diagnostics. Native entry/exit animations are not guaranteed; the fallback is intentionally instant. Test the visuals, not just the logical door state.
 
-If the model falls, moves unexpectedly, or has no safe seat, stop testing and reload the save. This is NOT an autonomous taxi yet. No takeoff or flight is implemented. Don't save while inside the test vehicle. The spawn position is a simple forward offset, not a validated landing location. The actual quest entity's rear seat and animation support require in-game confirmation.
+If the model falls, moves unexpectedly, or has no safe seat, stop testing and reload the save. This is NOT an autonomous taxi yet. No takeoff or flight is implemented. Don't save while inside the test vehicle. The spawn position uses a static terrain raycast and adjustable origin clearance (default 1 m). This is not a full landing-site validator and does not control gravity. Initial and settled height are logged; M1 Arc boarding is blocked if clearance is unstable. Do not use native Get in in this build. Test spawn clearance before any boarding. If clipping persists, remove the unoccupied vehicle and send diagnostics. The actual quest entity's rear seat and animation support require in-game confirmation.
+
+## dev.4 test focus
+
+User reports showed that the physical door and automatic closing work through M1 Arc, while native Get in bypasses that path. Both showed cabin clipping into the road. DAV's uploaded 3.5.0 reference uses a 1 m minimum ground clearance and disables gravity via its native controller. This build measures the origin height without using that DLL; it does not claim to solve gravity, camera or native animation issues.
 
 ## Research
 

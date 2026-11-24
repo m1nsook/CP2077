@@ -1,5 +1,16 @@
 [
   {
+    "id": "ground_clearance",
+    "kind": "float",
+    "label": "Test ground clearance (m)",
+    "description": "Requested AV origin height above a static surface at spawn. Default 1 m matches DAV Excalibur reference. Changes apply to next spawn.",
+    "group": "Prototype",
+    "min": 0.75,
+    "max": 2,
+    "step": 0.25,
+    "default": 1
+  },
+  {
     "id": "spawn",
     "kind": "action",
     "label": "Spawn test AV",

@@ -16,6 +16,10 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_returnPosition: Vector4;
   private let m_returnOrientation: Quaternion;
   private let m_boardPosition: Vector4;
+  private let m_groundZ: Float;
+  private let m_clearance: Float;
+  private let m_groundCheckWait: Int32;
+  private let m_groundStable: Bool;
 
   private func OnAttach() -> Void {
     this.m_running = true;
@@ -68,8 +72,29 @@ public class DelamainAVSystem extends ScriptableSystem {
     // Use the original quest entity's default appearance, not DAV's custom archive.
     let forward = player.GetWorldForward();
     forward.Z = 0.0;
-    spec.position = player.GetWorldPosition() + forward * 9.0;
-    spec.orientation = player.GetWorldOrientation();
+    forward = Vector4.Normalize(forward);
+    let target = player.GetWorldPosition() + forward * 9.0;
+    let rayStart = target + new Vector4(0.0, 0.0, 2.0, 0.0);
+    let rayEnd = target - new Vector4(0.0, 0.0, 3.0, 0.0);
+    let hit: TraceResult;
+    let spatial = GameInstance.GetSpatialQueriesSystem(player.GetGame());
+    if !spatial.SyncRaycastByCollisionGroup(rayStart, rayEnd, n"Static", hit, true, false) {
+      this.Log("WARNING", "GROUND_NO_HIT: No static surface below pickup point. Choose flat open ground.");
+      return;
+    };
+    if hit.normal.Z < 0.95 {
+      this.Log("WARNING", "GROUND_SLOPE: Surface too steep for stationary test.");
+      return;
+    };
+    this.m_groundZ = hit.position.Z;
+    this.m_clearance = M1Arc_GetFloat("m1nsook.delamain-av", "ground_clearance");
+    if this.m_clearance < 0.75 || this.m_clearance > 2.0 { this.m_clearance = 1.0; };
+    target.Z = this.m_groundZ + this.m_clearance;
+    spec.position = target;
+    spec.orientation = Quaternion.BuildFromDirectionVector(forward);
+    this.m_groundStable = false;
+    this.m_groundCheckWait = 0;
+    this.Log("INFO", "GROUND_SPAWN: surface Z=" + ToString(this.m_groundZ) + "; requested origin height=" + ToString(this.m_clearance));
     spec.persistState = false;
     spec.persistSpawn = false;
     spec.alwaysSpawned = true;
@@ -107,11 +132,30 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.Log("WARNING", "Entity is a VehicleObject but not an AVObject. Flight is not available.");
     };
     this.m_ready = true;
+    this.m_groundCheckWait = 6;
+    this.Log("INFO", "GROUND_INITIAL: origin above surface=" + ToString(vehicle.GetWorldPosition().Z - this.m_groundZ));
+  }
+
+  private func GroundCheck(vehicle: ref<VehicleObject>) -> Void {
+    if this.m_groundCheckWait <= 0 || !IsDefined(vehicle) { return; };
+    this.m_groundCheckWait -= 1;
+    if this.m_groundCheckWait != 0 { return; };
+    let delta = vehicle.GetWorldPosition().Z - this.m_groundZ;
+    this.m_groundStable = delta >= this.m_clearance - 0.25 && delta <= this.m_clearance + 0.25;
+    if this.m_groundStable {
+      this.Log("INFO", "GROUND_SETTLED: origin above surface=" + ToString(delta) + "; within target tolerance. Confirm visible landing gear.");
+    } else {
+      this.Log("WARNING", "GROUND_DRIFT: origin above surface=" + ToString(delta) + "; expected=" + ToString(this.m_clearance) + ". Do not board if clipped.");
+    };
   }
 
   private func CanBoard(player: ref<PlayerPuppet>, vehicle: ref<VehicleObject>) -> Bool {
     if !IsDefined(vehicle) || !this.m_ready {
       this.Log("WARNING", "No ready test AV.");
+      return false;
+    };
+    if this.m_groundCheckWait > 0 || !this.m_groundStable || vehicle.GetWorldPosition().Z - this.m_groundZ < this.m_clearance - 0.25 {
+      this.Log("WARNING", "Board blocked: ground clearance is not stable. Inspect and remove the AV.");
       return false;
     };
     if Vector4.Distance(player.GetWorldPosition(), vehicle.GetWorldPosition()) > 8.0 {
@@ -266,6 +310,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     } else {
       this.Log("ERROR", "Unexpected vehicle record.");
     };
+    this.Log("INFO", "GROUND_STATUS: current origin height=" + ToString(vehicle.GetWorldPosition().Z - this.m_groundZ) + "; requested=" + ToString(this.m_clearance));
     let mount = GameInstance.GetMountingFacility(player.GetGame()).GetMountingInfoSingleWithObjects(player);
     if Equals(mount.parentId, vehicle.GetEntityID()) {
       this.Log("INFO", "V is mounted in slot: " + NameToString(mount.slotId.id));
@@ -293,6 +338,8 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.m_wait = 0;
       this.m_ready = false;
       this.m_doorWait = 0;
+      this.m_groundCheckWait = 0;
+      this.m_groundStable = false;
       this.m_closeWait = 0;
       this.m_returnValid = false;
       this.Log("INFO", "Test AV removed.");
@@ -324,6 +371,7 @@ public class DelamainAVSystem extends ScriptableSystem {
           };
         };
       };
+      this.GroundCheck(vehicle);
       this.DoorCheck(vehicle);
       this.ExitTick(player, vehicle);
       if this.m_closeWait > 0 {
