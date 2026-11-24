@@ -1,0 +1,11 @@
+{
+  "name": "Free Chrome",
+  "shortDesc": "Zerowy koszt pojemności wszczepów",
+  "settings": {
+    "enabled": {
+      "label": "Zerowy koszt człowieczeństwa (wczytaj zapis)",
+      "description": "Po włączeniu lub wyłączeniu wczytaj zapis. Ceny, maksymalna pojemność i pozostałe statystyki pozostają bez zmian.",
+      "group": "Ogólne"
+    }
+  }
+}

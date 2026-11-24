@@ -1,0 +1,11 @@
+{
+  "name": "Free Chrome",
+  "shortDesc": "Zero cyberware capacity cost",
+  "settings": {
+    "enabled": {
+      "label": "Zero Humanity cost (reload save)",
+      "description": "After switching ON or OFF, reload a save. Implant prices, maximum capacity and other stats stay unchanged.",
+      "group": "General"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "m1nsook.free-chrome",
+  "name": "Free Chrome",
+  "version": "1.1.0",
+  "author": "민숙 MISO @m1nsook",
+  "scope": "Gameplay",
+  "shortDesc": "Zero cyberware capacity cost",
+  "requires": {
+    "m1arc": "1.0.1"
+  }
+}

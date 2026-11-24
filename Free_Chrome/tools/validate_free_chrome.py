@@ -1,99 +1,13 @@
-#!/usr/bin/env python3
-"""Static Free Chrome source checks. Game/runtime verification is separate."""
 import json
 from pathlib import Path
-
-root = Path(__file__).resolve().parents[2]
-mod = root / "Free_Chrome"
-cet = mod / "bin/x64/plugins/cyber_engine_tweaks/mods/FreeChrome"
-patch = (cet / "patch.lua").read_text(encoding="utf-8")
-main = (cet / "init.lua").read_text(encoding="utf-8")
-reds = (mod / "r6/scripts/FreeChrome/FreeChromeSettings.reds").read_text(encoding="utf-8")
-workflow = (root / ".github/workflows/release.yml").read_text(encoding="utf-8")
-metadata = json.loads((root / ".github/mod-descriptions.json").read_text(encoding="utf-8"))
-
-def require(condition, message):
-    if not condition:
-        raise AssertionError(message)
-
-for snippet in (
-    "MAX_HUMANITY_COST = 200",
-    '"Variants.Humanity" .. cost .. "Cost"',
-    '"TinkererVariant"',
-    '"_inline" .. index .. ".value"',
-    'TweakDB:GetFlat(path)',
-    'TweakDB:SetFlat(path, value)',
-    'getNumber(path) == value',
-    'self.originals[path] = value',
-    'if current == 0 then',
-    'setNumber(path, oldValue)',
-    'self.additional[path] = true',
-    'function self:addCostFlat(path)',
-    'Humanity modifier fields found=',
-    'write failures=',
-):
-    require(snippet in patch, "shared Humanity modifier logic missing: " + snippet)
-
-require('gamedataItem_Record' not in patch, "Do not use broken item-record scan")
-require('TweakDBID.new' not in patch, "Do not replace item variant array")
-require('".variants"' not in patch, "Do not change implant variants")
-require('MAX_HUMANITY_COST = 200' in patch, "Unexpected Humanity scan bound")
-
-# CET 1.38.1 / CP2077 2.5: TweakDB:SetFlat fails when called from Lua
-# pcall, including indirect pcall wrappers around patch:setEnabled/scan/restore.
-# See https://github.com/maximegmd/CyberEngineTweaks/issues/1081
-require('local result = TweakDB:SetFlat(path, value)' in patch,
-        "TweakDB:SetFlat must be a direct call")
-require('pcall(function() return TweakDB:SetFlat(' not in patch,
-        "TweakDB write must not be directly wrapped in pcall")
-require('pcall(function() patch:' not in main,
-        "TweakDB patch lifecycle must not be indirectly wrapped in pcall")
-require('xpcall(function() patch:' not in main,
-        "TweakDB patch lifecycle must not be indirectly wrapped in xpcall")
-require('patch:setEnabled(state.settings.enabled)' in main,
-        "Startup patch must run outside pcall")
-require('patch:setEnabled(enabled)' in main,
-        "Settings toggles must patch outside pcall")
-require(main.count('patch:scan()') == 2,
-        "Session and periodic rescan should both be direct calls")
-require('pcall(function() return TweakDB:GetFlat(path) end)' in patch,
-        "Read-only TweakDB lookups may remain protected")
-
-
-for snippet in (
-    'registerForEvent("onInit"',
-    'registerForEvent("onUpdate"',
-    'registerHotkey(MOD .. "_Toggle"',
-    'GetMod, "nativeSettings"',
-    'api.addSwitch(',
-    'if scanClock >= 30 then',
-    'if syncClock >= 0.5 then',
-    'qs:SetFactStr(FACT, value)',
-    'qs:GetFactStr(FACT)',
-    'patch:setEnabled(enabled)',
-    'patch:scan()',
-    'state.settings.enabled = data.settings.enabled',
-):
-    require(snippet in main, "settings bridge missing: " + snippet)
-
-require('"miso_free_chrome_disabled"' in reds
-        and '"miso_free_chrome_disabled"' in main, "Settings fact mismatch")
-require('ModSettings.RegisterListenerToClass(s)' in reds and
-        'ModSettings.UnregisterListenerToClass(s)' in reds,
-        "Mod Settings registration missing")
-require('ModuleExists("ModSettingsModule")' in reds, "Mod Settings must be optional")
-require('"Zero Humanity cost (reload save)"' in main,
-        "Native Settings UI must tell players to reload a save")
-require('"Zero Humanity cost (reload save)"' in reds,
-        "Mod Settings must visibly tell players to reload a save")
-reload_hint = "After switching ON or OFF, reload a save to apply the change."
-require(reload_hint in main and reload_hint in reds,
-        "Both settings descriptions must explain when to reload")
-
-
-require('Free_Chrome' in metadata, "Release metadata missing")
-require('          - Free_Chrome\n' in workflow, "Manual release dropdown missing")
-require('workflow_dispatch:' in workflow and 'push:' not in workflow and
-        'pull_request:' not in workflow, "Do not add automatic Actions triggers")
-require(not (cet / "db.json").exists(), "Do not ship player settings")
-print("PASS: Humanity modifier writes outside pcall, reversible settings, and manual packaging")
+mod = Path(__file__).resolve().parents[1]
+root = mod / "red4ext/plugins/m1arc/mods/m1nsook.free-chrome"
+src = (mod / "r6/scripts/FreeChrome/FreeChromeSettings.reds").read_text(encoding="utf-8")
+assert json.loads((root / "mod.json").read_text(encoding="utf-8"))["requires"]["m1arc"] == "1.0.1"
+assert json.loads((root / "settings.json").read_text(encoding="utf-8"))[0]["default"] is True
+assert not list(mod.glob("bin/**/*.lua"))
+for x in ("M1Arc_GetBool", "M1Arc_Log", "TweakDBInterface.GetFlat", "TweakDBManager.SetFlat", "cost <= 200", "TinkererVariant_inline", "this.IsNumeric(value)", "this.IsZero(current)", "this.original[i]", "this.Restore()", "this.running = false"):
+    assert x in src, x
+for lang in ("en_US", "pl_PL", "ko_KR"):
+    assert json.loads((root / "language" / (lang + ".json")).read_text(encoding="utf-8"))["settings"]["enabled"]["description"]
+print("PASS: Free Chrome native patch structure and manifests (not a runtime test)")
