@@ -1,4 +1,4 @@
-# Delamain AV — 0.1.3-dev.5
+# Delamain AV — 0.1.4-dev.6
 
 Stationary passenger-only prototype for Cyberpunk 2077 2.50. Uses the original quest entity via the separate `Vehicle.m1nsook_delamain_av` record. Does not register an owned vehicle or modify the ending.
 
@@ -6,7 +6,7 @@ Stationary passenger-only prototype for Cyberpunk 2077 2.50. Uses the original q
 
 RED4ext, redscript, TweakXL, M1 Arc 1.0.1 or newer (1.0.10 recommended), Codeware (temporary spawning backend). DAV and CET are not required. Disable DAV for isolation. No custom archive or DLL is shipped.
 
-The archive has a development suffix; the manifest must remain numeric `0.1.3` for M1 Arc discovery. Fully restart the game after replacing the files.
+The archive has a development suffix; the manifest must remain numeric `0.1.4` for M1 Arc discovery. Fully restart the game after replacing the files.
 
 ## Test
 
@@ -21,6 +21,10 @@ User reports showed that the physical door and automatic closing work through M1
 ## dev.5 test focus
 
 Dev.4 returned impossible height values despite a visually stable AV. Sample native position into a typed local before extracting coordinates; log raw Z and surface Z separately and reject impossible coordinates as invalid rather than drift. Boarding still requires a valid clearance measurement. Default 0.75 m follows the user's visual observation. Inspect now reports actual passenger PSM and high-level state. Do not force PSM or scene tier; no status effects are applied while parked. The final boarding flow should follow quest/dialogue-style interaction rather than standard driver controls. Exact q203 scene/quest graph wiring remains unverified; do not modify original ending resources. No flight in this build.
+
+## dev.6 compiler fix
+
+Replace unsupported Cast<Int32>(gamePSMVehicle.Passenger) with EnumInt(gamePSMVehicle.Passenger). No gameplay changes.
 
 ## Research
 

@@ -350,7 +350,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     };
     let state = bb.GetInt(GetAllBlackboardDefs().PlayerStateMachine.Vehicle);
     let high = bb.GetInt(GetAllBlackboardDefs().PlayerStateMachine.HighLevel);
-    if Equals(state, Cast<Int32>(gamePSMVehicle.Passenger)) {
+    if Equals(state, EnumInt(gamePSMVehicle.Passenger)) {
       this.Log("INFO", "PSM_PASSENGER: native passenger state confirmed; vehicle=" + ToString(state) + "; highLevel=" + ToString(high));
     } else {
       this.Log("INFO", "PSM_OTHER: vehicle=" + ToString(state) + "; highLevel=" + ToString(high));
