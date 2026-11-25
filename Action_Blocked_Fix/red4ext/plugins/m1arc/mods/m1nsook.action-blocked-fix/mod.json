@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "id": "m1nsook.action-blocked-fix",
+  "name": "Action Blocked Fix",
+  "version": "0.1.0-dev.1",
+  "scope": "Gameplay",
+  "shortDesc": "Diagnose and recover a suspected stuck NoCombat restriction",
+  "requires": {
+    "m1arc": "1.0.1"
+  }
+}

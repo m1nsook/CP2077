@@ -60,5 +60,9 @@
   "Tiny_Mike_Be_Gone": {
     "name": "Tiny Mike Be Gone",
     "summary": "Remove Tiny Mike NPC from Afterlife club after his rescue gig. Requires REDscript only; no CET or M1 Arc."
+  },
+  "Action_Blocked_Fix": {
+    "name": "Action Blocked Fix",
+    "summary": "Experimental diagnostics and guarded, manual NoCombat recovery."
   }
 }

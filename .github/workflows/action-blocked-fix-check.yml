@@ -1,0 +1,54 @@
+name: Action Blocked Fix - development checks
+on:
+  pull_request:
+    paths:
+      - 'Action_Blocked_Fix/**'
+      - '.github/workflows/action-blocked-fix-check.yml'
+      - 'Daemon/tools/check_redscript_cli.ps1'
+      - 'scripts/package_release.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  redscript:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin M1 Arc API
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory ".ci/m1arc-api" -Force | Out-Null
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/m1nsook/m1arc/8bd94c58869751f89323f5b7c47dd400c57f2bcb/r6/scripts/m1arc/M1Arc.reds" -OutFile ".ci/m1arc-api/M1Arc.reds"
+      - name: REDscript CLI parse and optional semantic compilation
+        shell: pwsh
+        env:
+          REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
+          REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Action_Blocked_Fix/r6/scripts", ".ci/m1arc-api")
+          if ($LASTEXITCODE -ne 0) { throw "REDscript checks failed" }
+  package:
+    needs: redscript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build game-root development ZIP
+        run: |
+          python3 scripts/package_release.py --mod Action_Blocked_Fix --tag 0.1.0-dev.1 --output dist
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile(next(Path("dist").glob("*.zip"))) as z:
+              expected = {
+                  "r6/scripts/ActionBlockedFix/ActionBlockedFix.reds",
+                  "red4ext/plugins/m1arc/mods/m1nsook.action-blocked-fix/mod.json",
+                  "red4ext/plugins/m1arc/mods/m1nsook.action-blocked-fix/settings.json",
+              }
+              assert set(z.namelist()) == expected, z.namelist()
+              z.extractall("game-root")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: action-blocked-fix-game-root-dev
+          path: game-root/
+          if-no-files-found: error
