@@ -33,11 +33,11 @@ jobs:
       - name: Configure native AV physics bridge
         run: cmake -S Delamain_AV/native -B build/delamain-av -A x64
       - name: Build native AV physics bridge
-        run: cmake --build build/delamain-av --config Release --parallel 2
+        run: cmake --build build/delamain-av --config RelWithDebInfo --parallel 2
       - name: Stage native DLL
         shell: pwsh
         run: |
-          $dll = 'build/delamain-av/Release/DelamainAV.dll'
+          $dll = 'build/delamain-av/RelWithDebInfo/DelamainAV.dll'
           if (!(Test-Path $dll)) { throw 'Native DLL missing' }
           New-Item -ItemType Directory -Force Delamain_AV/red4ext/plugins/DelamainAV
           Copy-Item $dll Delamain_AV/red4ext/plugins/DelamainAV/DelamainAV.dll
