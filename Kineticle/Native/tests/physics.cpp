@@ -1,6 +1,7 @@
 #include "physics.hpp"
 #include "contact_trace.hpp"
 #include "report_pages.hpp"
+#include "diagnostic_policy.hpp"
 #include <cstdlib>
 #include <cmath>
 #include <limits>
@@ -39,7 +40,7 @@ int main(){
     std::string reconstructed;
     for(std::size_t i=0;i<pages.size();++i){
         check(pages[i].size()<=reportPayloadBytes);
-        check(numberedPage("0.1.0-dev.6-native-probe.6",pages,i).size()<=2048);
+        check(numberedPage("0.1.0-dev.7-native-diagnostics",pages,i).size()<=2048);
         reconstructed+=pages[i];
     }
     check(reconstructed==report);
@@ -51,4 +52,21 @@ int main(){
     reconstructed.clear();
     for(const auto& part:longPages)reconstructed+=part;
     check(reconstructed==longField);
+    check(oneDriver(0,1)&&oneDriver(1,0)&&!oneDriver(-1,1)&&!oneDriver(1,1));
+    check(nativeGuards(1,0,0,0,0,0,0,true,true,false));
+    for(int i=0;i<5;++i) {
+        int g[5]={0,0,0,0,0};g[i]=-1;
+        check(!nativeGuards(1,0,g[0],g[1],g[2],g[3],g[4],true,true,false));
+        g[i]=1;
+        check(!nativeGuards(1,0,g[0],g[1],g[2],g[3],g[4],true,true,false));
+    }
+    check(!nativeGuards(1,0,0,0,0,0,0,true,false,false));
+    check(!nativeGuards(1,0,0,0,0,0,0,true,true,true));
+    check(nearPair(1,2,15000,2,1,10000));
+    check(!nearPair(1,2,65001,2,1,10000)&&!nearPair(1,2,15000,1,3,10000));
+    check(validMass(1500,1.0f/1500)&&!validMass(0,0)&&!validMass(1000,-1));
+    auto est=estimate({10,0,0},{5,0,0},1000,true);
+    check(eq(est.impulse,5000)&&eq(est.extra5,20000)&&eq(est.extra100,495000));
+    check(eq(est.recover50.x,7.5f)&&eq(est.recover100.x,10));
+    check(estimate({10,0,0},{5,0,0},0,false).impulse==0);
 }

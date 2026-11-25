@@ -13,6 +13,11 @@ struct TraceSample {
     std::uint32_t thread{};
     Vec before{},after{},angularBefore{},angularAfter{};
     float loss{},change{};
+    float mass{},inverseMass{},dt{};
+    std::uint32_t physicsState{};
+    bool candidate{};
+    Vec force{},torque{};
+    bool massOk{};
 };
 struct TraceEvent {
     std::uint64_t driver{},target{};
@@ -24,7 +29,7 @@ struct TraceEvent {
 struct ContactTrace {
     static constexpr std::int64_t windowUs=150000;
     std::array<TraceSample,512> samples{};
-    std::array<TraceEvent,4> events{};
+    std::array<TraceEvent,8> events{};
     std::size_t nextSample{},nextEvent{};
     static void match(TraceEvent& e,const TraceSample& s) {
         if(!e.driver||!s.id||(s.id!=e.driver&&s.id!=e.target))return;

@@ -4,6 +4,7 @@ native func Kineticle_SetProbeEnabled(enabled: Bool) -> Bool;
 native func Kineticle_CaptureDiagnostics() -> Int32;
 native func Kineticle_DiagnosticPart(index: Int32) -> String;
 native func Kineticle_ResetDiagnostics() -> Bool;
+native func Kineticle_SetControllerContext(vehicle: EntityID, detail: String) -> Bool;
 public class KineticleNativeM1ArcSystem extends ScriptableSystem {
   private let running: Bool;
   private let initialized: Bool;
@@ -26,7 +27,38 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
     cb.epoch = this.epoch;
     GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.50, false);
   }
+  private func Flag(value: Bool) -> String { return value ? "1" : "0"; }
+  private func SampleContext() -> Void {
+    let player = GetPlayer(this.GetGameInstance()) as PlayerPuppet;
+    let vehicle: wref<VehicleObject>;
+    let vehicleID: EntityID;
+    let state: Int32 = -1;
+    let mounted: Bool = false;
+    let driver: Bool = false;
+    let noDriving: Bool = false;
+    let forwardOnly: Bool = false;
+    let scene: Bool = false;
+    let detail: String;
+    if !IsDefined(player) {
+      Kineticle_SetControllerContext(vehicleID, "player unavailable");
+      return;
+    }
+    mounted = VehicleComponent.GetVehicle(player.GetGame(), player.GetEntityID(), vehicle);
+    driver = VehicleComponent.IsDriver(player.GetGame(), player);
+    if IsDefined(vehicle) { vehicleID = vehicle.GetEntityID(); }
+    let bb = player.GetPlayerStateMachineBlackboard();
+    if IsDefined(bb) { state = bb.GetInt(GetAllBlackboardDefs().PlayerStateMachine.Vehicle); }
+    noDriving = StatusEffectSystem.ObjectHasStatusEffectWithTag(player, n"NoDriving");
+    forwardOnly = StatusEffectSystem.ObjectHasStatusEffectWithTag(player, n"VehicleOnlyForward");
+    scene = StatusEffectSystem.ObjectHasStatusEffectWithTag(player, n"VehicleScene");
+    detail = "player=1 mounted=" + this.Flag(mounted) + " vehicle_defined=" + this.Flag(IsDefined(vehicle))
+      + " component_driver=" + this.Flag(driver) + " psm_vehicle=" + IntToString(state)
+      + " tag_NoDriving=" + this.Flag(noDriving) + " tag_VehicleOnlyForward=" + this.Flag(forwardOnly)
+      + " tag_VehicleScene=" + this.Flag(scene);
+    Kineticle_SetControllerContext(vehicleID, detail);
+  }
   private func Report(id: String) -> Void {
+    this.SampleContext();
     let count = Kineticle_CaptureDiagnostics();
     let i: Int32 = 0;
     let failures: Int32 = 0;
@@ -71,6 +103,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
         }
       }
       if this.initialized {
+        if this.lastEnabled { this.SampleContext(); }
         if M1Arc_ConsumeAction(id, "report") { this.Report(id); }
         if M1Arc_ConsumeAction(id, "reset") {
           Kineticle_ResetDiagnostics();
