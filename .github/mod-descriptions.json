@@ -56,5 +56,9 @@
   "Arc_Converter": {
     "name": "Arc Converter - Automatic Item Processing",
     "summary": "Automatically sell or disassemble newly acquired weapons and clothes by tier, craft ammunition, and sell junk for eddies. Requires M1 Arc 1.0.0."
+  },
+  "Tiny_Mike_Be_Gone": {
+    "name": "Tiny Mike Be Gone",
+    "summary": "Remove Tiny Mike NPC from Afterlife club after his rescue gig. Requires REDscript only; no CET or M1 Arc."
   }
 }

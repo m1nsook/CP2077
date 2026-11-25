@@ -63,5 +63,13 @@
     "description": "Optional addon: hold the map's Fast Travel action on an UndiscoverMe pin to teleport. Requires UndiscoverMe core.",
     "status": "auto",
     "checks": "deprecated"
+  },
+  {
+    "path": "Tiny_Mike_Be_Gone",
+    "name": "Tiny Mike Be Gone",
+    "nexus_id": null,
+    "m1arc": "-",
+    "description": "Remove Tiny Mike NPC from Afterlife club.",
+    "status": "auto"
   }
 ]

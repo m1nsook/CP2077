@@ -1,0 +1,30 @@
+name: Tiny Mike Be Gone - REDscript checks
+
+on:
+  push:
+    branches: ['dev/tiny-mike-be-gone']
+    paths:
+      - 'Tiny_Mike_Be_Gone/**'
+      - '.github/workflows/tiny-mike-be-gone-check.yml'
+  pull_request:
+    paths:
+      - 'Tiny_Mike_Be_Gone/**'
+      - '.github/workflows/tiny-mike-be-gone-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  redscript:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse REDscript (semantic compilation when private bundle configured)
+        shell: pwsh
+        env:
+          REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
+          REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @('Tiny_Mike_Be_Gone/r6/scripts')
+          if ($LASTEXITCODE -ne 0) { throw 'REDscript validation failed' }
