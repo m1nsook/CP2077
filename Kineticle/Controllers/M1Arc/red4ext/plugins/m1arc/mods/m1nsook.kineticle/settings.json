@@ -16,14 +16,15 @@
     "max": 20,
     "step": 1,
     "group": "Physics",
-    "description": "Experimental extra force on other vehicles. 1 restores vanilla collision response."
+    "description": "Experimental bounded extra collision force on the struck vehicle. 1 disables extra force. Native force units are unverified."
   },
   {
     "id": "protect",
     "kind": "boolean",
     "label": "Vehicle invulnerability",
     "default": true,
-    "group": "Protection"
+    "group": "Protection",
+    "description": "Zero computed damage only for the vehicle V is currently driving. No persistent GodMode."
   },
   {
     "id": "visuals",

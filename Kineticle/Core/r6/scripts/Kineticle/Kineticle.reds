@@ -1,19 +1,26 @@
-// Kineticle 0.1.0-dev.3. Experimental instance-scoped collision enhancement.
+// Kineticle 0.1.0-dev.4. Experimental instance-scoped collision enhancement.
 public class KineticleSystem extends ScriptableSystem {
   private let running: Bool;
-  private let epoch: Int32;
   private let enabled: Bool;
   private let multiplier: Float;
   private let protect: Bool;
   private let visuals: Bool;
   private let bikes: Bool;
-  private let protectedVehicle: EntityID;
-  private let ownsProtection: Bool;
   private let lastImpact: Float;
   private let hasImpact: Bool;
   public let contacts: Int32;
   public let applications: Int32;
-  public let emptyForce: Int32;
+  public let invalidMass: Int32;
+  public let directionRejected: Int32;
+  public let cooldownRejected: Int32;
+  public let protectedHits: Int32;
+  public let otherVehicleHits: Int32;
+  public let visualResets: Int32;
+  public let sampledForces: Int32;
+  private let forceSequence: Int32;
+  public let lastMass: Float;
+  public let lastSpeedBefore: Float;
+  public let lastSpeedAfter: Float;
   public let lastDeltaV: Float;
   public let lastForce: Float;
 
@@ -22,17 +29,18 @@ public class KineticleSystem extends ScriptableSystem {
   }
 
   private func OnAttach() -> Void {
-    this.epoch += 1;
     this.running = true;
     this.Configure(true, 5.0, true, true, true);
     this.ResetDiagnostics();
-    this.Schedule();
   }
 
   private func OnDetach() -> Void {
     this.running = false;
-    this.epoch += 1;
-    this.RemoveProtection();
+    this.forceSequence += 1;
+  }
+
+  public func BuildVersion() -> String {
+    return "0.1.0-dev.4";
   }
 
   public func Configure(enabled: Bool, multiplier: Float, protect: Bool, visuals: Bool, bikes: Bool) -> Void {
@@ -41,13 +49,22 @@ public class KineticleSystem extends ScriptableSystem {
     this.protect = protect;
     this.visuals = visuals;
     this.bikes = bikes;
-    if !enabled || !protect { this.RemoveProtection(); }
   }
 
   public func ResetDiagnostics() -> Void {
     this.contacts = 0;
     this.applications = 0;
-    this.emptyForce = 0;
+    this.invalidMass = 0;
+    this.directionRejected = 0;
+    this.cooldownRejected = 0;
+    this.protectedHits = 0;
+    this.otherVehicleHits = 0;
+    this.visualResets = 0;
+    this.sampledForces = 0;
+    this.forceSequence += 1;
+    this.lastMass = 0.0;
+    this.lastSpeedBefore = 0.0;
+    this.lastSpeedAfter = 0.0;
     this.lastDeltaV = 0.0;
     this.lastForce = 0.0;
   }
@@ -71,69 +88,46 @@ public class KineticleSystem extends ScriptableSystem {
     if StatusEffectSystem.ObjectHasStatusEffectWithTag(player, n"NoDriving")
       || StatusEffectSystem.ObjectHasStatusEffectWithTag(player, n"VehicleOnlyForward")
       || StatusEffectSystem.ObjectHasStatusEffectWithTag(player, n"VehicleScene")
-      || vehicle.IsVehicleRemoteControlled() {
+      || vehicle.IsVehicleRemoteControlled() || vehicle.IsInQuestOrScenePhysicsState() {
       return null;
     }
     return vehicle;
   }
 
-  public func ProtectsVisuals(vehicle: wref<VehicleObject>) -> Bool {
-    if !this.protect || !this.visuals || !IsDefined(vehicle) { return false; }
+  // Event-local checks only. No GodMode, stat modifiers, or persistent entity flags.
+  public func ProtectsVehicle(vehicle: wref<VehicleObject>) -> Bool {
+    if !this.protect || !IsDefined(vehicle) { return false; }
     let driven = this.DriverVehicle();
     return IsDefined(driven) && Equals(driven.GetEntityID(), vehicle.GetEntityID());
   }
 
-  private func RemoveProtection() -> Void {
-    if this.ownsProtection {
-      let gm = GameInstance.GetGodModeSystem(this.GetGameInstance());
-      if IsDefined(gm) {
-        gm.RemoveGodMode(this.protectedVehicle, gameGodModeType.Invulnerable, n"Kineticle");
-      }
-      this.ownsProtection = false;
-      let empty: EntityID;
-      this.protectedVehicle = empty;
+  public func ProtectsVisuals(vehicle: wref<VehicleObject>) -> Bool {
+    return this.visuals && this.ProtectsVehicle(vehicle);
+  }
+
+  public func FilterDamage(hitEvent: ref<gameHitEvent>) -> Void {
+    if !IsDefined(hitEvent) { return; }
+    let vehicle = hitEvent.target as VehicleObject;
+    if !IsDefined(vehicle) { return; }
+    if this.ProtectsVehicle(vehicle) && IsDefined(hitEvent.attackComputed) {
+      // Leave the vanilla damage pipeline running, but zero the computed damage
+      // for this exact hit. No changes survive the end of this callback.
+      hitEvent.attackComputed.MultAttackValue(0.0);
+      this.protectedHits += 1;
+    } else {
+      this.otherVehicleHits += 1;
     }
   }
 
-  private func UpdateProtection() -> Void {
-    let vehicle = this.DriverVehicle();
-    if !this.protect || !IsDefined(vehicle) {
-      this.RemoveProtection();
-      return;
-    }
-    let id = vehicle.GetEntityID();
-    if this.ownsProtection && NotEquals(id, this.protectedVehicle) { this.RemoveProtection(); }
-    if !this.ownsProtection {
-      let gm = GameInstance.GetGodModeSystem(this.GetGameInstance());
-      if IsDefined(gm) {
-        if gm.AddGodMode(id, gameGodModeType.Invulnerable, n"Kineticle") {
-          this.protectedVehicle = id;
-          this.ownsProtection = true;
-        }
-      }
-    }
-  }
-
-  public func HasOwnedProtection() -> Bool {
-    return this.ownsProtection;
-  }
-
-  private func Schedule() -> Void {
-    if !this.running { return; }
-    let cb = new KineticleTick();
-    cb.owner = this;
-    cb.epoch = this.epoch;
-    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.20, false);
-  }
-
-  public func Tick(epoch: Int32) -> Void {
-    if !this.running || epoch != this.epoch { return; }
-    this.UpdateProtection();
-    this.Schedule();
+  public func RecordForceSample(sequence: Int32, vehicle: wref<VehicleObject>, x: Float, y: Float) -> Void {
+    if !this.running || sequence != this.forceSequence || !IsDefined(vehicle) { return; }
+    let velocity = vehicle.GetLinearVelocity();
+    this.lastSpeedAfter = velocity.X*x + velocity.Y*y;
+    this.sampledForces += 1;
   }
 
   public func OnBump(target: ref<VehicleObject>, evt: ref<VehicleBumpEvent>) -> Void {
-    if !IsDefined(evt) || !IsDefined(target) || target.IsDestroyed() { return; }
+    if !IsDefined(evt) || !IsDefined(target) || target.IsDestroyed() || target.IsInQuestOrScenePhysicsState() { return; }
     let driver = this.DriverVehicle();
     let other = evt.hitVehicle as VehicleObject;
     // Only the event on the OTHER vehicle, never on V's vehicle.
@@ -157,21 +151,27 @@ public class KineticleSystem extends ScriptableSystem {
     y = y / length;
     let velocity = driver.GetLinearVelocity();
     let forward = velocity.X*x + velocity.Y*y;
-    if !(forward > 1.0 && forward < 150.0) { return; }
-
-    let now = EngineTime.ToFloat(GameInstance.GetSimTime(this.GetGameInstance()));
-    if this.hasImpact && now >= this.lastImpact && now - this.lastImpact < 0.30 { return; }
-
-    // The native force API is present in the 2.50 RTTI dump. Its runtime
-    // semantics and units are unverified. Prefer the measured force magnitude;
-    // do not invent force when the engine reports zero or invalid data.
-    let force = target.GetCollisionForce();
-    let magnitude = SqrtF(force.X*force.X + force.Y*force.Y + force.Z*force.Z);
-    if !(magnitude > 0.01 && magnitude < 10000000.0) {
-      this.emptyForce += 1;
+    if !(forward > 0.25 && forward < 150.0) {
+      this.directionRejected += 1;
       return;
     }
-    let extra = ClampF(magnitude * (this.multiplier - 1.0), 0.0, 30000.0);
+
+    let now = EngineTime.ToFloat(GameInstance.GetSimTime(this.GetGameInstance()));
+    if this.hasImpact && now >= this.lastImpact && now - this.lastImpact < 0.30 {
+      this.cooldownRejected += 1;
+      return;
+    }
+
+    // Estimate extra momentum from the struck vehicle's actual mass and the
+    // event delta-V, not GetCollisionForce() (usually zero in dev.3 tests).
+    // The native API's units are not established; cap both the requested
+    // additional speed and absolute magnitude for the experimental build.
+    let mass = target.GetTotalMass();
+    if !(mass >= 25.0 && mass <= 50000.0) {
+      this.invalidMass += 1;
+      return;
+    }
+    let extra = ClampF(mass * ClampF(delta * (this.multiplier - 1.0), 0.0, 12.0), 0.0, 30000.0);
     let impulse: Vector4;
     impulse.X = x * extra;
     impulse.Y = y * extra;
@@ -181,17 +181,48 @@ public class KineticleSystem extends ScriptableSystem {
     this.hasImpact = true;
     this.lastImpact = now;
     this.lastForce = extra;
+    this.lastMass = mass;
+    let before = target.GetLinearVelocity();
+    this.lastSpeedBefore = before.X*x + before.Y*y;
+    this.lastSpeedAfter = this.lastSpeedBefore;
     this.applications += 1;
+    this.forceSequence += 1;
+    // A bump already places the target in contact with V; wake before adding force.
+    target.PhysicsWakeUp();
     target.AddCollisionForce(impulse);
+    let sample = new KineticleForceSample();
+    sample.owner = this;
+    sample.vehicle = target;
+    sample.sequence = this.forceSequence;
+    sample.x = x;
+    sample.y = y;
+    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(sample, 0.10, false);
   }
 }
 
-public class KineticleTick extends DelayCallback {
+public class KineticleForceSample extends DelayCallback {
   public let owner: wref<KineticleSystem>;
-  public let epoch: Int32;
+  public let vehicle: wref<VehicleObject>;
+  public let sequence: Int32;
+  public let x: Float;
+  public let y: Float;
   public func Call() -> Void {
-    if IsDefined(this.owner) { this.owner.Tick(this.epoch); }
+    if IsDefined(this.owner) {
+      this.owner.RecordForceSample(this.sequence, this.vehicle, this.x, this.y);
+    }
   }
+}
+
+@wrapMethod(DamageSystem)
+private final func DealDamages(hitEvent: ref<gameHitEvent>) -> Void {
+  if IsDefined(hitEvent) {
+    let vehicle = hitEvent.target as VehicleObject;
+    if IsDefined(vehicle) {
+      let system = KineticleSystem.Get(vehicle.GetGame());
+      if IsDefined(system) { system.FilterDamage(hitEvent); }
+    }
+  }
+  wrappedMethod(hitEvent);
 }
 
 @wrapMethod(VehicleObject)
@@ -209,6 +240,7 @@ protected cb func OnGridDestruction(evt: ref<VehicleGridDestructionEvent>) -> Bo
   if IsDefined(vehicle) {
     let system = KineticleSystem.Get(vehicle.GetGame());
     if IsDefined(system) && system.ProtectsVisuals(vehicle) {
+      system.visualResets += 1;
       vehicle.DestructionResetGrid();
       vehicle.DestructionResetGlass();
     }
