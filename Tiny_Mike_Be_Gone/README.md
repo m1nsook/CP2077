@@ -9,7 +9,7 @@ Remove Tiny Mike NPC from Afterlife club.
 
 ## Installation
 
-Extract into the Cyberpunk 2077 game directory. If you tested the old CET prototype, remove `bin/x64/plugins/cyber_engine_tweaks/mods/TinyMikeBeGone` first.
+Extract into the Cyberpunk 2077 game directory. 
 
 ## Uninstallation
 
