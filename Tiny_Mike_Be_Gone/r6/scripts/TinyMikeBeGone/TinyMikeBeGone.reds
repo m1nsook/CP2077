@@ -1,4 +1,4 @@
-// Tiny Mike Be Gone 0.1.0-dev.3
+// Tiny Mike Be Gone 1.0.0
 // REDscript only. Never alter the character record or quest facts.
 public class TinyMikeBeGoneCheckEvent extends Event {
   public let attemptsLeft: Int32;

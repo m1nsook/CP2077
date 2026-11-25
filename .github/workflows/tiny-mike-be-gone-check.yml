@@ -20,12 +20,11 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - name: Require semantic compilation
+      - name: Parse REDscript (semantic compilation when private bundle configured)
         shell: pwsh
         env:
           REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
           REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
         run: |
-          if (!$env:REDSCRIPT_GAME_BUNDLE_URL -or !$env:REDSCRIPT_GAME_BUNDLE_SHA256) { throw 'Semantic compilation requires both private vanilla bundle secrets.' }
           ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @('Tiny_Mike_Be_Gone/r6/scripts')
           if ($LASTEXITCODE -ne 0) { throw 'REDscript validation failed' }

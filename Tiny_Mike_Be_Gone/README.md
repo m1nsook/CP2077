@@ -11,6 +11,10 @@ Remove Tiny Mike NPC from Afterlife club.
 
 Extract into the Cyberpunk 2077 game directory. If you tested the old CET prototype, remove `bin/x64/plugins/cyber_engine_tweaks/mods/TinyMikeBeGone` first.
 
-## Development
+## Uninstallation
 
-Version 0.1.0-dev.2 uses an NPC attachment callback and bounded delayed checks for Tiny Mike's exact character record at his confirmed Afterlife seat (4 m radius). It does not alter the original gig, character records, or quest facts. No CET, M1 Arc, or additional mod frameworks are used by the script. The automatic REDscript path still needs in-game verification.
+Remove `r6/scripts/TinyMikeBeGone` and restart the game.
+
+## Version 1.0.0
+
+Initial release. Removes the exact Tiny Mike character record only near his Afterlife seat. Does not change character records or quest facts. The author confirmed compilation and in-game removal on the dev.3 implementation. Full semantic CI remains optional until the private vanilla bundle is configured; no game bundles are distributed.
