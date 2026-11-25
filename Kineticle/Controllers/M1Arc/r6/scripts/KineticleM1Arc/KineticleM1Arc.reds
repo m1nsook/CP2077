@@ -36,7 +36,7 @@ public class KineticleM1ArcSystem extends ScriptableSystem {
       if !this.configured || revision != this.revision {
         let enabled = M1Arc_GetJson(id, "enabled");
         let multiplier = M1Arc_GetFloat(id, "multiplier");
-        if (Equals(enabled, "true") || Equals(enabled, "false")) && multiplier >= 1.0 && multiplier <= 20.0 {
+        if (Equals(enabled, "true") || Equals(enabled, "false")) && multiplier >= 1.0 && multiplier <= 100.0 {
           let enabledValue = M1Arc_GetBool(id, "enabled");
           let protect = M1Arc_GetBool(id, "protect");
           let visuals = M1Arc_GetBool(id, "visuals");
@@ -49,19 +49,21 @@ public class KineticleM1ArcSystem extends ScriptableSystem {
             this.appliedProtect = protect;
             this.appliedVisuals = visuals;
             this.appliedBikes = bikes;
-            M1Arc_Log(id, "INFO", "Kineticle Core " + system.BuildVersion() + "; controller dev.4; configuration applied.");
+            M1Arc_Log(id, "INFO", "Kineticle Core " + system.BuildVersion() + "; controller dev.5; configuration applied.");
           }
           this.configured = true;
           this.revision = revision;
         }
       }
       if M1Arc_ConsumeAction(id, "report") {
-        M1Arc_Log(id, "INFO", "Core " + system.BuildVersion() + "; controller dev.4; contacts=" + ToString(system.contacts)
+        M1Arc_Log(id, "INFO", "Core " + system.BuildVersion() + "; controller dev.5; contacts=" + ToString(system.contacts)
           + "; force calls=" + ToString(system.applications) + "; invalid mass=" + ToString(system.invalidMass)
           + "; direction rejected=" + ToString(system.directionRejected) + "; cooldown rejected=" + ToString(system.cooldownRejected)
           + "; last delta-V=" + ToString(system.lastDeltaV) + "; last target mass=" + ToString(system.lastMass)
-          + "; last extra force=" + ToString(system.lastForce) + "; velocity samples=" + ToString(system.sampledForces)
+          + "; requested force=" + ToString(system.lastRequestedForce) + "; last extra force=" + ToString(system.lastForce)
+          + "; capped forces=" + ToString(system.cappedForces) + "; velocity samples=" + ToString(system.sampledForces)
           + "; target outward velocity before=" + ToString(system.lastSpeedBefore) + "; after=" + ToString(system.lastSpeedAfter)
+          + "; observed outward delta-V=" + ToString(system.lastSpeedAfter - system.lastSpeedBefore)
           + "; protected hits=" + ToString(system.protectedHits) + "; vanilla vehicle hits=" + ToString(system.otherVehicleHits)
           + "; visual resets=" + ToString(system.visualResets));
       }

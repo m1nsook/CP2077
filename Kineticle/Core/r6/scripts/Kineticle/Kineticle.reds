@@ -1,4 +1,4 @@
-// Kineticle 0.1.0-dev.4. Experimental instance-scoped collision enhancement.
+// Kineticle 0.1.0-dev.5. Experimental instance-scoped collision enhancement.
 public class KineticleSystem extends ScriptableSystem {
   private let running: Bool;
   private let enabled: Bool;
@@ -23,6 +23,8 @@ public class KineticleSystem extends ScriptableSystem {
   public let lastSpeedAfter: Float;
   public let lastDeltaV: Float;
   public let lastForce: Float;
+  public let lastRequestedForce: Float;
+  public let cappedForces: Int32;
 
   public static func Get(gi: GameInstance) -> ref<KineticleSystem> {
     return GameInstance.GetScriptableSystemsContainer(gi).Get(n"KineticleSystem") as KineticleSystem;
@@ -40,12 +42,12 @@ public class KineticleSystem extends ScriptableSystem {
   }
 
   public func BuildVersion() -> String {
-    return "0.1.0-dev.4";
+    return "0.1.0-dev.5";
   }
 
   public func Configure(enabled: Bool, multiplier: Float, protect: Bool, visuals: Bool, bikes: Bool) -> Void {
     this.enabled = enabled;
-    this.multiplier = multiplier >= 1.0 && multiplier <= 20.0 ? multiplier : 1.0;
+    this.multiplier = multiplier >= 1.0 && multiplier <= 100.0 ? multiplier : 1.0;
     this.protect = protect;
     this.visuals = visuals;
     this.bikes = bikes;
@@ -67,6 +69,8 @@ public class KineticleSystem extends ScriptableSystem {
     this.lastSpeedAfter = 0.0;
     this.lastDeltaV = 0.0;
     this.lastForce = 0.0;
+    this.lastRequestedForce = 0.0;
+    this.cappedForces = 0;
   }
 
   public func DriverVehicle() -> wref<VehicleObject> {
@@ -171,7 +175,10 @@ public class KineticleSystem extends ScriptableSystem {
       this.invalidMass += 1;
       return;
     }
-    let extra = ClampF(mass * ClampF(delta * (this.multiplier - 1.0), 0.0, 12.0), 0.0, 30000.0);
+    let requested = mass * delta * (this.multiplier - 1.0);
+    let extra = ClampF(mass * ClampF(delta * (this.multiplier - 1.0), 0.0, 100.0), 0.0, 300000.0);
+    this.lastRequestedForce = requested;
+    if extra < requested { this.cappedForces += 1; }
     let impulse: Vector4;
     impulse.X = x * extra;
     impulse.Y = y * extra;

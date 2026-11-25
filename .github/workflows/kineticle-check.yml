@@ -49,6 +49,12 @@ jobs:
           assert len(m["shortDesc"].encode("utf-8")) <= 180
           settings = json.loads(manifest_path.with_name("settings.json").read_text(encoding="utf-8"))
           assert len({s["id"] for s in settings}) == len(settings)
+          assert next(s for s in settings if s["id"] == "multiplier")["max"] == 100
+          core = (root / "Core/r6/scripts/Kineticle/Kineticle.reds").read_text()
+          controller = (root / "Controllers/M1Arc/r6/scripts/KineticleM1Arc/KineticleM1Arc.reds").read_text()
+          assert 'return "0.1.0-dev.5"' in core
+          assert "controller dev.5" in controller
+          assert "multiplier <= 100.0" in core and "multiplier <= 100.0" in controller
           for name, source in [("Core", root / "Core"), ("Controller-M1Arc", root / "Controllers/M1Arc")]:
               files = sorted(p for p in source.rglob("*") if p.is_file())
               assert files
@@ -59,13 +65,13 @@ jobs:
                       assert p.suffix == ".reds"
                       assert b"AddGodMode(" not in p.read_bytes()
                       assert b"RemoveGodMode(" not in p.read_bytes()
-              with ZipFile(output / f"Kineticle-{name}-0.1.0-dev.4.zip", "w", ZIP_DEFLATED) as z:
+              with ZipFile(output / f"Kineticle-{name}-0.1.0-dev.5.zip", "w", ZIP_DEFLATED) as z:
                   for p in files:
                       z.write(p, p.relative_to(source).as_posix())
           PY
           (cd dist && sha256sum *.zip > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: kineticle-0.1.0-dev.4
+          name: kineticle-0.1.0-dev.5
           path: dist/
           if-no-files-found: error
