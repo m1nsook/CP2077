@@ -5,7 +5,7 @@
     "label": "Enable native physics diagnostics",
     "default": true,
     "group": "Diagnostics",
-    "description": "Read-only probe for the PhysX sync hook. No gameplay changes."
+    "description": "Read-only PhysX sync and vehicle bump diagnostics. No gameplay changes."
   },
   {
     "id": "report",

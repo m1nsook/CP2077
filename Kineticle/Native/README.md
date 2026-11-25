@@ -1,6 +1,6 @@
-# Native Kineticle (dev.6 probe.1)
+# Native Kineticle (dev.6 probe.2)
 
-Build correction: use the pinned SDK fork's actual v0 API aliases and runtime 2.50 constant. The physics hook and gameplay behavior are unchanged.
+Probe.2 adds read-only observation of `OnVehicleBumpEvent` through the pinned SDK's `CBaseFunction::ExecuteScripted` signature and exact `CStack_vtbl` guard. It checks the reflected handle type and resolves the event's weak hitVehicle reference only within the callback. It records both entity IDs, delta velocity, hit normal, native IsPlayerDriver results and remote/quest/destroyed/car-or-bike checks. Missing or non-native Bool methods produce -1 (unknown). No pointer is retained and no RTTI is invoked from the physics callback. Event dispatch coverage, thread affinity, PSM state and the precise contact-to-sync timing remain unverified; the native guard counter is not permission to modify physics.
 
 Standalone x64 RED4ext DLL. Core contains no REDscript and creates its own config.json on first load. The optional M1 Arc controller supplies only diagnostics and a probe toggle.
 
@@ -12,7 +12,8 @@ The native physics entry point is vehicle::PhysXSynchronizer::SyncFromPhysX (RED
 1. Start the game with native Core and optional diagnostic controller, check startup log.
 2. Reset counters while on foot, report.
 3. Drive normally, then report; hit a wall and report separately; hit another vehicle and report separately.
-4. Compare player-controlled candidate frames, forward-loss samples and last pre/post velocity. No gameplay differences expected.
+4. Compare player-controlled candidate frames, forward-loss samples and last pre/post velocity. Check bump callbacks, rejected stacks, observed vehicle pairs, player driver pairs and last pair fields. Reset between tests; for a vehicle hit exactly one IsPlayerDriver result should be 1 and the other 0. Wall-only contact must not create a player vehicle pair. Test a bike and passenger/remote control when possible. No gameplay differences expected.
+5. Event sync sequence is a counter snapshot, not a proven one-to-one link to a physics sample. -1 means unavailable, not false. If callbacks stay at zero or stacks are rejected, the dispatcher path has not been validated.
 
 ## Next implementation gates
 - Establish native collision partner identification and authoritative V driver scope, excluding remote/scripted control.
