@@ -63,7 +63,11 @@ jobs:
                 const latest=stable||preview;
                 const status=mod.status==="deprecated"?"Deprecated":mod.status==="development"||!stable?"Development":"Released";
                 const version=latest?`[${latest.version}](https://github.com/${repo}/releases/tag/${encodeURIComponent(latest.tag)})`:"-";
-                const nexus=mod.nexus_id?`<a href="https://www.nexusmods.com/cyberpunk2077/mods/${mod.nexus_id}"><img width="16" height="16" src="${icon}" /></a>`:"-";
+                // A release explicitly supplying a Nexus ID overrides the catalog fallback.
+                // A blank release input adds no link, so older explicit IDs remain usable.
+                const explicitNexus = releases.filter(r=>!r.draft && typeof r.tag_name==="string" && r.tag_name.startsWith(prefix) && /^\d+\.\d+\.\d+(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?$/.test(r.tag_name.slice(prefix.length))).map(r=>({id:(r.body||"").match(/^\*\*Nexus Mods:\*\* https:\/\/www\.nexusmods\.com\/cyberpunk2077\/mods\/([1-9][0-9]{0,14})\s*$/m)?.[1],published:r.published_at||"",tag:r.tag_name})).filter(r=>r.id).sort((a,b)=>b.published.localeCompare(a.published)||b.tag.localeCompare(a.tag))[0];
+                const nexusId = explicitNexus?.id || mod.nexus_id;
+                const nexus=nexusId?`<a href="https://www.nexusmods.com/cyberpunk2077/mods/${nexusId}"><img width="16" height="16" src="${icon}" /></a>`:"-";
                 const check = !mod.checks || mod.checks === "auto" ? status.toLowerCase() : mod.checks;
                 const checkIcon = `<img width="16" height="16" alt="${check}" title="${check}" src="assets/checks/${check}.png" />`;
                 lines.push(`| [${mod.name}](${mod.path}) | ${nexus} | ${mod.m1arc} | ${mod.description} | ${version} | ${checkIcon} | ${status} |`);
