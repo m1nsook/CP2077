@@ -1,0 +1,62 @@
+name: KinetiCars - development checks
+on:
+  pull_request:
+    paths:
+      - 'KinetiCars/**'
+      - '.github/workflows/kineticars-check.yml'
+      - 'Daemon/tools/check_redscript_cli.ps1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  redscript:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and optionally compile standalone Core
+        shell: pwsh
+        env:
+          REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
+          REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("KinetiCars/Core/r6/scripts")
+          if ($LASTEXITCODE -ne 0) { throw "Core check failed" }
+      - name: Parse optional controller (semantic linking requires M1 Arc)
+        shell: pwsh
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("KinetiCars/Controllers/M1Arc/r6/scripts")
+          if ($LASTEXITCODE -ne 0) { throw "Controller parse failed" }
+  package:
+    needs: redscript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify separation and create two game-root ZIPs
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          root = Path("KinetiCars")
+          output = Path("dist")
+          output.mkdir()
+          for name, source in [("Core", root / "Core"), ("Controller-M1Arc", root / "Controllers/M1Arc")]:
+              files = sorted(p for p in source.rglob("*") if p.is_file())
+              assert files
+              for p in files:
+                  assert p.relative_to(source).parts[0] in ("r6", "red4ext")
+                  if name == "Core":
+                      assert b"M1Arc_" not in p.read_bytes()
+                      assert p.suffix == ".reds"
+                  if p.suffix == ".json":
+                      json.loads(p.read_text(encoding="utf-8"))
+              with ZipFile(output / f"KinetiCars-{name}-0.1.0-dev.1.zip", "w", ZIP_DEFLATED) as z:
+                  for p in files:
+                      z.write(p, p.relative_to(source).as_posix())
+          PY
+          (cd dist && sha256sum *.zip > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kineticars-0.1.0-dev.1
+          path: dist/
+          if-no-files-found: error
