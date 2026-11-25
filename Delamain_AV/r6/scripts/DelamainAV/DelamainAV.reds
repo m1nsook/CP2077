@@ -46,7 +46,7 @@ public class DelamainAVSystem extends ScriptableSystem {
   private func OnAttach() -> Void {
     DelamainAV_WorldState(true);
     this.m_running = true;
-    this.Log("INFO", "SYSTEM_ATTACH: DelamainAV script attached; dev.24 persistent diagnostics enabled.");
+    this.Log("INFO", "SYSTEM_ATTACH: DelamainAV script attached; dev.24 animation isolation; persistent diagnostics enabled.");
     this.Schedule();
   }
 
@@ -216,11 +216,18 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.AbortArrival(vehicle, "private entity is not the expected car-based Excalibur; inspect ArchiveXL patch");
       return;
     };
-    this.SetThrusters(vehicle, this.m_arriving);
+    // Controlled A/B test: no quest thruster event or door animation during
+    // airborne initialization/hold/descent. Preserve stationary behavior.
+    if !this.m_arriving {
+      this.SetThrusters(vehicle, false);
+    } else {
+      this.Log("INFO", "ANIMATION_ISOLATION: no explicit thruster or door events until verified landing.");
+    };
     this.Log("INFO", "Spawned private car-physics Excalibur; arriving=" + ToString(this.m_arriving));
     this.m_ready = true;
     if this.m_arriving {
-      this.Door(vehicle, false);
+      this.m_doorOpen = false;
+      this.m_doorWait = 0;
       this.m_physicsSamples = 0;
       this.Log("INFO", "PHYSICS_BEGIN_BEFORE");
       let result = DelamainAV_PhysicsBegin(vehicle);
@@ -259,7 +266,7 @@ public class DelamainAVSystem extends ScriptableSystem {
   // velocity at the landing point, then verify clearance before boarding.
   private func FinishArrival(vehicle: ref<VehicleObject>) -> Void {
     if !IsDefined(vehicle) || vehicle.IsPlayerMounted() { return; };
-    this.SetThrusters(vehicle, false);
+    // No thrusters were requested during the isolation descent.
     this.m_arriving = false;
     this.m_groundStable = false;
     this.m_groundValid = false;
@@ -286,7 +293,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     if !IsDefined(vehicle) { return; };
     let mounts = GameInstance.GetMountingFacility(vehicle.GetGame()).GetMountingInfoMultipleWithObjects(null, vehicle);
     if vehicle.IsPlayerMounted() || ArraySize(mounts) > 0 { return; };
-    this.SetThrusters(vehicle, false);
+    // No thruster-off event: keep the failed run free of explicit AV animation events.
     this.Log("WARNING", "DELETE_BEFORE: reason=arrival abort; occupantCount=" + ToString(ArraySize(mounts)));
     if GameInstance.GetDynamicEntitySystem().DeleteEntity(this.m_id) {
       this.m_id = EntityID();
@@ -554,7 +561,7 @@ public class DelamainAVSystem extends ScriptableSystem {
   // Excalibur uses front-left as its physical entrance even for rear passengers.
   // Send the actual door enum name, bypassing passenger-seat-to-bone conversion.
   private func Door(vehicle: ref<VehicleObject>, opening: Bool) -> Void {
-    if !IsDefined(vehicle) || !this.m_ready { return; };
+    if !IsDefined(vehicle) || !this.m_ready || this.m_airborne { return; };
     let ps = vehicle.GetVehiclePS();
     if !IsDefined(ps) {
       this.Log("ERROR", "VehicleComponentPS unavailable.");

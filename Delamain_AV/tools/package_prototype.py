@@ -96,3 +96,6 @@ print(out)
 assert "g_shuttingDown.store(true" in cpp
 assert "sdk->hooking->Detach(" not in cpp
 assert "DelamainAV_WorldState(false)" in script
+
+assert "ANIMATION_ISOLATION" in script
+assert "this.SetThrusters(vehicle, this.m_arriving)" not in script
