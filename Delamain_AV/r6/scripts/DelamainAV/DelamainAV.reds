@@ -36,6 +36,9 @@ public class DelamainAVSystem extends ScriptableSystem {
   private let m_landingSettling: Bool;
   private let m_nativeHolding: Bool;
   private let m_touchdownTicks: Int32;
+  private let m_acquireStable: Int32;
+  private let m_acquirePosition: Vector4;
+  private let m_descentStarted: Bool;
   private let m_boardGroundRejected: Bool;
   private let m_physicsSamples: Int32;
   private let m_environmentLogged: Bool;
@@ -43,7 +46,7 @@ public class DelamainAVSystem extends ScriptableSystem {
   private func OnAttach() -> Void {
     DelamainAV_WorldState(true);
     this.m_running = true;
-    this.Log("INFO", "SYSTEM_ATTACH: DelamainAV script attached; dev.23 persistent diagnostics enabled.");
+    this.Log("INFO", "SYSTEM_ATTACH: DelamainAV script attached; dev.24 persistent diagnostics enabled.");
     this.Schedule();
   }
 
@@ -128,7 +131,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     this.m_clearance = M1Arc_GetFloat("m1nsook.delamain-av", "ground_clearance");
     if this.m_clearance < 0.75 || this.m_clearance > 2.0 { this.m_clearance = 1.0; };
     target.Z = this.m_groundZ + this.m_clearance;
-    // For the native taxi call, descend visibly from six metres above the
+    // For the native taxi call, descend visibly from twenty metres above the
     // proven pickup. Reject static overhead obstructions before spawning.
     this.m_arriving = false;
     this.m_airborne = false;
@@ -136,6 +139,8 @@ public class DelamainAVSystem extends ScriptableSystem {
     this.m_landingSettling = false;
     this.m_nativeHolding = false;
     this.m_touchdownTicks = 0;
+    this.m_acquireStable = 0;
+    this.m_descentStarted = false;
     this.m_boardGroundRejected = false;
     this.m_reopenBlocked = false;
     this.m_airExitLogged = false;
@@ -143,7 +148,7 @@ public class DelamainAVSystem extends ScriptableSystem {
     if arrival {
       let overhead: TraceResult;
       let rayBottom = target + new Vector4(0.0, 0.0, 0.25, 0.0);
-      let rayTop = target + new Vector4(0.0, 0.0, 9.0, 0.0);
+      let rayTop = target + new Vector4(0.0, 0.0, 23.0, 0.0);
       if spatial.SyncRaycastByCollisionGroup(rayBottom, rayTop, n"Static", overhead, true, false) ||
          spatial.SyncRaycastByCollisionGroup(rayTop, rayBottom, n"Static", overhead, true, false) {
         this.Log("WARNING", "TAXI_PICKUP_BLOCKED: overhead obstruction; choose open ground.");
@@ -153,7 +158,8 @@ public class DelamainAVSystem extends ScriptableSystem {
       this.m_airborne = true;
     };
     spec.position = target;
-    if this.m_arriving { spec.position = target + new Vector4(0.0, 0.0, 6.0, 0.0); };
+    if this.m_arriving { spec.position = target + new Vector4(0.0, 0.0, 20.0, 0.0); };
+    this.m_acquirePosition = spec.position;
     spec.orientation = this.m_arrivalOrientation;
     this.m_spawnTarget = target;
     this.m_groundStable = false;
@@ -311,7 +317,58 @@ public class DelamainAVSystem extends ScriptableSystem {
     let remaining = pos.Z - target.Z;
     let lateral = SqrtF((pos.X - target.X) * (pos.X - target.X) + (pos.Y - target.Y) * (pos.Y - target.Y));
     DelamainAV_DiagnosticLog("TRACE", "ARRIVAL_POSITION: step=" + ToString(this.m_arrivalStep) + "; xyz=" + ToString(pos.X) + "," + ToString(pos.Y) + "," + ToString(pos.Z) + "; target=" + ToString(target.X) + "," + ToString(target.Y) + "," + ToString(target.Z) + "; zDelta=" + ToString(remaining) + "; lateral=" + ToString(lateral) + "; mounts=" + ToString(ArraySize(mounts)));
-    if !(remaining >= -0.20 && remaining <= 7.5 && lateral <= 0.8) {
+    // DAV waits for a live body before descent and measures actual ground
+    // beneath it. Allow only a bounded initial zero-velocity acquisition;
+    // do not confuse a startup pose correction with sustained flight drift.
+    if !this.m_descentStarted {
+      if !(remaining >= 18.0 && remaining <= 21.5 && lateral <= 2.0) {
+        this.AbortArrival(vehicle, "initial physics pose outside acquisition envelope; lateral=" + ToString(lateral));
+        return;
+      };
+      let acquired = DelamainAV_PhysicsPulse(vehicle, 0.0);
+      if acquired < 0 && acquired != -20 {
+        this.AbortArrival(vehicle, "initial physics hold fault=" + ToString(acquired));
+        return;
+      };
+      if acquired > 0 && Vector4.Distance(pos, this.m_acquirePosition) <= 0.05 {
+        this.m_acquireStable += 1;
+      } else {
+        this.m_acquireStable = 0;
+      };
+      this.m_acquirePosition = pos;
+      if this.m_acquireStable >= 6 {
+        // Verify the actual new center and overhead column before committing
+        // to descent. The original ground height must still be equivalent.
+        let hit: TraceResult;
+        let overhead: TraceResult;
+        let center = new Vector4(pos.X, pos.Y, this.m_groundZ, 1.0);
+        let spatial = GameInstance.GetSpatialQueriesSystem(vehicle.GetGame());
+        if !spatial.SyncRaycastByCollisionGroup(center + new Vector4(0.0, 0.0, 2.0, 0.0), center - new Vector4(0.0, 0.0, 3.0, 0.0), n"Static", hit, true, false) ||
+           hit.normal.Z < 0.95 || AbsF(hit.position.Z - this.m_groundZ) > 0.25 {
+          this.AbortArrival(vehicle, "acquired landing surface invalid");
+          return;
+        };
+        let bottom = hit.position + new Vector4(0.0, 0.0, this.m_clearance + 0.25, 0.0);
+        let top = pos + new Vector4(0.0, 0.0, 3.0, 0.0);
+        if spatial.SyncRaycastByCollisionGroup(bottom, top, n"Static", overhead, true, false) ||
+           spatial.SyncRaycastByCollisionGroup(top, bottom, n"Static", overhead, true, false) {
+          this.AbortArrival(vehicle, "acquired landing column obstructed");
+          return;
+        };
+        this.m_groundZ = hit.position.Z;
+        this.m_spawnTarget = new Vector4(pos.X, pos.Y, this.m_groundZ + this.m_clearance, 1.0);
+        this.m_descentStarted = true;
+        this.Log("INFO", "TAXI_NATIVE_ACQUIRED: stable physics pose; lateral initialization shift=" + ToString(lateral) + "; samples=" + ToString(acquired));
+      } else {
+        if this.m_arrivalStep >= 40 {
+          this.AbortArrival(vehicle, "physics pose did not stabilize");
+          return;
+        };
+      };
+      this.ScheduleArrival();
+      return;
+    };
+    if !(remaining >= -0.20 && remaining <= 21.5 && lateral <= 0.8) {
       this.AbortArrival(vehicle, "position outside pickup corridor; zDelta=" + ToString(remaining) + "; lateral=" + ToString(lateral));
       return;
     };
@@ -326,7 +383,7 @@ public class DelamainAVSystem extends ScriptableSystem {
         return;
       };
     };
-    let speed = -MinF(1.35, MaxF(0.12, remaining * 0.85));
+    let speed = -MinF(5.0, MaxF(0.12, remaining * 0.85));
     if remaining <= 0.15 { speed = 0.0; };
     DelamainAV_DiagnosticLog("TRACE", "PULSE_BEFORE: requestedVz=" + ToString(speed));
     let samples = DelamainAV_PhysicsPulse(vehicle, speed);

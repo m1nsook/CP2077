@@ -42,7 +42,7 @@ enum Cat : uint32_t {
     C_Tick      = 1u << 10,  // PHYSICS_TICK / FORCE_STATE / FORCE_SUPPRESSED
 
     C_Default = C_Session | C_Rtti | C_Lifecycle | C_Script | C_Env
-              | C_Warn    | C_Physics | C_Fault,
+              | C_Warn    | C_Physics | C_Fault | C_Tick,
     C_Quiet   = C_Session | C_Lifecycle | C_Script | C_Warn | C_Fault,
     C_All     = 0xFFFFFFFFu,
 };
@@ -80,6 +80,7 @@ inline uint32_t CategoryBit(const char* c) noexcept {
     if (std::strcmp(c, "MODULE")            == 0) return C_Module;
     if (std::strcmp(c, "INSTALLED")         == 0) return C_Installed;
     if (std::strcmp(c, "PHYSICS_TICK")      == 0) return C_Tick;
+    if (std::strcmp(c, "BODY_POSE")         == 0) return C_Tick;
     if (std::strcmp(c, "FORCE_STATE")       == 0) return C_Tick;
     if (std::strcmp(c, "FORCE_SUPPRESSED")  == 0) return C_Tick;
     if (std::strcmp(c, "BEGIN")             == 0) return C_Physics;

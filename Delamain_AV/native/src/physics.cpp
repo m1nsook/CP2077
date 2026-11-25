@@ -25,9 +25,6 @@ using namespace RED4ext;
 using Vehicle = vehicle::BaseObject;
 using TickFn = void (*)(void*, float);
 using WakeFn = void (*)(Vehicle*);
-using ForceFn = void (*)(void*, Vector3*, Vector3*);
-constexpr uint32_t kForceHash = 611586815;
-constexpr uint32_t kTorqueHash = 3303544265;
 constexpr uint32_t kTickHash = 2526549425;
 constexpr uint32_t kWakeHash = 2793083181;
 // Actual DAV 3.5.0 DLL SHA256 a61ab1b4f42e79cccfff681d2699f9003793c95326526fb0c2d7c1eeeca0f3c4:
@@ -38,6 +35,8 @@ constexpr size_t kPhysicsParent = 0x60;
 constexpr size_t kVehicleBody = 0x2D8;
 constexpr size_t kPhysicsState = 0x260;
 constexpr size_t kOwner = 0x180;
+// DAV 3.5.0 DLL reads these worldPosition coordinates at RVAs 0x12F10, 0x12EE9, 0x12E7C.
+constexpr size_t kBodyPosition = 0x170;
 constexpr size_t kVelocity = 0x18;
 constexpr size_t kAngular = 0x24;
 constexpr size_t kMass = 0x1BC;
@@ -51,10 +50,6 @@ const v1::Sdk* g_sdk = nullptr;
 v1::PluginHandle g_plugin{};
 void* g_tickAddress = nullptr;
 TickFn g_tickOriginal = nullptr;
-void* g_forceAddress = nullptr;
-void* g_torqueAddress = nullptr;
-ForceFn g_forceOriginal = nullptr;
-ForceFn g_torqueOriginal = nullptr;
 WakeFn g_wake = nullptr;
 std::mutex g_mutex;
 std::atomic<bool> g_active{false};
@@ -74,8 +69,7 @@ struct Command {
     uint64_t lastTickLog = 0;
     int32_t samples = 0;
     int32_t fault = 0;
-    uint64_t suppressedForce = 0;
-    uint64_t suppressedTorque = 0;
+    int32_t lastPostSample = 0;
 };
 Command g_cmd;
 
@@ -207,11 +201,9 @@ void ApplyCommand(void* physics, float deltaTime) {
         Fault(-9); return;
     }
     if (!std::isfinite(deltaTime) || deltaTime <= 0.f || deltaTime > 0.25f) return;
-    const float dt = std::min(deltaTime, 0.05f);
-    // Like DAV develop mode 2, hold a velocity target on the actual physics
-    // tick, before the original resistance calculation. Ramp the target
-    // itself for a smooth start/stop rather than writing positions.
-    g_cmd.applied = Approach(g_cmd.applied, g_cmd.desired, 1.5f * dt);
+    // DAV mode 2 writes the current requested velocity directly. The
+    // script slows the requested descent as ground approaches.
+    g_cmd.applied = g_cmd.desired;
     // DAV mode 2 holds the entire velocity vector every physics tick.
     // dev.20 drift exceeded the corridor in just two script ticks; don't
     // gradually brake sideways motion. Smooth only the vertical target.
@@ -238,68 +230,45 @@ void ApplyCommand(void* physics, float deltaTime) {
     if (g_cmd.samples <= 10 || now-g_cmd.lastTickLog >= 100) {
         g_cmd.lastTickLog=now;
         avdiag::Log("PHYSICS_TICK","sample=%d dt=%.6f mass=%.3f desired=%.6f applied=%.6f velocity=%.6f,%.6f,%.6f angular=%.6f,%.6f,%.6f priorGravity=%u",g_cmd.samples,deltaTime,mass,g_cmd.desired,g_cmd.applied,velocity.X,velocity.Y,velocity.Z,angular.X,angular.Y,angular.Z,static_cast<unsigned>(gravity));
-        avdiag::Log("FORCE_STATE","sample=%d incomingV=%.6f,%.6f,%.6f incomingAngular=%.6f,%.6f,%.6f suppressedForce=%llu suppressedTorque=%llu",g_cmd.samples,incoming.X,incoming.Y,incoming.Z,incomingAngular.X,incomingAngular.Y,incomingAngular.Z,static_cast<unsigned long long>(g_cmd.suppressedForce),static_cast<unsigned long long>(g_cmd.suppressedTorque));
+        Vector3 position{};
+        bool posOK=Read(body,kBodyPosition,position);
+        avdiag::Log("BODY_POSE","phase=before_original sample=%d posReadable=%d xyz=%.6f,%.6f,%.6f incomingV=%.6f,%.6f,%.6f incomingAngular=%.6f,%.6f,%.6f",g_cmd.samples,posOK,position.X,position.Y,position.Z,incoming.X,incoming.Y,incoming.Z,incomingAngular.X,incomingAngular.Y,incomingAngular.Z);
     }
 }
-// DAV develop ApplyForceAtPosition/ApplyTorqueAtPosition: bypass the
-// original when flight owns that vehicle. Do not suppress collisions or
-// touch a foreign vehicle, an expired command or an inactive world.
-// Never hold our mutex while calling original engine code.
-bool SuppressOriginal(void* body, bool torque) {
-    if (!CanControl() || !g_active.load(std::memory_order_acquire)) return false;
-    uintptr_t owner = 0;
-    if (!Read(body,kOwner,owner) || !owner) return false;
+// Observe the result without writing after the engine routine. The body is
+// revalidated; the original callback is always invoked outside our mutex.
+void ObserveAfterOriginal(void* physics) {
+    if (!CanControl() || !g_active.load(std::memory_order_acquire)) return;
+    uintptr_t owner=0, body=0;
+    if (!Read(physics,kPhysicsParent,owner)) return;
     std::unique_lock guard(g_mutex,std::try_to_lock);
-    if (!guard.owns_lock() || !CanControl() ||
-        !g_active.load(std::memory_order_relaxed) || owner != g_cmd.owner ||
-        GetTickCount64() > g_cmd.deadline) return false;
+    if (!guard.owns_lock() || !CanControl() || !g_active.load(std::memory_order_relaxed) ||
+        owner!=g_cmd.owner || !owner || GetTickCount64()>g_cmd.deadline ||
+        g_cmd.samples==g_cmd.lastPostSample) return;
     uint64_t id=0;
-    uintptr_t expected=0;
-    if (!Read(reinterpret_cast<void*>(owner),kOwnerId,id) || id != g_cmd.id ||
-        !ResolveBody(owner,0,expected) || expected != reinterpret_cast<uintptr_t>(body))
-        return false;
-    auto& count = torque ? g_cmd.suppressedTorque : g_cmd.suppressedForce;
-    ++count;
-    if (count <= 3) avdiag::Log("FORCE_SUPPRESSED","kind=%s count=%llu entity=%016llx body=%p",torque?"torque":"force",static_cast<unsigned long long>(count),static_cast<unsigned long long>(id),body);
-    return true;
-}
-void ForceHook(void* body,Vector3* offset,Vector3* force) {
-    if (!SuppressOriginal(body,false)) g_forceOriginal(body,offset,force);
-}
-void TorqueHook(void* body,Vector3* offset,Vector3* torque) {
-    if (!SuppressOriginal(body,true)) g_torqueOriginal(body,offset,torque);
+    if (!Read(reinterpret_cast<void*>(owner),kOwnerId,id) || id!=g_cmd.id ||
+        !ResolveBody(owner,reinterpret_cast<uintptr_t>(physics),body)) return;
+    if (g_cmd.samples>10 && GetTickCount64()-g_cmd.lastTickLog>30) return;
+    g_cmd.lastPostSample=g_cmd.samples;
+    Vector3 p{},v{};
+    auto* ptr=reinterpret_cast<void*>(body);
+    bool pOK=Read(ptr,kBodyPosition,p),vOK=Read(ptr,kVelocity,v);
+    avdiag::Log("BODY_POSE","phase=after_original sample=%d posReadable=%d xyz=%.6f,%.6f,%.6f velocityReadable=%d velocity=%.6f,%.6f,%.6f",g_cmd.samples,pOK,p.X,p.Y,p.Z,vOK,v.X,v.Y,v.Z);
 }
 void TickHook(void* physics, float deltaTime) {
     ApplyCommand(physics, deltaTime);
     g_tickOriginal(physics, deltaTime);
+    ObserveAfterOriginal(physics);
 }
 bool Install() {
     if (!CanControl()) return false;
-    if (g_tickAddress && g_forceAddress && g_torqueAddress && g_wake) return true;
+    if (g_tickAddress && g_wake) return true;
     if (!g_sdk || !g_sdk->hooking || !g_sdk->hooking->Attach) return false;
     auto tick=Resolve(kTickHash), wake=Resolve(kWakeHash);
-    auto force=Resolve(kForceHash), torque=Resolve(kTorqueHash);
-    if (!tick || !wake || !force || !torque ||
-        tick==wake || tick==force || tick==torque || wake==force || wake==torque || force==torque) return false;
-    // Partial installation stays dormant: Begin cannot activate control
-    // until all three registered hooks are installed. RED4ext owns cleanup.
-    if (!g_forceAddress) {
-        if (!g_sdk->hooking->Attach(g_plugin,force,reinterpret_cast<void*>(&ForceHook),
-            reinterpret_cast<void**>(&g_forceOriginal))) return false;
-        g_forceAddress=force;
-        avdiag::Log("HOOK","force installed address=%p",force);
-    }
-    if (!g_torqueAddress) {
-        if (!g_sdk->hooking->Attach(g_plugin,torque,reinterpret_cast<void*>(&TorqueHook),
-            reinterpret_cast<void**>(&g_torqueOriginal))) return false;
-        g_torqueAddress=torque;
-        avdiag::Log("HOOK","torque installed address=%p",torque);
-    }
-    if (!g_tickAddress) {
-        if (!g_sdk->hooking->Attach(g_plugin,tick,reinterpret_cast<void*>(&TickHook),
-            reinterpret_cast<void**>(&g_tickOriginal))) return false;
-        g_tickAddress=tick;
-    }
+    if (!tick || !wake || tick==wake) return false;
+    if (!g_sdk->hooking->Attach(g_plugin,tick,reinterpret_cast<void*>(&TickHook),
+        reinterpret_cast<void**>(&g_tickOriginal))) return false;
+    g_tickAddress=tick;
     g_wake=reinterpret_cast<WakeFn>(wake);
     avdiag::Log("HOOK","resistance tick installed address=%p trampoline=%p wake=%p",tick,reinterpret_cast<void*>(g_tickOriginal),wake);
     return true;
@@ -343,6 +312,20 @@ void Begin(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
         if (!CanControl()) { g_active.store(false,std::memory_order_release); if (out) *out = -30; return; }
         g_wake(v.GetPtr());
         avdiag::Log("WAKE","after initial ForceEnablePhysics");
+        // DAV EnableGravity(false) also performs an immediate write on the
+        // resolved body after waking it, before the first descent tick.
+        {
+            std::lock_guard guard(g_mutex);
+            uintptr_t body=0;
+            uint8_t prior=0;
+            const uint8_t disabled=0;
+            if (CanControl() && g_active.load(std::memory_order_relaxed) &&
+                ResolveBody(g_cmd.owner,0,body,true) &&
+                Read(reinterpret_cast<void*>(body),kGravity,prior) && prior<=1 &&
+                Write(reinterpret_cast<void*>(body),kGravity,disabled)) {
+                avdiag::Log("WAKE","initial gravity disabled prior=%u",static_cast<unsigned>(prior));
+            } else { avdiag::Log("WAKE","initial gravity deferred to validated physics tick"); }
+        }
         Snapshot(v,"after native wake");
         code = 1;
     }
@@ -362,7 +345,7 @@ void Pulse(IScriptable*, CStackFrame* frame, int32_t* out, int64_t) {
             const auto now = GetTickCount64();
             if (g_cmd.fault) code = g_cmd.fault;
             else if (g_active.load(std::memory_order_relaxed) && now <= g_cmd.deadline &&
-                     std::isfinite(speed) && speed >= -2.f && speed <= 0.f) {
+                     std::isfinite(speed) && speed >= -5.f && speed <= 0.f) {
                 uintptr_t body = 0;
                 uint32_t state = 0;
                 // Bind first, then wake, then wait for the reciprocal
@@ -404,7 +387,7 @@ void Stop(IScriptable*, CStackFrame* frame, bool* out, int64_t) {
     GetParameter(frame, &id); frame->code++;
     std::lock_guard guard(g_mutex);
     bool ok = id.hash && id.hash == g_cmd.id;
-    avdiag::Log("STOP","requested=%016llx matched=%d samples=%d fault=%d suppressedForce=%llu suppressedTorque=%llu",static_cast<unsigned long long>(id.hash),ok,g_cmd.samples,g_cmd.fault,static_cast<unsigned long long>(g_cmd.suppressedForce),static_cast<unsigned long long>(g_cmd.suppressedTorque));
+    avdiag::Log("STOP","requested=%016llx matched=%d samples=%d fault=%d",static_cast<unsigned long long>(id.hash),ok,g_cmd.samples,g_cmd.fault);
     if (ok) { g_active.store(false, std::memory_order_release); g_cmd = {}; }
     if (out) *out = ok;
 }

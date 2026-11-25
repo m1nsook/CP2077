@@ -10,7 +10,7 @@ settings = json.loads((manifest_dir / "settings.json").read_text(encoding="utf-8
 assert manifest["id"] == "m1nsook.delamain-av"
 assert manifest["scope"] == "Gameplay"
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", manifest["version"]), "M1 Arc only accepts numeric x.y.z manifest versions"
-assert manifest["version"] == "0.2.16"
+assert manifest["version"] == "0.2.17"
 required = manifest["requires"]["m1arc"]
 assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", required)
 assert tuple(map(int, required.split("."))) <= (1, 0, 1), "Requires exceeds M1 Arc loader compatibility constant"
@@ -64,11 +64,10 @@ assert "TAXI_NATIVE_ABORT" in script
 cpp = (root / "native/src/physics.cpp").read_text(encoding="utf-8")
 assert "kTickHash = 2526549425" in cpp and "ResolveBody(" in cpp
 assert "g_tickOriginal(physics, deltaTime)" in cpp
-assert "kForceHash = 611586815" in cpp and "kTorqueHash = 3303544265" in cpp
-assert "if (!SuppressOriginal(body,false)) g_forceOriginal(body,offset,force);" in cpp
-assert "if (!SuppressOriginal(body,true)) g_torqueOriginal(body,offset,torque);" in cpp
-assert "expected != reinterpret_cast<uintptr_t>(body)" in cpp
-assert "FORCE_STATE" in cpp and "FORCE_SUPPRESSED" in cpp
+assert "g_forceOriginal" not in cpp and "g_torqueOriginal" not in cpp
+assert "kBodyPosition = 0x170" in cpp and "BODY_POSE" in cpp
+assert "TAXI_NATIVE_ACQUIRED" in script
+assert "lateral <= 2.0" in script and "lateral <= 0.8" in script
 native = root / "red4ext/plugins/DelamainAV/DelamainAV.dll"
 assert native.is_file() and native.read_bytes()[:2] == b"MZ", "Native physics plugin required"
 assert "TAXI_NATIVE_SETTLING" in script and "TAXI_LANDING_HANDOFF" not in script
@@ -84,7 +83,7 @@ assert "velocity.X = 0.f;" in cpp and "velocity.Y = 0.f;" in cpp
 assert "diagnostics.hpp" in cpp
 assert "TAXI_MOUNT_BLOCKED" in script
 assert "TAXI_BOARD_POSITION_INVALID" in script
-out = Path("dist/Delamain-AV-v0.2.16-dev.23")
+out = Path("dist/Delamain-AV-v0.2.17-dev.24")
 if out.exists():
     shutil.rmtree(out)
 out.mkdir(parents=True)
