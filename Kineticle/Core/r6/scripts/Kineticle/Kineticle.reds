@@ -1,4 +1,4 @@
-// Kineticle 0.1.0-dev.2. Experimental instance-scoped collision enhancement.
+// Kineticle 0.1.0-dev.3. Experimental instance-scoped collision enhancement.
 public class KineticleSystem extends ScriptableSystem {
   private let running: Bool;
   private let epoch: Int32;
@@ -80,7 +80,7 @@ public class KineticleSystem extends ScriptableSystem {
   public func ProtectsVisuals(vehicle: wref<VehicleObject>) -> Bool {
     if !this.protect || !this.visuals || !IsDefined(vehicle) { return false; }
     let driven = this.DriverVehicle();
-    return IsDefined(driven) && Equals(driven, vehicle);
+    return IsDefined(driven) && Equals(driven.GetEntityID(), vehicle.GetEntityID());
   }
 
   private func RemoveProtection() -> Void {
@@ -137,7 +137,9 @@ public class KineticleSystem extends ScriptableSystem {
     let driver = this.DriverVehicle();
     let other = evt.hitVehicle as VehicleObject;
     // Only the event on the OTHER vehicle, never on V's vehicle.
-    if !IsDefined(driver) || !IsDefined(other) || !Equals(other, driver) || Equals(target, driver) { return; }
+    if !IsDefined(driver) || !IsDefined(other) { return; }
+    let driverID = driver.GetEntityID();
+    if NotEquals(other.GetEntityID(), driverID) || Equals(target.GetEntityID(), driverID) { return; }
     let delta = AbsF(evt.impactVelocityChange);
     if !(delta >= 1.0 && delta <= 100.0) { return; }
     this.contacts += 1;
@@ -201,7 +203,7 @@ protected cb func OnVehicleBumpEvent(evt: ref<VehicleBumpEvent>) -> Bool {
 }
 
 @wrapMethod(VehicleComponent)
-protected cb func OnGridDestruction(evt: ref<vehicleGridDestructionEvent>) -> Bool {
+protected cb func OnGridDestruction(evt: ref<VehicleGridDestructionEvent>) -> Bool {
   let result = wrappedMethod(evt);
   let vehicle = this.GetVehicle();
   if IsDefined(vehicle) {

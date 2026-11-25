@@ -2,7 +2,9 @@
 
 Experimental collision force amplification and vehicle protection for vehicles driven by V.
 
-## 0.1.0-dev.2
+## 0.1.0-dev.3
+
+Compiler compatibility fix: use the REDscript class name `VehicleGridDestructionEvent` and compare vehicle entity IDs instead of mixed reference types. Gameplay behavior is unchanged from dev.2.
 
 Install the Core ZIP into the game root. M1 Arc controller is optional and requires M1 Arc 1.0.1+. Remove any previous KinetiCars probe scripts and manifest before installing. NSUI and Mod Settings are not implemented.
 

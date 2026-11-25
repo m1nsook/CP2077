@@ -36,7 +36,7 @@ public class KineticleM1ArcSystem extends ScriptableSystem {
             M1Arc_GetBool(id, "visuals"), M1Arc_GetBool(id, "bikes"));
           this.configured = true;
           this.revision = revision;
-          M1Arc_Log(id, "INFO", "Kineticle dev.2 configuration applied; force API experimental.");
+          M1Arc_Log(id, "INFO", "Kineticle dev.3 configuration applied; force API experimental.");
         }
       }
       if M1Arc_ConsumeAction(id, "report") {

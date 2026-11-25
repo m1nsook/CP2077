@@ -57,13 +57,13 @@ jobs:
                   if name == "Core":
                       assert b"M1Arc_" not in p.read_bytes()
                       assert p.suffix == ".reds"
-              with ZipFile(output / f"Kineticle-{name}-0.1.0-dev.2.zip", "w", ZIP_DEFLATED) as z:
+              with ZipFile(output / f"Kineticle-{name}-0.1.0-dev.3.zip", "w", ZIP_DEFLATED) as z:
                   for p in files:
                       z.write(p, p.relative_to(source).as_posix())
           PY
           (cd dist && sha256sum *.zip > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: kineticle-0.1.0-dev.2
+          name: kineticle-0.1.0-dev.3
           path: dist/
           if-no-files-found: error
