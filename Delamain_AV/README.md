@@ -1,0 +1,184 @@
+# Delamain AV — 0.2.3-dev.10
+
+dev.7 established the real failure: the original OccupantSlots component points to a passenger workspot with a looping seated sequence and no entry/exit nodes. The original spawn, 0.75 m clearance, exterior door animation, rear-left passenger PSM and despawn are already confirmed. Do not retest those as separate milestones.
+
+## Native resource implementation
+
+- `m1nsook\delamain_av\passenger.workspot` adds the original q113 player entry and exit animation names from q203_04_delamain.scene as workEntryAnim and workExitAnim with the native PSM's default slot. Preserves the original player rig/animation-set mappings and seated loop.
+- `m1nsook\delamain_av\occupant_patch.ent` supplies only the exact OccupantSlots component (name and CRUID preserved), including its original seat transforms, with the custom passenger workspot reference. There is no driver slot data.
+- ArchiveXL makes an independent copy of the vanilla q203 entity at the mod's private entity path and patches only that copy's occupant component. TweakXL points the existing mod vehicle record to the copy. No original resource or quest fact is overwritten.
+- The real archive is compiled and round-tripped with WolvenKit CLI 10.0.0-beta.1. No original animation binary or other mod code is redistributed.
+- Native exit still uses the passenger PSM and workspot. The custom resource uses cinematic root motion without navmesh snapping; the stationary/ground/structural workspot checks remain. Record-scoped PSM wrappers use the default exit animation and suppress road-car teleport recovery. No teleport fallback is added by this mod.
+- Right rear interaction is disabled because the original entity defines only the left rear passenger slot.
+
+## Requirements
+
+Cyberpunk 2077 2.50, RED4ext, REDscript, TweakXL, Codeware, M1 Arc 1.0.1+ and ArchiveXL with resource.copy support (required for the private copied entity). No CET or DAV dependency.
+
+## Validation
+
+CI must compile the two custom resources, export them back to JSON and verify the nodes and component binding, then pack an install-ready archive and ZIP. It does not verify game animation playback, alignment, native PSM timing, or ArchiveXL's in-game copy/patch application. The cinematic scene tier and autonomous flight are not yet implemented. No change to main.
+
+## dev.9 changes
+
+dev.8 game test verified animated boarding both manually and through M1 Arc, physical door animation, auto-close after M1 Arc boarding, spawning and despawn. Structural exit nodes are now present, but the navmesh-checked query rejected the cinematic exit. The game also attempted an upward exit and left the player in a vehicle state.
+
+- Keep entry resource and transforms unchanged.
+- Disable road navmesh requirements and Z snapping on the custom exit node only; retain stationary landing and structural workspot guards.
+- Route the native Exit input to the same door/exit request as M1 Arc. Use the native PSM default cinematic exit, suppress its car-specific teleport recovery only on the mod's private AV record.
+- Remap rear-left door open/close events to the physical front-left entrance only for this record. Observe manual passenger mounting and close the door after entry.
+- Native ExitEvents still owns the mounting relationship and player-state cleanup. No manual teleport or forced unmount fallback.
+- Runtime alignment, successful unmount, and REDscript compilation remain unverified by CI.
+
+## dev.10
+
+dev.9 manual entry opens the physical door, plays the animation, and closes it automatically. Do not change the confirmed entry path. Exit logs show native mount and player-state cleanup in the same second as the request, not actual animated exit.
+
+The supplied q203_04_delamain.scene JSON has a 5000 ms scnPlaySkAnimEvent for sit_couch__AV_excalibur__01__to__stand__2h_on_sides__01__turn270__01, with root motion enabled and scnUnmountEvent at 4999 ms. It is not a standard vehicle exit-slot sequence.
+
+Use the imported WorkspotGameSystem.SendSlowExitSignal(actor, animationName, dontWaitForCurrentAnimationToFinish) instead of UnmountFromVehicle inside the custom record's ExitWorkspot wrapper. The native ExitingDecisions waits for the actor's workspot to end; native ExitEvents then cleans up the mounting relationship. Log the named exit entry ID, observed exiting phase, elapsed time, and displacement. Keep the entrance open on premature detach. Do not claim gameplay success solely from cleared mount or PSM. The 2.5 s and 1 m thresholds are diagnostic heuristics, not proof of exterior clearance.
+
+No asset, entry, spawn, or original quest changes. The named workspot signal is imported in the supplied 2.50 script dump but its behavior on this AV remains unverified.
+
+## dev.11 — AV-owned disembark sequence
+
+Supersedes the dev.8–10 vehicle-exit-node approach. Original q203_04_delamain.scene uses a five-second skeletal animation followed by a separate unmount event at 4999 ms. The vanilla AV record inherits generic four-wheel data, but the cinematic sequence is not a road-car exit. The supplied SceneSystemInterface does not expose a standalone scene-start method.
+
+Preserve confirmed manual boarding and physical door routing. In the private passenger workspot, replace the workExitAnim with a finite workAnimClip (entry ID 6) carrying the exact original Excalibur clip. workAnimClip type, flag 2 and blendOutTime are verified against WolvenKit RED4 generated classes. Native SendJumpCommandEnt is present in the supplied workspotSystem.script and is used by vanilla takedown sequences.
+
+AV controller opens the entrance, jumps directly to this clip while V remains a passenger, waits for natural workspot end and checks elapsed time and displacement, then requests native PSM cleanup. The standard vehicle exit path is not responsible for animation or navigation. No mod teleport or forced instant unmount. The threshold checks are conservative heuristics; runtime clip playback, root motion, exterior position and cleanup still require verification. Forced engine transitions outside this managed lifecycle retain stock behavior.
+
+Not a standalone cinematic scene yet: the source does not establish a safe script API for starting one. No original quest edits or new dependencies.
+
+## dev.12 — user-provided missing animation-set correction
+
+The original q203_04_delamain.scene resource's cinematicAnimNames[1] lists
+sit_couch__AV_excalibur__01__to__stand__2h_on_sides__01__turn270__01.
+cinematicAnimSets[1] points to:
+`base\animations\quest\main_quests\prologue\q000\q000_corpo_03b_fly_to_lizzies\body\q000_corpo_03b_fly_to_lizzies__player_male.anims`
+
+Entry and idle belong to q113, but exit belongs to q000. Add that exact
+resource to both player rig cinematic setups and loadingHandles, priority 128,
+preserving existing q113 entries and setup hashes. Verify this in the compiled
+resource round trip. No change to entry/idle or original quest files.
+Integrate the user's 4-second timed cleanup and stock-exit suppression. Cleanup
+is not evidence of motion; leave the entrance open if displacement is below
+1 m. If the clip still fails, detached V may remain inside the AV. No teleport
+fallback. The actual .anims clip and hash computation are not independently
+verified; runtime playback still requires game testing.
+
+## dev.13 — proper workspot release with the now-verified q000 asset
+
+dev.12 runtime confirmed the original exit animation plays but world displacement
+is zero and the workspot remains active. Vanilla ExitingDecisions.ExitCondition
+waits for IsActorInWorkspot to become false. Suppressing ExitWorkspot in dev.12
+therefore left V stuck in the exit transition, including camera/movement.
+
+Preserve the q000 resource correction, existing hashes, entry, seat and doors.
+Restore a private workExitAnim (ID 6, default slot, no road-navmesh snap) now
+that its actual animation set is included. Use the engine's non-instant
+UnmountFromVehicle with that private node rather than a pose jump plus timer.
+Check GetIdOfExitAnim against the resource's authored entry ID. Clear the
+VehiclePassenger.isCar flag for the private AV exit request. Keep the
+record-scoped suppression of road-car teleport recovery. Never use a manual
+teleport or forced instant detach. ExitEvents owns cleanup. This is a native
+workspot release, not a standalone cinematic scene.
+
+Capture real animation name and entry ID from Codeware GetWorkspotInstance
+(verified in Codeware v1.21.4), workspot phase, mount, vehicle PSM, position
+and displacement every 0.5 s during exit. Codeware version must provide that
+API. Door only closes after native state release and observed movement.
+The 1 m displacement is a diagnostic heuristic, not proof of exterior clearance.
+The intended motion and runtime cleanup are not yet verified.
+
+## dev.14 — native taxi pickup and automatic entrance
+
+Preserves dev.13 workspot and exit animation unchanged. The native summon popup
+gets a separate top-row Delamain AV, with the vanilla cab's icon/style. No
+garage ownership, original cab registration, or quest facts. Selecting it
+requests the independent dynamic AV. On clear ground it spawns 6 m above
+pickup and descends over roughly five seconds using Codeware Entity.SetWorldTransform.
+This is an experimental unoccupied transform-based descent, not full flight
+physics or a validated obstacle planner. The centre overhead ray is not a
+complete vehicle-volume clearance check. If actual position diverges, abort
+and keep boarding disabled. M1 Arc retains only stationary diagnostic spawn,
+status, remove and clearance. No manual door actions. Entrance opens on
+verified arrival/approach, closes after mounting/exit, and does not reopen
+until V moves away. Exit requires a live raycast and verified parked position.
+
+Vanilla map integration research: UISystem.RequestDelamainTaxiMenu opens the
+existing taxi map. WorldMapMenuGameController.UpdateTravelDestination queues
+SetTravelDestinationRequest(mappinID,cost); MappinSystem.GetMappin(id) and
+IMappin.GetWorldPosition can resolve the destination. StartDelamainTaxiRequest
+normally starts road AutoDrive via DelamainTaxiComponent and must be scoped
+to the AV instead. Do not open the map until occupied flight and destination
+landing are implemented; the stock taxi must remain unaffected.
+
+Actions uploads the staged installation directory directly (one ZIP).
+No archive or passenger animation changes. New UI, transform motion and
+ground checks require runtime verification; no occupied ride yet.
+
+## dev.15 — preserve ground-origin mounting and restore diagnostic exit
+
+dev.14 confirmed the summon UI and arrival transform, but the original spawn
+height was restored on boarding (+6 m). A successful visual transform does
+not guarantee a relocated vehicle's authoritative mount origin. Preserve
+dev.13's verified ground-origin passenger lifecycle: the empty, non-boardable
+arrival AV is replaced at the end of descent by a newly created ground-origin
+AV with the same record and orientation. This is a temporary two-entity
+handoff, not a flight-physics solution. There may be a visible pop during
+replacement; it requires runtime verification. MountEntityToSlot now checks
+the tracked entity and live landing state, rather than relying on interaction
+state alone. No occupied transform, despawn, teleport, or forced exit.
+Restore a diagnostic disembark button using the same landed-only exit path.
+Log a failed post-mount ground check once rather than flooding the log.
+
+Use the vanilla VehicleQuestAVThrusterEvent to drive persisted thruster
+state, and exact original q203 exterior landing and entrance audio event
+names. Sound playback remains unverified. The original quest dust effect
+is a separate scene resource; no guessed FX API or dust injection. Do not
+enable occupied flight or destination travel until this pickup lifecycle
+is proven. Single-ZIP Actions artifact.
+
+## dev.16 — native physics descent experiment
+
+Source reference: [tidusmd/CP2077-RED4EXT-DAV](https://github.com/tidusmd0806/CP2077-RED4EXT-DAV), commit 9f0d1359a7f5bb02d71ac6fec86c36aef9dd5615 (MIT). The supplied DAV 3.5.0 DLL corroborates the force/torque/wake relocation hashes and rigid-body owner/id offsets. The public DAV source's forked BaseObject size (0xBA0) differs from current official SDK (0xBC0); we do not use that layout or physicsData pointer offset. The bridge uses the engine callback's rigid-body pointer, checks its owner pointer and full EntityID, AV class, private record, exact executable file version 3.0.88.46235, finite/bounded velocity and mass, and a 1.5-second command lease. It preserves original callbacks and gravity, applies bounded velocity changes in matching callbacks, and uses the original physics wake function once on the game thread. No strong vehicle references or indefinite hook retries. The reverse-engineered velocity, angular velocity and mass offsets still require runtime validation; successful C++ compilation is not proof of ABI compatibility.
+
+The scripted pickup now requests a downward velocity and observes actual world position rather than writing transforms. If the bridge is unavailable, has no matching callbacks, faults, or the empty AV drifts outside the narrow pickup corridor, abort and remove only the unoccupied arrival AV. No transform fallback, no occupied flight, no new UI. After actual descent to within 0.15 m, retain the dev.15 ground-origin handoff and the proven passenger system. This remains a prototype and the handoff can still visibly pop. No game testing in CI.
+
+## dev.17 — DAV develop physics tick
+
+Reference pinned to [develop commit 28a82418c9f956d2b3b06cdff575adc5a3752d63](https://github.com/tidusmd0806/CP2077-RED4EXT-DAV/blob/28a82418c9f956d2b3b06cdff575adc5a3752d63/src/Main.cpp#L1521), 19 commits ahead of main. The newer source drives velocity in VehicleApplyAllResistances (hash 2526549425) rather than the original force/torque hooks. It also reasserts physics when the vehicle is parked. Replace our two old hooks with this single physics-tick hook, pass the live vehicle handle to Pulse, wake only when the validated state is nonzero, and ramp the target velocity using actual engine deltaTime. Preserve the original resistance callback and gravity; no global force suppression. The fork's reciprocal physics/vehicle/body pointer fields are checked before accessing velocity; code -11 means pointer/state validation rejected, no write. Current SDK layout differs in overall size, so these offsets and the original tick signature remain runtime-unverified on 2.50. No occupied motion or transform fallback. The dev.15 ground-origin landing handoff, UI, door/audio and passenger system remain unchanged.
+
+## dev.18 — physics-capable private Excalibur
+
+The supplied DAV 3.5.0 entity export uses vehicleCarBaseObject, whereas q203_delamain_av uses vehicleAVBaseObject. Both use the same CarComponent and Chassis component IDs. Use ArchiveXL's supported entity-root replacement (ResourcePatchExtension::MergeEntity) on our private copy only; set both root entity and compiled package class to vehicleCarBaseObject, retain all original visual resources and our proven occupant patch. DAV's av.lua Spawn/SpawnToSky and engine.lua Init/UnsetPhysicsState/EnableGravity document the initialization sequence: bind after entity appears, wake physics, disable gravity, hold downward velocity, then zero velocity on landing. Wait for reciprocal physics pointer validation instead of rejecting immediately. Maintain zero-velocity hold on the same entity after landing; no replacement entity and no transform updates. The stationary M1 Arc spawn still uses the ground-origin path, now on the private car-based entity. Original quest untouched. C++/CR2W compilation cannot validate runtime physics offsets or changed car-class passenger behavior; those remain unverified. No occupied flight.
+
+## dev.19 — complete the private car-class rig hierarchy
+
+dev.18 crashed in game vehicle/chassis initialization before the native flight controller started. Comparison of the user-supplied DAV Excalibur entity export with the original q203 entity confirms that DAV adds an entAnimatedComponent named vehicle_rig (CRUID 1651752295586041860) using the vanilla v_base_x4_150_149_27 rig and animgraph, with AnimationController control binding. Its deformation_rig (CRUID 1651752295586041856) is controlled by and parented to vehicle_rig. Our class-only patch omitted both changes. Chassis collision resources and local transform are identical in both source entities. Add the missing vanilla rig and rebind the original deformation rig in the private ArchiveXL component patch, retaining the original Excalibur animset, invisible_in_fpp parameter and workspot. Use Vehicle.av_rayfield_excalibur as the private record base, as DAV's init.lua does, preserving the Delamain display name, Immortal tag, private q203-derived initial state and passenger-only actions. No copied DAV rig, mesh, app or archive. The flight controller is unchanged; these are necessary entity initialization corrections, not proof that car initialization or flight now works. The modified DAV deformation rig itself is not used, so equivalence of its bone transforms is not established. Runtime testing remains required.
+
+## dev.20 — persistent, verbose local diagnostics
+
+Instrumentation-only build of dev.19. No change to summon, entity rig, physics control, or cleanup decisions. The plugin writes red4ext/plugins/DelamainAV/DelamainAV-diagnostics.log from DLL load; rotates the last session to DelamainAV-diagnostics-previous.log and caps a single file at 32 MiB (one overflow log retained). UTC millisecond timestamps, monotonic time, sequence numbers, thread IDs; direct OS writes survive normal process crashes without a buffered application log. First summon inventories loaded module basenames and file versions, Windows version, CPU architecture/core count and memory, installed mod filenames/sizes in game-relative paths; no personal paths, save contents, account details, or automatic upload. Existing mod logs mirror to the persistent file; detailed arrival traces are file-only. Logs both sides of entity creation, native initialization, wake calls, script pulses, targeted native tick samples, every reciprocal pointer validation stage and fault, positions, raycast results, and deletion. Native tick telemetry is sampled at 100 ms (first ten ticks logged individually); no full memory dump, no new reverse-engineered writes. The log cannot guarantee a game-engine internal crash stack or every engine operation; engine crash report remains separate. Send the current diagnostics file after the failed summon/crash; if the game was restarted, send previous. The diagnostics themselves are unverified in game until this build runs.
+
+## dev.21 — binary-confirmed current physicsData layout
+
+The dev.20 runtime log captured two successful car-based entity materializations, matching resistance callbacks, ForceEnablePhysics changing state 0x20 to 0, and zero applied samples because the legacy +0x2C8 vehicle physics field held the IEEE-754 value 0.05 (0x3D4CCCCD). The AV then moved sideways 1.47 m / 2.47 m by arrival tick 2 and the corridor interlock deleted it. No native write took place.
+
+Disassembled the supplied DAV 3.5.0 DLL (SHA256 a61ab1b4f42e79cccfff681d2699f9003793c95326526fb0c2d7c1eeeca0f3c4). Image-relative RVAs: 0x1134 registers resistance hash 2526549425, 0x9BF7 reads physics parent +0x60, 0x9C04 reads entity ID +0x48, 0x9CA5 reads physics state +0x260, 0x9D13 reads parent physicsData **+0x2D8**, 0x9D2A reads mass +0x1BC, 0x9D48 writes gravity +0x1B0, 0x9ECA and 0x9EF8 address linear +0x18 and angular +0x24 velocity in mode 2. Its force/torque callbacks read body owner +0x180 (0x6AF9 and 0x6B7A). These are actual released binary instructions, not assumptions from stale headers. Use the engine-supplied tick pointer and exact parent/ID, verify body owner, then write validated finite velocity. No guessed vehicle.physics offset. Match DAV's mode 2 full-vector hold (zero horizontal/angular velocity, smoothed vertical target). Do not widen the safety corridor or alter entity assets, spawn logic, or passenger logic. Detailed diagnostics remain enabled. No DAV DLL dependency. Runtime validation of the corrected body pointer and descent is still necessary.
+
+## dev.22 — shutdown lifecycle
+
+Reported game process remaining alive after exit. RED4ext v1.31.1 source (src/dll/App.cpp, Systems/PluginSystem.cpp, Systems/HookingSystem.cpp, DetourTransaction.cpp) confirms plugin shutdown precedes the hooking system's cleanup; registered hooks retain plugin shared ownership and RED4ext performs a final detour transaction itself. Remove manual Detach in our unload callback; atomically disable control at world detach/unload and let RED4ext remove the hook. World detach does not wait for a physics mutex or call M1 Arc logging. Physics ticks skip contended command locks and diagnostics use try-lock with skipped record counts; shutdown does not wait on the diagnostics lock. Normal explicit removal still synchronizes through Stop before deleting an entity. No new threads or forced process termination. Preserve dev.21 offsets, vehicle assets and landing logic. This removes plausible teardown hazards; without an exit hang thread dump the precise deadlock cannot be confirmed. Test actual process termination before declaring fixed.
+
+## dev.23 — flight-owned force/torque isolation
+
+dev.21 log proves +0x2D8 and the reciprocal body owner are valid, mass 1300, physics state 0, gravity changes from 1 to 0, and seven successful native writes. Still, the vehicle drifted 0.857540 m in four arrival script ticks and tripped the unchanged 0.8 m corridor. Native write success is not proof of stable flight. DAV develop's ApplyForceAtPosition (611586815) and ApplyTorqueAtPosition (3303544265) bypass original forces when DAV owns physics; DAV uses this in flight, not necessarily every landing phase. Adopt that existing mechanism for our private active velocity controller rather than increasing the corridor or adding transforms. Validate exact entity ID, owner, reciprocal body, active world and lease; all other calls forward unmodified. Original resistance tick still runs. Log incoming velocities/angular velocities and suppressed force/torque counts to distinguish this hypothesis from collision or other engine motion. No collision hook, no entity changes, no new dependency. Preserve dev.22 shutdown gates and RED4ext-owned hook removal. Actual suppression effectiveness and shutdown remain unverified in game. The supplied log was dev.21, not dev.22.
+
+## dev.24 — DAV startup alignment and bounded pose acquisition
+
+Reviewed user commits 3d44e71, 38a8bfe, 70d9f9c, 892cf82; keep version resources, RelWithDebInfo and log profiles. dev.23 runtime: six successful native updates, no faults, zero suppressed forces/torques, 0.858076 m lateral displacement (dev.21 0.857540 m), abort at arrival step 4. Remove ineffective force/torque hooks, consistent with DAV SetVehicle resetting original physics to enabled during spawn. DAV 3.5.0 av.lua uses spawn_height=20, down_speed=-5, waits for materialization, then wakes body, disables gravity immediately via native EnableGravity, and holds direct velocity. Use 20 m descent with overhead check, immediate validated gravity initialization, and direct speed hold up to -5 with proportional slowing near target. Unlike DAV, our taxi must verify a safe landing: initial zero-velocity acquisition permits at most 2 m lateral shift, requires six consecutive stable position observations and valid body samples, then verifies actual ground and center column before anchoring descent. Retain 0.8 m post-acquisition lateral abort and empty-only cleanup. No transform writes, no passenger or entity-resource edits. DAV and vanilla deformation rig binary differ only in four thruster bone X/Y translations; no evidence to replace rig. Log native body position (+0x170 confirmed by SDK layout and DAV binary RVAs 0x12F10/0x12EE9/0x12E7C) and velocities before/after original resistance tick; default profile enables sampled tick details while retaining user 2 MiB cap. Startup correction remains a hypothesis, not a proven fix; runtime needed. Center raycasts do not guarantee full vehicle footprint clearance. dev.23 log reached plugin unload, but does not establish process termination.
+
+## dev.24 — animation isolation experiment (script only)
+The dev.24 log shows zero requested and post-resistance velocities but recurrent incoming horizontal velocity up to -14.429272 m/s and angular velocity up to 3.633081 rad/s. Body coordinates change before the next resistance callback. This is not a descent-speed or single spawn-position correction. The user suggested conflicting animations. Configure previously queued VehicleQuestAVThrusterEvent(true) and VehicleDoorClose immediately before Begin. Isolate both explicit requests for the entire airborne phase, including the abort path, and guard the Door helper while airborne. Stationary spawn and verified grounded door opening remain unchanged. Existing entity/appearance animation graphs may still execute; this does not disable every animation or prove the cause. No DLL, manifest, entity asset, safety-envelope, or physics-control changes. Keep version 0.2.17-dev.24 and identify this script by ANIMATION_ISOLATION in the log. A successful zero-velocity hold would justify separating door and thruster requests in a later test; a failed hold would rule out their explicit startup requests as necessary for the drift. Runtime REDscript compilation and motion are unverified.

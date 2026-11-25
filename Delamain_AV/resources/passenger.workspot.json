@@ -1,0 +1,563 @@
+{
+  "Header": {
+    "WolvenKitVersion": "10.0.0-beta.1",
+    "WKitJsonVersion": "0.0.9",
+    "GameVersion": 2500,
+    "ExportedDateTime": "2026-11-24T20:09:34.4141941Z",
+    "DataType": "CR2W",
+    "ArchiveFileName": "m1nsook\\delamain_av\\passenger.workspot"
+  },
+  "Data": {
+    "Version": 195,
+    "BuildVersion": 0,
+    "RootChunk": {
+      "$type": "workWorkspotResource",
+      "additionalAnimDatabases": [],
+      "animFeatures": [
+        {
+          "$type": "animAnimFeatureEntry",
+          "className": {
+            "$type": "CName",
+            "$storage": "string",
+            "$value": "animAnimFeatureUpdateWorkspot"
+          },
+          "debugEnabled": 0,
+          "forceAllocate": 0,
+          "name": {
+            "$type": "CName",
+            "$storage": "string",
+            "$value": "UpdateWorkspot"
+          }
+        }
+      ],
+      "cookingPlatform": "PLATFORM_PC",
+      "hackAlwaysSample": 0,
+      "hasMixerSlot": 0,
+      "isPaused": 0,
+      "jsonFilesDirectory": "",
+      "nodesToInit": [
+        {
+          "HandleId": "0",
+          "Data": {
+            "$type": "animAnimNode_Root",
+            "debugName": {
+              "$type": "CName",
+              "$storage": "string",
+              "$value": "None"
+            },
+            "id": 4294967295,
+            "poseInfoLogger": null,
+            "visAxes": 0,
+            "visMask": null,
+            "visNames": 0,
+            "visPostPose": 0,
+            "visPostPoseColor": {
+              "$type": "Color",
+              "Alpha": 0,
+              "Blue": 0,
+              "Green": 0,
+              "Red": 0
+            },
+            "visPrePose": 0,
+            "visPrePoseColor": {
+              "$type": "Color",
+              "Alpha": 0,
+              "Blue": 0,
+              "Green": 0,
+              "Red": 0
+            },
+            "visRigPartMask": {
+              "$type": "CName",
+              "$storage": "string",
+              "$value": "None"
+            },
+            "visWhenActive": 0,
+            "nodes": [
+              {
+                "HandleId": "1",
+                "Data": {
+                  "$type": "animAnimNode_Output",
+                  "debugName": {
+                    "$type": "CName",
+                    "$storage": "string",
+                    "$value": "None"
+                  },
+                  "id": 4294967295,
+                  "poseInfoLogger": null,
+                  "visAxes": 0,
+                  "visMask": null,
+                  "visNames": 0,
+                  "visPostPose": 0,
+                  "visPostPoseColor": {
+                    "$type": "Color",
+                    "Alpha": 0,
+                    "Blue": 0,
+                    "Green": 0,
+                    "Red": 0
+                  },
+                  "visPrePose": 0,
+                  "visPrePoseColor": {
+                    "$type": "Color",
+                    "Alpha": 0,
+                    "Blue": 0,
+                    "Green": 0,
+                    "Red": 0
+                  },
+                  "visRigPartMask": {
+                    "$type": "CName",
+                    "$storage": "string",
+                    "$value": "None"
+                  },
+                  "visWhenActive": 0,
+                  "node": {
+                    "$type": "animPoseLink",
+                    "node": {
+                      "HandleId": "2",
+                      "Data": {
+                        "$type": "animAnimNode_WorkspotHub",
+                        "debugName": {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "None"
+                        },
+                        "id": 4294967295,
+                        "poseInfoLogger": null,
+                        "visAxes": 0,
+                        "visMask": null,
+                        "visNames": 0,
+                        "visPostPose": 0,
+                        "visPostPoseColor": {
+                          "$type": "Color",
+                          "Alpha": 0,
+                          "Blue": 0,
+                          "Green": 0,
+                          "Red": 0
+                        },
+                        "visPrePose": 0,
+                        "visPrePoseColor": {
+                          "$type": "Color",
+                          "Alpha": 0,
+                          "Blue": 0,
+                          "Green": 0,
+                          "Red": 0
+                        },
+                        "visRigPartMask": {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "None"
+                        },
+                        "visWhenActive": 0,
+                        "additionalLinkIds": [],
+                        "additionalLinks": [],
+                        "animLoopEventName": {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "None"
+                        },
+                        "emotionalExpression": {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "None"
+                        },
+                        "eventFilterType": "Default",
+                        "facialIdleFemaleAnimation": {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "idle__neutral__female"
+                        },
+                        "facialIdleKey_FemaleAnimation": {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "idle__neutral__female__default"
+                        },
+                        "facialIdleKey_MaleAnimation": {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "idle__neutral__male__default"
+                        },
+                        "facialIdleMaleAnimation": {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "idle__neutral__male"
+                        },
+                        "facialKeyWeight": 1,
+                        "isCoverHubHack": 0,
+                        "mainEmotionalState": {
+                          "$type": "CName",
+                          "$storage": "string",
+                          "$value": "None"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ],
+            "outputNode": {
+              "$type": "animPoseLink",
+              "node": null
+            }
+          }
+        },
+        {
+          "HandleRefId": "1"
+        },
+        {
+          "HandleRefId": "2"
+        }
+      ],
+      "oneFrameToggle": 0,
+      "rootNode": {
+        "HandleRefId": "0"
+      },
+      "staticCommandsRig": {
+        "DepotPath": {
+          "$type": "ResourcePath",
+          "$storage": "uint64",
+          "$value": "0"
+        },
+        "Flags": "Default"
+      },
+      "timeDeltaMultiplier": 1,
+      "useAnimCommands": 0,
+      "useAnimCommandsForCrowd": 0,
+      "useAnimStaticCommands": 0,
+      "useLunaticMode": 0,
+      "variables": {
+        "HandleId": "3",
+        "Data": {
+          "$type": "animAnimVariableContainer",
+          "boolVariables": [],
+          "floatVariables": [],
+          "intVariables": [],
+          "quaternionVariables": [],
+          "transformVariables": [],
+          "vectorVariables": []
+        }
+      },
+      "workspotTree": {
+        "HandleId": "4",
+        "Data": {
+          "$type": "workWorkspotTree",
+          "animGraphSlotName": {
+            "$type": "CName",
+            "$storage": "string",
+            "$value": "WORKSPOT"
+          },
+          "autoTransitionBlendTime": 1,
+          "blacklistVisualTags": {
+            "$type": "redTagList",
+            "tags": []
+          },
+          "blendOutTime": 0,
+          "censorshipFlags": "0",
+          "customTransitionAnims": [],
+          "dontInjectWorkspotGraph": 0,
+          "finalAnimsets": [
+            {
+              "$type": "workWorkspotAnimsetEntry",
+              "animations": {
+                "$type": "animAnimSetup",
+                "cinematics": [
+                  {
+                    "$type": "animAnimSetupEntry",
+                    "animSet": {
+                      "DepotPath": {
+                        "$type": "ResourcePath",
+                        "$storage": "string",
+                        "$value": "base\\animations\\quest\\main_quests\\part1\\q113\\q113_05_av_flight\\body\\q113_05_av_flight__player_male.anims"
+                      },
+                      "Flags": "Default"
+                    },
+                    "priority": 128,
+                    "variableNames": []
+                  },
+                  {
+                    "$type": "animAnimSetupEntry",
+                    "animSet": {
+                      "DepotPath": {
+                        "$type": "ResourcePath",
+                        "$storage": "string",
+                        "$value": "base\\animations\\quest\\main_quests\\prologue\\q000\\q000_corpo_03b_fly_to_lizzies\\body\\q000_corpo_03b_fly_to_lizzies__player_male.anims"
+                      },
+                      "Flags": "Default"
+                    },
+                    "priority": 128,
+                    "variableNames": []
+                  }
+                ],
+                "gameplay": [],
+                "hash": "3905001969457152862"
+              },
+              "loadingHandles": [
+                {
+                  "DepotPath": {
+                    "$type": "ResourcePath",
+                    "$storage": "string",
+                    "$value": "base\\animations\\quest\\main_quests\\part1\\q113\\q113_05_av_flight\\body\\q113_05_av_flight__player_male.anims"
+                  },
+                  "Flags": "Default"
+                },
+                {
+                  "DepotPath": {
+                    "$type": "ResourcePath",
+                    "$storage": "string",
+                    "$value": "base\\animations\\quest\\main_quests\\prologue\\q000\\q000_corpo_03b_fly_to_lizzies\\body\\q000_corpo_03b_fly_to_lizzies__player_male.anims"
+                  },
+                  "Flags": "Default"
+                }
+              ],
+              "rig": {
+                "DepotPath": {
+                  "$type": "ResourcePath",
+                  "$storage": "string",
+                  "$value": "base\\characters\\entities\\player\\player_man_skeleton.rig"
+                },
+                "Flags": "Soft"
+              }
+            },
+            {
+              "$type": "workWorkspotAnimsetEntry",
+              "animations": {
+                "$type": "animAnimSetup",
+                "cinematics": [
+                  {
+                    "$type": "animAnimSetupEntry",
+                    "animSet": {
+                      "DepotPath": {
+                        "$type": "ResourcePath",
+                        "$storage": "string",
+                        "$value": "base\\animations\\quest\\main_quests\\part1\\q113\\q113_05_av_flight\\body\\q113_05_av_flight__player_female.anims"
+                      },
+                      "Flags": "Default"
+                    },
+                    "priority": 126,
+                    "variableNames": []
+                  },
+                  {
+                    "$type": "animAnimSetupEntry",
+                    "animSet": {
+                      "DepotPath": {
+                        "$type": "ResourcePath",
+                        "$storage": "string",
+                        "$value": "base\\animations\\quest\\main_quests\\part1\\q113\\q113_05_av_flight\\body\\q113_05_av_flight__player_male.anims"
+                      },
+                      "Flags": "Default"
+                    },
+                    "priority": 128,
+                    "variableNames": []
+                  },
+                  {
+                    "$type": "animAnimSetupEntry",
+                    "animSet": {
+                      "DepotPath": {
+                        "$type": "ResourcePath",
+                        "$storage": "string",
+                        "$value": "base\\animations\\quest\\main_quests\\prologue\\q000\\q000_corpo_03b_fly_to_lizzies\\body\\q000_corpo_03b_fly_to_lizzies__player_male.anims"
+                      },
+                      "Flags": "Default"
+                    },
+                    "priority": 128,
+                    "variableNames": []
+                  }
+                ],
+                "gameplay": [],
+                "hash": "17590187941192992864"
+              },
+              "loadingHandles": [
+                {
+                  "DepotPath": {
+                    "$type": "ResourcePath",
+                    "$storage": "string",
+                    "$value": "base\\animations\\quest\\main_quests\\part1\\q113\\q113_05_av_flight\\body\\q113_05_av_flight__player_female.anims"
+                  },
+                  "Flags": "Default"
+                },
+                {
+                  "DepotPath": {
+                    "$type": "ResourcePath",
+                    "$storage": "string",
+                    "$value": "base\\animations\\quest\\main_quests\\part1\\q113\\q113_05_av_flight\\body\\q113_05_av_flight__player_male.anims"
+                  },
+                  "Flags": "Default"
+                },
+                {
+                  "DepotPath": {
+                    "$type": "ResourcePath",
+                    "$storage": "string",
+                    "$value": "base\\animations\\quest\\main_quests\\prologue\\q000\\q000_corpo_03b_fly_to_lizzies\\body\\q000_corpo_03b_fly_to_lizzies__player_male.anims"
+                  },
+                  "Flags": "Default"
+                }
+              ],
+              "rig": {
+                "DepotPath": {
+                  "$type": "ResourcePath",
+                  "$storage": "string",
+                  "$value": "base\\characters\\entities\\player\\player_woman_skeleton.rig"
+                },
+                "Flags": "Soft"
+              }
+            }
+          ],
+          "frezeAtTheLastFrame_UseWithCaution": 0,
+          "globalProps": [],
+          "idCounter": 7,
+          "inertializationDurationEnter": 0.5,
+          "inertializationDurationExitForced": 0.2,
+          "inertializationDurationExitNatural": 0.5,
+          "initialActions": [],
+          "initialCanUseExits": 1,
+          "itemsPolicy": "ItemPolicy_SpawnItemOnIdleChange, ItemPolicy_DespawnItemOnIdleChange, ItemPolicy_DespawnItemOnReaction",
+          "propsPlaySyncAnim": 0,
+          "rootEntry": {
+            "HandleId": "5",
+            "Data": {
+              "$type": "workSequence",
+              "category": "Any",
+              "disableAutoTransition": 0,
+              "flags": 0,
+              "id": {
+                "$type": "workWorkEntryId",
+                "id": 1
+              },
+              "idleAnim": {
+                "$type": "CName",
+                "$storage": "string",
+                "$value": "None"
+              },
+              "list": [
+                {
+                  "HandleId": "8",
+                  "Data": {
+                    "$type": "workEntryAnim",
+                    "id": {
+                      "$type": "workWorkEntryId",
+                      "id": 5
+                    },
+                    "flags": 65552,
+                    "animName": {
+                      "$type": "CName",
+                      "$storage": "string",
+                      "$value": "stand__2h_on_sides__01__to__sit_couch__AV_excalibur__01__turn270__getting_into_AV__01"
+                    },
+                    "idleAnim": {
+                      "$type": "CName",
+                      "$storage": "string",
+                      "$value": "sit_couch__AV_excalibur__01"
+                    },
+                    "orientationType": "Forward",
+                    "isSynchronized": 0,
+                    "slotName": {
+                      "$type": "CName",
+                      "$storage": "string",
+                      "$value": "default"
+                    },
+                    "blendOutTime": 0.5
+                  }
+                },
+                {
+                  "HandleId": "6",
+                  "Data": {
+                    "$type": "workSequence",
+                    "category": "Any",
+                    "disableAutoTransition": 0,
+                    "flags": 0,
+                    "id": {
+                      "$type": "workWorkEntryId",
+                      "id": 2
+                    },
+                    "idleAnim": {
+                      "$type": "CName",
+                      "$storage": "string",
+                      "$value": "sit_couch__AV_excalibur__01"
+                    },
+                    "list": [
+                      {
+                        "HandleId": "7",
+                        "Data": {
+                          "$type": "workPauseClip",
+                          "blendOutTime": 1,
+                          "flags": 32,
+                          "id": {
+                            "$type": "workWorkEntryId",
+                            "id": 4
+                          },
+                          "timeMax": 7,
+                          "timeMin": 6
+                        }
+                      }
+                    ],
+                    "loopInfinitely": 1,
+                    "previousLoopInfinitely": 0
+                  }
+                },
+                {
+                  "HandleId": "9",
+                  "Data": {
+                    "$type": "workExitAnim",
+                    "id": {
+                      "$type": "workWorkEntryId",
+                      "id": 6
+                    },
+                    "flags": 8,
+                    "animName": {
+                      "$type": "CName",
+                      "$storage": "string",
+                      "$value": "sit_couch__AV_excalibur__01__to__stand__2h_on_sides__01__turn270__01"
+                    },
+                    "idleAnim": {
+                      "$type": "CName",
+                      "$storage": "string",
+                      "$value": "sit_couch__AV_excalibur__01"
+                    },
+                    "disableAutoTransition": 0,
+                    "movementType": "Walk",
+                    "isSynchronized": 0,
+                    "stayOnNavmesh": 0,
+                    "snapZToNavmesh": 0,
+                    "forceNoZSnap": 1,
+                    "slotName": {
+                      "$type": "CName",
+                      "$storage": "string",
+                      "$value": "default"
+                    },
+                    "disableRandomExit": 0
+                  }
+                }
+              ],
+              "loopInfinitely": 0,
+              "previousLoopInfinitely": 0
+            }
+          },
+          "sequencesTimeLimit": 1,
+          "snapToTerrain": 0,
+          "statusEffectID": {
+            "$type": "TweakDBID",
+            "$storage": "uint64",
+            "$value": "0"
+          },
+          "tags": {
+            "$type": "redTagList",
+            "tags": []
+          },
+          "unmountBodyCarry": 1,
+          "useTimeLimitForSequences": 0,
+          "whitelistVisualTags": {
+            "$type": "redTagList",
+            "tags": []
+          },
+          "workspotRig": {
+            "DepotPath": {
+              "$type": "ResourcePath",
+              "$storage": "uint64",
+              "$value": "0"
+            },
+            "Flags": "Soft"
+          }
+        }
+      }
+    },
+    "EmbeddedFiles": []
+  }
+}

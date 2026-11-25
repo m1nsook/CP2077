@@ -1,0 +1,3 @@
+Baseline 001
+Compile-only standalone native port; not an installable or runtime-verified mod.
+No game resources or private repository credentials included.

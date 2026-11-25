@@ -1,0 +1,19 @@
+# Independent, nonpersistent vehicle record; no patch to q203.
+Vehicle.m1nsook_delamain_av_state:
+  $base: Vehicle.q203_delamain_av_inline0
+  DisableAllInteractions: false
+  QuestLockAll: false
+  LockAll: false
+  Thrusters: false
+
+Vehicle.m1nsook_delamain_av:
+  $base: Vehicle.av_rayfield_excalibur
+  displayName: LocKey#77295
+  tags:
+    - !append-once Immortal
+  entityTemplatePath: m1nsook\delamain_av\excalibur.ent
+  savable: false
+  canOnlySpawnOnValidRoad: false
+  vehDefaultState: Vehicle.m1nsook_delamain_av_state
+  objectActions:
+    - VehicleActions.VehicleMountBackLeft

@@ -1,0 +1,9 @@
+resource:
+  copy:
+    base\quest\main_quests\epilogue\q203\characters\q203_delamain_av.ent:
+      - m1nsook\delamain_av\excalibur.ent
+  patch:
+    m1nsook\delamain_av\occupant_patch.ent:
+      props: [ entity, components, resolvedDependencies ]
+      targets:
+        - m1nsook\delamain_av\excalibur.ent

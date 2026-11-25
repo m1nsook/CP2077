@@ -1,0 +1,66 @@
+name: Delamain AV - standalone native baseline
+# Deliberate build request only. Source edits and workflow edits do not run CI.
+# Keep all private assets, credentials and unapproved source out of this repository.
+on:
+  push:
+    branches: [dev/delamain-av]
+    paths:
+      - 'Delamain_AV/ci-baseline/BUILD_REQUEST.txt'
+permissions:
+  contents: read
+concurrency:
+  group: delamain-av-baseline
+  cancel-in-progress: false
+jobs:
+  native-baseline:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate approved public source snapshot
+        run: |
+          $root = 'Delamain_AV/ci-baseline'
+          foreach ($file in @('BUILD_REQUEST.txt','native/CMakeLists.txt','native/src/Flight.cpp','native/LICENSE-DAV-native.txt','native/LICENSE-DAV-script.txt')) {
+            if (!(Test-Path -LiteralPath "$root/$file" -PathType Leaf)) { throw "Missing approved snapshot file: $file" }
+          }
+          Write-Host "Building public revision $env:GITHUB_SHA"
+      - name: Configure standalone native source
+        run: cmake -S Delamain_AV/ci-baseline/native -B build/delamain-baseline -A x64
+      - name: Compile standalone DLL
+        run: cmake --build build/delamain-baseline --config Release --parallel 2
+      - name: Package compile-only artifact and checksum
+        run: |
+          $dll = 'build/delamain-baseline/Release/DelamainFlight.dll'
+          if (!(Test-Path -LiteralPath $dll -PathType Leaf)) { throw 'DelamainFlight.dll missing' }
+          $short = $env:GITHUB_SHA.Substring(0,12)
+          $name = "DelamainFlight-compile-only-$short"
+          $stage = Join-Path $env:RUNNER_TEMP $name
+          New-Item -ItemType Directory -Force $stage, dist | Out-Null
+          Copy-Item $dll $stage
+          Copy-Item Delamain_AV/ci-baseline/native/LICENSE-DAV-native.txt, Delamain_AV/ci-baseline/native/LICENSE-DAV-script.txt $stage
+          @(
+            "Public source commit: $env:GITHUB_SHA"
+            "Run ID: $env:GITHUB_RUN_ID"
+            "Run attempt: $env:GITHUB_RUN_ATTEMPT"
+            "Status: compiled only; not game-tested; not installable"
+            "No game assets or legacy dev.24 files included."
+          ) | Set-Content -Encoding utf8 (Join-Path $stage 'BUILD_INFO.txt')
+          $zip = "dist/$name.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath $zip
+          $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $name.zip" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          "Artifact: $name" | Add-Content $env:GITHUB_STEP_SUMMARY
+          "SHA256: $hash" | Add-Content $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: delamain-flight-compile-only-${{ github.sha }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7

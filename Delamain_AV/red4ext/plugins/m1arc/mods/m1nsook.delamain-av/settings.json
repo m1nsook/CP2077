@@ -1,0 +1,45 @@
+[
+  {
+    "id": "ground_clearance",
+    "kind": "float",
+    "label": "Test ground clearance (m)",
+    "description": "Test AV origin height above a static surface. Default 0.75 m based on dev.4 visual feedback. Set explicitly; existing saved values are preserved.",
+    "group": "Diagnostics",
+    "min": 0.75,
+    "max": 2,
+    "step": 0.05,
+    "default": 0.75
+  },
+  {
+    "id": "spawn",
+    "kind": "action",
+    "label": "Spawn stationary diagnostic AV",
+    "buttonLabel": "Spawn diagnostic AV",
+    "description": "Diagnostic-only ground spawn. Use the native vehicle list for visible taxi arrival.",
+    "group": "Diagnostics"
+  },
+  {
+    "id": "exit",
+    "kind": "action",
+    "label": "Disembark landed AV",
+    "buttonLabel": "Request diagnostic exit",
+    "description": "Uses the verified native AV exit path. Does not bypass airborne protection or force an unmount.",
+    "group": "Diagnostics"
+  },
+  {
+    "id": "status",
+    "kind": "action",
+    "label": "Inspect vehicle",
+    "buttonLabel": "Log AV status",
+    "description": "Reports record, clearance, mounting slot, native PSM and workspot/exit-node availability.",
+    "group": "Diagnostics"
+  },
+  {
+    "id": "remove",
+    "kind": "action",
+    "label": "Remove test AV",
+    "buttonLabel": "Despawn empty AV",
+    "description": "Exit the AV first. Refuses to delete an occupied vehicle.",
+    "group": "Diagnostics"
+  }
+]
