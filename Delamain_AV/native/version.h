@@ -1,4 +1,6 @@
-#pragma once
+#ifndef DELAMAINAV_VERSION_H
+#define DELAMAINAV_VERSION_H
+
 // Single source of truth for DelamainAV's version.
 // Consumed by DelamainAV.rc (VERSIONINFO), physics.cpp's SESSION log line
 // and Query()'s reported plugin version.
@@ -14,3 +16,5 @@
 #else
 #  define DELAMAINAV_VERSION_STRING "0.2.16.23"
 #endif
+
+#endif // DELAMAINAV_VERSION_H
