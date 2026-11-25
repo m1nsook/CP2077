@@ -19,6 +19,8 @@
 #include <string>
 #include <vector>
 #include "physics.hpp"
+#include "contact_trace.hpp"
+#include <chrono>
 
 namespace {
 using RED4ext::IScriptable;
@@ -26,7 +28,7 @@ using RED4ext::CStackFrame;
 using RED4ext::CString;
 using PhysicsData=RED4ext::vehicle::PhysicsData;
 using Json=nlohmann::json;
-constexpr const char* version="0.1.0-dev.6-native-probe.4";
+constexpr const char* version="0.1.0-dev.6-native-probe.5";
 constexpr std::uint32_t syncHash=547299556u;
 using Sync=void(*)(void*,void*,PhysicsData*,float,float);
 Sync original=nullptr;
@@ -61,13 +63,15 @@ struct DecodeSample {
 DecodeSample lastDecode;
 struct PairSample {
     std::uint64_t receiver{},other{},syncSequence{};
-    int receiverDriver{-1},otherDriver{-1},remote{-1},quest{-1},destroyed{-1};
+    int receiverDriver{-1},otherDriver{-1},remote{-1},quest{-1},destroyed{-1},otherDestroyed{-1},otherQuest{-1};
+    bool destroyedScripted{},otherDestroyedScripted{};
     bool receiverCandidate{},otherCandidate{},roadVehicle{};
     float delta{};
     kineticle::Vec normal{};
     DWORD thread{};
 };
 PairSample lastPair;
+kineticle::ContactTrace trace;
 std::atomic<bool> enabled{true}, installed{false};
 std::atomic<std::uint64_t> calls{0}, candidateFrames{0}, corrections{0};
 std::mutex stateMutex, sampleMutex;
@@ -121,31 +125,46 @@ bool load() {
     } catch(...) {return false;}
 }
 kineticle::Vec vec(const RED4ext::Vector3& v){return {v.X,v.Y,v.Z};}
+std::int64_t nowUs() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 void sync(void* self,void* chassis,PhysicsData* rb,float a4,float dt) {
     if (!enabled.load(std::memory_order_relaxed)||!rb||!chassis) { original(self,chassis,rb,a4,dt);return; }
-    calls.fetch_add(1,std::memory_order_relaxed);
-    // isPlayerControlled is an SDK candidate flag, NOT proof of V being the driver.
+    const auto sequence=calls.fetch_add(1,std::memory_order_relaxed)+1;
     const auto* owner=rb->vehicle;
-    if (!owner||!owner->isPlayerControlled||owner->physicsData!=rb) { original(self,chassis,rb,a4,dt);return; }
-    const auto before=vec(rb->velocity), angularBefore=vec(rb->angularVelocity);
+    if(!owner||owner->physicsData!=rb) {original(self,chassis,rb,a4,dt);return;}
+    const auto id=owner->entityID.hash;
+    const bool candidate=owner->isPlayerControlled!=0;
+    const auto before=vec(rb->velocity),angularBefore=vec(rb->angularVelocity);
     original(self,chassis,rb,a4,dt);
-    candidateFrames.fetch_add(1,std::memory_order_relaxed);
-    const auto after=vec(rb->velocity), angularAfter=vec(rb->angularVelocity);
-    if(!kineticle::valid(before)||!kineticle::valid(after)||!kineticle::valid(angularBefore)||!kineticle::valid(angularAfter)) return;
+    if(candidate)candidateFrames.fetch_add(1,std::memory_order_relaxed);
+    const auto after=vec(rb->velocity),angularAfter=vec(rb->angularVelocity);
+    if(!id||!kineticle::valid(before)||!kineticle::valid(after)||
+       !kineticle::valid(angularBefore)||!kineticle::valid(angularAfter))return;
     const auto loss=kineticle::forwardLoss(before,after);
-    if(loss<0.5f) return;
+    const auto change=kineticle::length(kineticle::sub(after,before));
+    // Observe meaningful sync corrections on BOTH vehicles. No RTTI or stored
+    // entity pointers, and no modification of either rigid body.
+    if(change<0.1f&&(!candidate||loss<0.5f))return;
+    const auto stamp=nowUs();
     std::lock_guard lock(sampleMutex);
-    last={before,after,angularBefore,angularAfter,loss,calls.load(std::memory_order_relaxed)};
-    corrections.fetch_add(1,std::memory_order_relaxed);
+    trace.push({id,sequence,stamp,GetCurrentThreadId(),before,after,angularBefore,angularAfter,loss,change});
+    if(candidate&&loss>=0.5f) {
+        last={before,after,angularBefore,angularAfter,loss,sequence};
+        corrections.fetch_add(1,std::memory_order_relaxed);
+    }
 }
-// Only query zero-argument native Bool methods from a script event context.
-// Do not invoke RTTI from the PhysX sync callback.
-int readNativeBool(RED4ext::vehicle::BaseObject* object,const char* name) {
+// Query reflected zero-argument Bool methods from the script event context.
+// Only IsDestroyed explicitly permits a scripted implementation, using the
+// SDK's ExecuteFunction path. No RTTI from the PhysX sync callback.
+int readNativeBool(RED4ext::vehicle::BaseObject* object,const char* name,bool* scripted=nullptr) {
     auto* type=object->GetType();
     auto* fn=type?type->GetFunction(RED4ext::CName(name)):nullptr;
-    if(!fn||!fn->flags.isNative||fn->flags.isStatic||fn->params.size!=0||
+    if(!fn||(!fn->flags.isNative&&!scripted)||fn->flags.isStatic||fn->params.size!=0||
        !fn->returnType||!fn->returnType->type||
        fn->returnType->type->GetName()!=RED4ext::CName("Bool")) return -1;
+    if(scripted)*scripted=!fn->flags.isNative;
     bool result=false;
     return RED4ext::ExecuteFunction(static_cast<RED4ext::ScriptInstance>(object),fn,&result)
         ? (result?1:0) : -1;
@@ -258,6 +277,7 @@ void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
        !std::isfinite(bump->impactVelocityChange)||!kineticle::valid(vec(bump->hitNormal))) {
         invalidPairs.fetch_add(1,std::memory_order_relaxed);return;
     }
+    const auto eventTime=nowUs();
     observedPairs.fetch_add(1,std::memory_order_relaxed);
     PairSample sample;
     sample.receiver=receiver->entityID.hash;sample.other=other->entityID.hash;
@@ -284,13 +304,21 @@ void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
         auto* driver=sample.receiverDriver==1?receiver:other;
         sample.remote=readNativeBool(driver,"IsVehicleRemoteControlled");
         sample.quest=readNativeBool(driver,"IsInQuestOrScenePhysicsState");
-        sample.destroyed=readNativeBool(driver,"IsDestroyed");
+        sample.destroyed=readNativeBool(driver,"IsDestroyed",&sample.destroyedScripted);
+        auto* struck=driver==receiver?other:receiver;
+        sample.otherDestroyed=readNativeBool(struck,"IsDestroyed",&sample.otherDestroyedScripted);
+        sample.otherQuest=readNativeBool(struck,"IsInQuestOrScenePhysicsState");
         sample.roadVehicle=roadVehicle(driver,rtti);
-        if(sample.remote==0&&sample.quest==0&&sample.destroyed==0&&sample.roadVehicle)
+        if(sample.remote==0&&sample.quest==0&&sample.destroyed==0&&sample.otherDestroyed==0&&sample.otherQuest==0&&sample.roadVehicle)
             guardedPairs.fetch_add(1,std::memory_order_relaxed);
     }
     // Store only numeric observations, never keep a vehicle pointer across callbacks.
     std::lock_guard lock(sampleMutex);lastPair=sample;
+    if((sample.receiverDriver==1&&sample.otherDriver==0)||(sample.otherDriver==1&&sample.receiverDriver==0)) {
+        const auto driverId=sample.receiverDriver==1?sample.receiver:sample.other;
+        const auto targetId=sample.receiverDriver==1?sample.other:sample.receiver;
+        trace.event(driverId,targetId,eventTime,sample.syncSequence,sample.delta);
+    }
 }
 bool executeScripted(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack,void* a3) {
     if(enabled.load(std::memory_order_relaxed)&&fn&&
@@ -379,6 +407,8 @@ std::string diagnostic() {
      <<"; receiver candidate="<<lastPair.receiverCandidate<<"; other candidate="<<lastPair.otherCandidate
      <<"; receiver IsPlayerDriver="<<lastPair.receiverDriver<<"; other IsPlayerDriver="<<lastPair.otherDriver
      <<"; driver remote="<<lastPair.remote<<"; quest="<<lastPair.quest<<"; destroyed="<<lastPair.destroyed
+     <<"; destroyed scripted="<<lastPair.destroyedScripted<<"; target destroyed="<<lastPair.otherDestroyed
+     <<"; target destroyed scripted="<<lastPair.otherDestroyedScripted<<"; target quest="<<lastPair.otherQuest
      <<"; driver car/bike="<<lastPair.roadVehicle<<"; impact delta="<<lastPair.delta
      <<"; hit normal=("<<lastPair.normal.x<<","<<lastPair.normal.y<<","<<lastPair.normal.z<<")"
      <<"; event sync sequence="<<lastPair.syncSequence<<"; event thread="<<lastPair.thread
@@ -390,6 +420,23 @@ std::string diagnostic() {
         if(count){if(any)s<<",";s<<rejectNames[i]<<":"<<count;any=true;}
     }
     if(!any)s<<"none";
+    // Each trace includes strongest observed correction before/after the
+    // event for each exact entity ID. Temporal proximity is NOT causation.
+    auto outputMatch=[&](const char* label,const kineticle::TraceSample& m,std::int64_t t) {
+        s<<" "<<label<<"=";
+        if(!m.id){s<<"none";return;}
+        s<<"{dt_ms:"<<static_cast<double>(m.us-t)/1000.0<<",seq:"<<m.sequence
+         <<",thread:"<<m.thread<<",dv:"<<m.change<<",loss:"<<m.loss
+         <<",before:("<<m.before.x<<","<<m.before.y<<","<<m.before.z<<")"
+         <<",after:("<<m.after.x<<","<<m.after.y<<","<<m.after.z<<")"
+         <<",angular_dv:"<<kineticle::length(kineticle::sub(m.angularAfter,m.angularBefore))<<"}";
+    };
+    for(const auto& e:trace.events) {
+        if(!e.driver)continue;
+        s<<"; contact trace driver="<<e.driver<<" target="<<e.target<<" event_seq="<<e.sequence<<" bump_dv="<<e.delta;
+        outputMatch("V-pre",e.driverPre,e.us);outputMatch("V-post",e.driverPost,e.us);
+        outputMatch("NPC-pre",e.targetPre,e.us);outputMatch("NPC-post",e.targetPost,e.us);
+    }
     return s.str();
 }
 void getEnabled(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){frame->code++;if(out)*out=enabled.load();}
@@ -405,7 +452,7 @@ void resetReport(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
     calls.store(0);candidateFrames.store(0);corrections.store(0);last={};
     bumpCalls.store(0);rejectedStacks.store(0);invalidPairs.store(0);observedPairs.store(0);
     npcPairs.store(0);driverQueryFailures.store(0);playerPairs.store(0);flagDisagreements.store(0);
-    guardedPairs.store(0);arrayStacks.store(0);packedStacks.store(0);lastPair={};lastDecode={};
+    guardedPairs.store(0);arrayStacks.store(0);packedStacks.store(0);lastPair={};lastDecode={};trace={};
     for(auto& counter:rejectCounts)counter.store(0);
     if(out)*out=true;
 }
