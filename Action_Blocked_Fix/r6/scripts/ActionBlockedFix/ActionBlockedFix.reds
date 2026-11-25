@@ -1,32 +1,33 @@
 module MisoActionBlockedFix
 
-// Experimental: observe state without overriding any vanilla eligibility check.
-// Repair is deliberately a user-confirmed, single-record operation.
+// Standalone experimental recovery. Never replace vanilla eligibility
+// checks, reset quest facts, or repeatedly remove a newly applied effect.
 public class ActionBlockedFixSystem extends ScriptableSystem {
   private let running: Bool;
   private let generation: Int32;
-  private let previous: String;
   private let samples: Int32;
-  private let candidateLogged: Bool;
+  private let attempted: Bool;
+  private let cleanSamples: Int32;
   private let owner: wref<PlayerPuppet>;
-  private let verify: wref<PlayerPuppet>;
 
   private func OnAttach() -> Void {
     this.generation += 1;
     this.running = true;
-    this.previous = "";
-    this.samples = 0;
-    this.candidateLogged = false;
-    this.owner = null;
-    this.verify = null;
+    this.Reset();
     this.Schedule();
   }
 
   private func OnDetach() -> Void {
     this.running = false;
     this.generation += 1;
+    this.Reset();
+  }
+
+  private func Reset() -> Void {
     this.owner = null;
-    this.verify = null;
+    this.samples = 0;
+    this.attempted = false;
+    this.cleanSamples = 0;
   }
 
   private func Schedule() -> Void {
@@ -43,63 +44,30 @@ public class ActionBlockedFixSystem extends ScriptableSystem {
     this.Schedule();
   }
 
-  private func Log(level: String, message: String) -> Void {
-    M1Arc_Log("m1nsook.action-blocked-fix", level, message);
-  }
-
-  private func Consume(id: String) -> Bool {
-    let clicked: Bool = false;
-    let i: Int32 = 0;
-    // Collapse duplicate button clicks; never schedule a batch of repairs.
-    while i < 16 && M1Arc_ConsumeAction("m1nsook.action-blocked-fix", id) {
-      clicked = true;
-      i += 1;
-    }
-    return clicked;
-  }
-
-  private func ResetCandidate() -> Void {
-    this.samples = 0;
-    this.candidateLogged = false;
-  }
-
   private func Sample() -> Void {
-    let inspect = this.Consume("inspect");
-    let repair = this.Consume("repair");
     let gi = this.GetGameInstance();
     let player = GetPlayer(gi) as PlayerPuppet;
     if !IsDefined(player) {
-      this.owner = null;
-      this.verify = null;
-      this.previous = "";
-      this.ResetCandidate();
-      if inspect || repair { this.Log("WARNING", "ABF_NO_PLAYER: request discarded"); }
+      this.Reset();
       return;
     }
 
     if this.owner != player {
+      this.Reset();
       this.owner = player;
-      this.verify = null;
-      this.previous = "";
-      this.ResetCandidate();
-      // A queued repair must never follow a player/save transition.
-      if repair {
-        this.Log("WARNING", "ABF_PLAYER_CHANGED: repair discarded; retry in gameplay");
-        repair = false;
-      }
     }
 
     let boards = GameInstance.GetBlackboardSystem(gi);
     if !IsDefined(boards) {
-      this.ResetCandidate();
-      if inspect || repair { this.Log("WARNING", "ABF_NO_BLACKBOARDS: request discarded"); }
+      this.samples = 0;
+      this.cleanSamples = 0;
       return;
     }
     let psm = boards.GetLocalInstanced(player.GetEntityID(), GetAllBlackboardDefs().PlayerStateMachine);
     let vehicle = boards.Get(GetAllBlackboardDefs().UI_ActiveVehicleData);
     if !IsDefined(psm) || !IsDefined(vehicle) {
-      this.ResetCandidate();
-      if inspect || repair { this.Log("WARNING", "ABF_CONTEXT_UNKNOWN: request discarded"); }
+      this.samples = 0;
+      this.cleanSamples = 0;
       return;
     }
 
@@ -107,52 +75,31 @@ public class ActionBlockedFixSystem extends ScriptableSystem {
     let mounted = vehicle.GetBool(GetAllBlackboardDefs().UI_ActiveVehicleData.IsPlayerMounted);
     let combat = player.IsInCombat();
     let blocked = StatusEffectSystem.ObjectHasStatusEffect(player, t"GameplayRestriction.NoCombat");
-    let snapshot = "NoCombat=" + ToString(blocked) + " combat=" + ToString(combat)
-      + " sceneTier=" + ToString(tier) + " mounted=" + ToString(mounted);
-    if inspect || NotEquals(this.previous, snapshot) {
-      if M1Arc_Log("m1nsook.action-blocked-fix", "INFO", "ABF_STATE: " + snapshot) {
-        this.previous = snapshot;
-      }
-    }
 
-    if IsDefined(this.verify) {
-      if this.verify == player {
-        if blocked {
-          this.Log("WARNING", "ABF_STILL_ACTIVE: NoCombat remains or was reapplied; no retry");
-        } else {
-          this.Log("INFO", "ABF_EFFECT_CLEARED: test weapon/cyberware input; gameplay recovery not yet proven");
-        }
-      }
-      this.verify = null;
-    }
-
-    // A contradiction is evidence for diagnosis, not proof of a stale lock.
-    if blocked && combat && tier == 1 && !mounted {
-      if this.samples < 3 { this.samples += 1; }
-      if this.samples >= 3 && !this.candidateLogged {
-        this.Log("WARNING", "ABF_CANDIDATE: NoCombat during full-gameplay combat for three samples; no automatic removal");
-        this.candidateLogged = true;
-      }
+    // Re-arm only after ten consecutive clean, unrestricted noncombat
+    // samples. Never fight a restriction that the game keeps applying.
+    if !blocked && !combat && tier == 1 && !mounted {
+      if this.cleanSamples < 10 { this.cleanSamples += 1; }
+      if this.cleanSamples >= 10 { this.attempted = false; }
     } else {
-      this.ResetCandidate();
+      this.cleanSamples = 0;
     }
 
-    if !repair { return; }
-    if !blocked {
-      this.Log("INFO", "ABF_NOT_PRESENT: NoCombat is absent; no change");
+    if this.attempted || !blocked || !combat || tier != 1 || mounted {
+      this.samples = 0;
       return;
     }
-    if tier != 1 || mounted || !combat || this.samples < 3 {
-      this.Log("WARNING", "ABF_GUARD: requires sustained on-foot combat in scene tier 1; no change");
-      return;
-    }
-    // The user must confirm that V is outside any intentionally restricted
-    // quest, phone call, safe zone or scripted encounter. Those independent
-    // guards have not been verified on 2.5, so no unattended repair exists.
+
+    // NoCombat in sustained combat is a suspected stale restriction,
+    // not definitive proof of an orphaned effect. This is a narrow
+    // development heuristic pending vanilla quest/zone/phone validation.
+    this.samples += 1;
+    if this.samples < 8 { return; }
+
+    // Set latch before removing, and never retry this encounter.
+    this.attempted = true;
+    this.samples = 0;
     StatusEffectHelper.RemoveStatusEffect(player, t"GameplayRestriction.NoCombat");
-    this.verify = player;
-    this.ResetCandidate();
-    this.Log("INFO", "ABF_REPAIR_REQUESTED: single NoCombat removal; checking next sample");
   }
 }
 

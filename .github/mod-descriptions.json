@@ -63,6 +63,6 @@
   },
   "Action_Blocked_Fix": {
     "name": "Action Blocked Fix",
-    "summary": "Experimental diagnostics and guarded, manual NoCombat recovery."
+    "summary": "Experimental standalone automatic recovery for a suspected stuck NoCombat restriction."
   }
 }
