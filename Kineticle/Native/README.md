@@ -1,4 +1,6 @@
-# Native Kineticle (dev.6 probe)
+# Native Kineticle (dev.6 probe.1)
+
+Build correction: use the pinned SDK fork's actual v0 API aliases and runtime 2.50 constant. The physics hook and gameplay behavior are unchanged.
 
 Standalone x64 RED4ext DLL. Core contains no REDscript and creates its own config.json on first load. The optional M1 Arc controller supplies only diagnostics and a probe toggle.
 

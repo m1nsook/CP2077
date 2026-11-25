@@ -21,7 +21,7 @@ using RED4ext::CStackFrame;
 using RED4ext::CString;
 using PhysicsData=RED4ext::vehicle::PhysicsData;
 using Json=nlohmann::json;
-constexpr const char* version="0.1.0-dev.6-native-probe";
+constexpr const char* version="0.1.0-dev.6-native-probe.1";
 constexpr std::uint32_t syncHash=547299556u;
 using Sync=void(*)(void*,void*,PhysicsData*,float,float);
 Sync original=nullptr;
@@ -96,7 +96,7 @@ void sync(void* self,void* chassis,PhysicsData* rb,float a4,float dt) {
     last={before,after,angularBefore,angularAfter,loss};
     corrections.fetch_add(1,std::memory_order_relaxed);
 }
-bool attach(RED4ext::v1::PluginHandle handle,const RED4ext::v1::Sdk* sdk) {
+bool attach(RED4ext::PluginHandle handle,const RED4ext::Sdk* sdk) {
     if(moduleVersion(nullptr)!="3.0.88.46235"){status="unsupported executable; hook inactive";return false;}
     auto loader=GetModuleHandleW(L"RED4ext.dll");
     if(!loader||moduleVersion(loader)!="1.31.1.0"){status="unsupported RED4ext; hook inactive";return false;}
@@ -159,15 +159,15 @@ void postRegister(){
     add("Kineticle_ResetDiagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&resetReport),"Bool",false);
 }
 }
-RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,RED4ext::v1::EMainReason reason,const RED4ext::v1::Sdk* sdk){
-    if(reason==RED4ext::v1::EMainReason::Unload){
+RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle handle,RED4ext::EMainReason reason,const RED4ext::Sdk* sdk){
+    if(reason==RED4ext::EMainReason::Unload){
         enabled.store(false);
         if(installed.load()&&sdk&&sdk->hooking&&sdk->hooking->Detach){
             sdk->hooking->Detach(handle,target);installed.store(false);
         }
         return true;
     }
-    if(reason!=RED4ext::v1::EMainReason::Load)return true;
+    if(reason!=RED4ext::EMainReason::Load)return true;
     auto* rtti=RED4ext::CRTTISystem::Get();if(!rtti)return false;
     rtti->AddRegisterCallback(registerTypes);rtti->AddPostRegisterCallback(postRegister);
     if(load()) attach(handle,sdk);
@@ -175,8 +175,8 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,RED4ext
     if(sdk&&sdk->logger&&sdk->logger->Info){const auto message=diagnostic();sdk->logger->Info(handle,message.c_str());}
     return true;
 }
-RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info){
-    info->name=L"Kineticle";info->author=L"MISO";info->version=RED4EXT_V1_SEMVER(0,1,0);
-    info->runtime=RED4EXT_V1_RUNTIME_VERSION_LATEST;info->sdk=RED4EXT_V1_SDK_VERSION_CURRENT;
+RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::PluginInfo* info){
+    info->name=L"Kineticle";info->author=L"MISO";info->version=RED4EXT_SEMVER(0,1,0);
+    info->runtime=RED4EXT_RUNTIME_2_50;info->sdk=RED4EXT_SDK_LATEST;
 }
-RED4EXT_C_EXPORT std::uint32_t RED4EXT_CALL Supports(){return RED4EXT_API_VERSION_1;}
+RED4EXT_C_EXPORT std::uint32_t RED4EXT_CALL Supports(){return RED4EXT_API_VERSION_LATEST;}
