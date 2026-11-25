@@ -1,0 +1,54 @@
+[
+  {
+    "id": "enabled",
+    "kind": "boolean",
+    "label": "Enabled",
+    "default": true,
+    "group": "General",
+    "description": "Apply effects only while V drives."
+  },
+  {
+    "id": "multiplier",
+    "kind": "float",
+    "label": "Collision force multiplier",
+    "default": 5,
+    "min": 1,
+    "max": 20,
+    "step": 1,
+    "group": "Physics",
+    "description": "Experimental extra force on other vehicles. 1 restores vanilla collision response."
+  },
+  {
+    "id": "protect",
+    "kind": "boolean",
+    "label": "Vehicle invulnerability",
+    "default": true,
+    "group": "Protection"
+  },
+  {
+    "id": "visuals",
+    "kind": "boolean",
+    "label": "Reset collision deformation and glass",
+    "default": true,
+    "group": "Protection"
+  },
+  {
+    "id": "bikes",
+    "kind": "boolean",
+    "label": "Include motorcycles",
+    "default": true,
+    "group": "General"
+  },
+  {
+    "id": "report",
+    "kind": "action",
+    "label": "Report diagnostics",
+    "group": "Diagnostics"
+  },
+  {
+    "id": "reset",
+    "kind": "action",
+    "label": "Reset collision counters",
+    "group": "Diagnostics"
+  }
+]

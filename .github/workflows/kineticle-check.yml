@@ -1,9 +1,9 @@
-name: KinetiCars - development checks
+name: Kineticle - development checks
 on:
   pull_request:
     paths:
-      - 'KinetiCars/**'
-      - '.github/workflows/kineticars-check.yml'
+      - 'Kineticle/**'
+      - '.github/workflows/kineticle-check.yml'
       - 'Daemon/tools/check_redscript_cli.ps1'
   workflow_dispatch:
 permissions:
@@ -19,27 +19,36 @@ jobs:
           REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
           REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
         run: |
-          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("KinetiCars/Core/r6/scripts")
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Core/r6/scripts")
           if ($LASTEXITCODE -ne 0) { throw "Core check failed" }
-      - name: Parse optional controller (semantic linking requires M1 Arc)
+      - name: Parse optional controller
         shell: pwsh
         run: |
-          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("KinetiCars/Controllers/M1Arc/r6/scripts")
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Controllers/M1Arc/r6/scripts")
           if ($LASTEXITCODE -ne 0) { throw "Controller parse failed" }
   package:
     needs: redscript
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify separation and create two game-root ZIPs
+      - name: Verify manifest and package independently
         run: |
           python3 - <<'PY'
-          import json
+          import json, re
           from pathlib import Path
           from zipfile import ZipFile, ZIP_DEFLATED
-          root = Path("KinetiCars")
+          root = Path("Kineticle")
           output = Path("dist")
           output.mkdir()
+          manifest_path = root / "Controllers/M1Arc/red4ext/plugins/m1arc/mods/m1nsook.kineticle/mod.json"
+          m = json.loads(manifest_path.read_text(encoding="utf-8"))
+          assert m["format"] == 1 and m["id"] == manifest_path.parent.name
+          assert m["scope"] in ("Gameplay","Crafting","Cheats","Weapons","Locations","Appearance","Characters","Miscellaneous","UI/UX")
+          assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", m["version"])
+          assert m["requires"]["m1arc"] == "1.0.1"
+          assert len(m["shortDesc"].encode("utf-8")) <= 180
+          settings = json.loads(manifest_path.with_name("settings.json").read_text(encoding="utf-8"))
+          assert len({s["id"] for s in settings}) == len(settings)
           for name, source in [("Core", root / "Core"), ("Controller-M1Arc", root / "Controllers/M1Arc")]:
               files = sorted(p for p in source.rglob("*") if p.is_file())
               assert files
@@ -48,15 +57,13 @@ jobs:
                   if name == "Core":
                       assert b"M1Arc_" not in p.read_bytes()
                       assert p.suffix == ".reds"
-                  if p.suffix == ".json":
-                      json.loads(p.read_text(encoding="utf-8"))
-              with ZipFile(output / f"KinetiCars-{name}-0.1.0-dev.1.zip", "w", ZIP_DEFLATED) as z:
+              with ZipFile(output / f"Kineticle-{name}-0.1.0-dev.2.zip", "w", ZIP_DEFLATED) as z:
                   for p in files:
                       z.write(p, p.relative_to(source).as_posix())
           PY
           (cd dist && sha256sum *.zip > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: kineticars-0.1.0-dev.1
+          name: kineticle-0.1.0-dev.2
           path: dist/
           if-no-files-found: error
