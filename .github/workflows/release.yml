@@ -26,6 +26,10 @@ on:
         description: "Version (1.0.0 or v1.0.0; optional -dev.1)"
         required: true
         type: string
+      nexus_id:
+        description: "Nexus Mods ID (optional; e.g. 39614; blank keeps existing link)"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -50,7 +54,8 @@ jobs:
         env:
           MOD: ${{ inputs.mod }}
           VERSION: ${{ inputs.version }}
-        run: python3 scripts/package_release.py --mod "$MOD" --tag "$VERSION" --output dist
+          NEXUS_ID: ${{ inputs.nexus_id }}
+        run: python3 scripts/package_release.py --mod "$MOD" --tag "$VERSION" --nexus-id "$NEXUS_ID" --output dist
 
       - name: Publish standalone release
         shell: bash

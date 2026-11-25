@@ -94,6 +94,20 @@ class OneModReleaseTest(unittest.TestCase):
         notes = Path("source-dist/RELEASE_NOTES.md").read_text("utf-8")
         self.assertIn("Do NOT extract into the game directory", notes)
 
+    def test_optional_nexus_id_is_saved_in_release_notes(self):
+        with_id = build("UndiscoverMe", "1.0.0", Path("with-id"), nexus_id="39614")
+        without_id = build("UndiscoverMe", "1.0.0", Path("without-id"))
+        self.assertEqual(with_id.read_bytes(), without_id.read_bytes())
+        self.assertIn("**Nexus Mods:** https://www.nexusmods.com/cyberpunk2077/mods/39614\n", Path("with-id/RELEASE_NOTES.md").read_text())
+        self.assertNotIn("**Nexus Mods:**", Path("without-id/RELEASE_NOTES.md").read_text())
+
+    def test_invalid_nexus_id_rejected_before_packaging(self):
+        for value in ("0", "-1", "1.5", "abc", "1;echo hacked", "9999999999999999"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    build("UndiscoverMe", "1.0.0", Path("dist"), nexus_id=value)
+        self.assertFalse(Path("dist").exists())
+
     def test_reject_unknown_mod_or_invalid_version(self):
         for mod, version in [("OtherMod", "v0.1.0"), ("UndiscoverMe", "v0.1.0;echo hacked"), ("UndiscoverMe", "../v0.1.0")]:
             with self.subTest(mod=mod, version=version):

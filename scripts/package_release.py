@@ -75,8 +75,16 @@ def normalize_version(version: str) -> str:
     return normalized
 
 
-def build(mod: str, version: str, output: Path) -> Path:
+def normalize_nexus_id(value: str) -> str:
+    value = value.strip()
+    if value and not re.fullmatch(r"[1-9][0-9]{0,14}", value):
+        raise ValueError("Nexus Mods ID must be a positive numeric ID, e.g. 39614 (or blank)")
+    return value
+
+
+def build(mod: str, version: str, output: Path, nexus_id: str = "") -> Path:
     version = normalize_version(version)
+    nexus_id = normalize_nexus_id(nexus_id)
 
     descriptions = json.loads(Path(".github/mod-descriptions.json").read_text("utf-8"))
     if mod not in descriptions:
@@ -121,7 +129,8 @@ def build(mod: str, version: str, output: Path) -> Path:
         f"## {name} {version}\n\n"
         f"{summary}\n\n"
         f"{required_line}"
-        "**Game:** Cyberpunk 2077 2.5\n\n"
+        + (f"**Nexus Mods:** https://www.nexusmods.com/cyberpunk2077/mods/{nexus_id}\n\n" if nexus_id else "")
+        + "**Game:** Cyberpunk 2077 2.5\n\n"
         f"{install}"
         "### SHA-256\n\n"
         f"{chr(96)}{digest}  {zip_filename}{chr(96)}\n"
@@ -140,9 +149,10 @@ def main() -> None:
     parser.add_argument("--mod", required=True, help="One mod directory, e.g. UndiscoverMe_Teleporter")
     parser.add_argument("--tag", required=True, help="Mod version, e.g. 1.0.0 or v1.0.0")
     parser.add_argument("--output", default="dist")
+    parser.add_argument("--nexus-id", default="", help="Optional numeric Nexus Mods ID")
     args = parser.parse_args()
     try:
-        build(args.mod, args.tag, Path(args.output))
+        build(args.mod, args.tag, Path(args.output), nexus_id=args.nexus_id)
     except (ValueError, FileNotFoundError) as err:
         parser.error(str(err))
 
