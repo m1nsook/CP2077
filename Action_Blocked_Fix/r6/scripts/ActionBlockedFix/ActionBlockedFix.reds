@@ -9,6 +9,9 @@ public class ActionBlockedFixSystem extends ScriptableSystem {
   private let attempted: Bool;
   private let cleanSamples: Int32;
   private let owner: wref<PlayerPuppet>;
+  private let lockedOut: Bool;
+  private let probationTicks: Int32;
+  private let lastEpoch: Int32;
 
   private func OnAttach() -> Void {
     this.generation += 1;
@@ -24,7 +27,14 @@ public class ActionBlockedFixSystem extends ScriptableSystem {
   }
 
   private func Reset() -> Void {
+    if IsDefined(this.owner) {
+      this.owner.misoProbationActive = false;
+      this.owner.misoReappliedDuringProbation = false;
+    }
     this.owner = null;
+    this.lockedOut = false;
+    this.probationTicks = 0;
+    this.lastEpoch = 0;
     this.samples = 0;
     this.attempted = false;
     this.cleanSamples = 0;
@@ -92,6 +102,39 @@ public class ActionBlockedFixSystem extends ScriptableSystem {
     if this.owner != player {
       this.Reset();
       this.owner = player;
+      this.lastEpoch = player.misoRestrictionEpoch;
+      player.misoProbationActive = false;
+      player.misoReappliedDuringProbation = false;
+      player.misoRecoveryState = 0;
+      player.misoFixCount = 0;
+    }
+
+    if this.lockedOut { return; }
+
+    // Both the event ledger and the live status-effect system are checked.
+    // A missed callback or failed removal must not permit another attempt.
+    if this.probationTicks > 0 {
+      if player.misoReappliedDuringProbation
+        || player.misoRestrictionEpoch != this.lastEpoch
+        || StatusEffectSystem.ObjectHasStatusEffect(player, t"GameplayRestriction.NoCombat")
+        || StatusEffectSystem.ObjectHasStatusEffect(player, t"GameplayRestriction.NoZooming") {
+        this.lockedOut = true;
+        this.probationTicks = 0;
+        player.misoProbationActive = false;
+        player.misoRecoveryState = 4;
+        return;
+      }
+      this.probationTicks -= 1;
+      if this.probationTicks == 0 {
+        player.misoProbationActive = false;
+        player.misoRecoveryState = 3;
+      }
+      return;
+    }
+
+    if player.misoRestrictionEpoch != this.lastEpoch {
+      this.lastEpoch = player.misoRestrictionEpoch;
+      this.samples = 0;
     }
 
     let boards = GameInstance.GetBlackboardSystem(gi);
@@ -153,6 +196,13 @@ public class ActionBlockedFixSystem extends ScriptableSystem {
 
     this.attempted = true;
     this.samples = 0;
+    // Start probation BEFORE removal so synchronous reapplication is seen.
+    this.lastEpoch = player.misoRestrictionEpoch;
+    player.misoReappliedDuringProbation = false;
+    player.misoProbationActive = true;
+    player.misoRecoveryState = 2;
+    player.misoFixCount += 1;
+    this.probationTicks = 10;
     // Use only the two removals confirmed to recover the affected save.
     // Let the vanilla listeners restore upper-body state and Radioport.
     StatusEffectHelper.RemoveStatusEffect(player, t"GameplayRestriction.NoCombat");
@@ -167,4 +217,37 @@ public class ActionBlockedFixTick extends DelayCallback {
   public func Call() -> Void {
     if IsDefined(this.owner) { this.owner.Tick(this.generation); }
   }
+}
+
+// Volatile diagnostics, readable through CET during development only.
+// No external logging headers or runtime framework required.
+@addField(PlayerPuppet)
+public let misoRestrictionEpoch: Int32;
+
+@addField(PlayerPuppet)
+public let misoProbationActive: Bool;
+
+@addField(PlayerPuppet)
+public let misoReappliedDuringProbation: Bool;
+
+// 0 = no fix yet, 2 = probation, 3 = passed, 4 = session lockout.
+@addField(PlayerPuppet)
+public let misoRecoveryState: Int32;
+
+@addField(PlayerPuppet)
+public let misoFixCount: Int32;
+
+@wrapMethod(PlayerPuppet)
+protected cb func OnStatusEffectApplied(evt: ref<ApplyStatusEffectEvent>) -> Bool {
+  // Observe only; never suppress or modify the original event.
+  if IsDefined(evt) && IsDefined(evt.staticData) {
+    let id = evt.staticData.GetID();
+    if Equals(id, t"GameplayRestriction.NoCombat") || Equals(id, t"GameplayRestriction.NoZooming") {
+      this.misoRestrictionEpoch += 1;
+      if this.misoProbationActive {
+        this.misoReappliedDuringProbation = true;
+      }
+    }
+  }
+  return wrappedMethod(evt);
 }

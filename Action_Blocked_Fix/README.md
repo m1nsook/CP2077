@@ -2,22 +2,21 @@
 
 Experimental automatic recovery for Cyberpunk 2077 2.5. Requires REDscript only.
 
-## Confirmed reproduction
+## Recovery
 
-An affected save showed SceneTier=1, HighLevel=1, Zones=1, UpperBody=5, Vitals=0, no combat, no vehicle, ForceEmptyHands=0, and active GameplayRestriction.NoCombat and GameplayRestriction.NoZooming. Removing both records in CET restored weapons, cyberware, scanner and Radioport without manually changing the player state machine.
+Matches the reproduced normal-exploration NoCombat + NoZooming lock for eight consecutive gameplay samples, preserving the guards from dev.3. Removes only those two effects and lets vanilla recover the upper-body state and Radioport.
 
-The mod now matches that signature for eight consecutive one-second gameplay samples. It also refuses recovery if other GameplayRestriction-tagged records, PhoneCall, BlockFastTravel, FastForward, InDaClub or VehicleScene tags are present. It removes only the confirmed pair, once, then rearms after ten clean normal gameplay samples or a player/session change. It never changes quest facts or directly resets player or radio state.
+A callback records new applications of the two effects and resets the candidate wait. A ten-sample probation starts before removal. Any reapplication event, epoch change or live presence of either effect during probation locks out further repairs for the current player/session. After successful probation, ten clean normal gameplay samples are required to rearm. No persistent data, quest facts, native state overrides or extra logging dependencies.
 
 ## Test
 
-- Install the game-root artifact (replace the old REDscript file); keep a backup of the original affected save.
-- Load the original broken save before any CET repairs. Do not enter combat or use CET to clear effects. Wait at least eight gameplay seconds.
-- Verify weapon drawing, cyberware, scanner zoom and Radioport.
-- On a healthy save test dialogue, phone calls, safe zones, scripted quests and vehicles. Confirm intentional restrictions remain.
-- Uninstall by deleting `r6/scripts/ActionBlockedFix`.
+- Install the development artifact over dev.3 and load the original broken save. Confirm automatic recovery after about eight gameplay seconds.
+- Test normal play, dialogue, phone calls, braindance, radio scenes, safe zones, vehicles, scripted quests and fast-travel restrictions; no repair should occur.
+- Optional temporary CET diagnostics (not a mod dependency): `local p=Game.GetPlayer(); print("ABF state:",p.misoRecoveryState,"fixes:",p.misoFixCount,"epoch:",p.misoRestrictionEpoch,"probation:",p.misoProbationActive,"reapplied:",p.misoReappliedDuringProbation)`
+- State 0 = no fix yet; 2 = probation; 3 = passed; 4 = lockout. Fix count should stay zero during legitimate restrictions. During an affected-save test state should become 2 then 3.
+- On a disposable test save, after state 2, apply NoCombat with CET within ten gameplay seconds, resume gameplay and check state 4. Confirm a new save/player session clears the lockout. Do not save the artificially restricted state.
+- Remove `r6/scripts/ActionBlockedFix` to uninstall.
 
 ## Limitations
 
-The repair itself was confirmed via CET on one affected save; automatic REDscript detection and the new API calls still require compilation and runtime testing. The guards narrow the reproduced signature but cannot prove which quest or native system owns a restriction. Untagged phone/quest locks may not be detected. Other restriction combinations, zones and combat states are deliberately not repaired. Do not publish as stable until positive and negative gameplay tests pass.
-
-Reference for the vanilla zone/fact/tag checks: https://github.com/spuddeh/cp2077-radio-xl/blob/main/r6/scripts/RadioXL/Restrictions.reds
+The dev.3 recovery was confirmed in game; this revision requires separate semantic compilation and testing. The application callback is supported by public game API examples, but has not been verified against the exact 2.5 bundle. The epoch is evidence of application, not ownership. A legitimate restriction matching every guard for eight seconds could still be removed once, and late reapplication beyond probation is not necessarily caught. A new legitimate restriction during probation also causes conservative lockout. No stable release until positive and negative tests pass.
