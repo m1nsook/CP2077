@@ -1,0 +1,22 @@
+[
+  {
+    "id": "probeEnabled",
+    "kind": "boolean",
+    "label": "Enable native physics diagnostics",
+    "default": true,
+    "group": "Diagnostics",
+    "description": "Read-only probe for the PhysX sync hook. No gameplay changes."
+  },
+  {
+    "id": "report",
+    "kind": "action",
+    "label": "Report diagnostics",
+    "group": "Diagnostics"
+  },
+  {
+    "id": "reset",
+    "kind": "action",
+    "label": "Reset diagnostics",
+    "group": "Diagnostics"
+  }
+]

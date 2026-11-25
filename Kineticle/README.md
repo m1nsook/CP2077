@@ -1,5 +1,7 @@
 # Kineticle
 
+Native development has begun in [Native](Native/README.md). The native dev.6 probe is diagnostics-only; the tested dev.5 REDscript implementation below is retained as a fallback. They are separate builds, not interchangeable controllers.
+
 Experimental collision force amplification and vehicle protection for vehicles driven by V.
 
 ## 0.1.0-dev.5

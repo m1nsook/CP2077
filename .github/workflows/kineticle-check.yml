@@ -9,69 +9,62 @@ on:
 permissions:
   contents: read
 jobs:
-  redscript:
+  native:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - name: Parse and optionally compile standalone Core
-        shell: pwsh
-        env:
-          REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
-          REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
-        run: |
-          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Core/r6/scripts")
-          if ($LASTEXITCODE -ne 0) { throw "Core check failed" }
-      - name: Parse optional controller
+      - name: Configure x64 native DLL
         shell: pwsh
         run: |
-          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Controllers/M1Arc/r6/scripts")
+          cmake -S Kineticle/Native -B build/kineticle -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON
+          if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
+      - name: Build native probe and tests
+        shell: pwsh
+        run: |
+          cmake --build build/kineticle --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "Native build failed" }
+          ctest --test-dir build/kineticle -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "Native tests failed" }
+      - name: Parse optional M1 Arc controller
+        shell: pwsh
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Native/Controllers/M1Arc/r6/scripts")
           if ($LASTEXITCODE -ne 0) { throw "Controller parse failed" }
-  package:
-    needs: redscript
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Verify manifest and package independently
+      - name: Package native Core and optional controller separately
+        shell: pwsh
         run: |
-          python3 - <<'PY'
-          import json, re
+          $ErrorActionPreference = "Stop"
+          $dst = "build/package/red4ext/plugins/Kineticle"
+          New-Item -ItemType Directory -Path $dst -Force | Out-Null
+          Copy-Item "build/kineticle/Release/Kineticle.dll" "$dst/Kineticle.dll"
+          $sdkLicense = Get-ChildItem "build/kineticle/_deps/red4ext_sdk-src" -File | Where-Object Name -Match '^LICENSE(\..*)?$' | Select-Object -First 1
+          if (!$sdkLicense) { throw "SDK license missing" }
+          Copy-Item $sdkLicense.FullName "$dst/RED4ext-SDK-LICENSE.txt"
+          Copy-Item "build/kineticle/_deps/nlohmann_json-src/LICENSE.MIT" "$dst/nlohmann-json-LICENSE.txt"
+          @'
+          import json, hashlib
           from pathlib import Path
           from zipfile import ZipFile, ZIP_DEFLATED
-          root = Path("Kineticle")
-          output = Path("dist")
-          output.mkdir()
-          manifest_path = root / "Controllers/M1Arc/red4ext/plugins/m1arc/mods/m1nsook.kineticle/mod.json"
-          m = json.loads(manifest_path.read_text(encoding="utf-8"))
-          assert m["format"] == 1 and m["id"] == manifest_path.parent.name
-          assert m["scope"] in ("Gameplay","Crafting","Cheats","Weapons","Locations","Appearance","Characters","Miscellaneous","UI/UX")
-          assert re.fullmatch(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", m["version"])
-          assert m["requires"]["m1arc"] == "1.0.1"
-          assert len(m["shortDesc"].encode("utf-8")) <= 180
-          settings = json.loads(manifest_path.with_name("settings.json").read_text(encoding="utf-8"))
-          assert len({s["id"] for s in settings}) == len(settings)
-          assert next(s for s in settings if s["id"] == "multiplier")["max"] == 100
-          core = (root / "Core/r6/scripts/Kineticle/Kineticle.reds").read_text()
-          controller = (root / "Controllers/M1Arc/r6/scripts/KineticleM1Arc/KineticleM1Arc.reds").read_text()
-          assert 'return "0.1.0-dev.5"' in core
-          assert "controller dev.5" in controller
-          assert "multiplier <= 100.0" in core and "multiplier <= 100.0" in controller
-          for name, source in [("Core", root / "Core"), ("Controller-M1Arc", root / "Controllers/M1Arc")]:
-              files = sorted(p for p in source.rglob("*") if p.is_file())
-              assert files
-              for p in files:
-                  assert p.relative_to(source).parts[0] in ("r6", "red4ext")
-                  if name == "Core":
-                      assert b"M1Arc_" not in p.read_bytes()
-                      assert p.suffix == ".reds"
-                      assert b"AddGodMode(" not in p.read_bytes()
-                      assert b"RemoveGodMode(" not in p.read_bytes()
-              with ZipFile(output / f"Kineticle-{name}-0.1.0-dev.5.zip", "w", ZIP_DEFLATED) as z:
-                  for p in files:
-                      z.write(p, p.relative_to(source).as_posix())
-          PY
-          (cd dist && sha256sum *.zip > SHA256SUMS.txt)
+          dist = Path("dist")
+          dist.mkdir(exist_ok=True)
+          core = Path("build/package")
+          ctrl = Path("Kineticle/Native/Controllers/M1Arc")
+          m = json.loads((ctrl/"red4ext/plugins/m1arc/mods/m1nsook.kineticle/mod.json").read_text(encoding="utf-8"))
+          assert m["format"] == 1 and m["id"] == "m1nsook.kineticle"
+          assert m["version"] == "0.1.0" and m["requires"]["m1arc"] == "1.0.1"
+          assert (core/"red4ext/plugins/Kineticle/Kineticle.dll").is_file()
+          assert not list(core.rglob("*.reds"))
+          for name, src in [("Core",core),("Controller-M1Arc",ctrl)]:
+              with ZipFile(dist/f"Kineticle-{name}-0.1.0-dev.6-native-probe.zip","w",ZIP_DEFLATED) as z:
+                  for p in sorted(src.rglob("*")):
+                      if p.is_file():
+                          assert p.relative_to(src).parts[0] in ("red4ext","r6")
+                          z.write(p,p.relative_to(src).as_posix())
+          (dist/"SHA256SUMS.txt").write_text("".join(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in sorted(dist.glob("*.zip"))))
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "Packaging failed" }
       - uses: actions/upload-artifact@v4
         with:
-          name: kineticle-0.1.0-dev.5
+          name: kineticle-0.1.0-dev.6-native-probe
           path: dist/
           if-no-files-found: error

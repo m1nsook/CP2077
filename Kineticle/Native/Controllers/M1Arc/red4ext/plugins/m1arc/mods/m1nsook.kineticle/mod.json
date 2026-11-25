@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "m1nsook.kineticle",
+  "name": "Kineticle",
+  "version": "0.1.0",
+  "author": "민숙 MISO @m1nsook",
+  "scope": "Gameplay",
+  "shortDesc": "Native physics development probe; read-only diagnostics, no gameplay changes.",
+  "requires": {
+    "m1arc": "1.0.1"
+  }
+}
