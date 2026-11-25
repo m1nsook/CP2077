@@ -1,50 +1,66 @@
-name: Delamain AV prototype
+name: Delamain AV - standalone native baseline
+# Deliberate build request only. Source edits and workflow edits do not run CI.
+# Keep all private assets, credentials and unapproved source out of this repository.
 on:
   push:
     branches: [dev/delamain-av]
     paths:
-      - 'Delamain_AV/**'
-      - '.github/workflows/delamain-av-check.yml'
+      - 'Delamain_AV/ci-baseline/BUILD_REQUEST.txt'
 permissions:
   contents: read
+concurrency:
+  group: delamain-av-baseline
+  cancel-in-progress: false
 jobs:
-  prototype:
+  native-baseline:
     runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - name: Download pinned WolvenKit CLI
-        shell: pwsh
+          persist-credentials: false
+      - name: Validate approved public source snapshot
         run: |
-          $url = 'https://github.com/WolvenKit/WolvenKit/releases/download/10.0.0-beta.1/WolvenKit.Console-10.0.0-beta.1.zip'
-          $zip = Join-Path $env:RUNNER_TEMP 'wolvenkit.zip'
-          $dir = Join-Path $env:RUNNER_TEMP 'wolvenkit'
-          Invoke-WebRequest -Uri $url -OutFile $zip
-          Expand-Archive -Path $zip -DestinationPath $dir -Force
-          $cli = Get-ChildItem -Path $dir -Filter 'WolvenKit.CLI.exe' -Recurse | Select-Object -First 1
-          if (!$cli) { $cli = Get-ChildItem -Path $dir -Filter 'cp77tools.exe' -Recurse | Select-Object -First 1 }
-          if (!$cli) { throw 'WolvenKit CLI executable missing' }
-          "WOLVENKIT_CLI=$($cli.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - name: Compile native workspot and occupant resource
-        shell: pwsh
-        run: python Delamain_AV/tools/build_resources.py "$env:WOLVENKIT_CLI"
-      - name: Configure native AV physics bridge
-        run: cmake -S Delamain_AV/native -B build/delamain-av -A x64
-      - name: Build native AV physics bridge
-        run: cmake --build build/delamain-av --config RelWithDebInfo --parallel 2
-      - name: Stage native DLL
-        shell: pwsh
+          $root = 'Delamain_AV/ci-baseline'
+          foreach ($file in @('BUILD_REQUEST.txt','native/CMakeLists.txt','native/src/Flight.cpp','native/LICENSE-DAV-native.txt','native/LICENSE-DAV-script.txt')) {
+            if (!(Test-Path -LiteralPath "$root/$file" -PathType Leaf)) { throw "Missing approved snapshot file: $file" }
+          }
+          Write-Host "Building public revision $env:GITHUB_SHA"
+      - name: Configure standalone native source
+        run: cmake -S Delamain_AV/ci-baseline/native -B build/delamain-baseline -A x64
+      - name: Compile standalone DLL
+        run: cmake --build build/delamain-baseline --config Release --parallel 2
+      - name: Package compile-only artifact and checksum
         run: |
-          $dll = 'build/delamain-av/RelWithDebInfo/DelamainAV.dll'
-          if (!(Test-Path $dll)) { throw 'Native DLL missing' }
-          New-Item -ItemType Directory -Force Delamain_AV/red4ext/plugins/DelamainAV
-          Copy-Item $dll Delamain_AV/red4ext/plugins/DelamainAV/DelamainAV.dll
-      - name: Validate and package prototype
-        run: python Delamain_AV/tools/package_prototype.py
+          $dll = 'build/delamain-baseline/Release/DelamainFlight.dll'
+          if (!(Test-Path -LiteralPath $dll -PathType Leaf)) { throw 'DelamainFlight.dll missing' }
+          $short = $env:GITHUB_SHA.Substring(0,12)
+          $name = "DelamainFlight-compile-only-$short"
+          $stage = Join-Path $env:RUNNER_TEMP $name
+          New-Item -ItemType Directory -Force $stage, dist | Out-Null
+          Copy-Item $dll $stage
+          Copy-Item Delamain_AV/ci-baseline/native/LICENSE-DAV-native.txt, Delamain_AV/ci-baseline/native/LICENSE-DAV-script.txt $stage
+          @(
+            "Public source commit: $env:GITHUB_SHA"
+            "Run ID: $env:GITHUB_RUN_ID"
+            "Run attempt: $env:GITHUB_RUN_ATTEMPT"
+            "Status: compiled only; not game-tested; not installable"
+            "No game assets or legacy dev.24 files included."
+          ) | Set-Content -Encoding utf8 (Join-Path $stage 'BUILD_INFO.txt')
+          $zip = "dist/$name.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath $zip
+          $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $name.zip" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          "Artifact: $name" | Add-Content $env:GITHUB_STEP_SUMMARY
+          "SHA256: $hash" | Add-Content $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v4
         with:
-          name: Delamain-AV-v0.2.17-dev.24
-          path: dist/Delamain-AV-v0.2.17-dev.24/
+          name: delamain-flight-compile-only-${{ github.sha }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
           if-no-files-found: error
+          retention-days: 7
