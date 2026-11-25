@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -25,7 +26,7 @@ using RED4ext::CStackFrame;
 using RED4ext::CString;
 using PhysicsData=RED4ext::vehicle::PhysicsData;
 using Json=nlohmann::json;
-constexpr const char* version="0.1.0-dev.6-native-probe.3";
+constexpr const char* version="0.1.0-dev.6-native-probe.4";
 constexpr std::uint32_t syncHash=547299556u;
 using Sync=void(*)(void*,void*,PhysicsData*,float,float);
 Sync original=nullptr;
@@ -44,6 +45,20 @@ std::atomic<std::uint64_t> bumpCalls{0}, rejectedStacks{0}, invalidPairs{0},
     observedPairs{0}, npcPairs{0}, driverQueryFailures{0}, playerPairs{0},
     flagDisagreements{0}, guardedPairs{0}, arrayStacks{0}, packedStacks{0};
 std::string eventStatus="contact hook inactive";
+enum class Reject : unsigned { None, StackMemory, MissingParam, ParamLayout, ArrayCount,
+    ArrayMemory, ArrayType, PackedLayout, ArgumentMemory, EventObject, Count };
+constexpr const char* rejectNames[]={"none","stack-memory","missing-param","param-layout",
+    "array-count","array-memory","array-type","packed-layout","argument-memory","event-object"};
+static_assert(std::size(rejectNames)==static_cast<unsigned>(Reject::Count));
+std::atomic<std::uint64_t> rejectCounts[static_cast<unsigned>(Reject::Count)]{};
+struct DecodeSample {
+    Reject reason{Reject::None};
+    bool array{},knownVtable{},hasResult{},hasResultType{},hasArgType{},argTypeMatches{},hasArgs{};
+    bool outParam{};
+    std::uint32_t paramSize{},paramOffset{};
+    int stackSize{};
+};
+DecodeSample lastDecode;
 struct PairSample {
     std::uint64_t receiver{},other{},syncSequence{};
     int receiverDriver{-1},otherDriver{-1},remote{-1},quest{-1},destroyed{-1};
@@ -153,43 +168,63 @@ bool readable(const void* ptr,std::size_t size) {
     auto offset=reinterpret_cast<std::uintptr_t>(ptr)-reinterpret_cast<std::uintptr_t>(region.BaseAddress);
     return offset<region.RegionSize&&size<=region.RegionSize-offset;
 }
-const RED4ext::Handle<IScriptable>* bumpArgument(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
-    if(!readable(stack,sizeof(RED4ext::CScriptStack))||!fn->returnType||
-       !fn->returnType->type||fn->returnType->type->GetName()!=RED4ext::CName("Bool")||
-       fn->params.size!=1||!fn->params[0]||!fn->params[0]->type||!stack->args)return nullptr;
+// Record the exact failed gate rather than aggregate all decoder failures.
+void recordDecode(DecodeSample sample) {
+    if(sample.reason!=Reject::None) {
+        rejectCounts[static_cast<unsigned>(sample.reason)].fetch_add(1,std::memory_order_relaxed);
+        rejectedStacks.fetch_add(1,std::memory_order_relaxed);
+    }
+    std::lock_guard lock(sampleMutex);lastDecode=sample;
+}
+const RED4ext::Handle<IScriptable>* bumpArgument(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack,DecodeSample& d) {
+    const auto fail=[&](Reject why)->const RED4ext::Handle<IScriptable>* {d.reason=why;return nullptr;};
+    if(!readable(stack,sizeof(RED4ext::CScriptStack)))return fail(Reject::StackMemory);
+    if(fn->params.size!=1||!fn->params[0]||!fn->params[0]->type)return fail(Reject::MissingParam);
     auto* param=fn->params[0];
-    if(param->flags.isOut||param->type->GetSize()!=sizeof(RED4ext::Handle<IScriptable>))return nullptr;
+    d.paramSize=param->type->GetSize();d.paramOffset=param->valueOffset;
+    d.stackSize=fn->stackSize;d.outParam=param->flags.isOut;d.hasArgs=stack->args!=nullptr;
+    if(d.outParam||d.paramSize!=sizeof(RED4ext::Handle<IScriptable>))return fail(Reject::ParamLayout);
+    if(!d.hasArgs)return fail(Reject::MissingParam);
     auto* result=stack->GetResultAddr();
-    if(!result||stack->GetResultType()!=fn->returnType->type)return nullptr;
-    // CET uses value != GetResultAddr() to distinguish the CStackType array
-    // form from the contiguous script argument storage. Keep the original
-    // exact CStack vtable/count check as an additional guard where applicable.
+    // Event dispatch may discard the callback return; a null result address or
+    // type is not evidence of invalid arguments. CET's dispatcher observer
+    // uses the result address solely to distinguish the two stack layouts.
+    d.hasResult=result!=nullptr;
+    d.hasResultType=stack->GetResultType()!=nullptr;
+    d.knownVtable=*reinterpret_cast<const std::uintptr_t*>(stack)==stackVtable;
+    d.array=stack->value!=result;
     void* value=nullptr;
-    const bool arrayForm=stack->value!=result;
-    if(arrayForm) {
-        if(*reinterpret_cast<const std::uintptr_t*>(stack)==stackVtable&&
-           (!readable(stack,sizeof(RED4ext::CStack))||
-            reinterpret_cast<RED4ext::CStack*>(stack)->argsCount!=1))return nullptr;
-        if(!readable(stack->args,sizeof(RED4ext::CStackType)))return nullptr;
+    if(d.array) {
+        if(d.knownVtable&&(!readable(stack,sizeof(RED4ext::CStack))||
+            reinterpret_cast<RED4ext::CStack*>(stack)->argsCount!=1))return fail(Reject::ArrayCount);
+        if(!readable(stack->args,sizeof(RED4ext::CStackType)))return fail(Reject::ArrayMemory);
         const auto& arg=*reinterpret_cast<const RED4ext::CStackType*>(stack->args);
-        if(arg.type!=param->type)return nullptr;
+        d.hasArgType=arg.type!=nullptr;d.argTypeMatches=arg.type==param->type;
+        // The SDK ExecuteFunction helper permits initially untyped arguments;
+        // the dispatcher observer uses the function's reflected parameter type.
+        // Reject conflicting non-null metadata, not absent metadata.
+        if(d.hasArgType&&!d.argTypeMatches)return fail(Reject::ArrayType);
         value=arg.value;
     } else {
-        if(*reinterpret_cast<const std::uintptr_t*>(stack)==stackVtable)return nullptr;
-        // Single required handle parameter; use reflected offset, not a guessed
-        // field address. Reject unexpected layout rather than interpreting it.
-        if(param->valueOffset!=0)return nullptr;
-        value=stack->args+param->valueOffset;
+        if(d.knownVtable)return fail(Reject::PackedLayout);
+        // Use RTTI's parameter offset; permit a non-zero offset only when
+        // it fits inside the declared function stack. No arbitrary offsets.
+        if(d.paramOffset!=0&&(d.stackSize<=0||
+            d.paramOffset>static_cast<unsigned>(d.stackSize)||
+            d.paramSize>static_cast<unsigned>(d.stackSize)-d.paramOffset))
+            return fail(Reject::PackedLayout);
+        if(!readable(stack->args,static_cast<std::size_t>(d.paramOffset)+d.paramSize))
+            return fail(Reject::ArgumentMemory);
+        value=stack->args+d.paramOffset;
     }
     if(!readable(value,sizeof(RED4ext::Handle<IScriptable>))||
-       reinterpret_cast<std::uintptr_t>(value)%alignof(RED4ext::Handle<IScriptable>))return nullptr;
-    (arrayForm?arrayStacks:packedStacks).fetch_add(1,std::memory_order_relaxed);
+       reinterpret_cast<std::uintptr_t>(value)%alignof(RED4ext::Handle<IScriptable>))return fail(Reject::ArgumentMemory);
     return static_cast<const RED4ext::Handle<IScriptable>*>(value);
 }
 void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
     bumpCalls.fetch_add(1,std::memory_order_relaxed);
     if(!readable(stack,sizeof(RED4ext::CScriptStack))) {
-        rejectedStacks.fetch_add(1,std::memory_order_relaxed);return;
+        DecodeSample d;d.reason=Reject::StackMemory;recordDecode(d);return;
     }
     auto* rtti=RED4ext::CRTTISystem::Get();
     auto* vehicleType=rtti?rtti->GetClass("vehicleBaseObject"):nullptr;
@@ -204,12 +239,16 @@ void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
        static_cast<RED4ext::CRTTIHandleType*>(paramType)->GetInnerType()!=bumpType) {
         invalidPairs.fetch_add(1,std::memory_order_relaxed);return;
     }
-    const auto* eventHandle=bumpArgument(fn,stack);
-    if(!eventHandle){rejectedStacks.fetch_add(1,std::memory_order_relaxed);return;}
+    DecodeSample decode;
+    const auto* eventHandle=bumpArgument(fn,stack,decode);
+    if(!eventHandle){recordDecode(decode);return;}
     auto* event=eventHandle->GetPtr();
-    if(!event||!event->GetType()||!event->GetType()->IsA(bumpType)) {
-        invalidPairs.fetch_add(1,std::memory_order_relaxed);return;
+    if(!readable(event,sizeof(RED4ext::vehicle::VehicleBumpEvent))||
+       !event->GetType()||!event->GetType()->IsA(bumpType)) {
+        decode.reason=Reject::EventObject;recordDecode(decode);return;
     }
+    (decode.array?arrayStacks:packedStacks).fetch_add(1,std::memory_order_relaxed);
+    recordDecode(decode);
     auto* bump=static_cast<RED4ext::vehicle::VehicleBumpEvent*>(event);
     auto otherHandle=bump->hitVehicle.Lock();
     auto* other=otherHandle.GetPtr();
@@ -325,7 +364,13 @@ std::string diagnostic() {
      <<"; forward loss="<<last.loss<<"; loss sample sync sequence="<<last.sequence
      <<"; "<<eventStatus<<"; bump callbacks="<<bumpCalls.load()
      <<"; rejected stacks="<<rejectedStacks.load()<<"; array stacks="<<arrayStacks.load()
-     <<"; packed stacks="<<packedStacks.load()<<"; invalid pairs="<<invalidPairs.load()
+     <<"; packed stacks="<<packedStacks.load()<<"; last decoder="<<rejectNames[static_cast<unsigned>(lastDecode.reason)]
+     <<"; decoder array="<<lastDecode.array<<"; known vtable="<<lastDecode.knownVtable
+     <<"; result address present="<<lastDecode.hasResult<<"; result type present="<<lastDecode.hasResultType
+     <<"; args present="<<lastDecode.hasArgs<<"; array type present="<<lastDecode.hasArgType
+     <<"; array type matches="<<lastDecode.argTypeMatches<<"; param size="<<lastDecode.paramSize
+     <<"; param offset="<<lastDecode.paramOffset<<"; param out="<<lastDecode.outParam
+     <<"; function stack size="<<lastDecode.stackSize<<"; invalid pairs="<<invalidPairs.load()
      <<"; observed vehicle pairs="<<observedPairs.load()<<"; NPC pairs="<<npcPairs.load()
      <<"; driver query failures="<<driverQueryFailures.load()
      <<"; player driver pairs="<<playerPairs.load()<<"; candidate flag disagreements="<<flagDisagreements.load()
@@ -338,6 +383,13 @@ std::string diagnostic() {
      <<"; hit normal=("<<lastPair.normal.x<<","<<lastPair.normal.y<<","<<lastPair.normal.z<<")"
      <<"; event sync sequence="<<lastPair.syncSequence<<"; event thread="<<lastPair.thread
      <<"; PSM and exact contact-to-sync correlation unverified; all gameplay writes inactive";
+    s<<"; decoder rejections by reason=";
+    bool any=false;
+    for(unsigned i=1;i<static_cast<unsigned>(Reject::Count);++i) {
+        auto count=rejectCounts[i].load();
+        if(count){if(any)s<<",";s<<rejectNames[i]<<":"<<count;any=true;}
+    }
+    if(!any)s<<"none";
     return s.str();
 }
 void getEnabled(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){frame->code++;if(out)*out=enabled.load();}
@@ -353,7 +405,9 @@ void resetReport(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
     calls.store(0);candidateFrames.store(0);corrections.store(0);last={};
     bumpCalls.store(0);rejectedStacks.store(0);invalidPairs.store(0);observedPairs.store(0);
     npcPairs.store(0);driverQueryFailures.store(0);playerPairs.store(0);flagDisagreements.store(0);
-    guardedPairs.store(0);arrayStacks.store(0);packedStacks.store(0);lastPair={};if(out)*out=true;
+    guardedPairs.store(0);arrayStacks.store(0);packedStacks.store(0);lastPair={};lastDecode={};
+    for(auto& counter:rejectCounts)counter.store(0);
+    if(out)*out=true;
 }
 void registerTypes(){}
 void postRegister(){

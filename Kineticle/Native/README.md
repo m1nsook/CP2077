@@ -1,4 +1,4 @@
-# Native Kineticle (dev.6 probe.3)
+# Native Kineticle (dev.6 probe.4)
 
 Probe.2 added read-only observation of `OnVehicleBumpEvent` through the pinned SDK's `CBaseFunction::ExecuteScripted` signature and exact `CStack_vtbl` guard. It checks the reflected handle type and resolves the event's weak hitVehicle reference only within the callback. It records both entity IDs, delta velocity, hit normal, native IsPlayerDriver results and remote/quest/destroyed/car-or-bike checks. Missing or non-native Bool methods produce -1 (unknown). No pointer is retained and no RTTI is invoked from the physics callback.
 
@@ -9,6 +9,8 @@ Standalone x64 RED4ext DLL. Core contains no REDscript and creates its own confi
 **This is not a gameplay replacement yet.** No impulses, velocity, torque, health, collision flags or mass are modified. The proven dev.5 scripts remain under ../Core and ../Controllers as a fallback; do not use the old and new controllers together. Remove the two old Kineticle REDscript folders and old M1 Arc manifest folder before testing the native-only packages. Do not overwrite your only working dev.5 archive.
 
 The native physics entry point is vehicle::PhysXSynchronizer::SyncFromPhysX (RED4ext hash 547299556). References: https://github.com/jackhumbert/let_there_be_flight/blob/main/src/red4ext/Physics/ChassisContacts.cpp and the same project's pinned SDK fork 21efd4250f18f6703d6ff7caba0245093b834859. The hook is version-gated to executable 3.0.88.46235 and RED4ext 1.31.1.0. Missing addresses should leave it inactive. The player-controlled flag is a candidate signal, not authoritative driver/vehicle pair identification.
+
+Probe.3 saw five bump callbacks and rejected all five before decoding. Probe.4 no longer requires the caller to provide a callback return buffer: the reference observer uses the return address for layout selection, not validation. Array arguments use reflected parameter metadata when the array type is absent (conflicting metadata is still rejected). Packed offsets must fit the reflected stack size when nonzero. All argument paths still require the exact reflected bump event handle type, readable storage and the actual event object's RTTI class before accessing event fields. Reports include the exact failed gate, layout discriminator, return-buffer presence, parameter offset and size, and cumulative rejection counts. This addresses plausible false rejections; the probe.3 aggregate counters did not identify which gate failed.
 
 ## Test
 1. Start the game with native Core and optional diagnostic controller, check startup log.
