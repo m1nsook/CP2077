@@ -1,4 +1,4 @@
-// Tiny Mike Be Gone 0.1.0-dev.2
+// Tiny Mike Be Gone 0.1.0-dev.3
 // REDscript only. Never alter the character record or quest facts.
 public class TinyMikeBeGoneCheckEvent extends Event {
   public let attemptsLeft: Int32;
@@ -27,7 +27,8 @@ protected cb func OnTinyMikeBeGoneCheckEvent(evt: ref<TinyMikeBeGoneCheckEvent>)
   let dz: Float = pos.Z - 16.549995;
   // Match only the confirmed Afterlife seat within a 4 m sphere.
   if dx * dx + dy * dy + dz * dz <= 16.0 {
-    this.Dispose();
+    // Both native signatures are present in the supplied 2.50 game bundle.
+    EntityGameInterface.Destroy(this.GetEntity());
     return true;
   }
 
