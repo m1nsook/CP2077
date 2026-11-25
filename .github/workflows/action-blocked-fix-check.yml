@@ -1,0 +1,45 @@
+name: Action Blocked Fix - development checks
+on:
+  pull_request:
+    paths:
+      - 'Action_Blocked_Fix/**'
+      - '.github/workflows/action-blocked-fix-check.yml'
+      - 'Daemon/tools/check_redscript_cli.ps1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  redscript:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: REDscript CLI parse and optional semantic compilation
+        shell: pwsh
+        env:
+          REDSCRIPT_GAME_BUNDLE_URL: ${{ secrets.REDSCRIPT_GAME_BUNDLE_URL }}
+          REDSCRIPT_GAME_BUNDLE_SHA256: ${{ secrets.REDSCRIPT_GAME_BUNDLE_SHA256 }}
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Action_Blocked_Fix/r6/scripts")
+          if ($LASTEXITCODE -ne 0) { throw "REDscript checks failed" }
+  package:
+    needs: redscript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare standalone game-root artifact
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from shutil import copyfile
+          src = Path("Action_Blocked_Fix/r6/scripts/ActionBlockedFix/ActionBlockedFix.reds")
+          dst = Path("game-root/r6/scripts/ActionBlockedFix/ActionBlockedFix.reds")
+          dst.parent.mkdir(parents=True, exist_ok=True)
+          assert b"M1Arc_" not in src.read_bytes()
+          copyfile(src, dst)
+          assert [p for p in Path("game-root").rglob("*") if p.is_file()] == [dst]
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: action-blocked-fix-0.1.0-dev.5
+          path: game-root/
+          if-no-files-found: error
