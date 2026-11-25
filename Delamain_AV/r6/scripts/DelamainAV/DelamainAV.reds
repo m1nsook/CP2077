@@ -348,7 +348,7 @@ public class DelamainAVSystem extends ScriptableSystem {
           this.AbortArrival(vehicle, "acquired landing surface invalid");
           return;
         };
-        let bottom = hit.position + new Vector4(0.0, 0.0, this.m_clearance + 0.25, 0.0);
+        let bottom = new Vector4(hit.position.X, hit.position.Y, hit.position.Z + this.m_clearance + 0.25, 1.0);
         let top = pos + new Vector4(0.0, 0.0, 3.0, 0.0);
         if spatial.SyncRaycastByCollisionGroup(bottom, top, n"Static", overhead, true, false) ||
            spatial.SyncRaycastByCollisionGroup(top, bottom, n"Static", overhead, true, false) {
