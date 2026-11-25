@@ -63,6 +63,6 @@
   },
   "Action_Blocked_Fix": {
     "name": "Action Blocked Fix",
-    "summary": "Experimental standalone automatic recovery for a suspected stuck NoCombat restriction."
+    "summary": "Experimental standalone automatic recovery for the reproduced stuck NoCombat and NoZooming restriction pair. Requires REDscript only."
   }
 }

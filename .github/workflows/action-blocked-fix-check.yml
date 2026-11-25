@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build standalone development ZIP
         run: |
-          python3 scripts/package_release.py --mod Action_Blocked_Fix --tag 0.1.0-dev.2 --output dist
+          python3 scripts/package_release.py --mod Action_Blocked_Fix --tag 0.1.0-dev.3 --output dist
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
