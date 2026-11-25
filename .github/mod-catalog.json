@@ -71,5 +71,13 @@
     "m1arc": "-",
     "description": "Remove Tiny Mike NPC from Afterlife club.",
     "status": "auto"
+  },
+  {
+    "path": "Action_Blocked_Fix",
+    "name": "Action Blocked Fix",
+    "nexus_id": null,
+    "m1arc": "-",
+    "description": "Automatically recovers stuck gameplay restrictions during normal exploration.",
+    "status": "auto"
   }
 ]
