@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: sync-mod-readme
@@ -70,32 +71,74 @@ jobs:
               return readme.slice(0,from+start.length)+"\n"+lines.join("\n")+"\n"+readme.slice(to);
             }
             
+            
             const {owner, repo} = context.repo;
             const repository = owner + "/" + repo;
-            const releases = await github.paginate(github.rest.repos.listReleases, {owner, repo, per_page:100});
-            for (let attempt=0; attempt<3; attempt++) {
-              const [readmeResponse, catalogResponse] = await Promise.all([
-                github.rest.repos.getContent({owner, repo, path:"README.md", ref:"main"}),
-                github.rest.repos.getContent({owner, repo, path:".github/mod-catalog.json", ref:"main"})
-              ]);
-              const decode = data => Buffer.from(data.content, "base64").toString("utf8");
-              const readme = decode(readmeResponse.data);
-              const catalog = JSON.parse(decode(catalogResponse.data));
-              const updated = render(readme,catalog,releases,repository);
-              if (updated === readme) {
-                core.info("README is already synchronized.");
-                return;
+            const prefix = "automation/readme-sync-";
+            const base = "main";
+            const {data: mainRef} = await github.rest.git.getRef({owner, repo, ref:"heads/" + base});
+            const baseSha = mainRef.object.sha;
+            const [readmeResponse, catalogResponse, releases, openPulls] = await Promise.all([
+              github.rest.repos.getContent({owner, repo, path:"README.md", ref:baseSha}),
+              github.rest.repos.getContent({owner, repo, path:".github/mod-catalog.json", ref:baseSha}),
+              github.paginate(github.rest.repos.listReleases, {owner, repo, per_page:100}),
+              github.paginate(github.rest.pulls.list, {owner, repo, state:"open", base, per_page:100})
+            ]);
+            const decode = data => Buffer.from(data.content, "base64").toString("utf8");
+            const readme = decode(readmeResponse.data);
+            const catalog = JSON.parse(decode(catalogResponse.data));
+            const updated = render(readme,catalog,releases,repository);
+            // Only manage pull requests created by this workflow in this repository.
+            const pending = openPulls.filter(p => p.user?.login === "github-actions[bot]" &&
+              p.head.repo?.full_name === repository && p.head.ref.startsWith(prefix));
+            async function closeSuperseded(keep) {
+              for (const p of pending) {
+                if (p.number === keep) continue;
+                await github.rest.pulls.update({owner, repo, pull_number:p.number, state:"closed"});
+                core.info("Closed superseded README sync PR #" + p.number);
               }
+            }
+            if (updated === readme) {
+              await closeSuperseded(null);
+              core.info("README is already synchronized.");
+              return;
+            }
+            let pr;
+            const branchPrefix = prefix + baseSha.slice(0,12) + "-";
+            for (const p of pending.filter(p => p.head.ref.startsWith(branchPrefix))) {
+              const {data} = await github.rest.repos.getContent({owner, repo, path:"README.md", ref:p.head.sha});
+              if (decode(data) === updated) { pr = p; break; }
+            }
+            if (!pr) {
+              const branch = branchPrefix + context.runId + "-" + process.env.GITHUB_RUN_ATTEMPT;
+              await github.rest.git.createRef({owner, repo, ref:"refs/heads/" + branch, sha:baseSha});
+              await github.rest.repos.createOrUpdateFileContents({
+                owner, repo, path:"README.md", branch, sha:readmeResponse.data.sha,
+                message:"docs: synchronize mod release catalog",
+                content:Buffer.from(updated,"utf8").toString("base64")
+              });
               try {
-                await github.rest.repos.createOrUpdateFileContents({
-                  owner, repo, path:"README.md", branch:"main", sha:readmeResponse.data.sha,
-                  message:"docs: synchronize mod release catalog",
-                  content:Buffer.from(updated,"utf8").toString("base64")
-                });
-                core.info("Updated README.md.");
-                return;
+                ({data:pr} = await github.rest.pulls.create({
+                  owner, repo, head:branch, base,
+                  title:"docs: synchronize mod release catalog",
+                  body:"Automatically generated from the mod catalog and published releases."
+                }));
               } catch (error) {
-                if (error.status !== 409 || attempt === 2) throw error;
-                core.warning("Concurrent README update; retrying with fresh contents.");
+                if (error.status === 403) core.error("Check Settings > Actions > General > Allow GitHub Actions to create and approve pull requests.");
+                throw error;
               }
+            }
+            await closeSuperseded(pr.number);
+            core.info("README sync PR: " + pr.html_url);
+            // Respect all repository rules; leave the PR open if checks or approval are required.
+            try {
+              const {data:result} = await github.rest.pulls.merge({
+                owner, repo, pull_number:pr.number, sha:pr.head.sha,
+                merge_method:"squash"
+              });
+              if (!result.merged) core.warning("README sync PR remains open: " + result.message);
+              else core.info("README sync PR merged.");
+            } catch (error) {
+              if (![403,405,409,422].includes(error.status)) throw error;
+              core.warning("README sync PR remains open for required checks or approval: " + pr.html_url);
             }
