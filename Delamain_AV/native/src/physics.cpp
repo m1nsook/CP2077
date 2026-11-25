@@ -18,6 +18,7 @@
 #include <vector>
 #include <algorithm>
 #include "diagnostics.hpp"
+#include "version.h"
 
 namespace {
 using namespace RED4ext;
@@ -484,7 +485,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
     if (reason == RED4ext::v1::EMainReason::Load) {
         g_sdk = sdk; g_plugin = handle;
         const bool logging=avdiag::Open();
-        avdiag::Log("SESSION","DelamainAV 0.2.16-dev.23 diagnostics format 1; UTC; SDK vehicle size=0x%zx; expected runtime=3.0.88.46235; DAV 3.5.0 binary-confirmed body offset 0x2D8",sizeof(Vehicle));
+        avdiag::Log("SESSION","DelamainAV " DELAMAINAV_VERSION_STRING " diagnostics format 1; UTC; SDK vehicle size=0x%zx; expected runtime=3.0.88.46235; DAV 3.5.0 binary-confirmed body offset 0x2D8",sizeof(Vehicle));
         g_runtimeOK = RuntimeOK();
         avdiag::Log("SESSION","runtime gate=%d",g_runtimeOK);
         if (sdk && sdk->logger && sdk->logger->Info) sdk->logger->Info(handle,logging?"DelamainAV persistent diagnostics enabled: DelamainAV-diagnostics.log":"DelamainAV could not open persistent diagnostics file");
@@ -512,7 +513,10 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
 RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info) {
     info->name = L"Delamain AV Physics";
     info->author = L"MISO";
-    info->version = RED4EXT_V1_SEMVER(0, 2, 16);
+    info->version = RED4EXT_V1_SEMVER(
+        DELAMAINAV_VERSION_MAJOR,
+        DELAMAINAV_VERSION_MINOR,
+        DELAMAINAV_VERSION_PATCH);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }
