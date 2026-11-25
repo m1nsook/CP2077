@@ -25,21 +25,24 @@ using RED4ext::CStackFrame;
 using RED4ext::CString;
 using PhysicsData=RED4ext::vehicle::PhysicsData;
 using Json=nlohmann::json;
-constexpr const char* version="0.1.0-dev.6-native-probe.2";
+constexpr const char* version="0.1.0-dev.6-native-probe.3";
 constexpr std::uint32_t syncHash=547299556u;
 using Sync=void(*)(void*,void*,PhysicsData*,float,float);
 Sync original=nullptr;
 void* target=nullptr;
-// The SDK's CBaseFunction::Execute wrapper supplies this exact signature.
-// Observe only the engine CStack layout, never CScriptStack or VM bytecode.
-using ExecuteScripted=bool(*)(RED4ext::CBaseFunction*,RED4ext::CStack*,void*);
+// The pinned SDK's ExecuteScripted hash is also CET's CScript_RunPureScript
+// (3791200470). The dispatcher accepts both array and packed argument stacks.
+// Source: CET d7c378d4e9c7b15ca1ce42c37e8732d3b397b047,
+// src/scripting/FunctionOverride.cpp (HookRunPureScriptFunction).
+// No CET dependency or VM bytecode decoding.
+using ExecuteScripted=bool(*)(RED4ext::CBaseFunction*,RED4ext::CScriptStack*,void*);
 ExecuteScripted originalScripted=nullptr;
 void* eventTarget=nullptr;
 std::uintptr_t stackVtable=0;
 std::atomic<bool> eventInstalled{false};
 std::atomic<std::uint64_t> bumpCalls{0}, rejectedStacks{0}, invalidPairs{0},
     observedPairs{0}, npcPairs{0}, driverQueryFailures{0}, playerPairs{0},
-    flagDisagreements{0}, guardedPairs{0};
+    flagDisagreements{0}, guardedPairs{0}, arrayStacks{0}, packedStacks{0};
 std::string eventStatus="contact hook inactive";
 struct PairSample {
     std::uint64_t receiver{},other{},syncSequence{};
@@ -138,9 +141,54 @@ bool roadVehicle(RED4ext::vehicle::BaseObject* v,RED4ext::CRTTISystem* rtti) {
     auto* bike=rtti->GetClass("vehicleBikeBaseObject");
     return type&&((car&&type->IsA(car))||(bike&&type->IsA(bike)));
 }
-void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CStack* stack) {
+// Validate entire span in a committed readable page before examining the
+// event argument. This is not a substitute for reflected type validation.
+bool readable(const void* ptr,std::size_t size) {
+    if(!ptr||!size)return false;
+    MEMORY_BASIC_INFORMATION region{};
+    if(!VirtualQuery(ptr,&region,sizeof(region))||region.State!=MEM_COMMIT||
+       (region.Protect&(PAGE_GUARD|PAGE_NOACCESS))||
+       !(region.Protect&(PAGE_READONLY|PAGE_READWRITE|PAGE_WRITECOPY|PAGE_EXECUTE_READ|
+                         PAGE_EXECUTE_READWRITE|PAGE_EXECUTE_WRITECOPY)))return false;
+    auto offset=reinterpret_cast<std::uintptr_t>(ptr)-reinterpret_cast<std::uintptr_t>(region.BaseAddress);
+    return offset<region.RegionSize&&size<=region.RegionSize-offset;
+}
+const RED4ext::Handle<IScriptable>* bumpArgument(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
+    if(!readable(stack,sizeof(RED4ext::CScriptStack))||!fn->returnType||
+       !fn->returnType->type||fn->returnType->type->GetName()!=RED4ext::CName("Bool")||
+       fn->params.size!=1||!fn->params[0]||!fn->params[0]->type||!stack->args)return nullptr;
+    auto* param=fn->params[0];
+    if(param->flags.isOut||param->type->GetSize()!=sizeof(RED4ext::Handle<IScriptable>))return nullptr;
+    auto* result=stack->GetResultAddr();
+    if(!result||stack->GetResultType()!=fn->returnType->type)return nullptr;
+    // CET uses value != GetResultAddr() to distinguish the CStackType array
+    // form from the contiguous script argument storage. Keep the original
+    // exact CStack vtable/count check as an additional guard where applicable.
+    void* value=nullptr;
+    const bool arrayForm=stack->value!=result;
+    if(arrayForm) {
+        if(*reinterpret_cast<const std::uintptr_t*>(stack)==stackVtable&&
+           (!readable(stack,sizeof(RED4ext::CStack))||
+            reinterpret_cast<RED4ext::CStack*>(stack)->argsCount!=1))return nullptr;
+        if(!readable(stack->args,sizeof(RED4ext::CStackType)))return nullptr;
+        const auto& arg=*reinterpret_cast<const RED4ext::CStackType*>(stack->args);
+        if(arg.type!=param->type)return nullptr;
+        value=arg.value;
+    } else {
+        if(*reinterpret_cast<const std::uintptr_t*>(stack)==stackVtable)return nullptr;
+        // Single required handle parameter; use reflected offset, not a guessed
+        // field address. Reject unexpected layout rather than interpreting it.
+        if(param->valueOffset!=0)return nullptr;
+        value=stack->args+param->valueOffset;
+    }
+    if(!readable(value,sizeof(RED4ext::Handle<IScriptable>))||
+       reinterpret_cast<std::uintptr_t>(value)%alignof(RED4ext::Handle<IScriptable>))return nullptr;
+    (arrayForm?arrayStacks:packedStacks).fetch_add(1,std::memory_order_relaxed);
+    return static_cast<const RED4ext::Handle<IScriptable>*>(value);
+}
+void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
     bumpCalls.fetch_add(1,std::memory_order_relaxed);
-    if(!stack||*reinterpret_cast<const std::uintptr_t*>(stack)!=stackVtable) {
+    if(!readable(stack,sizeof(RED4ext::CScriptStack))) {
         rejectedStacks.fetch_add(1,std::memory_order_relaxed);return;
     }
     auto* rtti=RED4ext::CRTTISystem::Get();
@@ -148,18 +196,17 @@ void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CStack* stack) {
     auto* bumpType=rtti?rtti->GetClass("vehicleVehicleBumpEvent"):nullptr;
     auto* context=stack->GetContext();
     if(!vehicleType||!bumpType||!context||!context->GetType()||
-       !context->GetType()->IsA(vehicleType)||fn->params.size!=1||
-       !stack->args||stack->argsCount!=1) {
+       !context->GetType()->IsA(vehicleType)||fn->params.size!=1||!fn->params[0]) {
         invalidPairs.fetch_add(1,std::memory_order_relaxed);return;
     }
-    auto& arg=stack->args[0];
-    if(!arg.type||!arg.value||!fn->params[0]||arg.type!=fn->params[0]->type||
-       arg.type->GetType()!=RED4ext::ERTTIType::Handle||
-       static_cast<RED4ext::CRTTIHandleType*>(arg.type)->GetInnerType()!=bumpType) {
+    auto* paramType=fn->params[0]->type;
+    if(!paramType||paramType->GetType()!=RED4ext::ERTTIType::Handle||
+       static_cast<RED4ext::CRTTIHandleType*>(paramType)->GetInnerType()!=bumpType) {
         invalidPairs.fetch_add(1,std::memory_order_relaxed);return;
     }
-    const auto& eventHandle=*static_cast<const RED4ext::Handle<IScriptable>*>(arg.value);
-    auto* event=eventHandle.GetPtr();
+    const auto* eventHandle=bumpArgument(fn,stack);
+    if(!eventHandle){rejectedStacks.fetch_add(1,std::memory_order_relaxed);return;}
+    auto* event=eventHandle->GetPtr();
     if(!event||!event->GetType()||!event->GetType()->IsA(bumpType)) {
         invalidPairs.fetch_add(1,std::memory_order_relaxed);return;
     }
@@ -206,7 +253,7 @@ void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CStack* stack) {
     // Store only numeric observations, never keep a vehicle pointer across callbacks.
     std::lock_guard lock(sampleMutex);lastPair=sample;
 }
-bool executeScripted(RED4ext::CBaseFunction* fn,RED4ext::CStack* stack,void* a3) {
+bool executeScripted(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack,void* a3) {
     if(enabled.load(std::memory_order_relaxed)&&fn&&
        fn->shortName==RED4ext::CName("OnVehicleBumpEvent")) {
         // A native Bool query should not reenter this event, but fail closed if it does.
@@ -277,7 +324,8 @@ std::string diagnostic() {
      <<"; after=("<<last.angularAfter.x<<","<<last.angularAfter.y<<","<<last.angularAfter.z<<")"
      <<"; forward loss="<<last.loss<<"; loss sample sync sequence="<<last.sequence
      <<"; "<<eventStatus<<"; bump callbacks="<<bumpCalls.load()
-     <<"; rejected stacks="<<rejectedStacks.load()<<"; invalid pairs="<<invalidPairs.load()
+     <<"; rejected stacks="<<rejectedStacks.load()<<"; array stacks="<<arrayStacks.load()
+     <<"; packed stacks="<<packedStacks.load()<<"; invalid pairs="<<invalidPairs.load()
      <<"; observed vehicle pairs="<<observedPairs.load()<<"; NPC pairs="<<npcPairs.load()
      <<"; driver query failures="<<driverQueryFailures.load()
      <<"; player driver pairs="<<playerPairs.load()<<"; candidate flag disagreements="<<flagDisagreements.load()
@@ -305,7 +353,7 @@ void resetReport(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
     calls.store(0);candidateFrames.store(0);corrections.store(0);last={};
     bumpCalls.store(0);rejectedStacks.store(0);invalidPairs.store(0);observedPairs.store(0);
     npcPairs.store(0);driverQueryFailures.store(0);playerPairs.store(0);flagDisagreements.store(0);
-    guardedPairs.store(0);lastPair={};if(out)*out=true;
+    guardedPairs.store(0);arrayStacks.store(0);packedStacks.store(0);lastPair={};if(out)*out=true;
 }
 void registerTypes(){}
 void postRegister(){
