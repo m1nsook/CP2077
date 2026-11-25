@@ -40,6 +40,6 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: action-blocked-fix-0.1.0-dev.4
+          name: action-blocked-fix-0.1.0-dev.5
           path: game-root/
           if-no-files-found: error

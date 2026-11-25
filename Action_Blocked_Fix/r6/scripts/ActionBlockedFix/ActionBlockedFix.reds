@@ -189,10 +189,11 @@ public class ActionBlockedFixSystem extends ScriptableSystem {
       return;
     }
 
-    // Eight consecutive normal-gameplay samples with the exact observed
-    // restriction pair. This is still a heuristic, not quest ownership.
+    // Two matching samples one gameplay second apart. The first sample
+    // starts the wait; a changed application epoch resets it.
+    // This is still a heuristic, not proof of quest ownership.
     this.samples += 1;
-    if this.samples < 8 { return; }
+    if this.samples < 2 { return; }
 
     this.attempted = true;
     this.samples = 0;
