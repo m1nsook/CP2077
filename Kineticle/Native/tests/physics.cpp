@@ -41,7 +41,7 @@ int main(){
     std::string reconstructed;
     for(std::size_t i=0;i<pages.size();++i){
         check(pages[i].size()<=reportPayloadBytes);
-        check(numberedPage("0.1.0-dev.8-native-motion",pages,i).size()<=2048);
+        check(numberedPage("0.1.0-dev.9-native-motion",pages,i).size()<=2048);
         reconstructed+=pages[i];
     }
     check(reconstructed==report);
@@ -84,25 +84,25 @@ int main(){
     check(length(motion.targetAdd)>5.3f&&length(motion.targetAdd)<5.4f);
     auto unrelated=npc;unrelated.after=npc.before;check(planMotion(v,unrelated).reason==TrialReject::Momentum);
     auto flagged=npc;flagged.candidate=true;check(planMotion(v,flagged).reason==TrialReject::Sample);
-    auto traffic=npc;traffic.physicsState=1;check(planMotion(v,traffic).reason==TrialReject::Sample);
+    auto traffic=npc;traffic.physicsState=1;check(planMotion(v,traffic).reason==TrialReject::None&&!trialSample(traffic,false,true));
     auto late=npc;late.us+=6000;check(planMotion(v,late).reason==TrialReject::Timing);
     MotionTrial mt;mt.arm(v.id,npc.id,100000,100751);
     std::array<TraceSample,2> source{npc,v};mt.seed(source);
     check(mt.ready&&mt.planned==1);
     auto cleanNpc=npc;cleanNpc.sequence+=10;cleanNpc.us+=30000;cleanNpc.before=cleanNpc.after;cleanNpc.change=0;
     auto cleanV=v;cleanV.sequence+=20;cleanV.us+=31000;cleanV.before=cleanV.after;cleanV.change=0;
-    check(!mt.step(cleanV,true).apply); // target must be delivered first
+    check(!mt.step(cleanV,true,true).apply); // target must be delivered first
     auto act=mt.step(cleanNpc,true);check(act.apply&&!act.driver);
     mt.recordWrite(act,cleanNpc.after,add(cleanNpc.after,act.delta),cleanNpc.us);
     check(!mt.step(cleanNpc,true).apply);
-    act=mt.step(cleanV,true);check(act.apply&&act.driver);
+    act=mt.step(cleanV,true,true);check(act.apply&&act.driver);
     mt.recordWrite(act,cleanV.after,add(cleanV.after,act.delta),cleanV.us);
     check(!mt.active&&mt.targetWrites==1&&mt.driverWrites==1&&mt.completed==1);
     mt.arm(v.id,npc.id,100000,100751);mt.seed(source);
     auto wall=cleanNpc;wall.change=1;check(!mt.step(wall,true).apply&&!mt.active&&mt.lastReason==TrialReject::NewCorrection);
     mt.arm(v.id,npc.id,100000,100751);mt.seed(source);
     check(!mt.step(cleanNpc,false).apply&&!mt.active&&mt.lastReason==TrialReject::Context);
-    mt.arm(v.id,npc.id,100000,100751);mt.seed(source);mt.expire(220001);
+    mt.arm(v.id,npc.id,100000,100751);mt.seed(source);mt.expire(320001);
     check(!mt.active&&mt.lastReason==TrialReject::Expired);
     mt.arm(v.id,npc.id,100000,100751);mt.seed(source);
     act=mt.step(cleanNpc,true);check(act.apply);
@@ -112,4 +112,41 @@ int main(){
     auto pre=v;pre.us=99000;mt.offer(pre);check(!mt.d.id);
     auto stray=v;stray.id=42;mt.offer(stray);check(!mt.d.id);
     mt.offer(v);mt.offer(npc);mt.finishPlan();check(mt.ready);
+    // Real dev.8 bike/traffic collision #30, including the 6.7% residual.
+    TraceSample bike{},car{};
+    bike.id=9015092;bike.sequence=96741;bike.us=100744;bike.mass=380;bike.inverseMass=.00263158f;
+    bike.massOk=true;bike.dt=.0239499f;bike.candidate=true;
+    bike.before={14.3715f,15.993f,.79639f};bike.after={5.54949f,5.58235f,-1.85412f};
+    bike.change=length(sub(bike.after,bike.before));bike.loss=forwardLoss(bike.before,bike.after);
+    car.id=10570069;car.sequence=96757;car.us=101038;car.mass=1600;car.inverseMass=.000625f;
+    car.massOk=true;car.dt=bike.dt;car.physicsState=1;
+    car.before={2.52888f,3.57062f,.0197956f};car.after={4.77554f,6.22186f,.694791f};
+    car.change=length(sub(car.after,car.before));car.loss=forwardLoss(car.before,car.after);
+    auto bikePlan=planMotion(bike,car);
+    check(bikePlan.reason==TrialReject::None&&bikePlan.error>.06f&&bikePlan.error<.08f);
+    MotionTrial trafficTrial;trafficTrial.arm(bike.id,car.id,100000,96740);
+    check(!trafficTrial.step(bike,true).apply);
+    check(!trafficTrial.step(car,true).apply&&trafficTrial.ready&&trafficTrial.trafficWaits==1);
+    auto dynamic=car;dynamic.physicsState=0;dynamic.sequence+=100;dynamic.us+=30000;
+    dynamic.before=dynamic.after;dynamic.change=0;
+    act=trafficTrial.step(dynamic,true);check(act.apply&&!act.driver);
+    trafficTrial.recordWrite(act,dynamic.after,add(dynamic.after,act.delta),dynamic.us);
+    auto laterBike=bike;laterBike.sequence+=200;laterBike.us+=40000;laterBike.before=laterBike.after;laterBike.change=0;
+    check(!trafficTrial.step(laterBike,true,false).apply&&trafficTrial.contextWaits==1);
+    check(!trafficTrial.step(laterBike,false,true).apply&&trafficTrial.partial==1);
+    // Multiple candidates: reject an unrelated correction without canceling
+    // the transaction, then accept the matching real samples.
+    MotionTrial many;many.arm(v.id,npc.id,100000,100751);
+    auto wrong=npc;wrong.sequence=100755;wrong.us=101000;wrong.after=wrong.before;wrong.after.x+=1;wrong.change=1;
+    many.offer(wrong);many.offer(v);many.finishPlan();check(many.active&&!many.ready);
+    act=many.step(npc,true);check(many.ready&&act.apply&&!act.driver);
+    many.recordWrite(act,npc.after,add(npc.after,act.delta),npc.us);check(many.sameSyncWrites==1);
+    check(!many.step(cleanV,true,false).apply);
+    act=many.step(cleanV,true,true);check(act.apply&&act.driver);
+    many.recordWrite(act,cleanV.after,add(cleanV.after,act.delta),cleanV.us);
+    check(many.auditIndex==1&&many.audit[0].driverDone&&many.audit[0].targetDone);
+    auto badState=car;badState.physicsState=0x20;
+    check(planMotion(bike,badState).reason==TrialReject::Sample);
+    auto playerTraffic=bike;playerTraffic.physicsState=1;
+    check(planMotion(playerTraffic,car).reason==TrialReject::Sample);
 }

@@ -55,7 +55,7 @@ jobs:
           assert (core/"red4ext/plugins/Kineticle/Kineticle.dll").is_file()
           assert not list(core.rglob("*.reds"))
           for name, src in [("Core",core),("Controller-M1Arc",ctrl)]:
-              with ZipFile(dist/f"Kineticle-{name}-0.1.0-dev.8-native-motion.zip","w",ZIP_DEFLATED) as z:
+              with ZipFile(dist/f"Kineticle-{name}-0.1.0-dev.9-native-motion.zip","w",ZIP_DEFLATED) as z:
                   for p in sorted(src.rglob("*")):
                       if p.is_file():
                           assert p.relative_to(src).parts[0] in ("red4ext","r6")
@@ -65,6 +65,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Packaging failed" }
       - uses: actions/upload-artifact@v4
         with:
-          name: kineticle-0.1.0-dev.8-native-motion
+          name: kineticle-0.1.0-dev.9-native-motion
           path: dist/
           if-no-files-found: error

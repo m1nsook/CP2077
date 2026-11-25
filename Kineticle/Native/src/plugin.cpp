@@ -32,7 +32,7 @@ using RED4ext::CStackFrame;
 using RED4ext::CString;
 using PhysicsData=RED4ext::vehicle::PhysicsData;
 using Json=nlohmann::json;
-constexpr const char* version="0.1.0-dev.8-native-motion";
+constexpr const char* version="0.1.0-dev.9-native-motion";
 constexpr std::uint32_t syncHash=547299556u;
 using Sync=void(*)(void*,void*,PhysicsData*,float,float);
 Sync original=nullptr;
@@ -179,7 +179,7 @@ void addCost(std::atomic<std::uint64_t>& total,std::atomic<std::uint64_t>& maxim
 }
 bool contextAllows(std::uint64_t id,std::int64_t stamp) {
     return id&&controllerContext.vehicle==id&&controllerContext.allowed&&
-        stamp>=controllerContext.us&&stamp-controllerContext.us<=750000;
+        stamp>=controllerContext.us&&stamp-controllerContext.us<=350000;
 }
 // All trial state is serialized by sampleMutex. The atomic IDs are only a
 // fast-path filter: they never authorize a write or retain a body pointer.
@@ -224,7 +224,7 @@ void sync(void* self,void* chassis,PhysicsData* rb,float a4,float dt) {
     if(trialCandidate&&experiment.load(std::memory_order_relaxed)&&enabled.load(std::memory_order_relaxed)&&trial.active) {
         // The planner returns at most one adjustment for THIS callback's body.
         // Never wait for another physics worker or touch its rigid body.
-        auto action=trial.step(current,contextAllows(trial.driver,stamp));
+        auto action=trial.step(current,contextAllows(trial.driver,stamp),controllerContext.us>=trial.eventUs);
         if(action.apply) {
             auto result=kineticle::add(after,action.delta);
             rb->velocity=RED4ext::Vector3(result.x,result.y,result.z);
@@ -430,7 +430,7 @@ void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
     if(controllerContext.us) {
         sample.contextAgeUs=eventTime-controllerContext.us;
         sample.contextMatches=driverId&&driverId==controllerContext.vehicle&&
-            sample.contextAgeUs>=0&&sample.contextAgeUs<=750000;
+            sample.contextAgeUs>=0&&sample.contextAgeUs<=350000;
         sample.context=controllerContext.detail;
     }
     pairHistory[pairIndex++%pairHistory.size()]=sample;
@@ -440,11 +440,12 @@ void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
         if(playerPair) {
             // Any additional event while a transaction is pending makes the
             // association ambiguous. Cancel rather than reuse old samples.
+            trial.expire(nowUs());
             if(trial.active)trial.cancel(kineticle::TrialReject::Overlap);
             else if(!trialGuards)trial.reject(kineticle::TrialReject::Guards);
             else if(!sample.contextMatches||!contextAllows(driverId,nowUs()))
                 trial.reject(kineticle::TrialReject::Context);
-            else if(sample.duplicate||!std::isfinite(sample.delta)||sample.delta<0.10f)
+            else if(sample.duplicate||!std::isfinite(sample.delta)||sample.delta<0.0f)
                 trial.reject(kineticle::TrialReject::Event);
             else {
                 trial.arm(driverId,targetId,eventTime,sample.syncSequence);
@@ -590,10 +591,22 @@ std::string diagnostic() {
      <<" completed="<<trial.completed<<" partial="<<trial.partial<<" pending="<<trial.active
      <<" last_reason="<<kineticle::trialReason(trial.lastReason)
      <<" last_driver="<<trial.driver<<" last_target="<<trial.target
+     <<" traffic_observations="<<trial.trafficObservations<<" traffic_waits="<<trial.trafficWaits
+     <<" post_context_waits="<<trial.contextWaits<<" same_sync_target_writes="<<trial.sameSyncWrites
      <<" last_pair_error="<<trial.plan.error<<" last_driver_add=("<<trial.plan.driverAdd.x<<","<<trial.plan.driverAdd.y<<","<<trial.plan.driverAdd.z<<")"
      <<" last_target_add=("<<trial.plan.targetAdd.x<<","<<trial.plan.targetAdd.y<<","<<trial.plan.targetAdd.z<<")";
     for(unsigned i=1;i<static_cast<unsigned>(kineticle::TrialReject::Count);++i)
         s<<" "<<kineticle::trialReason(static_cast<kineticle::TrialReject>(i))<<"="<<trial.rejections[i];
+    for(std::size_t i=0;i<std::min(trial.auditIndex,trial.audit.size());++i) {
+        const auto& a=trial.audit[(trial.auditIndex-1-i)%trial.audit.size()];
+        s<<"; MOTION_ATTEMPT driver="<<a.driver<<" target="<<a.target<<" event_seq="<<a.eventSequence
+         <<" result="<<kineticle::trialReason(a.reason)<<" plan="<<a.ready<<" target_written="<<a.targetDone
+         <<" driver_written="<<a.driverDone<<" candidates_V="<<a.driverCount<<" candidates_NPC="<<a.targetCount
+         <<" V_state="<<a.d.physicsState<<" NPC_state="<<a.t.physicsState
+         <<" V_seq="<<a.d.sequence<<" NPC_seq="<<a.t.sequence
+         <<" V_loss="<<a.d.loss<<" NPC_dv="<<a.t.change<<" error="<<a.plan.error
+         <<" V_dt="<<a.d.dt<<" NPC_dt="<<a.t.dt;
+    }
     for(std::size_t i=0;i<std::min(trial.writeIndex,trial.writes.size());++i) {
         const auto& w=trial.writes[(trial.writeIndex-1-i)%trial.writes.size()];
         s<<"; MOTION_WRITE role="<<(w.driver?"V":"NPC")<<" id="<<w.id<<" pair_event_us="<<w.eventUs
@@ -693,6 +706,7 @@ void setControllerContext(IScriptable*,CStackFrame* frame,bool* out,std::int64_t
 void captureReport(IScriptable*,CStackFrame* frame,std::int32_t* out,std::int64_t) {
     frame->code++;
     if(!out)return;
+    {std::lock_guard lock(sampleMutex);trial.expire(nowUs());publishTrialIds();}
     auto snapshot=diagnostic();
     std::lock_guard lock(reportMutex);
     const bool saved=writeReportFile(snapshot);

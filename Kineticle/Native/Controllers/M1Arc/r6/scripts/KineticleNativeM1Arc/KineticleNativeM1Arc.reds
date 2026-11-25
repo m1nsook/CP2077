@@ -29,7 +29,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
     let cb = new KineticleNativeM1ArcTick();
     cb.owner = this;
     cb.epoch = this.epoch;
-    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.50, false);
+    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, this.lastExperiment ? 0.10 : 0.50, false);
   }
   private func Flag(value: Bool) -> String { return value ? "1" : "0"; }
   private func SampleContext() -> Void {
