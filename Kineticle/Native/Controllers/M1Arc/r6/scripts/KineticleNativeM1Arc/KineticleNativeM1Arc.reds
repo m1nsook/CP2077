@@ -4,12 +4,14 @@ native func Kineticle_SetProbeEnabled(enabled: Bool) -> Bool;
 native func Kineticle_CaptureDiagnostics() -> Int32;
 native func Kineticle_DiagnosticPart(index: Int32) -> String;
 native func Kineticle_ResetDiagnostics() -> Bool;
-native func Kineticle_SetControllerContext(vehicle: EntityID, detail: String) -> Bool;
+native func Kineticle_SetControllerContext(vehicle: EntityID, detail: String, allowed: Bool) -> Bool;
+native func Kineticle_SetExperimentEnabled(enabled: Bool) -> Bool;
 public class KineticleNativeM1ArcSystem extends ScriptableSystem {
   private let running: Bool;
   private let initialized: Bool;
   private let epoch: Int32;
   private let lastEnabled: Bool;
+  private let lastExperiment: Bool;
   private func OnAttach() -> Void {
     this.epoch += 1;
     this.running = true;
@@ -19,6 +21,8 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
   private func OnDetach() -> Void {
     this.running = false;
     this.epoch += 1;
+    Kineticle_SetExperimentEnabled(false);
+    this.lastExperiment = false;
   }
   private func Schedule() -> Void {
     if !this.running { return; }
@@ -40,7 +44,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
     let scene: Bool = false;
     let detail: String;
     if !IsDefined(player) {
-      Kineticle_SetControllerContext(vehicleID, "player unavailable");
+      Kineticle_SetControllerContext(vehicleID, "player unavailable", false);
       return;
     }
     mounted = VehicleComponent.GetVehicle(player.GetGame(), player.GetEntityID(), vehicle);
@@ -55,7 +59,8 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
       + " component_driver=" + this.Flag(driver) + " psm_vehicle=" + IntToString(state)
       + " tag_NoDriving=" + this.Flag(noDriving) + " tag_VehicleOnlyForward=" + this.Flag(forwardOnly)
       + " tag_VehicleScene=" + this.Flag(scene);
-    Kineticle_SetControllerContext(vehicleID, detail);
+    let allowed = mounted && IsDefined(vehicle) && driver && (state == 1 || state == 6) && !noDriving && !forwardOnly && !scene;
+    Kineticle_SetControllerContext(vehicleID, detail, allowed);
   }
   private func Report(id: String) -> Void {
     this.SampleContext();
@@ -89,6 +94,9 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
         this.lastEnabled = Kineticle_GetProbeEnabled();
         if M1Arc_SetBool(id, "probeEnabled", this.lastEnabled) {
           this.initialized = true;
+          this.lastExperiment = false;
+          Kineticle_SetExperimentEnabled(false);
+          M1Arc_SetBool(id, "experimentEnabled", false);
           this.Report(id);
         }
       } else {
@@ -104,6 +112,20 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
       }
       if this.initialized {
         if this.lastEnabled { this.SampleContext(); }
+        let wanted = M1Arc_GetBool(id, "experimentEnabled");
+        if !this.lastEnabled { wanted = false; }
+        if NotEquals(wanted, this.lastExperiment) {
+          if Kineticle_SetExperimentEnabled(wanted) {
+            this.lastExperiment = wanted;
+            M1Arc_Log(id, "INFO", wanted ? "Experimental paired motion enabled for this session." : "Experimental paired motion disabled.");
+          } else {
+            this.lastExperiment = false;
+            M1Arc_Log(id, "ERROR", "Native experimental motion could not be enabled.");
+          }
+        }
+        if NotEquals(M1Arc_GetBool(id, "experimentEnabled"), this.lastExperiment) {
+          M1Arc_SetBool(id, "experimentEnabled", this.lastExperiment);
+        }
         if M1Arc_ConsumeAction(id, "report") { this.Report(id); }
         if M1Arc_ConsumeAction(id, "reset") {
           Kineticle_ResetDiagnostics();

@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "author": "민숙 MISO @m1nsook",
   "scope": "Gameplay",
-  "shortDesc": "Native physics development probe; read-only diagnostics, no gameplay changes.",
+  "shortDesc": "Native collision diagnostics and opt-in paired motion development test.",
   "requires": {
     "m1arc": "1.0.1"
   }

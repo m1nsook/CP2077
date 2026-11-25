@@ -2,6 +2,7 @@
 #include "contact_trace.hpp"
 #include "report_pages.hpp"
 #include "diagnostic_policy.hpp"
+#include "motion_trial.hpp"
 #include <cstdlib>
 #include <cmath>
 #include <limits>
@@ -40,7 +41,7 @@ int main(){
     std::string reconstructed;
     for(std::size_t i=0;i<pages.size();++i){
         check(pages[i].size()<=reportPayloadBytes);
-        check(numberedPage("0.1.0-dev.7-native-diagnostics",pages,i).size()<=2048);
+        check(numberedPage("0.1.0-dev.8-native-motion",pages,i).size()<=2048);
         reconstructed+=pages[i];
     }
     check(reconstructed==report);
@@ -69,4 +70,46 @@ int main(){
     check(eq(est.impulse,5000)&&eq(est.extra5,20000)&&eq(est.extra100,495000));
     check(eq(est.recover50.x,7.5f)&&eq(est.recover100.x,10));
     check(estimate({10,0,0},{5,0,0},0,false).impulse==0);
+    // Replay the equal-mass collision from dev.7, preserving the measured timing.
+    TraceSample v{},npc{};
+    v.id=9015084;v.sequence=100786;v.us=120859;v.candidate=true;v.mass=1600;v.inverseMass=.000625f;v.massOk=true;v.dt=.0333333f;
+    v.before={1.33757f,25.0523f,-.348003f};v.after={1.01073f,19.6988f,-.0974044f};
+    v.change=length(sub(v.after,v.before));v.loss=forwardLoss(v.before,v.after);
+    npc.id=10564884;npc.sequence=100788;npc.us=120879;npc.mass=1600;npc.inverseMass=.000625f;npc.massOk=true;npc.dt=v.dt;
+    npc.before={.923578f,15.2854f,.331723f};npc.after={1.25042f,20.6389f,.0811251f};
+    npc.change=length(sub(npc.after,npc.before));npc.loss=forwardLoss(npc.before,npc.after);
+    const auto motion=planMotion(v,npc);
+    check(motion.reason==TrialReject::None&&motion.error<.001f&&motion.driverAdd.z==0&&motion.targetAdd.z==0);
+    check(length(motion.driverAdd)>2.6f&&length(motion.driverAdd)<2.8f);
+    check(length(motion.targetAdd)>5.3f&&length(motion.targetAdd)<5.4f);
+    auto unrelated=npc;unrelated.after=npc.before;check(planMotion(v,unrelated).reason==TrialReject::Momentum);
+    auto flagged=npc;flagged.candidate=true;check(planMotion(v,flagged).reason==TrialReject::Sample);
+    auto traffic=npc;traffic.physicsState=1;check(planMotion(v,traffic).reason==TrialReject::Sample);
+    auto late=npc;late.us+=6000;check(planMotion(v,late).reason==TrialReject::Timing);
+    MotionTrial mt;mt.arm(v.id,npc.id,100000,100751);
+    std::array<TraceSample,2> source{npc,v};mt.seed(source);
+    check(mt.ready&&mt.planned==1);
+    auto cleanNpc=npc;cleanNpc.sequence+=10;cleanNpc.us+=30000;cleanNpc.before=cleanNpc.after;cleanNpc.change=0;
+    auto cleanV=v;cleanV.sequence+=20;cleanV.us+=31000;cleanV.before=cleanV.after;cleanV.change=0;
+    check(!mt.step(cleanV,true).apply); // target must be delivered first
+    auto act=mt.step(cleanNpc,true);check(act.apply&&!act.driver);
+    mt.recordWrite(act,cleanNpc.after,add(cleanNpc.after,act.delta),cleanNpc.us);
+    check(!mt.step(cleanNpc,true).apply);
+    act=mt.step(cleanV,true);check(act.apply&&act.driver);
+    mt.recordWrite(act,cleanV.after,add(cleanV.after,act.delta),cleanV.us);
+    check(!mt.active&&mt.targetWrites==1&&mt.driverWrites==1&&mt.completed==1);
+    mt.arm(v.id,npc.id,100000,100751);mt.seed(source);
+    auto wall=cleanNpc;wall.change=1;check(!mt.step(wall,true).apply&&!mt.active&&mt.lastReason==TrialReject::NewCorrection);
+    mt.arm(v.id,npc.id,100000,100751);mt.seed(source);
+    check(!mt.step(cleanNpc,false).apply&&!mt.active&&mt.lastReason==TrialReject::Context);
+    mt.arm(v.id,npc.id,100000,100751);mt.seed(source);mt.expire(220001);
+    check(!mt.active&&mt.lastReason==TrialReject::Expired);
+    mt.arm(v.id,npc.id,100000,100751);mt.seed(source);
+    act=mt.step(cleanNpc,true);check(act.apply);
+    mt.recordWrite(act,cleanNpc.after,add(cleanNpc.after,act.delta),cleanNpc.us);
+    mt.cancel(TrialReject::Overlap);check(mt.partial==1&&!mt.active);
+    mt.arm(v.id,npc.id,100000,100751);
+    auto pre=v;pre.us=99000;mt.offer(pre);check(!mt.d.id);
+    auto stray=v;stray.id=42;mt.offer(stray);check(!mt.d.id);
+    mt.offer(v);mt.offer(npc);mt.finishPlan();check(mt.ready);
 }

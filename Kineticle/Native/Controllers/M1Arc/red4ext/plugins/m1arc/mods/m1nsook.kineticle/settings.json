@@ -5,7 +5,15 @@
     "label": "Enable native physics diagnostics",
     "default": true,
     "group": "Diagnostics",
-    "description": "Read-only PhysX sync and vehicle bump diagnostics. No gameplay changes."
+    "description": "Enable native observations. Disabling also stops the session-only experiment."
+  },
+  {
+    "id": "experimentEnabled",
+    "kind": "boolean",
+    "label": "Experimental paired motion (session only)",
+    "default": false,
+    "group": "Experimental",
+    "description": "Opt-in test: nominal 2x horizontal outgoing correction (max +8 m/s) and 50% forward recovery (max +4 m/s). Requires fresh player context; resets off on session attach. Not a release feature."
   },
   {
     "id": "report",
