@@ -20,6 +20,7 @@
 #include <vector>
 #include "physics.hpp"
 #include "contact_trace.hpp"
+#include "report_pages.hpp"
 #include <chrono>
 
 namespace {
@@ -28,7 +29,7 @@ using RED4ext::CStackFrame;
 using RED4ext::CString;
 using PhysicsData=RED4ext::vehicle::PhysicsData;
 using Json=nlohmann::json;
-constexpr const char* version="0.1.0-dev.6-native-probe.5";
+constexpr const char* version="0.1.0-dev.6-native-probe.6";
 constexpr std::uint32_t syncHash=547299556u;
 using Sync=void(*)(void*,void*,PhysicsData*,float,float);
 Sync original=nullptr;
@@ -74,7 +75,8 @@ PairSample lastPair;
 kineticle::ContactTrace trace;
 std::atomic<bool> enabled{true}, installed{false};
 std::atomic<std::uint64_t> calls{0}, candidateFrames{0}, corrections{0};
-std::mutex stateMutex, sampleMutex;
+std::mutex stateMutex, sampleMutex, reportMutex;
+std::vector<std::string> reportPages;
 std::filesystem::path configPath;
 std::string status="not initialized";
 struct Sample { kineticle::Vec before{},after{},angularBefore{},angularAfter{}; float loss{}; std::uint64_t sequence{}; };
@@ -447,6 +449,24 @@ void setEnabled(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
 void getReport(IScriptable*,CStackFrame* frame,CString* out,std::int64_t){
     frame->code++;if(out)*out=CString(diagnostic().c_str());
 }
+// Capture once: the controller reads numbered pages from the same snapshot.
+// Keep the transport separate from physics and independent of M1 Arc.
+void captureReport(IScriptable*,CStackFrame* frame,std::int32_t* out,std::int64_t) {
+    frame->code++;
+    if(!out)return;
+    auto pages=kineticle::reportPages(diagnostic());
+    std::lock_guard lock(reportMutex);
+    reportPages=std::move(pages);
+    *out=static_cast<std::int32_t>(reportPages.size());
+}
+void getReportPart(IScriptable*,CStackFrame* frame,CString* out,std::int64_t) {
+    std::int32_t index=-1;RED4ext::GetParameter(frame,&index);frame->code++;
+    if(!out)return;
+    std::lock_guard lock(reportMutex);
+    if(index<0||static_cast<std::size_t>(index)>=reportPages.size()) {*out=CString("");return;}
+    const auto text=kineticle::numberedPage(version,reportPages,static_cast<std::size_t>(index));
+    *out=CString(text.c_str());
+}
 void resetReport(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
     frame->code++;std::lock_guard lock(sampleMutex);
     calls.store(0);candidateFrames.store(0);corrections.store(0);last={};
@@ -459,17 +479,19 @@ void resetReport(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
 void registerTypes(){}
 void postRegister(){
     auto* rtti=RED4ext::CRTTISystem::Get();if(!rtti)return;
-    const auto add=[&](const char* name,RED4ext::ScriptingFunction_t<void*> callback,const char* result,bool arg){
+    const auto add=[&](const char* name,RED4ext::ScriptingFunction_t<void*> callback,const char* result,const char* argType=nullptr,const char* argName=nullptr){
         auto* fn=RED4ext::CGlobalFunction::Create(name,name,callback);
         if(!fn)return;
         fn->flags=RED4ext::CBaseFunction::Flags{.isNative=true,.isStatic=true};
-        fn->SetReturnType(result);if(arg)fn->AddParam("Bool","enabled");
+        fn->SetReturnType(result);if(argType)fn->AddParam(argType,argName);
         rtti->RegisterFunction(fn);
     };
-    add("Kineticle_GetProbeEnabled",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getEnabled),"Bool",false);
-    add("Kineticle_SetProbeEnabled",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&setEnabled),"Bool",true);
-    add("Kineticle_Diagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getReport),"String",false);
-    add("Kineticle_ResetDiagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&resetReport),"Bool",false);
+    add("Kineticle_GetProbeEnabled",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getEnabled),"Bool");
+    add("Kineticle_SetProbeEnabled",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&setEnabled),"Bool","Bool","enabled");
+    add("Kineticle_Diagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getReport),"String");
+    add("Kineticle_ResetDiagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&resetReport),"Bool");
+    add("Kineticle_CaptureDiagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&captureReport),"Int32");
+    add("Kineticle_DiagnosticPart",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getReportPart),"String","Int32","index");
 }
 }
 RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle handle,RED4ext::EMainReason reason,const RED4ext::Sdk* sdk){

@@ -1,5 +1,6 @@
 #include "physics.hpp"
 #include "contact_trace.hpp"
+#include "report_pages.hpp"
 #include <cstdlib>
 #include <cmath>
 #include <limits>
@@ -31,4 +32,23 @@ int main(){
     check(e.driverPost.sequence==5);
     trace={};
     check(trace.events[0].driver==0);
+    std::string report;
+    for(int i=0;i<500;++i)report+="; contact velocity=123.456";
+    auto pages=reportPages(report);
+    check(pages.size()>1);
+    std::string reconstructed;
+    for(std::size_t i=0;i<pages.size();++i){
+        check(pages[i].size()<=reportPayloadBytes);
+        check(numberedPage("0.1.0-dev.6-native-probe.6",pages,i).size()<=2048);
+        reconstructed+=pages[i];
+    }
+    check(reconstructed==report);
+    check(numberedPage("version",pages,pages.size()).empty());
+    check(reportPages("").empty());
+    auto longField=std::string(5000,'x');
+    auto longPages=reportPages(longField);
+    check(longPages.size()==3);
+    reconstructed.clear();
+    for(const auto& part:longPages)reconstructed+=part;
+    check(reconstructed==longField);
 }

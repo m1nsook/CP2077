@@ -1,7 +1,8 @@
 // Optional controller. The native Core has no REDscript dependency.
 native func Kineticle_GetProbeEnabled() -> Bool;
 native func Kineticle_SetProbeEnabled(enabled: Bool) -> Bool;
-native func Kineticle_Diagnostics() -> String;
+native func Kineticle_CaptureDiagnostics() -> Int32;
+native func Kineticle_DiagnosticPart(index: Int32) -> String;
 native func Kineticle_ResetDiagnostics() -> Bool;
 public class KineticleNativeM1ArcSystem extends ScriptableSystem {
   private let running: Bool;
@@ -25,6 +26,28 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
     cb.epoch = this.epoch;
     GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.50, false);
   }
+  private func Report(id: String) -> Void {
+    let count = Kineticle_CaptureDiagnostics();
+    let i: Int32 = 0;
+    let failures: Int32 = 0;
+    let message: String;
+    if count <= 0 || count > 32 {
+      M1Arc_Log(id, "ERROR", "Native diagnostic snapshot returned an invalid page count.");
+      return;
+    }
+    while i < count {
+      message = Kineticle_DiagnosticPart(i);
+      if Equals(message, "") {
+        failures += 1;
+      } else {
+        if !M1Arc_Log(id, "INFO", message) { failures += 1; }
+      }
+      i += 1;
+    }
+    if failures > 0 {
+      M1Arc_Log(id, "ERROR", "Native diagnostic report incomplete: " + IntToString(failures) + " page(s) rejected.");
+    }
+  }
   public func Tick(epoch: Int32) -> Void {
     if !this.running || epoch != this.epoch { return; }
     let id = "m1nsook.kineticle";
@@ -34,7 +57,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
         this.lastEnabled = Kineticle_GetProbeEnabled();
         if M1Arc_SetBool(id, "probeEnabled", this.lastEnabled) {
           this.initialized = true;
-          M1Arc_Log(id, "INFO", Kineticle_Diagnostics());
+          this.Report(id);
         }
       } else {
         let value = M1Arc_GetBool(id, "probeEnabled");
@@ -48,7 +71,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
         }
       }
       if this.initialized {
-        if M1Arc_ConsumeAction(id, "report") { M1Arc_Log(id, "INFO", Kineticle_Diagnostics()); }
+        if M1Arc_ConsumeAction(id, "report") { this.Report(id); }
         if M1Arc_ConsumeAction(id, "reset") {
           Kineticle_ResetDiagnostics();
           M1Arc_Log(id, "INFO", "Native diagnostics reset.");
