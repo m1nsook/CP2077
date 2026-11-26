@@ -1,0 +1,8 @@
+version: 1.0.0
+music:
+  MainMenuMusic:
+    file: ./serce.wav
+    usage: streaming
+    settings:
+      volume: 1.0
+      loop: true
