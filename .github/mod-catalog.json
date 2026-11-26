@@ -87,5 +87,13 @@
     "m1arc": "Optional",
     "description": "Configurable chassis collision mass and vehicle protection for V, with a choice of settings controllers.",
     "status": "auto"
+  },
+  {
+    "path": "Serce_Main_Menu_Music",
+    "name": "Serce — Main Menu Music",
+    "nexus_id": 39716,
+    "m1arc": "-",
+    "description": "Replaces main menu music with Serce from 102.0 HKGN FM.",
+    "status": "auto"
   }
 ]
