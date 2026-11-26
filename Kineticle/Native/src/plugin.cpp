@@ -37,7 +37,7 @@ using RED4ext::CStackFrame;
 using RED4ext::CString;
 using PhysicsData=RED4ext::vehicle::PhysicsData;
 using Json=nlohmann::json;
-constexpr const char* version="0.1.0-dev.12-native-mass";
+constexpr const char* version="0.1.0-dev.13-native-chassis-mass";
 constexpr std::uint32_t syncHash=547299556u;
 using Sync=void(*)(void*,void*,PhysicsData*,float,float);
 Sync original=nullptr;
@@ -182,9 +182,9 @@ void addCost(std::atomic<std::uint64_t>& total,std::atomic<std::uint64_t>& maxim
     auto old=maximum.load(std::memory_order_relaxed);
     while(old<elapsed&&!maximum.compare_exchange_weak(old,elapsed,std::memory_order_relaxed)) {}
 }
-void massStep(PhysicsData* rb);
+void massStep(PhysicsData* rb,void* chassis);
 void sync(void* self,void* chassis,PhysicsData* rb,float a4,float dt) {
-    massStep(rb);
+    massStep(rb,chassis);
     if (!enabled.load(std::memory_order_relaxed)||!rb||!chassis) { original(self,chassis,rb,a4,dt);return; }
     const auto sequence=calls.fetch_add(1,std::memory_order_relaxed)+1;
     const auto* owner=rb->vehicle;
@@ -487,7 +487,7 @@ bool attach(RED4ext::PluginHandle handle,const RED4ext::Sdk* sdk) {
     }
     installed.store(true);
     status="PhysX sync hook installed; mass experiment off by default; no velocity writes";
-    resolveMass();
+    resolveMass(handle,sdk,resolve);
     attachEvents(handle,sdk,resolve);
     return true;
 }
@@ -627,8 +627,11 @@ void setExperiment(IScriptable*,CStackFrame* frame,bool* out,std::int64_t) {
 void setMassMultiplier(IScriptable*,CStackFrame* frame,bool* out,std::int64_t) {
     std::int32_t value=1;RED4ext::GetParameter(frame,&value);frame->code++;
     if(out)*out=false;
-    if(!kineticle::validMultiplier(value)||(value>1&&(!installed.load()||!setAltMass||!setNormalMass)))return;
+    if(!kineticle::validMultiplier(value)||(value>1&&(!installed.load()||!massReady.load())))return;
     requestedMass.store(value);if(out)*out=true;
+}
+void getMassMultiplier(IScriptable*,CStackFrame* frame,std::int32_t* out,std::int64_t) {
+    frame->code++;if(out)*out=requestedMass.load();
 }
 void getProtection(IScriptable*,CStackFrame* frame,std::int32_t* out,std::int64_t) {
     frame->code++;if(out)*out=static_cast<std::int32_t>(protectionFlags.load());
@@ -703,6 +706,7 @@ void postRegister(){
     add("Kineticle_Diagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getReport),"String");
     add("Kineticle_ResetDiagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&resetReport),"Bool");
     add("Kineticle_SetExperimentEnabled",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&setExperiment),"Bool","Bool","enabled");
+    add("Kineticle_GetMassMultiplier",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getMassMultiplier),"Int32");
     add("Kineticle_SetMassMultiplier",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&setMassMultiplier),"Bool","Int32","multiplier");
     add("Kineticle_GetProtectionFlags",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getProtection),"Int32");
     add("Kineticle_SetProtectionFlags",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&setProtection),"Bool","Int32","flags");
@@ -726,6 +730,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle handle,RED4ext::EM
         if(installed.load()&&sdk&&sdk->hooking&&sdk->hooking->Detach){
             sdk->hooking->Detach(handle,target);installed.store(false);
         }
+        if(massWriterTarget&&sdk&&sdk->hooking&&sdk->hooking->Detach) {sdk->hooking->Detach(handle,massWriterTarget);massWriterTarget=nullptr;}
         // Preserve the last manual snapshot. On standalone normal exit, or
         // if no manual report succeeded, save the current native observations.
         if(lastFileStatus.rfind("saved",0)!=0)writeReportFile(diagnostic());

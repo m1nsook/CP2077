@@ -5,6 +5,7 @@ native func Kineticle_CaptureDiagnostics() -> Int32;
 native func Kineticle_DiagnosticPart(index: Int32) -> String;
 native func Kineticle_ResetDiagnostics() -> Bool;
 native func Kineticle_SetControllerContext(vehicle: EntityID, detail: String, allowed: Bool) -> Bool;
+native func Kineticle_GetMassMultiplier() -> Int32;
 native func Kineticle_SetMassMultiplier(multiplier: Int32) -> Bool;
 native func Kineticle_GetProtectionFlags() -> Int32;
 native func Kineticle_SetProtectionFlags(flags: Int32) -> Bool;
@@ -15,6 +16,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
   private let lastEnabled: Bool;
   private let lastFlags: Int32;
   private let lastMass: Int32;
+  private let lastMassAttempt: Int32;
   private func OnAttach() -> Void {
     this.epoch += 1;
     this.running = true;
@@ -111,6 +113,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
           this.lastFlags = Kineticle_GetProtectionFlags();
           this.SyncFlags(id, this.lastFlags);
           this.lastMass = 1;
+          this.lastMassAttempt = 1;
           Kineticle_SetMassMultiplier(1);
           M1Arc_SetInt(id, "massMultiplier", 1);
           this.Report(id);
@@ -129,17 +132,25 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
       if this.initialized {
         if this.lastEnabled { this.SampleContext(); }
         let massWanted: Int32 = this.lastEnabled ? M1Arc_GetInt(id, "massMultiplier") : 1;
-        if massWanted != this.lastMass {
+        if massWanted != this.lastMassAttempt {
+          this.lastMassAttempt = massWanted;
           if Kineticle_SetMassMultiplier(massWanted) {
             this.lastMass = massWanted;
             M1Arc_Log(id, "INFO", "Session chassis mass multiplier: " + IntToString(massWanted));
           } else {
             this.lastMass = 1;
             Kineticle_SetMassMultiplier(1);
-            M1Arc_Log(id, "ERROR", "Native chassis mass setter signatures unavailable or invalid multiplier.");
+            M1Arc_Log(id, "ERROR", "Native chassis mass unavailable or invalid multiplier. Request rejected.");
           }
         }
-        if M1Arc_GetInt(id, "massMultiplier") != this.lastMass { M1Arc_SetInt(id, "massMultiplier", this.lastMass); }
+        let actualMass = Kineticle_GetMassMultiplier();
+        if actualMass != this.lastMass {
+          this.lastMass = actualMass;
+          M1Arc_Log(id, "ERROR", "Native mass request reverted; see diagnostics.");
+        }
+        if M1Arc_GetInt(id, "massMultiplier") != this.lastMass {
+          if M1Arc_SetInt(id, "massMultiplier", this.lastMass) { this.lastMassAttempt = this.lastMass; }
+        }
         let wanted: Int32 = 0;
         if M1Arc_GetBool(id, "mechanicalProtection") { wanted += 1; }
         if M1Arc_GetBool(id, "gridProtection") { wanted += 2; }

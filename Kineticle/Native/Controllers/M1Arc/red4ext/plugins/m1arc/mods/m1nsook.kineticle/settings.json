@@ -16,7 +16,7 @@
     "max": 25,
     "step": 1,
     "group": "Physics",
-    "description": "Session only. 1 = vanilla mass; 2–25x applies only to the currently driven car/bike using the game's native alternative chassis mass setter. Requires validated native signatures; resets to 1 on attach."
+    "description": "1 = vanilla; 2–25x alternative collision chassis mass for the actively driven vehicle. Native 2.50 refresh and command validation required. Session only."
   },
   {
     "id": "mechanicalProtection",
