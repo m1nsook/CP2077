@@ -95,5 +95,13 @@
     "m1arc": "-",
     "description": "Replaces main menu music with Serce from 102.0 HKGN FM.",
     "status": "auto"
+  },
+  {
+    "path": "You_Cant_Run_From_Me_Main_Menu_Music",
+    "name": "You Can't Run From Me — Main Menu Music",
+    "nexus_id": 39717,
+    "m1arc": "-",
+    "description": "Replaces main menu music with You Can't Run From Me from 102.0 HKGN FM.",
+    "status": "auto"
   }
 ]
