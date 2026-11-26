@@ -1,5 +1,5 @@
 // Mod Settings 0.2.35: annotations and accepted-change callback from supplied API.
-public class KineticleModSettingsValues {
+public class KineticleModSettingsValues extends IScriptable {
   @runtimeProperty("ModSettings.mod", "Kineticle")
   @runtimeProperty("ModSettings.category", "Physics")
   @runtimeProperty("ModSettings.category.order", "0")
@@ -52,106 +52,103 @@ public class KineticleModSettingsValues {
   public let glassProtection: Bool = false;
 }
 
-// UI mirrors Core. Only this mod's ConfigVar objects are touched. SetValue
-// stages a pending change when switching from another controller; the player
-// chooses Apply/Reset. Never call the global AcceptChanges ourselves.
-public class KineticleModSettingsListener extends IScriptable {
-  private let vars: array<ref<ConfigVar>>;
-  private func HasFlag(flags: Int32, bit: Int32) -> Bool {
-    if bit == 1 { return flags == 1 || flags == 3 || flags == 5 || flags == 7; }
-    if bit == 2 { return flags == 2 || flags == 3 || flags == 6 || flags == 7; }
-    return flags >= 4 && flags <= 7;
+// Use the documented registered-class listener API. No menu wrappers or
+// ConfigVar casts. Mod Settings updates accepted fields after Apply/Reset.
+public class KineticleModSettingsSystem extends ScriptableSystem {
+  private let values: ref<KineticleModSettingsValues>;
+  private let running: Bool;
+  private let epoch: Int32;
+  private let initialized: Bool;
+  private let lastEnabled: Bool;
+  private let lastBikes: Bool;
+  private let lastMass: Int32;
+  private let lastFlags: Int32;
+
+  private func OnAttach() -> Void {
+    this.epoch += 1;
+    this.running = true;
+    this.initialized = false;
+    this.Schedule();
   }
-  private func Bit(name: CName) -> Int32 {
-    if Equals(name,n"mechanicalProtection") { return 1; }
-    if Equals(name,n"gridProtection") { return 2; }
-    if Equals(name,n"glassProtection") { return 4; }
-    return 0;
+
+  private func OnDetach() -> Void {
+    this.running = false;
+    this.epoch += 1;
+    if IsDefined(this.values) {
+      ModSettings.UnregisterListenerToClass(this.values);
+      this.values = null;
+    }
+    this.initialized = false;
   }
-  private func BoolValue(name: CName) -> Bool {
-    if Equals(name,n"probeEnabled") { return Kineticle_GetProbeEnabled(); }
-    if Equals(name,n"includeMotorcycles") { return Kineticle_GetIncludeMotorcycles(); }
-    return this.HasFlag(Kineticle_GetProtectionFlags(),this.Bit(name));
+
+  private func Schedule() -> Void {
+    if !this.running { return; }
+    let cb = new KineticleModSettingsTick();
+    cb.owner = this;
+    cb.epoch = this.epoch;
+    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.25, false);
   }
-  public func Attach() -> Void {
-    let group = ModSettings.GetVars(n"Kineticle", n"Physics");
-    for item in group { ArrayPush(this.vars,item); }
-    group = ModSettings.GetVars(n"Kineticle", n"Protection");
-    for item in group { ArrayPush(this.vars,item); }
-    for item in this.vars {
-      if IsDefined(item) {
-        let name = item.GetName();
-        let slider = item as ModConfigVarInt32;
-        let toggle = item as ModConfigVarBool;
-        if Equals(name,n"massMultiplier") && IsDefined(slider) {
-          let value = Kineticle_GetMassMultiplier();
-          if slider.GetValue() != value { slider.SetValue(value); }
-        } else {
-          if IsDefined(toggle) && (Equals(name,n"probeEnabled") || Equals(name,n"includeMotorcycles") || this.Bit(name) > 0) {
-            let value = this.BoolValue(name);
-            if NotEquals(toggle.GetValue(),value) { toggle.SetValue(value); }
-          }
-        }
+
+  private func TryAttach() -> Void {
+    // Do not import class defaults before the framework has loaded the mod.
+    let physics = ModSettings.GetVars(n"Kineticle", n"Physics");
+    let protection = ModSettings.GetVars(n"Kineticle", n"Protection");
+    if ArraySize(physics) != 3 || ArraySize(protection) != 3 { return; }
+    this.values = new KineticleModSettingsValues();
+    ModSettings.RegisterListenerToClass(this.values);
+    this.initialized = true;
+    this.ApplyAccepted(true);
+  }
+
+  private func ApplyAccepted(first: Bool) -> Void {
+    if !IsDefined(this.values) { return; }
+    let on = this.values.probeEnabled;
+    let bikes = this.values.includeMotorcycles;
+    let mass = this.values.massMultiplier;
+    let flags: Int32 = 0;
+    if this.values.mechanicalProtection { flags += 1; }
+    if this.values.gridProtection { flags += 2; }
+    if this.values.glassProtection { flags += 4; }
+
+    if (first || NotEquals(on, this.lastEnabled)) && !on {
+      if Kineticle_GetProbeEnabled() { Kineticle_SetProbeEnabled(false); }
+    }
+    if first || mass != this.lastMass {
+      if mass >= 1 && mass <= 100 && Kineticle_GetMassAvailable() && mass != Kineticle_GetMassMultiplier() {
+        Kineticle_SetMassMultiplier(mass);
       }
     }
-    ModSettings.RegisterListenerToModifications(this);
-  }
-  public func Detach() -> Void {
-    ModSettings.UnregisterListenerToModifications(this);
-    ArrayClear(this.vars);
-  }
-  public cb func OnModVariableChangeAccepted(groupPath: CName, varName: CName) -> Void {
-    // Match the actual registered group/name pair, not another mod's same-named variable.
-    for item in this.vars {
-      if IsDefined(item) && Equals(item.GetGroupPath(),groupPath) && Equals(item.GetName(),varName) {
-        if Equals(varName,n"massMultiplier") {
-          let slider = item as ModConfigVarInt32;
-          if IsDefined(slider) && slider.GetValue() != Kineticle_GetMassMultiplier() {
-            Kineticle_SetMassMultiplier(slider.GetValue());
-          }
-          return;
-        }
-        let toggle = item as ModConfigVarBool;
-        if !IsDefined(toggle) { return; }
-        let value = toggle.GetValue();
-        if Equals(varName,n"probeEnabled") {
-          if NotEquals(value,Kineticle_GetProbeEnabled()) { Kineticle_SetProbeEnabled(value); }
-          return;
-        }
-        if Equals(varName,n"includeMotorcycles") {
-          if NotEquals(value,Kineticle_GetIncludeMotorcycles()) { Kineticle_SetIncludeMotorcycles(value); }
-          return;
-        }
-        let bit = this.Bit(varName);
-        if bit > 0 {
-          let flags = Kineticle_GetProtectionFlags();
-          if NotEquals(this.HasFlag(flags,bit),value) {
-            Kineticle_SetProtectionFlags(value ? flags + bit : flags - bit);
-          }
-        }
-        return;
-      }
+    if first || NotEquals(bikes, this.lastBikes) {
+      if NotEquals(bikes, Kineticle_GetIncludeMotorcycles()) { Kineticle_SetIncludeMotorcycles(bikes); }
     }
+    if first || flags != this.lastFlags {
+      if flags != Kineticle_GetProtectionFlags() { Kineticle_SetProtectionFlags(flags); }
+    }
+    if (first || NotEquals(on, this.lastEnabled)) && on {
+      if !Kineticle_GetProbeEnabled() { Kineticle_SetProbeEnabled(true); }
+    }
+    // Avoid repeatedly submitting rejected native requests.
+    this.lastEnabled = on;
+    this.lastBikes = bikes;
+    this.lastMass = mass;
+    this.lastFlags = flags;
+  }
+
+  public func Tick(epoch: Int32) -> Void {
+    if !this.running || epoch != this.epoch { return; }
+    if !this.initialized {
+      this.TryAttach();
+    } else {
+      this.ApplyAccepted(false);
+    }
+    this.Schedule();
   }
 }
 
-// The supplied 0.2.35 screen exists in both pregame and pause menus.
-// Listener lifetime is bounded by the actual screen.
-@addField(ModStngsMainGameController)
-private let kineticleSettingsListener: ref<KineticleModSettingsListener>;
-
-@wrapMethod(ModStngsMainGameController)
-protected cb func OnInitialize() -> Void {
-  this.kineticleSettingsListener = new KineticleModSettingsListener();
-  this.kineticleSettingsListener.Attach();
-  wrappedMethod();
-}
-
-@wrapMethod(ModStngsMainGameController)
-protected cb func OnUninitialize() -> Bool {
-  if IsDefined(this.kineticleSettingsListener) {
-    this.kineticleSettingsListener.Detach();
-    this.kineticleSettingsListener = null;
+public class KineticleModSettingsTick extends DelayCallback {
+  public let owner: wref<KineticleModSettingsSystem>;
+  public let epoch: Int32;
+  public func Call() -> Void {
+    if IsDefined(this.owner) { this.owner.Tick(this.epoch); }
   }
-  return wrappedMethod();
 }
