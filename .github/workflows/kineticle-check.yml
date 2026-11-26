@@ -1,0 +1,121 @@
+name: Kineticle - development checks
+on:
+  pull_request:
+    paths:
+      - 'Kineticle/**'
+      - '.github/workflows/kineticle-check.yml'
+      - 'Daemon/tools/check_redscript_cli.ps1'
+  push:
+    branches: [main]
+    paths:
+      - 'Kineticle/Native/release-version.txt'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure x64 native DLL
+        shell: pwsh
+        run: |
+          cmake -S Kineticle/Native -B build/kineticle -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON
+          if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
+      - name: Build standalone Core and tests
+        shell: pwsh
+        run: |
+          cmake --build build/kineticle --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "Native build failed" }
+          ctest --test-dir build/kineticle -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "Native tests failed" }
+      - name: Parse each optional REDscript controller separately
+        shell: pwsh
+        run: |
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Native/Controllers/M1Arc/r6/scripts")
+          if ($LASTEXITCODE -ne 0) { throw "M1 Arc parse failed" }
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Native/Controllers/NSUI/r6/scripts")
+          if ($LASTEXITCODE -ne 0) { throw "NSUI scope parse failed" }
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Native/Controllers/ModSettings/r6/scripts")
+          if ($LASTEXITCODE -ne 0) { throw "Mod Settings parse failed" }
+      - name: Package native Core and optional controller separately
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dst = "build/package/red4ext/plugins/Kineticle"
+          New-Item -ItemType Directory -Path $dst -Force | Out-Null
+          Copy-Item "build/kineticle/Release/Kineticle.dll" "$dst/Kineticle.dll"
+          $sdkLicense = Get-ChildItem "build/kineticle/_deps/red4ext_sdk-src" -File | Where-Object Name -Match '^LICENSE(\..*)?$' | Select-Object -First 1
+          if (!$sdkLicense) { throw "SDK license missing" }
+          Copy-Item $sdkLicense.FullName "$dst/RED4ext-SDK-LICENSE.txt"
+          Copy-Item "build/kineticle/_deps/nlohmann_json-src/LICENSE.MIT" "$dst/nlohmann-json-LICENSE.txt"
+          @'
+          import json, hashlib
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          dist = Path("dist")
+          dist.mkdir(exist_ok=True)
+          core = Path("build/package")
+          ctrl = Path("Kineticle/Native/Controllers/M1Arc")
+          m = json.loads((ctrl/"red4ext/plugins/m1arc/mods/m1nsook.kineticle/mod.json").read_text(encoding="utf-8"))
+          assert m["format"] == 1 and m["id"] == "m1nsook.kineticle"
+          assert m["version"] == "1.0.0" and m["requires"]["m1arc"] == "1.0.1"
+          assert (core/"red4ext/plugins/Kineticle/Kineticle.dll").is_file()
+          assert not list(core.rglob("*.reds"))
+          assert (ctrl.parent/"release-version.txt").is_file() == False
+          assert (ctrl.parent.parent/"release-version.txt").read_text().strip() == "1.0.0"
+          assert not any(s["kind"] == "action" for s in json.loads((ctrl/"red4ext/plugins/m1arc/mods/m1nsook.kineticle/settings.json").read_text(encoding="utf-8")))
+          assert (ctrl.parent/"NSUI/bin/x64/plugins/cyber_engine_tweaks/mods/KineticleNSUI/init.lua").is_file()
+          assert (ctrl.parent/"ModSettings/r6/scripts/KineticleModSettings/KineticleModSettings.reds").is_file()
+          for name, src in [("Core",core),("Controller-M1Arc",ctrl),("Controller-NSUI",ctrl.parent/"NSUI"),("Controller-ModSettings",ctrl.parent/"ModSettings")]:
+              with ZipFile(dist/f"Kineticle-{name}-1.0.0.zip","w",ZIP_DEFLATED) as z:
+                  for p in sorted(src.rglob("*")):
+                      if p.is_file():
+                          assert p.relative_to(src).parts[0] in ("red4ext","r6","bin")
+                          z.write(p,p.relative_to(src).as_posix())
+          (dist/"SHA256SUMS.txt").write_text("".join(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in sorted(dist.glob("*.zip"))))
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "Packaging failed" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kineticle-1.0.0
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish Kineticle 1.0.0
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: native
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: kineticle-1.0.0
+          path: dist
+      - name: Verify release assets
+        run: |
+          set -euo pipefail
+          test "$(cat Kineticle/Native/release-version.txt)" = "1.0.0"
+          cd dist
+          sha256sum -c SHA256SUMS.txt
+          test "$(find . -maxdepth 1 -name '*.zip' | wc -l)" -eq 4
+          for name in Core Controller-M1Arc Controller-NSUI Controller-ModSettings; do
+            test -f "Kineticle-${name}-1.0.0.zip"
+          done
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="kineticle-v1.0.0"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; refusing to replace it."
+            exit 1
+          fi
+          gh release create "$tag" dist/*.zip dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Kineticle 1.0.0" --notes-file Kineticle/Native/RELEASE_NOTES.md

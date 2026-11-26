@@ -1,0 +1,53 @@
+[
+  {
+    "id": "probeEnabled",
+    "kind": "boolean",
+    "label": "Enable Kineticle",
+    "default": true,
+    "group": "Physics",
+    "description": "Master switch for all Kineticle effects. Configuration is saved by Core."
+  },
+  {
+    "id": "massMultiplier",
+    "kind": "integer",
+    "label": "Chassis mass multiplier",
+    "default": 1,
+    "min": 1,
+    "max": 100,
+    "step": 1,
+    "group": "Physics",
+    "description": "Persistent 1–100x alternative chassis collision mass, capped at 100,000 kg. 1 = vanilla."
+  },
+  {
+    "id": "includeMotorcycles",
+    "kind": "boolean",
+    "label": "Include motorcycles",
+    "default": true,
+    "group": "Physics",
+    "description": "Allow Kineticle effects while V drives motorcycles."
+  },
+  {
+    "id": "mechanicalProtection",
+    "kind": "boolean",
+    "label": "Mechanical damage protection",
+    "default": false,
+    "group": "Protection",
+    "description": "Zero the computed vehicle hit values for V's actively driven road vehicle."
+  },
+  {
+    "id": "gridProtection",
+    "kind": "boolean",
+    "label": "Body deformation restoration",
+    "default": false,
+    "group": "Protection",
+    "description": "Reset the damage grid after the vanilla destruction callback."
+  },
+  {
+    "id": "glassProtection",
+    "kind": "boolean",
+    "label": "Glass restoration",
+    "default": false,
+    "group": "Protection",
+    "description": "Reset glass after the vanilla destruction callback."
+  }
+]

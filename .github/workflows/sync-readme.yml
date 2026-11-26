@@ -4,7 +4,7 @@ name: Synchronize mod README
 # workflows. workflow_run handles those releases; release handles human edits.
 on:
   workflow_run:
-    workflows: ["Release a mod"]
+    workflows: ["Release a mod", "Kineticle - development checks"]
     types: [completed]
     branches: [main]
   release:
