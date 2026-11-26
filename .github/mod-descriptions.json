@@ -64,5 +64,10 @@
   "Action_Blocked_Fix": {
     "name": "Action Blocked Fix",
     "summary": "Automatically recovers the reproduced stuck NoCombat and NoZooming gameplay restriction pair. Requires REDscript only."
+  },
+  "Serce_Main_Menu_Music": {
+    "name": "Serce — Main Menu Music",
+    "summary": "Replaces main menu music with Serce from 102.0 HKGN FM. Requires Immersive Main Menu Audio, Audioware and REDscript. The original audio is not included in the GitHub package.",
+    "package_type": "local_audio"
   }
 }

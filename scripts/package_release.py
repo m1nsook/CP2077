@@ -96,7 +96,8 @@ def build(mod: str, version: str, output: Path, nexus_id: str = "") -> Path:
         raise ValueError("Mod name and summary must be nonempty, single-line strings")
 
     is_sources = metadata.get("package_type") == "sources"
-    files = tracked_source_files(mod) if is_sources else tracked_install_files(mod)
+    is_local_audio = metadata.get("package_type") == "local_audio"
+    files = tracked_source_files(mod) if is_sources or is_local_audio else tracked_install_files(mod)
     if not files:
         raise ValueError(f"No tracked installable files in {mod}/")
     output.mkdir(parents=True, exist_ok=True)
@@ -122,6 +123,8 @@ def build(mod: str, version: str, output: Path, nexus_id: str = "") -> Path:
     install = (
         "**Type:** Translator source archive. Do NOT extract into the game directory.\n\n"
         if is_sources else
+        "**Type:** Configuration-only package; audio is not included. Follow the included README to supply the track from your own game. See Nexus Mods for the mod listing.\n\n"
+        if is_local_audio else
         "**Install:** Extract the ZIP into your Cyberpunk 2077 game directory. "
         "The archive contains game-ready folders only; no tools, docs, or saved settings.\n\n"
     )

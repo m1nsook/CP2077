@@ -1,25 +1,30 @@
 # Serce — Main Menu Music
 
-Replaces the main menu music with Serce (Underground / CMAZ), from 102.0 HKGN FM.
+Replaces the main menu music with Serce (Underground / CMAZ) from 102.0 HKGN FM.
+
+[Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/39716)
 
 ## Requirements
 
 - Cyberpunk 2077 2.50
-- [Immersive Main Menu Audio](https://www.nexusmods.com/cyberpunk2077/mods/22695)
+- [Immersive Main Menu Audio 1.4](https://www.nexusmods.com/cyberpunk2077/mods/22695)
 - [Audioware](https://www.nexusmods.com/cyberpunk2077/mods/12001) and its dependencies
 - REDscript
-- Mod Settings (optional)
 
-## Installation (development)
+## Installation from GitHub
 
-The song is not distributed with this repository. Obtain the track from your own game installation and export it as `serce.wav`. The vanilla audio event is `mus_radio_15_serce`; its Wwise media ID is not yet verified. Do not confuse the event ID with the media ID.
+The GitHub package contains the configuration, not the original game audio.
 
-Place `serce.wav` next to `audios.yaml` under `r6/audioware/MainMenuMusic/`. Copy the resulting `r6` folder into the game directory. Remove any other manifest registering `MainMenuMusic` before installation (back it up first). Do not install multiple main menu music packs at once.
+1. In WolvenKit, locate and export `807764327.wem` from your own game as WAV.
+2. Rename the exported file to `serce.wav` and place it beside `audios.yaml` in `r6/audioware/MainMenuMusic/`.
+3. Copy the `r6` folder into your game directory. Back up and remove any other manifest registering `MainMenuMusic` first.
+
+The vanilla event is `mus_radio_15_serce` (event ID `3385271940`); the media ID is `807764327`.
 
 ## Uninstallation
 
-Remove this pack's `audios.yaml` and `serce.wav` from `r6/audioware/MainMenuMusic/`, then restart the game. Restore the previous music pack if desired.
+Remove this pack's `audios.yaml` and `serce.wav` and restart the game. Restore your previous music pack if needed.
 
 ## Status
 
-Development only. Audio asset identification and in-game testing are pending.
+v1.0.0 — in-game playback confirmed by the author on Cyberpunk 2077 2.50.
