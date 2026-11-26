@@ -2,21 +2,29 @@
   {
     "id": "probeEnabled",
     "kind": "boolean",
-    "label": "Enable native physics diagnostics",
+    "label": "Enable Kineticle",
     "default": true,
     "group": "Diagnostics",
-    "description": "Native sync observations and mass experiment enable gate."
+    "description": "Master switch for all Kineticle effects. Configuration is saved by Core."
   },
   {
     "id": "massMultiplier",
     "kind": "integer",
-    "label": "Experimental chassis mass multiplier",
+    "label": "Chassis mass multiplier",
     "default": 1,
     "min": 1,
-    "max": 25,
+    "max": 100,
     "step": 1,
     "group": "Physics",
-    "description": "1 = vanilla; 2–25x alternative collision chassis mass for the actively driven vehicle. Native 2.50 refresh and command validation required. Session only."
+    "description": "Persistent 1–100x alternative chassis collision mass, capped at 100,000 kg. 1 = vanilla."
+  },
+  {
+    "id": "includeMotorcycles",
+    "kind": "boolean",
+    "label": "Include motorcycles",
+    "default": true,
+    "group": "Physics",
+    "description": "Allow Kineticle effects while V drives motorcycles."
   },
   {
     "id": "mechanicalProtection",

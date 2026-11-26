@@ -17,7 +17,6 @@ void* observeMassWriter(void* writer,float value,std::uint32_t actor,bool flag){
     }
     return originalMassWriter(writer,value,actor,flag);
 }
-std::atomic<int> requestedMass{1};
 std::atomic<std::uint64_t> selectedMassID{0},activeMassID{0};
 std::mutex massMutex;
 struct MassState {
@@ -33,6 +32,7 @@ std::uint64_t massApplies{},massRestores{},massRejects{},massReadbackFailures{},
 std::string massStatus="not resolved";
 std::uintptr_t refreshRva{},updateRva{},writerRva{};
 std::uint64_t massRefreshes{},massCommands{},massCommandFailures{};
+float lastAppliedMass{},lastRestoredMass{};
 float lastCommandMass{};
 std::uint32_t lastCommandActor{};
 
@@ -93,16 +93,17 @@ void massStep(PhysicsData* rb,void* chassis) {
     auto* owner=rb->vehicle;const auto id=owner->entityID.hash;
     const auto active=activeMassID.load(std::memory_order_relaxed),selected=selectedMassID.load(std::memory_order_relaxed);
     if(!id||(id!=active&&id!=selected))return;
-    if(!active&&requestedMass.load()==1)return;
+    if(!active&&(!enabled.load()||requestedMass.load()==1))return;
+    ++syncCalls;
     if(!massReady.load(std::memory_order_acquire)||!refreshMass)return;
     if(!chassis||owner->chassis.GetPtr()!=chassis)return;
     const auto stamp=nowUs();bool permitted=false;
     int wanted=requestedMass.load(std::memory_order_relaxed);
     {
         std::lock_guard lock(sampleMutex);
-        permitted=kineticle::massScope(id,controllerContext.vehicle,owner->isPlayerControlled!=0,
-            static_cast<unsigned>(owner->physicsState),controllerContext.allowed&&controllerContext.us!=0,
-            stamp-controllerContext.us,wanted);
+        permitted=kineticle::massScope(id,driverContext.vehicle,owner->isPlayerControlled!=0,
+            static_cast<unsigned>(owner->physicsState),enabled.load()&&running.load()&&driverContext.allowed&&driverContext.us!=0,
+            stamp-driverContext.us,wanted);
     }
     static thread_local bool inside=false;if(inside)return;
     std::lock_guard lock(massMutex);++massCalls;
@@ -115,15 +116,15 @@ void massStep(PhysicsData* rb,void* chassis) {
         // Never overwrite another mod's mass mode or a replaced body's data.
         const auto expected=kineticle::desiredChassisMass(currentMass.baseChassis,currentMass.multiplier);
         if(!currentMass.flag||std::abs(currentMass.alternative-expected)>0.1f){
-            ++massRejects;lastMass=currentMass;currentMass={};activeMassID.store(0);requestedMass.store(1);return;
+            ++massRejects;lastMass=currentMass;currentMass={};activeMassID.store(0);massReady.store(false);return;
         }
         if(!permitted||wanted!=currentMass.multiplier||requestedMass.load()!=wanted) {
             rb->alternativeChassisMass=currentMass.baseAlternative;
             rb->usesAlternativeChassisMass=0;
             const bool restored=submitMass(rb,currentMass.baseChassis);
             massReadback(rb,currentMass);lastMass=currentMass;
-            if(!restored||currentMass.flag!=0){++massRestoreFailures;requestedMass.store(1);currentMass={};activeMassID.store(0);massReady.store(false);return;}
-            ++massRestores;currentMass={};activeMassID.store(0);
+            if(!restored||currentMass.flag!=0){++massRestoreFailures;massReady.store(false);currentMass={};activeMassID.store(0);massReady.store(false);return;}
+            ++massRestores;lastRestoredMass=currentMass.baseChassis;currentMass={};activeMassID.store(0);
         }else return;
     }
     if(!permitted||requestedMass.load()!=wanted||selectedMassID.load()!=id)return;
@@ -138,14 +139,14 @@ void massStep(PhysicsData* rb,void* chassis) {
     const bool submitted=submitMass(rb,requested);
     massReadback(rb,currentMass);lastMass=currentMass;
     if(!submitted||!currentMass.flag||std::abs(currentMass.alternative-requested)>0.1f){
-        ++massReadbackFailures;requestedMass.store(1);
+        ++massReadbackFailures;massReady.store(false);
         rb->alternativeChassisMass=currentMass.baseAlternative;rb->usesAlternativeChassisMass=0;
         if(!submitMass(rb,currentMass.baseChassis))++massRestoreFailures;
         massReadback(rb,currentMass);lastMass=currentMass;
         currentMass={};activeMassID.store(0);massReady.store(false);
         return;
     }
-    ++massApplies;
+    ++massApplies;lastAppliedMass=requested;
 }
 void massReport(std::ostringstream& s) {
     std::lock_guard lock(massMutex);
@@ -153,6 +154,7 @@ void massReport(std::ostringstream& s) {
     s<<"; MASS status="<<massStatus<<" available="<<massReady.load()
      <<" refresh_rva="<<refreshRva<<" update_rva="<<updateRva<<" writer_rva="<<writerRva
      <<" refreshes="<<massRefreshes<<" native_commands="<<massCommands<<" command_failures="<<massCommandFailures
+     <<" last_applied_mass="<<lastAppliedMass<<" last_restored_mass="<<lastRestoredMass
      <<" last_command_mass="<<lastCommandMass<<" last_command_actor="<<lastCommandActor
      <<" requested="<<requestedMass.load()<<" selected_id="<<selectedMassID.load()<<" active_id="<<activeMassID.load()
      <<" applies="<<massApplies<<" restores="<<massRestores<<" rejected="<<massRejects<<" readback_failed="<<massReadbackFailures
@@ -164,6 +166,6 @@ void massReport(std::ostringstream& s) {
 void resetMassCounters(){
     std::lock_guard lock(massMutex);
     massApplies=massRestores=massRejects=massReadbackFailures=massRestoreFailures=massBlocked=massCalls=0;
-    massRefreshes=massCommands=massCommandFailures=0;lastCommandMass=0;lastCommandActor=0;
+    massRefreshes=massCommands=massCommandFailures=0;lastAppliedMass=lastRestoredMass=0;lastCommandMass=0;lastCommandActor=0;
     if(!currentMass.id)lastMass={};
 }

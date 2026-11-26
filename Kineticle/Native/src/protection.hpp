@@ -84,6 +84,19 @@ H componentVehicle(IScriptable* component) {
        !RED4ext::ExecuteFunction(static_cast<RED4ext::ScriptInstance>(component),f,&weak))return {};
     auto out=weak.Lock();return isObject(out.GetPtr(),"vehicleBaseObject")?out:H{};
 }
+H localPlayer() {
+    auto* rtti=RED4ext::CRTTISystem::Get();if(!rtti)return {};
+    auto* engine=RED4ext::CGameEngine::Get();
+    auto* playerClass=rtti->GetClass("cpPlayerSystem");
+    auto* game=engine&&engine->framework?engine->framework->gameInstance:nullptr;
+    auto* ps=game&&playerClass?game->GetSystem(playerClass):nullptr;
+    H player;
+    auto* pf=method(ps,"GetLocalPlayerMainGameObject");
+    if(!signature(pf,0,false,true)||!handleType(retType(pf),"gameObject")||
+       !RED4ext::ExecuteFunction(static_cast<RED4ext::ScriptInstance>(ps),pf,&player)||
+       !isObject(player.GetPtr(),"PlayerPuppet"))return {};
+    return player;
+}
 kineticle::Scope scope(RED4ext::vehicle::BaseObject* v) {
     using S=kineticle::Scope;
     auto* rtti=RED4ext::CRTTISystem::Get();
@@ -95,15 +108,9 @@ kineticle::Scope scope(RED4ext::vehicle::BaseObject* v) {
     if(queryBool(v,"IsVehicleOnStateLocked").value!=0)return S::Locked;
     // Standalone scope: resolve the live local player through the SDK's
     // game-system API, then verify the exact mounted vehicle, PSM and tags.
-    auto* engine=RED4ext::CGameEngine::Get();
-    auto* playerClass=rtti->GetClass("cpPlayerSystem");
-    auto* game=engine&&engine->framework?engine->framework->gameInstance:nullptr;
-    auto* ps=game&&playerClass?game->GetSystem(playerClass):nullptr;
-    H player;
-    auto* pf=method(ps,"GetLocalPlayerMainGameObject");
-    if(!signature(pf,0,false,true)||!handleType(retType(pf),"gameObject")||
-       !RED4ext::ExecuteFunction(static_cast<RED4ext::ScriptInstance>(ps),pf,&player)||
-       !isObject(player.GetPtr(),"PlayerPuppet"))return S::Player;
+    auto player=localPlayer();if(!player.GetPtr())return S::Player;
+    // Static native RTTI calls use the current player as context (no this).
+    auto* ps=player.GetPtr();
     H mounted;
     if(!getHandle(player.GetPtr(),"GetMountedVehicle","vehicleBaseObject",mounted)||mounted.GetPtr()!=v)return S::Mounted;
     H bb,defs;
@@ -146,7 +153,7 @@ IScriptable* eventArg(Fn* f,RED4ext::CScriptStack* stack,const char* context,con
     if(!readable(stack,sizeof(RED4ext::CScriptStack))||!isObject(stack->GetContext(),context)||
        !signature(f,1,false)||!handleType(argType(f,0),event))return nullptr;
     DecodeSample decode;
-    auto* h=bumpArgument(f,stack,decode);auto* o=h?h->GetPtr():nullptr;
+    auto* h=eventArgument(f,stack,decode);auto* o=h?h->GetPtr():nullptr;
     return isObject(o,event)?o:nullptr;
 }
 bool zeroDamage(IScriptable* computed) {
@@ -187,7 +194,7 @@ void protectDamage(Fn* fn,RED4ext::CScriptStack* stack) {
     if(!isObject(target.GetPtr(),"vehicleBaseObject"))return;
     damageVehicle++;
     auto* v=static_cast<RED4ext::vehicle::BaseObject*>(target.GetPtr());
-    if(!eligible(v))return;
+    if(!v->isPlayerControlled||!eligible(v))return;
     auto computed=strongProperty(event,"attackComputed","gameAttackComputed");
     if(!(protectionFlags.load()&kineticle::Mechanical))return;
     if(zeroDamage(computed.GetPtr()))lastProtectedId.store(v->entityID.hash);
@@ -226,7 +233,7 @@ bool protectDispatch(Fn* fn,RED4ext::CScriptStack* stack,void* a3) {
     auto vehicle=observeGrid(fn,stack);
     const bool result=originalScripted(fn,stack,a3);
     const auto flags=protectionFlags.load();
-    if(result&&vehicle.GetPtr()&&(flags&(kineticle::Grid|kineticle::Glass))&&
+    if(result&&enabled.load()&&vehicle.GetPtr()&&static_cast<RED4ext::vehicle::BaseObject*>(vehicle.GetPtr())->isPlayerControlled&&(flags&(kineticle::Grid|kineticle::Glass))&&
         eligible(static_cast<RED4ext::vehicle::BaseObject*>(vehicle.GetPtr()))) {
         if(flags&kineticle::Grid){if(voidNative(vehicle.GetPtr(),"DestructionResetGrid"))gridResets++;else visualApiFail++;}
         if(flags&kineticle::Glass){if(voidNative(vehicle.GetPtr(),"DestructionResetGlass"))glassResets++;else visualApiFail++;}
