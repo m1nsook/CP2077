@@ -79,5 +79,13 @@
     "m1arc": "-",
     "description": "Automatically recovers stuck gameplay restrictions during normal exploration.",
     "status": "auto"
+  },
+  {
+    "path": "Kineticle",
+    "name": "Kineticle",
+    "nexus_id": 39702,
+    "m1arc": "Optional",
+    "description": "Configurable chassis collision mass and vehicle protection for V, with a choice of settings controllers.",
+    "status": "auto"
   }
 ]
