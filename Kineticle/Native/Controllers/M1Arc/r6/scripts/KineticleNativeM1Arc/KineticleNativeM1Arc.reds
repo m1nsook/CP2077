@@ -5,13 +5,14 @@ native func Kineticle_CaptureDiagnostics() -> Int32;
 native func Kineticle_DiagnosticPart(index: Int32) -> String;
 native func Kineticle_ResetDiagnostics() -> Bool;
 native func Kineticle_SetControllerContext(vehicle: EntityID, detail: String, allowed: Bool) -> Bool;
-native func Kineticle_SetExperimentEnabled(enabled: Bool) -> Bool;
+native func Kineticle_GetProtectionFlags() -> Int32;
+native func Kineticle_SetProtectionFlags(flags: Int32) -> Bool;
 public class KineticleNativeM1ArcSystem extends ScriptableSystem {
   private let running: Bool;
   private let initialized: Bool;
   private let epoch: Int32;
   private let lastEnabled: Bool;
-  private let lastExperiment: Bool;
+  private let lastFlags: Int32;
   private func OnAttach() -> Void {
     this.epoch += 1;
     this.running = true;
@@ -21,15 +22,13 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
   private func OnDetach() -> Void {
     this.running = false;
     this.epoch += 1;
-    Kineticle_SetExperimentEnabled(false);
-    this.lastExperiment = false;
   }
   private func Schedule() -> Void {
     if !this.running { return; }
     let cb = new KineticleNativeM1ArcTick();
     cb.owner = this;
     cb.epoch = this.epoch;
-    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, this.lastExperiment ? 0.10 : 0.50, false);
+    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.50, false);
   }
   private func Flag(value: Bool) -> String { return value ? "1" : "0"; }
   private func SampleContext() -> Void {
@@ -85,6 +84,11 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
       M1Arc_Log(id, "ERROR", "Native diagnostic report incomplete: " + IntToString(failures) + " page(s) rejected.");
     }
   }
+  private func SyncFlags(id: String, flags: Int32) -> Void {
+    M1Arc_SetBool(id, "mechanicalProtection", flags == 1 || flags == 3 || flags == 5 || flags == 7);
+    M1Arc_SetBool(id, "gridProtection", flags == 2 || flags == 3 || flags == 6 || flags == 7);
+    M1Arc_SetBool(id, "glassProtection", flags >= 4 && flags <= 7);
+  }
   public func Tick(epoch: Int32) -> Void {
     if !this.running || epoch != this.epoch { return; }
     let id = "m1nsook.kineticle";
@@ -94,9 +98,8 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
         this.lastEnabled = Kineticle_GetProbeEnabled();
         if M1Arc_SetBool(id, "probeEnabled", this.lastEnabled) {
           this.initialized = true;
-          this.lastExperiment = false;
-          Kineticle_SetExperimentEnabled(false);
-          M1Arc_SetBool(id, "experimentEnabled", false);
+          this.lastFlags = Kineticle_GetProtectionFlags();
+          this.SyncFlags(id, this.lastFlags);
           this.Report(id);
         }
       } else {
@@ -112,19 +115,18 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
       }
       if this.initialized {
         if this.lastEnabled { this.SampleContext(); }
-        let wanted = M1Arc_GetBool(id, "experimentEnabled");
-        if !this.lastEnabled { wanted = false; }
-        if NotEquals(wanted, this.lastExperiment) {
-          if Kineticle_SetExperimentEnabled(wanted) {
-            this.lastExperiment = wanted;
-            M1Arc_Log(id, "INFO", wanted ? "Experimental paired motion enabled for this session." : "Experimental paired motion disabled.");
+        let wanted: Int32 = 0;
+        if M1Arc_GetBool(id, "mechanicalProtection") { wanted += 1; }
+        if M1Arc_GetBool(id, "gridProtection") { wanted += 2; }
+        if M1Arc_GetBool(id, "glassProtection") { wanted += 4; }
+        if wanted != this.lastFlags {
+          if Kineticle_SetProtectionFlags(wanted) {
+            this.lastFlags = wanted;
+            M1Arc_Log(id, "INFO", "Protection flags saved: " + IntToString(wanted));
           } else {
-            this.lastExperiment = false;
-            M1Arc_Log(id, "ERROR", "Native experimental motion could not be enabled.");
+            this.SyncFlags(id, this.lastFlags);
+            M1Arc_Log(id, "ERROR", "Native protection configuration failed.");
           }
-        }
-        if NotEquals(M1Arc_GetBool(id, "experimentEnabled"), this.lastExperiment) {
-          M1Arc_SetBool(id, "experimentEnabled", this.lastExperiment);
         }
         if M1Arc_ConsumeAction(id, "report") { this.Report(id); }
         if M1Arc_ConsumeAction(id, "reset") {

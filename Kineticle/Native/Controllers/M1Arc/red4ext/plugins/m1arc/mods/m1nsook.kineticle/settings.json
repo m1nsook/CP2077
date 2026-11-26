@@ -5,15 +5,31 @@
     "label": "Enable native physics diagnostics",
     "default": true,
     "group": "Diagnostics",
-    "description": "Enable native observations. Disabling also stops the session-only experiment."
+    "description": "Read-only collision observations. Protection switches are independent."
   },
   {
-    "id": "experimentEnabled",
+    "id": "mechanicalProtection",
     "kind": "boolean",
-    "label": "Experimental paired motion (session only)",
+    "label": "Mechanical damage protection",
     "default": false,
-    "group": "Experimental",
-    "description": "Opt-in test: nominal 2x horizontal outgoing correction (max +8 m/s) and 50% forward recovery (max +4 m/s). Traffic observations permitted; writes only to dynamic bodies. Fresh post-contact player confirmation required for recovery. Resets off on attach."
+    "group": "Protection",
+    "description": "Zero the computed vehicle hit values for V's actively driven road vehicle."
+  },
+  {
+    "id": "gridProtection",
+    "kind": "boolean",
+    "label": "Body deformation restoration",
+    "default": false,
+    "group": "Protection",
+    "description": "Reset the damage grid after the vanilla destruction callback."
+  },
+  {
+    "id": "glassProtection",
+    "kind": "boolean",
+    "label": "Glass restoration",
+    "default": false,
+    "group": "Protection",
+    "description": "Reset glass after the vanilla destruction callback."
   },
   {
     "id": "report",

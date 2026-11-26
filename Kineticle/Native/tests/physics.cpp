@@ -3,6 +3,7 @@
 #include "report_pages.hpp"
 #include "diagnostic_policy.hpp"
 #include "motion_trial.hpp"
+#include "protection_policy.hpp"
 #include <cstdlib>
 #include <cmath>
 #include <limits>
@@ -41,7 +42,7 @@ int main(){
     std::string reconstructed;
     for(std::size_t i=0;i<pages.size();++i){
         check(pages[i].size()<=reportPayloadBytes);
-        check(numberedPage("0.1.0-dev.9-native-motion",pages,i).size()<=2048);
+        check(numberedPage("0.1.0-dev.10-native-protection",pages,i).size()<=2048);
         reconstructed+=pages[i];
     }
     check(reconstructed==report);
@@ -149,4 +150,20 @@ int main(){
     check(planMotion(bike,badState).reason==TrialReject::Sample);
     auto playerTraffic=bike;playerTraffic.physicsState=1;
     check(planMotion(playerTraffic,car).reason==TrialReject::Sample);
+    check(validProtectionFlags(0)&&validProtectionFlags(Mechanical|Grid|Glass)&&!validProtectionFlags(8));
+    check(allowedScope(true,1,0,0,0,0,true,1,0,0,0));
+    check(allowedScope(true,1,0,0,0,0,true,6,0,0,0));
+    for(int state=-1;state<=7;++state)if(state!=1&&state!=6)
+        check(!allowedScope(true,1,0,0,0,0,true,state,0,0,0));
+    check(!allowedScope(false,1,0,0,0,0,true,1,0,0,0));
+    check(!allowedScope(true,0,0,0,0,0,true,1,0,0,0));
+    check(!allowedScope(true,1,0,0,0,0,false,1,0,0,0));
+    check(!allowedScope(true,1,1,0,0,0,true,1,0,0,0));
+    check(!allowedScope(true,1,0,1,0,0,true,1,0,0,0));
+    check(!allowedScope(true,1,0,0,1,0,true,1,0,0,0));
+    check(!allowedScope(true,1,0,0,0,1,true,1,0,0,0));
+    check(!allowedScope(true,1,0,0,0,0,true,1,1,0,0));
+    check(!allowedScope(true,1,0,0,0,0,true,1,0,1,0));
+    check(!allowedScope(true,1,0,0,0,0,true,1,0,0,1));
+    check(!allowedScope(true,1,-1,0,0,0,true,1,0,0,0));
 }
