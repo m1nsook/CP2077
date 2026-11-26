@@ -123,7 +123,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
       if this.initialized {
         if this.lastEnabled { this.SampleContext(); }
         let motionWanted = this.lastEnabled && M1Arc_GetBool(id, "contactMotion");
-        if motionWanted != this.lastMotion {
+        if NotEquals(motionWanted, this.lastMotion) {
           if Kineticle_SetExperimentEnabled(motionWanted) {
             this.lastMotion = motionWanted;
             M1Arc_Log(id, "INFO", motionWanted ? "Contact motion enabled for this session." : "Contact motion disabled.");
@@ -132,7 +132,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
             M1Arc_Log(id, "ERROR", "Required native contact motion hooks unavailable.");
           }
         }
-        if M1Arc_GetBool(id, "contactMotion") != this.lastMotion { M1Arc_SetBool(id, "contactMotion", this.lastMotion); }
+        if NotEquals(M1Arc_GetBool(id, "contactMotion"), this.lastMotion) { M1Arc_SetBool(id, "contactMotion", this.lastMotion); }
         let wanted: Int32 = 0;
         if M1Arc_GetBool(id, "mechanicalProtection") { wanted += 1; }
         if M1Arc_GetBool(id, "gridProtection") { wanted += 2; }
