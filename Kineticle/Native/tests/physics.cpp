@@ -6,6 +6,14 @@
 using namespace kineticle;
 void check(bool v){if(!v)std::abort();}
 int main(){
+ struct ScopeSample{std::uint64_t vehicle;bool allowed;std::int64_t us;};
+ ScopeSample controller{1,false,100000},native{2,true,100000};
+ check(chooseScope(false,controller,native).vehicle==2);
+ check(chooseScope(true,controller,native).vehicle==1&&!chooseScope(true,controller,native).allowed);
+ controller.allowed=true;
+ check(massScope(1,chooseScope(true,controller,native).vehicle,true,0,controller.allowed,100000,25));
+ check(!massScope(2,chooseScope(true,controller,native).vehicle,true,0,controller.allowed,100000,25));
+ check(!massScope(1,chooseScope(true,controller,native).vehicle,true,0,controller.allowed,250001,25));
  check(validMultiplier(1)&&validMultiplier(25)&&validMultiplier(100)&&!validMultiplier(0)&&!validMultiplier(101));
  check(desiredChassisMass(1390,25)==34750.f);
  check(desiredChassisMass(1390,100)==100000.f);

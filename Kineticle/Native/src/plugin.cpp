@@ -34,7 +34,7 @@ using RED4ext::CStackFrame;
 using RED4ext::CString;
 using PhysicsData=RED4ext::vehicle::PhysicsData;
 using Json=nlohmann::json;
-constexpr const char* version="0.1.0-dev.14-standalone";
+constexpr const char* version="0.1.0-dev.15-scope-recovery";
 constexpr std::uint32_t syncHash=547299556u;
 using Sync=void(*)(void*,void*,PhysicsData*,float,float);
 Sync original=nullptr;
@@ -70,6 +70,13 @@ struct DriverContext {
     bool allowed{};
 };
 DriverContext driverContext;
+// Once a controller claims scope in this process, native fallback must not
+// override a negative, detached, or expired controller sample.
+DriverContext controllerContext;
+bool controllerClaimed=false;
+std::string controllerDetail="not sampled";
+std::uint64_t controllerSamples=0,controllerAllowed=0;
+std::atomic<bool> controllerOwnsScope{false};
 std::atomic<std::uint64_t> driverSamples{0},driverAllowed{0},syncCalls{0};
 std::atomic<bool> scopeRegistered{false},running{false};
 std::atomic<int> requestedMass{1};
@@ -260,13 +267,13 @@ bool executableAddress(void* address) {
 void publishDriver(std::uint64_t id,bool allowed,const char* reason){
     std::lock_guard lock(sampleMutex);
     driverContext={id,nowUs(),reason,allowed&&id!=0};
-    selectedMassID.store(driverContext.allowed?id:0,std::memory_order_release);
+    if(!controllerClaimed)selectedMassID.store(driverContext.allowed?id:0,std::memory_order_release);
 }
 bool onRunningEnter(RED4ext::CGameApplication*) {
     running.store(true);publishDriver(0,false,"running entered");return true;
 }
 bool onRunningUpdate(RED4ext::CGameApplication*) {
-    if(!running.load())return true;
+    if(!running.load()||controllerOwnsScope.load())return true;
     static std::int64_t lastTick=0;
     const auto now=nowUs();if(now-lastTick<100000)return true;lastTick=now;
     if(!enabled.load()||requestedMass.load()<=1||!massReady.load()){
@@ -336,7 +343,7 @@ bool attach(RED4ext::PluginHandle handle,const RED4ext::Sdk* sdk) {
     RED4ext::v0::GameState state{onRunningEnter,onRunningUpdate,onRunningExit};
     if(sdk->gameStates&&sdk->gameStates->Add&&sdk->gameStates->Add(handle,RED4ext::EGameStateType::Running,&state)){
         scopeRegistered.store(true);
-    }else{massReady.store(false);status="native driver update registration failed; mass disabled";}
+    }else{status="native driver registration unavailable; controller scope supported";}
     return true;
 }
 std::string diagnostic() {
@@ -351,6 +358,11 @@ std::string diagnostic() {
      <<" vehicle="<<driverContext.vehicle<<" allowed="<<driverContext.allowed
      <<" age_ms="<<(driverContext.us?static_cast<double>(nowUs()-driverContext.us)/1000.0:-1)
      <<" reason="<<driverContext.reason
+     <<"; CONTROLLER_SCOPE claimed="<<controllerClaimed<<" samples="<<controllerSamples<<" allowed_samples="<<controllerAllowed
+     <<" vehicle="<<controllerContext.vehicle<<" allowed="<<controllerContext.allowed
+     <<" age_ms="<<(controllerContext.us?static_cast<double>(nowUs()-controllerContext.us)/1000.0:-1)
+     <<" detail="<<controllerDetail
+     <<"; SCOPE_SOURCE="<<(controllerClaimed?"controller":"native")
      <<"; NOT VERIFIED: tire and occupant protection; native mechanical damage callback; collision-only scope vs walls";
     writeProtectionDiagnostics(s);massReport(s);return s.str();
 }
@@ -404,7 +416,22 @@ void setBikes(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
     if(out)*out=ok;
 }
 void getMassAvailable(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
-    frame->code++;if(out)*out=massReady.load()&&scopeRegistered.load();
+    frame->code++;if(out)*out=massReady.load();
+}
+// Shared scope bridge. Same signature and validation as working dev.13.
+void setControllerContext(IScriptable*,CStackFrame* frame,bool* out,std::int64_t) {
+    RED4ext::ent::EntityID id{};CString detail;bool allowed=false;
+    RED4ext::GetParameter(frame,&id);RED4ext::GetParameter(frame,&detail);RED4ext::GetParameter(frame,&allowed);frame->code++;
+    if(out)*out=false;
+    const std::string value=detail.c_str()?detail.c_str():"";
+    if(value.size()>512)return;
+    std::lock_guard lock(sampleMutex);
+    controllerClaimed=true;controllerOwnsScope.store(true);
+    controllerContext={id.hash,nowUs(),"controller",allowed&&id.hash!=0&&enabled.load()};
+    controllerDetail=value;++controllerSamples;
+    if(controllerContext.allowed)++controllerAllowed;
+    selectedMassID.store(controllerContext.allowed?id.hash:0,std::memory_order_release);
+    if(out)*out=true;
 }
 void captureReport(IScriptable*,CStackFrame* frame,std::int32_t* out,std::int64_t) {
     frame->code++;
@@ -431,7 +458,7 @@ void getReportPart(IScriptable*,CStackFrame* frame,CString* out,std::int64_t) {
 }
 void resetReport(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
     frame->code++;std::lock_guard lock(sampleMutex);
-    driverSamples.store(0);driverAllowed.store(0);resetProtectionDiagnostics();resetMassCounters();resetUs=nowUs();
+    driverSamples.store(0);driverAllowed.store(0);controllerSamples=controllerAllowed=0;resetProtectionDiagnostics();resetMassCounters();resetUs=nowUs();
     if(out)*out=true;
 }
 void registerTypes(){}
@@ -457,6 +484,13 @@ void postRegister(){
     add("Kineticle_GetIncludeMotorcycles",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getBikes),"Bool");
     add("Kineticle_SetIncludeMotorcycles",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&setBikes),"Bool","Bool","enabled");
     add("Kineticle_GetMassAvailable",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getMassAvailable),"Bool");
+    auto* contextFn=RED4ext::CGlobalFunction::Create("Kineticle_SetControllerContext","Kineticle_SetControllerContext",
+        reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&setControllerContext));
+    if(contextFn) {
+        contextFn->flags=RED4ext::CBaseFunction::Flags{.isNative=true,.isStatic=true};
+        if(contextFn->SetReturnType("Bool")&&contextFn->AddParam("entEntityID","vehicle")&&
+           contextFn->AddParam("String","detail")&&contextFn->AddParam("Bool","allowed"))rtti->RegisterFunction(contextFn);
+    }
 }
 }
 RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle handle,RED4ext::EMainReason reason,const RED4ext::Sdk* sdk){

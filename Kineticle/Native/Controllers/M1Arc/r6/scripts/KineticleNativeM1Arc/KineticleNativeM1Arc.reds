@@ -8,6 +8,7 @@ native func Kineticle_GetMassMultiplier() -> Int32;
 native func Kineticle_GetIncludeMotorcycles() -> Bool;
 native func Kineticle_SetIncludeMotorcycles(enabled: Bool) -> Bool;
 native func Kineticle_GetMassAvailable() -> Bool;
+native func Kineticle_SetControllerContext(vehicle: EntityID, detail: String, allowed: Bool) -> Bool;
 native func Kineticle_SetMassMultiplier(multiplier: Int32) -> Bool;
 native func Kineticle_GetProtectionFlags() -> Int32;
 native func Kineticle_SetProtectionFlags(flags: Int32) -> Bool;
@@ -26,20 +27,61 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
     this.epoch += 1;
     this.running = true;
     this.initialized = false;
+    let emptyID: EntityID;
+    Kineticle_SetControllerContext(emptyID, "controller attached", false);
     this.Schedule();
   }
   private func OnDetach() -> Void {
     this.running = false;
     this.epoch += 1;
+    let emptyID: EntityID;
+    Kineticle_SetControllerContext(emptyID, "controller detached", false);
   }
   private func Schedule() -> Void {
     if !this.running { return; }
     let cb = new KineticleNativeM1ArcTick();
     cb.owner = this;
     cb.epoch = this.epoch;
-    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.25, false);
+    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.10, false);
+  }
+  private func Flag(value: Bool) -> String { return value ? "1" : "0"; }
+  private func SampleContext() -> Void {
+    let player = GetPlayer(this.GetGameInstance()) as PlayerPuppet;
+    let vehicle: wref<VehicleObject>;
+    let vehicleID: EntityID;
+    let state: Int32 = -1;
+    let mounted: Bool = false;
+    let driver: Bool = false;
+    let noDriving: Bool = false;
+    let forwardOnly: Bool = false;
+    let scene: Bool = false;
+    let detail: String;
+    if !IsDefined(player) {
+      Kineticle_SetControllerContext(vehicleID, "player unavailable", false);
+      return;
+    }
+    mounted = VehicleComponent.GetVehicle(player.GetGame(), player.GetEntityID(), vehicle);
+    driver = VehicleComponent.IsDriver(player.GetGame(), player);
+    if IsDefined(vehicle) { vehicleID = vehicle.GetEntityID(); }
+    let bb = player.GetPlayerStateMachineBlackboard();
+    if IsDefined(bb) { state = bb.GetInt(GetAllBlackboardDefs().PlayerStateMachine.Vehicle); }
+    noDriving = StatusEffectSystem.ObjectHasStatusEffectWithTag(player, n"NoDriving");
+    forwardOnly = StatusEffectSystem.ObjectHasStatusEffectWithTag(player, n"VehicleOnlyForward");
+    scene = StatusEffectSystem.ObjectHasStatusEffectWithTag(player, n"VehicleScene");
+    detail = "player=1 mounted=" + this.Flag(mounted) + " vehicle_defined=" + this.Flag(IsDefined(vehicle))
+      + " component_driver=" + this.Flag(driver) + " psm_vehicle=" + IntToString(state)
+      + " tag_NoDriving=" + this.Flag(noDriving) + " tag_VehicleOnlyForward=" + this.Flag(forwardOnly)
+      + " tag_VehicleScene=" + this.Flag(scene);
+    let allowed = false;
+    if mounted && IsDefined(vehicle) && driver && (state == 1 || state == 6) && !noDriving && !forwardOnly && !scene {
+      allowed = vehicle.IsPlayerDriver() && !vehicle.IsDestroyed() && !vehicle.IsVehicleRemoteControlled()
+        && !vehicle.IsInQuestOrScenePhysicsState() && (IsDefined(vehicle as CarObject) || IsDefined(vehicle as BikeObject));
+    }
+    if allowed && !Kineticle_GetIncludeMotorcycles() && IsDefined(vehicle as BikeObject) { allowed = false; }
+    Kineticle_SetControllerContext(vehicleID, detail, allowed);
   }
   private func Report(id: String) -> Void {
+    this.SampleContext();
     let count = Kineticle_CaptureDiagnostics();
     let i: Int32 = 0;
     let failures: Int32 = 0;
@@ -68,6 +110,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
   }
   public func Tick(epoch: Int32) -> Void {
     if !this.running || epoch != this.epoch { return; }
+    this.SampleContext();
     let id = "m1nsook.kineticle";
     let raw = M1Arc_GetJson(id, "probeEnabled");
     if Equals(raw, "true") || Equals(raw, "false") {
@@ -104,9 +147,9 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
           this.pendingMass = massWanted;
           this.stableTicks = 0;
         } else {
-          if this.stableTicks < 3 { this.stableTicks += 1; }
+          if this.stableTicks < 6 { this.stableTicks += 1; }
         }
-        if this.stableTicks >= 2 && massWanted != this.lastMassAttempt {
+        if this.stableTicks >= 5 && massWanted != this.lastMassAttempt {
           this.lastMassAttempt = massWanted;
           if Kineticle_SetMassMultiplier(massWanted) {
             this.lastMass = massWanted;

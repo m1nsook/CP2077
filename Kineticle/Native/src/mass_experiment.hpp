@@ -101,9 +101,10 @@ void massStep(PhysicsData* rb,void* chassis) {
     int wanted=requestedMass.load(std::memory_order_relaxed);
     {
         std::lock_guard lock(sampleMutex);
-        permitted=kineticle::massScope(id,driverContext.vehicle,owner->isPlayerControlled!=0,
-            static_cast<unsigned>(owner->physicsState),enabled.load()&&running.load()&&driverContext.allowed&&driverContext.us!=0,
-            stamp-driverContext.us,wanted);
+        const auto& scope=kineticle::chooseScope(controllerClaimed,controllerContext,driverContext);
+        permitted=kineticle::massScope(id,scope.vehicle,owner->isPlayerControlled!=0,
+            static_cast<unsigned>(owner->physicsState),enabled.load()&&(controllerClaimed||running.load())&&scope.allowed&&scope.us!=0,
+            stamp-scope.us,wanted);
     }
     static thread_local bool inside=false;if(inside)return;
     std::lock_guard lock(massMutex);++massCalls;
@@ -123,11 +124,11 @@ void massStep(PhysicsData* rb,void* chassis) {
             rb->usesAlternativeChassisMass=0;
             const bool restored=submitMass(rb,currentMass.baseChassis);
             massReadback(rb,currentMass);lastMass=currentMass;
-            if(!restored||currentMass.flag!=0){++massRestoreFailures;massReady.store(false);currentMass={};activeMassID.store(0);massReady.store(false);return;}
+            if(!restored||currentMass.flag!=0){++massRestoreFailures;currentMass={};activeMassID.store(0);massReady.store(false);return;}
             ++massRestores;lastRestoredMass=currentMass.baseChassis;currentMass={};activeMassID.store(0);
         }else return;
     }
-    if(!permitted||requestedMass.load()!=wanted||selectedMassID.load()!=id)return;
+    if(!permitted||!enabled.load()||requestedMass.load()!=wanted||selectedMassID.load()!=id)return;
     if(rb->usesAlternativeChassisMass!=0||!std::isfinite(rb->inverseMass)||rb->inverseMass<=0||
         !std::isfinite(rb->total_mass)||rb->total_mass<=0){++massRejects;return;}
     const auto requested=kineticle::desiredChassisMass(rb->chassis_mass,wanted);
