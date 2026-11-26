@@ -1,4 +1,4 @@
-// Kineticle: standalone protection + opt-in event-local rigid-body correction.
+// Kineticle: native instance chassis mass experiment. No velocity corrections.
 #include <RED4ext/RED4ext.hpp>
 #include <RED4ext/Scripting/Natives/vehicleBaseObject.hpp>
 #include <RED4ext/Scripting/Natives/vehiclePhysicsData.hpp>
@@ -23,7 +23,9 @@
 #include "report_pages.hpp"
 #include "diagnostic_policy.hpp"
 #include "protection_policy.hpp"
-#include "contact_motion.hpp"
+#include "mass_policy.hpp"
+#include <cstring>
+#include <cstddef>
 #include <RED4ext/GameEngine.hpp>
 #include <RED4ext/Scripting/Natives/IGameInstance.hpp>
 #include <iomanip>
@@ -35,15 +37,10 @@ using RED4ext::CStackFrame;
 using RED4ext::CString;
 using PhysicsData=RED4ext::vehicle::PhysicsData;
 using Json=nlohmann::json;
-constexpr const char* version="0.1.0-dev.11-contact-motion";
+constexpr const char* version="0.1.0-dev.12-native-mass";
 constexpr std::uint32_t syncHash=547299556u;
 using Sync=void(*)(void*,void*,PhysicsData*,float,float);
 Sync original=nullptr;
-using Integrate=void(*)(PhysicsData*,float);
-Integrate originalIntegrate=nullptr;
-void* integrateTarget=nullptr;
-std::atomic<bool> integrateInstalled{false},motionEnabled{false};
-std::atomic<std::uint64_t> motionDriver{0},motionTarget{0};
 void* target=nullptr;
 // The pinned SDK's ExecuteScripted hash is also CET's CScript_RunPureScript
 // (3791200470). The dispatcher accepts both array and packed argument stacks.
@@ -118,9 +115,6 @@ std::int64_t resetUs{};
 
 kineticle::ContactTrace trace;
 std::atomic<std::uint32_t> protectionFlags{0};
-kineticle::ContactMotion motion;
-std::atomic<std::uint64_t> motionNativeScopePass{0},motionControllerScopePass{0};
-std::atomic<bool> motionNativeScopeOnly{false};
 std::string lastFileStatus="not captured";
 std::atomic<bool> enabled{true}, installed{false};
 std::atomic<std::uint64_t> calls{0}, candidateFrames{0}, corrections{0};
@@ -188,47 +182,9 @@ void addCost(std::atomic<std::uint64_t>& total,std::atomic<std::uint64_t>& maxim
     auto old=maximum.load(std::memory_order_relaxed);
     while(old<elapsed&&!maximum.compare_exchange_weak(old,elapsed,std::memory_order_relaxed)) {}
 }
-void publishMotion() {
-    motionDriver.store(motion.active?motion.driver:0,std::memory_order_relaxed);
-    motionTarget.store(motion.active?motion.target:0,std::memory_order_relaxed);
-}
-// Caller holds sampleMutex. Optional controller is allowed only for this
-// explicit development experiment; native event-time driver guards are still
-// required. Standalone authorization is evaluated in the event callback.
-bool motionContext(std::int64_t stamp) {
-    if(motionNativeScopeOnly.load())return true;
-    return controllerContext.allowed&&controllerContext.vehicle==motion.driver&&
-        stamp>=controllerContext.us&&stamp-controllerContext.us<=350000;
-}
-void integrate(PhysicsData* rb,float dt) {
-    // No RTTI or cross-body pointer writes on physics workers. This is the
-    // same fixed-step velocity adjustment point demonstrated by LTBF.
-    if(motionEnabled.load(std::memory_order_relaxed)&&rb&&rb->vehicle&&rb->vehicle->physicsData==rb) {
-        auto* owner=rb->vehicle;
-        auto id=owner->entityID.hash;
-        if(id&&(id==motionDriver.load(std::memory_order_relaxed)||id==motionTarget.load(std::memory_order_relaxed))) {
-            const auto stamp=nowUs();
-            std::lock_guard lock(sampleMutex);
-            if(motionEnabled.load(std::memory_order_relaxed)&&motion.includes(id)) {
-                ++motion.integratorCalls;
-                if(std::isfinite(dt)&&dt>0&&dt<=.10f) {
-                    auto before=vec(rb->velocity),angular=vec(rb->angularVelocity);
-                    auto result=motion.delivery(id,stamp,static_cast<unsigned>(owner->physicsState),
-                        owner->isPlayerControlled!=0,rb->inverseMass,before,angular,motionContext(stamp));
-                    if(result.valid) {
-                        auto v=kineticle::add(before,result.linear),w=kineticle::add(angular,result.angular);
-                        rb->velocity=RED4ext::Vector3(v.x,v.y,v.z);
-                        rb->angularVelocity=RED4ext::Vector3(w.x,w.y,w.z);
-                        motion.record(id);
-                    }
-                }
-                publishMotion();
-            }
-        }
-    }
-    originalIntegrate(rb,dt);
-}
+void massStep(PhysicsData* rb);
 void sync(void* self,void* chassis,PhysicsData* rb,float a4,float dt) {
+    massStep(rb);
     if (!enabled.load(std::memory_order_relaxed)||!rb||!chassis) { original(self,chassis,rb,a4,dt);return; }
     const auto sequence=calls.fetch_add(1,std::memory_order_relaxed)+1;
     const auto* owner=rb->vehicle;
@@ -256,13 +212,7 @@ void sync(void* self,void* chassis,PhysicsData* rb,float a4,float dt) {
         mass,inverse,dt,static_cast<std::uint32_t>(owner->physicsState),candidate,
         vec(rb->force),vec(rb->torque),massOk};
     std::lock_guard lock(sampleMutex);
-    // Preserve vanilla observations; never modify either body in the sync callback.
-    if(motionEnabled.load(std::memory_order_relaxed)&&motion.includes(id)) {
-        motion.expire(stamp);
-        if(motion.active&&!motionContext(stamp)){++motion.contextCancelled;motion.close("context");}
-        if(motion.active)motion.offer(current);
-        publishMotion();
-    }
+    // Preserve vanilla observations before any optional adjustment.
     if(meaningful) {
         trace.push(current);traceSamples.fetch_add(1,std::memory_order_relaxed);
     }
@@ -371,9 +321,6 @@ const RED4ext::Handle<IScriptable>* bumpArgument(RED4ext::CBaseFunction* fn,RED4
        reinterpret_cast<std::uintptr_t>(value)%alignof(RED4ext::Handle<IScriptable>))return fail(Reject::ArgumentMemory);
     return static_cast<const RED4ext::Handle<IScriptable>*>(value);
 }
-// Defined after the native scope/RTTI helpers.
-void armMotion(RED4ext::vehicle::BaseObject* driver,RED4ext::vehicle::BaseObject* target,
-    const VehicleGuard& driverGuard,const VehicleGuard& targetGuard,std::int64_t stamp,std::uint64_t seq);
 void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
     bumpCalls.fetch_add(1,std::memory_order_relaxed);
     if(!readable(stack,sizeof(RED4ext::CScriptStack))) {
@@ -449,20 +396,6 @@ void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
             driver.road,driver.candidate,struck.candidate);
         if(guards)guardedPairs.fetch_add(1,std::memory_order_relaxed);
     }
-    if(motionEnabled.load(std::memory_order_relaxed)) {
-        if(playerPair) {
-            auto* driver=sample.receiverDriver==1?receiver:other;
-            auto* struck=sample.receiverDriver==1?other:receiver;
-            const auto& dg=sample.receiverDriver==1?sample.receiverChecks:sample.otherChecks;
-            const auto& tg=sample.receiverDriver==1?sample.otherChecks:sample.receiverChecks;
-            armMotion(driver,struck,dg,tg,eventTime,sample.syncSequence);
-        } else {
-            std::lock_guard lock(sampleMutex);
-            if(motion.includes(sample.receiver)||motion.includes(sample.other)) {
-                ++motion.driverLoss;motion.close("driver-lost");publishMotion();
-            }
-        }
-    }
     std::lock_guard lock(sampleMutex);
     // Nearby repeated callbacks are labeled, not discarded: two distinct
     // contacts may happen close together and no exact contact ID is known.
@@ -484,60 +417,6 @@ void observeBump(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack) {
 
 }
 #include "protection.hpp"
-bool motionVector(RED4ext::vehicle::BaseObject* v,const char* name,kineticle::Vec& out) {
-    auto* f=method(v,name);
-    if(!signature(f,0,false,true)||!typeNamed(retType(f),"Vector4")||
-       retType(f)->GetSize()!=sizeof(RED4ext::Vector4))return false;
-    RED4ext::Vector4 result{};
-    if(!RED4ext::ExecuteFunction(static_cast<RED4ext::ScriptInstance>(v),f,&result))return false;
-    out={result.X,result.Y,result.Z};
-    return std::isfinite(out.x)&&std::isfinite(out.y)&&std::isfinite(out.z);
-}
-void armMotion(RED4ext::vehicle::BaseObject* driver,RED4ext::vehicle::BaseObject* target,
-    const VehicleGuard& dg,const VehicleGuard& tg,std::int64_t stamp,std::uint64_t seq) {
-    if(!driver||!target||!dg.road||!tg.road||dg.driver.value!=1||tg.driver.value!=0||
-       dg.remote.value!=0||tg.remote.value!=0||dg.quest.value!=0||tg.quest.value!=0||
-       dg.destroyed.value!=0||tg.destroyed.value!=0||!dg.candidate||tg.candidate||
-       dg.physicsState!=0||(tg.physicsState!=0&&tg.physicsState!=1)) {
-        std::lock_guard lock(sampleMutex);++motion.guardFailed;
-        if(motion.includes(driver?driver->entityID.hash:0)||motion.includes(target?target->entityID.hash:0)){
-            motion.close("guard");publishMotion();
-        }
-        return;
-    }
-    const auto did=driver->entityID.hash,tid=target->entityID.hash;
-    // The existing dev.8 controller PSM/tag validation is the preferred
-    // authorization for this experiment. Without any controller sample,
-    // the standalone native event-time scope may authorize instead.
-    bool sampled=false,controllerPresent=false;
-    {
-        std::lock_guard lock(sampleMutex);
-        controllerPresent=controllerContext.us!=0;
-        sampled=controllerContext.allowed&&controllerContext.vehicle==did&&
-            stamp>=controllerContext.us&&stamp-controllerContext.us<=350000;
-    }
-    bool standalone=false;
-    if(!controllerPresent)standalone=eligible(driver);
-    if(!sampled&&!standalone) {
-        std::lock_guard lock(sampleMutex);++motion.guardFailed;
-        if(motion.includes(did)){motion.close("scope");publishMotion();}
-        return;
-    }
-    kineticle::Vec a,b,velocity,dir;
-    if(!motionVector(driver,"GetWorldPosition",a)||!motionVector(target,"GetWorldPosition",b)||
-       !motionVector(driver,"GetLinearVelocity",velocity)||!kineticle::contactDirection(a,b,velocity,dir)) {
-        std::lock_guard lock(sampleMutex);++motion.directionFailed;return;
-    }
-    std::lock_guard lock(sampleMutex);
-    if(!motionEnabled.load()||!enabled.load())return;
-    if(motion.arm(did,tid,seq,stamp,dir)) {
-        motionNativeScopeOnly.store(standalone);
-        if(standalone)++motionNativeScopePass;else ++motionControllerScopePass;
-        motion.seed(trace.samples);
-        motion.expire(nowUs());
-        publishMotion();
-    }
-}
 bool executeScripted(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack,void* a3) {
     // Hook only the exact reflected methods. Reentrant calls made by our
     // scope/RTTI helpers always take the vanilla path.
@@ -555,18 +434,7 @@ bool executeScripted(RED4ext::CBaseFunction* fn,RED4ext::CScriptStack* stack,voi
     if(fn&&enabled.load(std::memory_order_relaxed)&&fn->fullName==RED4ext::CName("OnGridDestruction")) {
         observeGrid(fn,stack);
     }
-    if(enabled.load(std::memory_order_relaxed)&&fn&&
-       fn->shortName==RED4ext::CName("OnVehicleBumpEvent")) {
-        // A native Bool query should not reenter this event, but fail closed if it does.
-        static thread_local bool observing=false;
-        if(!observing) {
-            observing=true;
-            const auto start=nowUs();
-            observeBump(fn,stack);
-            addCost(eventCostUs,eventCostMaxUs,start);
-            observing=false;
-        } else reentrantEvents.fetch_add(1,std::memory_order_relaxed);
-    }
+    // No per-bump RTTI in mass mode.
     return originalScripted(fn,stack,a3);
 }
 bool executableAddress(void* address) {
@@ -575,6 +443,7 @@ bool executableAddress(void* address) {
         region.AllocationBase==GetModuleHandleW(nullptr)&&!(region.Protect&PAGE_GUARD)&&
         (region.Protect&(PAGE_EXECUTE|PAGE_EXECUTE_READ|PAGE_EXECUTE_READWRITE|PAGE_EXECUTE_WRITECOPY));
 }
+#include "mass_experiment.hpp"
 using Resolver=std::uintptr_t(*)(std::uint32_t);
 void attachEvents(RED4ext::PluginHandle handle,const RED4ext::Sdk* sdk,Resolver resolve) {
     eventTarget=reinterpret_cast<void*>(resolve(RED4ext::Detail::AddressHashes::CBaseFunction_ExecuteScripted));
@@ -617,14 +486,8 @@ bool attach(RED4ext::PluginHandle handle,const RED4ext::Sdk* sdk) {
         target=nullptr;status="physics hook attach failed";return false;
     }
     installed.store(true);
-    status="PhysX sync hook installed; contact-local motion experiment off by default";
-    // Native fixed-step delivery: verified signature in LTBF ChassisContacts.cpp
-    // RigidBody::IntegrateMotion(float), address hash 2021199885.
-    integrateTarget=reinterpret_cast<void*>(resolve(2021199885u));
-    if(executableAddress(integrateTarget)&&sdk->hooking->Attach(handle,integrateTarget,
-        reinterpret_cast<void*>(&integrate),reinterpret_cast<void**>(&originalIntegrate))) {
-        integrateInstalled.store(true);
-    } else integrateTarget=nullptr;
+    status="PhysX sync hook installed; mass experiment off by default; no velocity writes";
+    resolveMass();
     attachEvents(handle,sdk,resolve);
     return true;
 }
@@ -661,7 +524,7 @@ std::string diagnostic() {
      <<"; driver car/bike="<<lastPair.roadVehicle<<"; impact delta="<<lastPair.delta
      <<"; hit normal=("<<lastPair.normal.x<<","<<lastPair.normal.y<<","<<lastPair.normal.z<<")"
      <<"; event sync sequence="<<lastPair.syncSequence<<"; event thread="<<lastPair.thread
-     <<"; contact motion enabled="<<motionEnabled.load()<<"; exact solver contact ID unverified";
+     <<"; velocity writes disabled; bump observer disabled";
     s<<"; decoder rejections by reason=";
     bool any=false;
     for(unsigned i=1;i<static_cast<unsigned>(Reject::Count);++i) {
@@ -688,23 +551,7 @@ std::string diagnostic() {
      <<" "<<controllerContext.detail
      <<"; NOT VERIFIED: native protection runtime delivery; exact contact ID; tire and occupant hooks; impulse solver";
     writeProtectionDiagnostics(s);
-    s<<"; CONTACT_MOTION enabled="<<motionEnabled.load()<<" fixed_hook="<<integrateInstalled.load()
-     <<" armed="<<motion.armed<<" duplicates="<<motion.duplicates<<" overlaps="<<motion.overlaps
-     <<" expired="<<motion.expired<<" context_cancelled="<<motion.contextCancelled<<" driver_lost="<<motion.driverLoss
-     <<" guard_failed="<<motion.guardFailed<<" direction_failed="<<motion.directionFailed
-     <<" native_scope="<<motionNativeScopePass.load()<<" controller_scope="<<motionControllerScopePass.load()
-     <<" V_measured="<<motion.vMeasured<<" NPC_measured="<<motion.npcMeasured<<" traffic_measured="<<motion.trafficMeasured
-     <<" V_writes="<<motion.vWrites<<" NPC_writes="<<motion.npcWrites<<" rejected="<<motion.writeRejected
-     <<" integrator_calls="<<motion.integratorCalls<<" pending="<<motion.active;
-    for(std::size_t i=0;i<std::min(motion.auditIndex,motion.audit.size());++i) {
-        const auto& a=motion.audit[(motion.auditIndex-1-i)%motion.audit.size()];
-        s<<"; CONTACT_ATTEMPT driver="<<a.driver<<" target="<<a.target<<" event_seq="<<a.eventSequence<<" outcome="<<a.reason;
-        for(const auto* side:{&a.v,&a.npc})s<<" "<<(side==&a.v?"V":"NPC")<<"{measured:"<<side->measured
-          <<",consumed:"<<side->delivered<<",seq:"<<side->sampleSequence<<",state:"<<side->sample.physicsState
-          <<",total_mass:"<<side->sample.mass<<",inverse_mass:"<<side->sample.inverseMass
-          <<",delta:("<<side->adjustment.linear.x<<","<<side->adjustment.linear.y<<","<<side->adjustment.linear.z<<")"
-          <<",angular:("<<side->adjustment.angular.x<<","<<side->adjustment.angular.y<<","<<side->adjustment.angular.z<<")}";
-    }
+    massReport(s);
     auto writeGuard=[&](const char* label,const VehicleGuard& g) {
         auto q=[&](const char* n,const BoolQuery& v){s<<" "<<n<<"="<<v.value<<"("<<v.status<<")";};
         s<<" "<<label<<":";
@@ -753,7 +600,7 @@ void getEnabled(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){frame->c
 void setEnabled(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
     bool value=false;RED4ext::GetParameter(frame,&value);frame->code++;
     std::lock_guard lock(stateMutex);const auto ok=save(value,protectionFlags.load());
-    if(ok&&!value){std::lock_guard samples(sampleMutex);motionEnabled.store(false);motion.close("diagnostics-off");publishMotion();}
+    if(ok&&!value)requestedMass.store(1);
     if(out)*out=ok;
 }
 void getReport(IScriptable*,CStackFrame* frame,CString* out,std::int64_t){
@@ -772,15 +619,16 @@ bool writeReportFile(const std::string& snapshot) {
         return MoveFileExW(tmp.c_str(),dst.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
     } catch(...) {return false;}
 }
-// Session-only switch; not written to disk. Fail closed on missing hooks.
+// Kept as a compatibility stub for the old controller. Motion cannot be enabled.
 void setExperiment(IScriptable*,CStackFrame* frame,bool* out,std::int64_t) {
     bool value=false;RED4ext::GetParameter(frame,&value);frame->code++;
+    if(out)*out=!value;
+}
+void setMassMultiplier(IScriptable*,CStackFrame* frame,bool* out,std::int64_t) {
+    std::int32_t value=1;RED4ext::GetParameter(frame,&value);frame->code++;
     if(out)*out=false;
-    std::lock_guard lock(sampleMutex);
-    if(value&&(!enabled.load()||!installed.load()||!eventInstalled.load()||!integrateInstalled.load()))return;
-    motionEnabled.store(value);
-    if(!value){motion.close("disabled");publishMotion();}
-    if(out)*out=true;
+    if(!kineticle::validMultiplier(value)||(value>1&&(!installed.load()||!setAltMass||!setNormalMass)))return;
+    requestedMass.store(value);if(out)*out=true;
 }
 void getProtection(IScriptable*,CStackFrame* frame,std::int32_t* out,std::int64_t) {
     frame->code++;if(out)*out=static_cast<std::int32_t>(protectionFlags.load());
@@ -801,13 +649,12 @@ void setControllerContext(IScriptable*,CStackFrame* frame,bool* out,std::int64_t
     if(value.size()>512)return;
     std::lock_guard lock(sampleMutex);
     controllerContext={id.hash,nowUs(),value,allowed&&id.hash!=0};
-    if(motion.active&&(!allowed||id.hash!=motion.driver)){++motion.contextCancelled;motion.close("controller-transition");publishMotion();}
+    selectedMassID.store(controllerContext.allowed?id.hash:0,std::memory_order_relaxed);
     if(out)*out=true;
 }
 void captureReport(IScriptable*,CStackFrame* frame,std::int32_t* out,std::int64_t) {
     frame->code++;
     if(!out)return;
-    {std::lock_guard lock(sampleMutex);motion.expire(nowUs());publishMotion();}
     auto snapshot=diagnostic();
     std::lock_guard lock(reportMutex);
     const bool saved=writeReportFile(snapshot);
@@ -816,7 +663,7 @@ void captureReport(IScriptable*,CStackFrame* frame,std::int32_t* out,std::int64_
     // Keep M1 Arc transport bounded independently of the full disk report.
     if(pages.size()>30)pages.resize(30);
     pages.insert(pages.begin(),std::string("Full native report: ")+lastFileStatus+
-        "; see CONTACT_MOTION, CONTACT_ATTEMPT, PROTECTION and GRID");
+        "; see MASS, PROTECTION and GRID");
     reportPages=std::move(pages);
     *out=static_cast<std::int32_t>(reportPages.size());
 }
@@ -835,7 +682,7 @@ void resetReport(IScriptable*,CStackFrame* frame,bool* out,std::int64_t){
     npcPairs.store(0);driverQueryFailures.store(0);playerPairs.store(0);flagDisagreements.store(0);
     guardedPairs.store(0);arrayStacks.store(0);packedStacks.store(0);lastPair={};lastDecode={};trace={};
     for(auto& counter:rejectCounts)counter.store(0);
-    pairHistory={};pairIndex=0;controllerContext={};motion={};publishMotion();motionNativeScopePass.store(0);motionControllerScopePass.store(0);resetProtectionDiagnostics();resetUs=nowUs();
+    pairHistory={};pairIndex=0;controllerContext={};selectedMassID.store(0);resetProtectionDiagnostics();resetMassCounters();resetUs=nowUs();
     for(auto* counter:{&invalidOwner,&invalidVectors,&invalidMass,&invalidDt,&syncObserved,&traceSamples,
         &reentrantEvents,&duplicateEvents,&absentOther,&badContext,&badSignature,&badPair,
         &syncCostUs,&syncCostMaxUs,&eventCostUs,&eventCostMaxUs})counter->store(0);
@@ -856,6 +703,7 @@ void postRegister(){
     add("Kineticle_Diagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getReport),"String");
     add("Kineticle_ResetDiagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&resetReport),"Bool");
     add("Kineticle_SetExperimentEnabled",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&setExperiment),"Bool","Bool","enabled");
+    add("Kineticle_SetMassMultiplier",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&setMassMultiplier),"Bool","Int32","multiplier");
     add("Kineticle_GetProtectionFlags",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getProtection),"Int32");
     add("Kineticle_SetProtectionFlags",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&setProtection),"Bool","Int32","flags");
     add("Kineticle_CaptureDiagnostics",reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&captureReport),"Int32");
@@ -871,8 +719,7 @@ void postRegister(){
 }
 RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle handle,RED4ext::EMainReason reason,const RED4ext::Sdk* sdk){
     if(reason==RED4ext::EMainReason::Unload){
-        enabled.store(false);protectionFlags.store(0);motionEnabled.store(false);
-        if(integrateInstalled.load()&&sdk&&sdk->hooking&&sdk->hooking->Detach){sdk->hooking->Detach(handle,integrateTarget);integrateInstalled.store(false);}
+        enabled.store(false);protectionFlags.store(0);requestedMass.store(1);
         if(eventInstalled.load()&&sdk&&sdk->hooking&&sdk->hooking->Detach){
             sdk->hooking->Detach(handle,eventTarget);eventInstalled.store(false);
         }

@@ -5,6 +5,7 @@
 #include "motion_trial.hpp"
 #include "protection_policy.hpp"
 #include "contact_motion.hpp"
+#include "mass_policy.hpp"
 #include <cstdlib>
 #include <cmath>
 #include <limits>
@@ -197,4 +198,14 @@ int main(){
     auto differentMass=car;differentMass.mass=2800;differentMass.inverseMass=.000125f;
     check(contactCorrection(differentMass,direction,false).valid);
     check(!contactDirection({0,0,0},{1,0,0},{-2,0,0},direction));
+    check(validMultiplier(1)&&validMultiplier(25)&&!validMultiplier(0)&&!validMultiplier(26));
+    check(eq(desiredChassisMass(1500,5),7500)&&eq(desiredChassisMass(960,10),9600));
+    check(desiredChassisMass(8000,25)==0&&desiredChassisMass(-1,5)==0);
+    check(massScope(1,1,true,0,true,100000,5));
+    check(!massScope(2,1,true,0,true,100000,5));
+    check(!massScope(1,1,false,0,true,100000,5));
+    check(!massScope(1,1,true,1,true,100000,5));
+    check(!massScope(1,1,true,0,false,100000,5));
+    check(!massScope(1,1,true,0,true,250001,5));
+    check(!massScope(1,1,true,0,true,100000,1));
 }

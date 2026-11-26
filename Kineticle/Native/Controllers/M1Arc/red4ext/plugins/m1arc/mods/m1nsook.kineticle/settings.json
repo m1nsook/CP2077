@@ -5,15 +5,18 @@
     "label": "Enable native physics diagnostics",
     "default": true,
     "group": "Diagnostics",
-    "description": "Read-only collision observations. Protection switches are independent."
+    "description": "Native sync observations and mass experiment enable gate."
   },
   {
-    "id": "contactMotion",
-    "kind": "boolean",
-    "label": "Experimental contact motion",
-    "default": false,
+    "id": "massMultiplier",
+    "kind": "integer",
+    "label": "Experimental chassis mass multiplier",
+    "default": 1,
+    "min": 1,
+    "max": 25,
+    "step": 1,
     "group": "Physics",
-    "description": "Session-only: nominal 5x outgoing horizontal correction, 75% forward momentum retention, 50% recoil and spin reduction. Bounded at +12 m/s NPC, +8 m/s V, 3 rad/s rotation. Off on attach."
+    "description": "Session only. 1 = vanilla mass; 2–25x applies only to the currently driven car/bike using the game's native alternative chassis mass setter. Requires validated native signatures; resets to 1 on attach."
   },
   {
     "id": "mechanicalProtection",
