@@ -5,6 +5,7 @@ native func Kineticle_CaptureDiagnostics() -> Int32;
 native func Kineticle_DiagnosticPart(index: Int32) -> String;
 native func Kineticle_ResetDiagnostics() -> Bool;
 native func Kineticle_SetControllerContext(vehicle: EntityID, detail: String, allowed: Bool) -> Bool;
+native func Kineticle_SetExperimentEnabled(enabled: Bool) -> Bool;
 native func Kineticle_GetProtectionFlags() -> Int32;
 native func Kineticle_SetProtectionFlags(flags: Int32) -> Bool;
 public class KineticleNativeM1ArcSystem extends ScriptableSystem {
@@ -13,6 +14,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
   private let epoch: Int32;
   private let lastEnabled: Bool;
   private let lastFlags: Int32;
+  private let lastMotion: Bool;
   private func OnAttach() -> Void {
     this.epoch += 1;
     this.running = true;
@@ -22,13 +24,15 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
   private func OnDetach() -> Void {
     this.running = false;
     this.epoch += 1;
+    Kineticle_SetExperimentEnabled(false);
+    this.lastMotion = false;
   }
   private func Schedule() -> Void {
     if !this.running { return; }
     let cb = new KineticleNativeM1ArcTick();
     cb.owner = this;
     cb.epoch = this.epoch;
-    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, 0.50, false);
+    GameInstance.GetDelaySystem(this.GetGameInstance()).DelayCallback(cb, this.lastMotion ? 0.10 : 0.50, false);
   }
   private func Flag(value: Bool) -> String { return value ? "1" : "0"; }
   private func SampleContext() -> Void {
@@ -100,6 +104,9 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
           this.initialized = true;
           this.lastFlags = Kineticle_GetProtectionFlags();
           this.SyncFlags(id, this.lastFlags);
+          this.lastMotion = false;
+          Kineticle_SetExperimentEnabled(false);
+          M1Arc_SetBool(id, "contactMotion", false);
           this.Report(id);
         }
       } else {
@@ -115,6 +122,17 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
       }
       if this.initialized {
         if this.lastEnabled { this.SampleContext(); }
+        let motionWanted = this.lastEnabled && M1Arc_GetBool(id, "contactMotion");
+        if motionWanted != this.lastMotion {
+          if Kineticle_SetExperimentEnabled(motionWanted) {
+            this.lastMotion = motionWanted;
+            M1Arc_Log(id, "INFO", motionWanted ? "Contact motion enabled for this session." : "Contact motion disabled.");
+          } else {
+            this.lastMotion = false;
+            M1Arc_Log(id, "ERROR", "Required native contact motion hooks unavailable.");
+          }
+        }
+        if M1Arc_GetBool(id, "contactMotion") != this.lastMotion { M1Arc_SetBool(id, "contactMotion", this.lastMotion); }
         let wanted: Int32 = 0;
         if M1Arc_GetBool(id, "mechanicalProtection") { wanted += 1; }
         if M1Arc_GetBool(id, "gridProtection") { wanted += 2; }

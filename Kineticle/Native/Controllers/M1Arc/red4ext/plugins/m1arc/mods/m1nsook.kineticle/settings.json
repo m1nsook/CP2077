@@ -8,6 +8,14 @@
     "description": "Read-only collision observations. Protection switches are independent."
   },
   {
+    "id": "contactMotion",
+    "kind": "boolean",
+    "label": "Experimental contact motion",
+    "default": false,
+    "group": "Physics",
+    "description": "Session-only: nominal 5x outgoing horizontal correction, 75% forward momentum retention, 50% recoil and spin reduction. Bounded at +12 m/s NPC, +8 m/s V, 3 rad/s rotation. Off on attach."
+  },
+  {
     "id": "mechanicalProtection",
     "kind": "boolean",
     "label": "Mechanical damage protection",

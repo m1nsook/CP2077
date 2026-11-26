@@ -4,6 +4,7 @@
 #include "diagnostic_policy.hpp"
 #include "motion_trial.hpp"
 #include "protection_policy.hpp"
+#include "contact_motion.hpp"
 #include <cstdlib>
 #include <cmath>
 #include <limits>
@@ -42,7 +43,7 @@ int main(){
     std::string reconstructed;
     for(std::size_t i=0;i<pages.size();++i){
         check(pages[i].size()<=reportPayloadBytes);
-        check(numberedPage("0.1.0-dev.10-native-protection",pages,i).size()<=2048);
+        check(numberedPage("0.1.0-dev.11-contact-motion",pages,i).size()<=2048);
         reconstructed+=pages[i];
     }
     check(reconstructed==report);
@@ -166,4 +167,34 @@ int main(){
     check(!allowedScope(true,1,0,0,0,0,true,1,0,1,0));
     check(!allowedScope(true,1,0,0,0,0,true,1,0,0,1));
     check(!allowedScope(true,1,-1,0,0,0,true,1,0,0,0));
+    // Replay actual dev.8 motorcycle and traffic contact independently,
+    // without the old equal-and-opposite momentum or same-tick condition.
+    Vec direction{};
+    check(contactDirection({1000,1000,0},{1002,1003,0},bike.before,direction));
+    auto vFix=contactCorrection(bike,direction,true),nFix=contactCorrection(car,direction,false);
+    check(vFix.valid&&nFix.valid&&vFix.linear.z==0&&nFix.linear.z==0);
+    check(length(vFix.linear)<=8.0001f&&length(nFix.linear)<=12.0001f);
+    check(length(vFix.angular)<=3.0001f);
+    ContactMotion cm;check(cm.arm(bike.id,car.id,96740,100000,direction));
+    cm.offer(car);check(cm.npc.measured&&!cm.v.measured&&cm.trafficMeasured==1);
+    check(!cm.delivery(car.id,102000,1,false,car.inverseMass,car.after,car.angularAfter,true).valid);
+    auto delivery=cm.delivery(car.id,120000,0,false,car.inverseMass,car.after,car.angularAfter,true);
+    check(delivery.valid);cm.record(car.id);
+    check(!cm.delivery(car.id,120001,0,false,car.inverseMass,car.after,car.angularAfter,true).valid);
+    cm.offer(bike);check(cm.v.measured);
+    delivery=cm.delivery(bike.id,121000,0,true,bike.inverseMass,bike.after,bike.angularAfter,true);
+    check(delivery.valid);cm.record(bike.id);check(!cm.active&&cm.vWrites==1&&cm.npcWrites==1);
+    check(!cm.arm(bike.id,car.id,96741,140000,direction));
+    check(cm.arm(bike.id,car.id,96740,400000,direction));
+    auto wrongBody=bike;wrongBody.id=999;wrongBody.us=401000;cm.offer(wrongBody);check(!cm.v.measured);
+    auto wrongDirection=bike;wrongDirection.us=401000;wrongDirection.after=add(wrongDirection.before,scale(direction,5));
+    cm.offer(wrongDirection);check(!cm.v.measured);
+    auto sample=bike;sample.us=401000;cm.offer(sample);check(cm.v.measured);
+    check(!cm.delivery(bike.id,405000,0,true,bike.inverseMass,bike.after,bike.angularAfter,false).valid&&!cm.active);
+    check(cm.arm(bike.id,car.id,96740,700000,direction));cm.expire(920001);check(!cm.active);
+    // A target with an unrelated mass ratio may still receive its own
+    // measured correction; inverseMass is validated for delivery.
+    auto differentMass=car;differentMass.mass=2800;differentMass.inverseMass=.000125f;
+    check(contactCorrection(differentMass,direction,false).valid);
+    check(!contactDirection({0,0,0},{1,0,0},{-2,0,0},direction));
 }

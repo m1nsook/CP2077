@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "author": "민숙 MISO @m1nsook",
   "scope": "Gameplay",
-  "shortDesc": "Standalone native vehicle protection development; read-only physics diagnostics.",
+  "shortDesc": "Vehicle protection and event-local native collision motion experiment.",
   "requires": {
     "m1arc": "1.0.1"
   }
