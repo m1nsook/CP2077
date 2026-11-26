@@ -25,11 +25,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Native build failed" }
           ctest --test-dir build/kineticle -C Release --output-on-failure
           if ($LASTEXITCODE -ne 0) { throw "Native tests failed" }
-      - name: Parse optional M1 Arc controller
+      - name: Parse each optional REDscript controller separately
         shell: pwsh
         run: |
           ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Native/Controllers/M1Arc/r6/scripts")
-          if ($LASTEXITCODE -ne 0) { throw "Controller parse failed" }
+          if ($LASTEXITCODE -ne 0) { throw "M1 Arc parse failed" }
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Native/Controllers/NSUI/r6/scripts")
+          if ($LASTEXITCODE -ne 0) { throw "NSUI scope parse failed" }
+          ./Daemon/tools/check_redscript_cli.ps1 -SourceRoots @("Kineticle/Native/Controllers/ModSettings/r6/scripts")
+          if ($LASTEXITCODE -ne 0) { throw "Mod Settings parse failed" }
       - name: Package native Core and optional controller separately
         shell: pwsh
         run: |
@@ -54,17 +58,17 @@ jobs:
           assert m["version"] == "0.1.0" and m["requires"]["m1arc"] == "1.0.1"
           assert (core/"red4ext/plugins/Kineticle/Kineticle.dll").is_file()
           assert not list(core.rglob("*.reds"))
-          for name, src in [("Core",core),("Controller-M1Arc",ctrl)]:
-              with ZipFile(dist/f"Kineticle-{name}-0.1.0-dev.15-scope-recovery.zip","w",ZIP_DEFLATED) as z:
+          for name, src in [("Core",core),("Controller-M1Arc",ctrl),("Controller-NSUI",ctrl.parent/"NSUI"),("Controller-ModSettings",ctrl.parent/"ModSettings")]:
+              with ZipFile(dist/f"Kineticle-{name}-0.1.0-dev.15-controllers.zip","w",ZIP_DEFLATED) as z:
                   for p in sorted(src.rglob("*")):
                       if p.is_file():
-                          assert p.relative_to(src).parts[0] in ("red4ext","r6")
+                          assert p.relative_to(src).parts[0] in ("red4ext","r6","bin")
                           z.write(p,p.relative_to(src).as_posix())
           (dist/"SHA256SUMS.txt").write_text("".join(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in sorted(dist.glob("*.zip"))))
           '@ | python -
           if ($LASTEXITCODE -ne 0) { throw "Packaging failed" }
       - uses: actions/upload-artifact@v4
         with:
-          name: kineticle-0.1.0-dev.15-scope-recovery
+          name: kineticle-0.1.0-dev.15-controllers
           path: dist/
           if-no-files-found: error
