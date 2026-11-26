@@ -3,7 +3,6 @@ native func Kineticle_GetProbeEnabled() -> Bool;
 native func Kineticle_SetProbeEnabled(enabled: Bool) -> Bool;
 native func Kineticle_CaptureDiagnostics() -> Int32;
 native func Kineticle_DiagnosticPart(index: Int32) -> String;
-native func Kineticle_ResetDiagnostics() -> Bool;
 native func Kineticle_GetMassMultiplier() -> Int32;
 native func Kineticle_GetIncludeMotorcycles() -> Bool;
 native func Kineticle_SetIncludeMotorcycles(enabled: Bool) -> Bool;
@@ -177,11 +176,7 @@ public class KineticleNativeM1ArcSystem extends ScriptableSystem {
             M1Arc_Log(id, "ERROR", "Native protection configuration failed.");
           }
         }
-        if M1Arc_ConsumeAction(id, "report") { this.Report(id); }
-        if M1Arc_ConsumeAction(id, "reset") {
-          Kineticle_ResetDiagnostics();
-          M1Arc_Log(id, "INFO", "Native diagnostics reset.");
-        }
+
       }
     }
     this.Schedule();

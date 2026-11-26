@@ -4,7 +4,7 @@
     "kind": "boolean",
     "label": "Enable Kineticle",
     "default": true,
-    "group": "Diagnostics",
+    "group": "Physics",
     "description": "Master switch for all Kineticle effects. Configuration is saved by Core."
   },
   {
@@ -49,17 +49,5 @@
     "default": false,
     "group": "Protection",
     "description": "Reset glass after the vanilla destruction callback."
-  },
-  {
-    "id": "report",
-    "kind": "action",
-    "label": "Report diagnostics",
-    "group": "Diagnostics"
-  },
-  {
-    "id": "reset",
-    "kind": "action",
-    "label": "Reset diagnostics",
-    "group": "Diagnostics"
   }
 ]
